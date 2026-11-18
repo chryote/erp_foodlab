@@ -12,8 +12,9 @@ class DatabaseSeeder extends Seeder
     {
         LabSample::factory()->count(15)->create();
 
-        Company::query()->firstOrCreate([
-            'name' => 'PT. Slaras Nusa Foodlab',
-        ]);
+        Company::query()->updateOrCreate(
+            ['name' => 'PT. Slaras Nusa Foodlab'],
+            ['stakeholder_name' => 'Budi Santoso']
+        );
     }
 }

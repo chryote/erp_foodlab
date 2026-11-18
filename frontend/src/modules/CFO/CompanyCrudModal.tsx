@@ -6,7 +6,20 @@ import {
   fetchCompanies,
   updateCompany,
 } from '../../api/client';
-import { CrudModal } from '../../components/ui';
+import { type CrudFieldConfig, CrudModal } from '../../components/ui';
+
+export const COMPANY_CRUD_FIELDS: CrudFieldConfig<Company>[] = [
+  {
+    key: 'name',
+    label: 'Nama Perusahaan',
+    placeholder: 'Contoh: PT. ABC DEF',
+  },
+  {
+    key: 'stakeholder_name',
+    label: 'Nama Stakeholder',
+    placeholder: 'Contoh: Agus',
+  },
+];
 
 export interface CompanyCrudModalProps {
   isOpen: boolean;
@@ -42,11 +55,14 @@ export const CompanyCrudModal: React.FC<CompanyCrudModalProps> = ({
     }
   }, [isOpen, loadCompanies]);
 
-  const handleCreate = async (name: string) => {
+  const handleCreate = async (values: Record<string, string>) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await createCompany({ name });
+      const res = await createCompany({
+        name: values.name ?? '',
+        stakeholder_name: values.stakeholder_name ?? '',
+      });
       setCompanies((prev) => [res.data, ...prev]);
     } catch (err) {
       setError(
@@ -57,11 +73,14 @@ export const CompanyCrudModal: React.FC<CompanyCrudModalProps> = ({
     }
   };
 
-  const handleUpdate = async (id: number, name: string) => {
+  const handleUpdate = async (id: number, values: Record<string, string>) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await updateCompany(id, { name });
+      const res = await updateCompany(id, {
+        name: values.name ?? '',
+        stakeholder_name: values.stakeholder_name ?? '',
+      });
       setCompanies((prev) =>
         prev.map((item) => (item.id === id ? res.data : item))
       );
@@ -93,11 +112,13 @@ export const CompanyCrudModal: React.FC<CompanyCrudModalProps> = ({
     <CrudModal
       isOpen={isOpen}
       title="Manajemen Perusahaan"
-      subtitle="Kelola data perusahaan pada modul CFO (Input Modal)"
+      subtitle="Kelola data perusahaan dan stakeholder pada modul CFO (Input Modal)"
       testId="perusahaan-crud-modal"
-      inputLabel="Nama Perusahaan"
-      inputPlaceholder="Contoh: PT. Slaras Nusa Foodlab"
+      fields={COMPANY_CRUD_FIELDS}
+      filterLabel="Filter Perusahaan / Stakeholder"
+      filterPlaceholder="Cari nama perusahaan atau stakeholder..."
       emptyMessage="Belum ada data perusahaan."
+      pageSize={5}
       items={companies}
       loading={loading}
       error={error}

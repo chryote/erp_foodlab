@@ -3,6 +3,7 @@
 namespace App\Modules\CFO\Services;
 
 use App\Models\Company;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
@@ -17,6 +18,21 @@ class CompanyService
                 ->orderByDesc('id')
                 ->get();
         });
+    }
+
+    public function paginateCompanies(?string $search = null, int $perPage = 10, int $page = 1): LengthAwarePaginator
+    {
+        $query = Company::query()->orderByDesc('id');
+
+        if ($search !== null && trim($search) !== '') {
+            $term = '%' . trim($search) . '%';
+            $query->where(function ($q) use ($term) {
+                $q->where('name', 'like', $term)
+                    ->orWhere('stakeholder_name', 'like', $term);
+            });
+        }
+
+        return $query->paginate($perPage, ['*'], 'page', $page);
     }
 
     public function createCompany(array $attributes): Company

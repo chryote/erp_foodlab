@@ -27,14 +27,28 @@ describe('App ERP Main Menu integration', () => {
       meta: { count: 5 },
     });
     vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
-      data: [{ id: 1, name: 'PT. Slaras Nusa Foodlab' }],
+      data: [
+        {
+          id: 1,
+          name: 'PT. Slaras Nusa Foodlab',
+          stakeholder_name: 'Budi Santoso',
+        },
+      ],
       meta: { count: 1 },
     });
     vi.mocked(apiClient.createCompany).mockResolvedValue({
-      data: { id: 2, name: 'PT. Pangan Nusantara' },
+      data: {
+        id: 2,
+        name: 'PT. Pangan Nusantara',
+        stakeholder_name: 'Siti Aminah',
+      },
     });
     vi.mocked(apiClient.updateCompany).mockResolvedValue({
-      data: { id: 2, name: 'PT. Pangan Nusantara Baru' },
+      data: {
+        id: 2,
+        name: 'PT. Pangan Nusantara Baru',
+        stakeholder_name: 'Rina Kartika',
+      },
     });
     vi.mocked(apiClient.deleteCompany).mockResolvedValue({
       message: 'Company deleted successfully.',
@@ -89,29 +103,48 @@ describe('App ERP Main Menu integration', () => {
     await waitFor(() => {
       expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(1);
     });
+    expect(screen.getByText('Budi Santoso')).toBeInTheDocument();
 
-    // Create company
-    const input = screen.getByLabelText('Nama Perusahaan');
-    fireEvent.change(input, { target: { value: 'PT. Pangan Nusantara' } });
+    // Create company with stakeholder_name
+    const nameInput = screen.getByLabelText('Nama Perusahaan');
+    const stakeholderInput = screen.getByLabelText('Nama Stakeholder');
+    fireEvent.change(nameInput, { target: { value: 'PT. Pangan Nusantara' } });
+    fireEvent.change(stakeholderInput, { target: { value: 'Siti Aminah' } });
     fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
 
     await waitFor(() => {
       expect(apiClient.createCompany).toHaveBeenCalledWith({
         name: 'PT. Pangan Nusantara',
+        stakeholder_name: 'Siti Aminah',
       });
       expect(screen.getByText('PT. Pangan Nusantara')).toBeInTheDocument();
+      expect(screen.getByText('Siti Aminah')).toBeInTheDocument();
     });
+
+    // Filter company table
+    const filterInput = screen.getByLabelText('Filter Perusahaan / Stakeholder');
+    fireEvent.change(filterInput, { target: { value: 'Siti' } });
+    expect(screen.getByText('PT. Pangan Nusantara')).toBeInTheDocument();
+    expect(screen.queryByText('Budi Santoso')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reset Filter' }));
 
     // Update company
     fireEvent.click(screen.getByTestId('edit-row-2'));
-    fireEvent.change(input, { target: { value: 'PT. Pangan Nusantara Baru' } });
+    fireEvent.change(nameInput, {
+      target: { value: 'PT. Pangan Nusantara Baru' },
+    });
+    fireEvent.change(stakeholderInput, {
+      target: { value: 'Rina Kartika' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Perbarui' }));
 
     await waitFor(() => {
       expect(apiClient.updateCompany).toHaveBeenCalledWith(2, {
         name: 'PT. Pangan Nusantara Baru',
+        stakeholder_name: 'Rina Kartika',
       });
       expect(screen.getByText('PT. Pangan Nusantara Baru')).toBeInTheDocument();
+      expect(screen.getByText('Rina Kartika')).toBeInTheDocument();
     });
 
     // Delete company

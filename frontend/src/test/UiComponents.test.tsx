@@ -133,7 +133,7 @@ describe('Reusable UI Components (src/components/ui)', () => {
     expect(screen.getByText('Daftar Saham Perusahaan')).toBeInTheDocument();
   });
 
-  it('renders reusable CrudModal and triggers create, update, and delete callbacks', async () => {
+  it('renders reusable CrudModal and triggers create, update, delete, filter, and pagination', async () => {
     const onCreate = vi.fn();
     const onUpdate = vi.fn();
     const onDelete = vi.fn();
@@ -143,8 +143,16 @@ describe('Reusable UI Components (src/components/ui)', () => {
       <CrudModal
         isOpen={true}
         title="Manajemen Perusahaan"
-        inputLabel="Nama Perusahaan"
-        items={[{ id: 10, name: 'PT. Contoh Satu' }]}
+        pageSize={2}
+        fields={[
+          { key: 'name', label: 'Nama Perusahaan' },
+          { key: 'stakeholder_name', label: 'Nama Stakeholder' },
+        ]}
+        items={[
+          { id: 10, name: 'PT. Contoh Satu', stakeholder_name: 'Andi' },
+          { id: 11, name: 'PT. Contoh Dua', stakeholder_name: 'Budi' },
+          { id: 12, name: 'PT. Contoh Tiga', stakeholder_name: 'Citra' },
+        ]}
         onClose={onClose}
         onCreate={onCreate}
         onUpdate={onUpdate}
@@ -154,19 +162,45 @@ describe('Reusable UI Components (src/components/ui)', () => {
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByText('PT. Contoh Satu')).toBeInTheDocument();
+    expect(screen.getByText('PT. Contoh Dua')).toBeInTheDocument();
+    expect(screen.queryByText('PT. Contoh Tiga')).not.toBeInTheDocument();
+    expect(screen.getByTestId('crud-modal-pagination-info')).toHaveTextContent(
+      'Halaman 1 dari 2 (3 data)'
+    );
 
-    const input = screen.getByLabelText('Nama Perusahaan');
-    fireEvent.change(input, { target: { value: 'PT. Contoh Dua' } });
+    // Navigate to page 2
+    fireEvent.click(screen.getByTestId('crud-modal-pagination-next'));
+    expect(screen.getByText('PT. Contoh Tiga')).toBeInTheDocument();
+
+    // Filter by stakeholder
+    fireEvent.change(screen.getByLabelText('Filter Data'), {
+      target: { value: 'Andi' },
+    });
+    expect(screen.getByText('PT. Contoh Satu')).toBeInTheDocument();
+    expect(screen.queryByText('PT. Contoh Tiga')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reset Filter' }));
+
+    const nameInput = screen.getByLabelText('Nama Perusahaan');
+    const stakeholderInput = screen.getByLabelText('Nama Stakeholder');
+    fireEvent.change(nameInput, { target: { value: 'PT. Contoh Empat' } });
+    fireEvent.change(stakeholderInput, { target: { value: 'Dewi' } });
     fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
     await waitFor(() => {
-      expect(onCreate).toHaveBeenCalledWith('PT. Contoh Dua');
+      expect(onCreate).toHaveBeenCalledWith({
+        name: 'PT. Contoh Empat',
+        stakeholder_name: 'Dewi',
+      });
     });
 
     fireEvent.click(screen.getByTestId('edit-row-10'));
-    fireEvent.change(input, { target: { value: 'PT. Contoh Satu Revisi' } });
+    fireEvent.change(nameInput, { target: { value: 'PT. Contoh Satu Revisi' } });
+    fireEvent.change(stakeholderInput, { target: { value: 'Andi Wijaya' } });
     fireEvent.click(screen.getByRole('button', { name: 'Perbarui' }));
     await waitFor(() => {
-      expect(onUpdate).toHaveBeenCalledWith(10, 'PT. Contoh Satu Revisi');
+      expect(onUpdate).toHaveBeenCalledWith(10, {
+        name: 'PT. Contoh Satu Revisi',
+        stakeholder_name: 'Andi Wijaya',
+      });
     });
 
     fireEvent.click(screen.getByTestId('delete-row-10'));
