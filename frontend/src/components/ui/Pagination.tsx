@@ -1,5 +1,7 @@
 import React from 'react';
 import { Button } from './Button';
+import { ShadcnInput } from './shadcn/input';
+import { ShadcnLabel } from './shadcn/label';
 
 export interface TableFilterBarProps {
   searchValue: string;
@@ -19,15 +21,15 @@ export const TableFilterBar: React.FC<TableFilterBarProps> = ({
   children,
 }) => {
   return (
-    <div className="ui-filter-bar" data-testid={testId}>
-      <div className="ui-input-group">
-        <label htmlFor={`${testId}-input`} className="ui-input-label">
-          {searchLabel}
-        </label>
-        <input
+    <div
+      className="flex flex-wrap items-end justify-between gap-2.5"
+      data-testid={testId}
+    >
+      <div className="flex flex-1 flex-col gap-1.5">
+        <ShadcnLabel htmlFor={`${testId}-input`}>{searchLabel}</ShadcnLabel>
+        <ShadcnInput
           id={`${testId}-input`}
           type="search"
-          className="ui-input"
           placeholder={searchPlaceholder}
           value={searchValue}
           onChange={(e) => onSearchChange(e.target.value)}
@@ -65,12 +67,18 @@ export const Pagination: React.FC<PaginationProps> = ({
   const safeTotalPages = Math.max(1, totalPages);
 
   return (
-    <div className="ui-pagination" data-testid={testId}>
-      <span className="ui-pagination-info" data-testid={`${testId}-info`}>
+    <div
+      className="mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3"
+      data-testid={testId}
+    >
+      <span
+        className="text-xs text-muted-foreground"
+        data-testid={`${testId}-info`}
+      >
         Halaman {currentPage} dari {safeTotalPages}
         {totalItems !== undefined ? ` (${totalItems} data)` : ''}
       </span>
-      <div className="ui-pagination-actions">
+      <div className="flex items-center gap-2">
         <Button
           type="button"
           variant="secondary"

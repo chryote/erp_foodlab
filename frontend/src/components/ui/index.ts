@@ -7,3 +7,4 @@ export * from './Modal';
 export * from './ModuleLauncherCard';
 export * from './PageHeader';
 export * from './Pagination';
+export * from './shadcn';

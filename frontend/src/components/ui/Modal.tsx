@@ -1,7 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { cn } from '@/lib/utils';
 import { Button, type ButtonVariant } from './Button';
 import { DataTable, type DataTableColumn } from './DataTable';
 import { Pagination } from './Pagination';
+import { ShadcnInput } from './shadcn/input';
+import { ShadcnLabel } from './shadcn/label';
 
 export interface ModalProps {
   isOpen: boolean;
@@ -28,7 +31,7 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <div
-      className="ui-modal-backdrop"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-6 backdrop-blur-xs"
       data-testid={`${testId}-backdrop`}
       onClick={onClose}
     >
@@ -37,13 +40,15 @@ export const Modal: React.FC<ModalProps> = ({
         aria-modal="true"
         aria-label={title}
         data-testid={testId}
-        className="ui-modal-dialog"
+        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="ui-modal-header">
+        <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-4">
           <div>
-            <h2 className="ui-modal-title">{title}</h2>
-            {subtitle && <p className="ui-subtitle">{subtitle}</p>}
+            <h2 className="text-lg font-bold tracking-tight">{title}</h2>
+            {subtitle && (
+              <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+            )}
           </div>
           <Button
             variant="secondary"
@@ -54,9 +59,15 @@ export const Modal: React.FC<ModalProps> = ({
           </Button>
         </div>
 
-        <div className="ui-modal-body">{children}</div>
+        <div className="flex flex-col gap-4 overflow-y-auto px-6 py-5">
+          {children}
+        </div>
 
-        {footer && <div className="ui-modal-footer">{footer}</div>}
+        {footer && (
+          <div className="flex justify-end gap-2.5 border-t border-border px-6 py-3.5">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -70,21 +81,13 @@ export interface TextInputProps
 export const TextInput: React.FC<TextInputProps> = ({
   label,
   id,
-  className = '',
+  className,
   ...rest
 }) => {
   return (
-    <div className="ui-input-group">
-      {label && (
-        <label htmlFor={id} className="ui-input-label">
-          {label}
-        </label>
-      )}
-      <input
-        id={id}
-        className={`ui-input ${className}`.trim()}
-        {...rest}
-      />
+    <div className="flex flex-1 flex-col gap-1.5">
+      {label && <ShadcnLabel htmlFor={id}>{label}</ShadcnLabel>}
+      <ShadcnInput id={id} className={className} {...rest} />
     </div>
   );
 };
@@ -126,7 +129,6 @@ export function parseDecimalInputRaw(displayValue: string): string {
   }
   const trimmed = displayValue.trim();
 
-  // In Indonesian format, comma (,) is the decimal separator and dots (.) are thousand separators
   if (trimmed.includes(',')) {
     const [intSide = '', ...fracParts] = trimmed.split(',');
     const cleanInt = intSide.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
@@ -134,7 +136,6 @@ export function parseDecimalInputRaw(displayValue: string): string {
     return `${cleanInt || '0'}.${cleanFrac}`;
   }
 
-  // If a plain decimal number with a single dot is pasted/set at once (e.g. "500000000.75" or "625000000.25")
   const dotParts = trimmed.split('.');
   if (dotParts.length === 2) {
     const [left = '', right = ''] = dotParts;
@@ -145,7 +146,6 @@ export function parseDecimalInputRaw(displayValue: string): string {
     }
   }
 
-  // Otherwise, all dots in displayValue are thousand separators; strip non-digits
   return trimmed.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
 }
 
@@ -154,7 +154,7 @@ export const DecimalInput: React.FC<DecimalInputProps> = ({
   id,
   value,
   onChange,
-  className = '',
+  className,
   ...rest
 }) => {
   const displayValue = useMemo(() => formatDecimalInputDisplay(value), [value]);
@@ -165,17 +165,13 @@ export const DecimalInput: React.FC<DecimalInputProps> = ({
   };
 
   return (
-    <div className="ui-input-group">
-      {label && (
-        <label htmlFor={id} className="ui-input-label">
-          {label}
-        </label>
-      )}
-      <input
+    <div className="flex flex-1 flex-col gap-1.5">
+      {label && <ShadcnLabel htmlFor={id}>{label}</ShadcnLabel>}
+      <ShadcnInput
         id={id}
         type="text"
         inputMode="decimal"
-        className={`ui-input ${className}`.trim()}
+        className={className}
         value={displayValue}
         onChange={handleChange}
         {...rest}
@@ -201,19 +197,18 @@ export const SelectInput: React.FC<SelectInputProps> = ({
   id,
   placeholder = 'Pilih opsi...',
   options,
-  className = '',
+  className,
   ...rest
 }) => {
   return (
-    <div className="ui-input-group">
-      {label && (
-        <label htmlFor={id} className="ui-input-label">
-          {label}
-        </label>
-      )}
+    <div className="flex flex-1 flex-col gap-1.5">
+      {label && <ShadcnLabel htmlFor={id}>{label}</ShadcnLabel>}
       <select
         id={id}
-        className={`ui-input ${className}`.trim()}
+        className={cn(
+          'flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1.5 text-sm text-foreground shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          className
+        )}
         {...rest}
       >
         <option value="">{placeholder}</option>
@@ -239,10 +234,15 @@ export const SummaryBanner: React.FC<SummaryBannerProps> = ({
   testId = 'ui-summary-banner',
 }) => {
   return (
-    <div className="ui-summary-banner" data-testid={testId}>
-      <span className="ui-summary-banner-label">{label}</span>
+    <div
+      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-4 py-3"
+      data-testid={testId}
+    >
+      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
       <strong
-        className="ui-summary-banner-value"
+        className="text-base font-bold text-emerald-400"
         data-testid={`${testId}-value`}
       >
         {value}
@@ -466,7 +466,7 @@ export function CrudModal<T extends CrudEntity>({
             key: 'actions',
             header: 'Aksi',
             render: (row: T) => (
-              <div className="ui-table-actions">
+              <div className="flex flex-wrap items-center gap-2">
                 {rowActions.map((action) => (
                   <Button
                     key={action.key}
@@ -515,13 +515,19 @@ export function CrudModal<T extends CrudEntity>({
       onClose={onClose}
     >
       {error && (
-        <div role="alert" className="alert-error">
+        <div
+          role="alert"
+          className="rounded-lg border border-red-500/40 bg-red-500/15 px-3.5 py-2.5 text-sm text-red-400"
+        >
           {error}
         </div>
       )}
 
       {!readOnly && (
-        <form onSubmit={handleSubmit} className="ui-crud-form">
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-wrap items-end gap-2.5 border-b border-border pb-4"
+        >
           {resolvedFields.map((field) => {
             if (field.type === 'select') {
               return (
@@ -562,7 +568,7 @@ export function CrudModal<T extends CrudEntity>({
               />
             );
           })}
-          <div className="ui-crud-form-actions">
+          <div className="flex items-center gap-2">
             <Button type="submit" variant="primary" disabled={loading}>
               {editingItem ? 'Perbarui' : 'Tambah'}
             </Button>

@@ -337,4 +337,30 @@ describe('App ERP Main Menu integration', () => {
     expect(screen.queryByTestId('edit-row-10')).not.toBeInTheDocument();
     expect(screen.queryByTestId('delete-row-10')).not.toBeInTheDocument();
   });
+
+  it('hydrates directly from Inertia server props without calling fetchErpModules', () => {
+    render(
+      <App
+        modules={[
+          DEFAULT_CFO_MODULE,
+          DEFAULT_CHO_MODULE,
+          DEFAULT_CPO_MODULE,
+          DEFAULT_CDO_MODULE,
+          DEFAULT_CMO_MODULE,
+        ]}
+        companies={[{ id: 1, name: 'PT. Slaras Nusa Foodlab' }]}
+        capitalCompanies={[
+          {
+            id: 10,
+            company_id: 1,
+            stakeholder_name: 'Rian',
+            capital: 250000000,
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText('PT. Slaras Nusa Foodlab')).toBeInTheDocument();
+    expect(apiClient.fetchErpModules).not.toHaveBeenCalled();
+  });
 });

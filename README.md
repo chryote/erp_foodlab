@@ -2,7 +2,10 @@
 
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
 [![Laravel 11](https://img.shields.io/badge/Laravel-11.x-FF2D20.svg?style=flat-square&logo=laravel)](https://laravel.com)
+[![Inertia.js](https://img.shields.io/badge/Inertia.js-2.x-9553E9.svg?style=flat-square)](https://inertiajs.com)
 [![React 18](https://img.shields.io/badge/React-18.x-61DAFB.svg?style=flat-square&logo=react)](https://react.dev)
+[![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4.svg?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
+[![shadcn/ui](https://img.shields.io/badge/shadcn%2Fui-Radix_UI-000000.svg?style=flat-square)](https://ui.shadcn.com)
 [![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED.svg?style=flat-square&logo=docker)](https://docs.docker.com/compose/)
 [![MySQL 8.0](https://img.shields.io/badge/MySQL-8.0-4479A1.svg?style=flat-square&logo=mysql&logoColor=white)](https://www.mysql.com)
 [![Redis 7](https://img.shields.io/badge/Redis-7.4-DC382D.svg?style=flat-square&logo=redis&logoColor=white)](https://redis.io)
@@ -10,9 +13,9 @@
 [![Prometheus](https://img.shields.io/badge/Prometheus-Monitoring-E6522C.svg?style=flat-square&logo=prometheus&logoColor=white)](https://prometheus.io)
 [![Grafana](https://img.shields.io/badge/Grafana-Dashboards-F46800.svg?style=flat-square&logo=grafana&logoColor=white)](https://grafana.com)
 
-> Monorepo scaffolder with Laravel, React.js, Docker, MySQL, Redis, Pest/Vitest, k6, and Prometheus + Grafana.
+> Full-stack ERP monorepo powered by Laravel 11, Inertia.js, React 18, Tailwind CSS v4, `shadcn/ui`, Docker, MySQL, Redis, Pest/Vitest, k6, and Prometheus + Grafana.
 
-`erp_foodlab` (**PT. Slaras Nusa Foodlab**) is a modular full-stack ERP monorepo starter template built with a **Laravel 11 REST API** (`backend/`) and a **React 18 + Vite + TypeScript SPA** (`frontend/`). It features a modular domain architecture for five executive ERP modules (**CFO**, **CHO**, **CPO**, **CDO**, **CMO**), a reusable UI component library (`frontend/src/components/ui/`), containerized backing services via **Docker Compose** (**MySQL 8.0**, **Redis 7.4**, **Nginx**), automated unit and feature test suites (**Pest PHP** + **Vitest & React Testing Library**), load/stress benchmarking via **Grafana k6**, and pre-provisioned **Prometheus + Grafana** observability dashboards.
+`erp_foodlab` (**PT. Slaras Nusa Foodlab**) is a modular full-stack ERP system built with **Laravel 11 + Inertia.js** (`backend/`) and **React 18 + Vite + TypeScript + Tailwind CSS v4 + `shadcn/ui`** (`frontend/`). It features a low-token declarative UI architecture across five executive ERP modules (**CFO**, **CHO**, **CPO**, **CDO**, **CMO**), containerized backing services via **Docker Compose** (**MySQL 8.0**, **Redis 7.4**, **Nginx**), automated unit and feature test suites (**Pest PHP** + **Vitest & React Testing Library**), load/stress benchmarking via **Grafana k6**, and pre-provisioned **Prometheus + Grafana** observability dashboards.
 
 ## Table of Contents
 
@@ -20,7 +23,7 @@
 - [Background](#background)
 - [Install](#install)
 - [Usage](#usage)
-- [API](#api)
+- [API & Inertia Routes](#api--inertia-routes)
 - [Maintainers](#maintainers)
 - [Contributing](#contributing)
 - [License](#license)
@@ -35,38 +38,49 @@ Never commit production secrets, `.env` files, or private API keys to version co
 
 ## Background
 
-Modern laboratory and enterprise resource planning systems require clear modular boundaries, reusable UI primitives, low-latency Redis caching, automated testing, repeatable load verification, and real-time telemetry from day one.
+Modern laboratory and enterprise resource planning systems require clear modular boundaries, reusable `shadcn/ui` primitives, declarative CRUD abstractions that minimize AI agent token consumption, low-latency Redis caching, automated testing, repeatable load verification, and real-time telemetry from day one.
 
 ### Repository Structure
 
 ```text
 erp_foodlab/
-├── backend/                          # Laravel 11 API (PHP 8.4), MySQL, Redis, Prometheus, Pest PHP
+├── AGENTS.md                         # Low-token agentic development rules for Inertia.js + shadcn/ui
+├── backend/                          # Laravel 11 (PHP 8.4), Inertia.js, MySQL, Redis, Prometheus, Pest PHP
 │   ├── app/
 │   │   ├── Http/
-│   │   │   ├── Controllers/          # ErpMenuController, HealthController, LabSampleController, MetricsController
-│   │   │   └── Middleware/           # RecordPrometheusMetrics
+│   │   │   ├── Controllers/          # ErpInertiaController, ErpMenuController, HealthController, LabSampleController, MetricsController
+│   │   │   └── Middleware/           # HandleInertiaRequests, RecordPrometheusMetrics
+│   │   ├── Models/                   # Company, CapitalCompany, LabSample, User
 │   │   ├── Modules/                  # Dedicated Backend Folders per Executive Module
-│   │   │   ├── CFO/                  # CFO (Keuangan) — Controllers, Services, routes.php
+│   │   │   ├── CFO/                  # CFO (Keuangan) — CompanyController, CapitalCompanyController, Services, routes.php
 │   │   │   ├── CHO/                  # CHO (SDM) — Controllers, Services, routes.php
 │   │   │   ├── CPO/                  # CPO (Persediaan Barang Dagang) — Controllers, Services, routes.php
 │   │   │   ├── CDO/                  # CDO (Pemasaran) — Controllers, Services, routes.php
 │   │   │   └── CMO/                  # CMO (Penjualan) — Controllers, Services, routes.php
 │   │   └── Services/                 # LabSampleService, MetricsCollectorService
-│   └── tests/                        # Pest PHP Unit & Feature test suites (16 tests, 73 assertions)
-├── frontend/                         # React 18 + Vite + TypeScript SPA
+│   ├── resources/views/app.blade.php # Inertia.js root Blade template (@inertiaHead & @inertia)
+│   └── tests/                        # Pest PHP Unit & Feature test suites (31 tests, 244 assertions)
+├── frontend/                         # React 18 + Inertia.js + Vite + TypeScript + Tailwind v4 + shadcn/ui
+│   ├── components.json               # Official shadcn/ui CLI configuration
 │   └── src/
-│       ├── api/                      # Typed REST API client (client.ts)
+│       ├── Pages/
+│       │   └── Dashboard.tsx         # Inertia.js ERP Main Dashboard Page
+│       ├── api/                      # Typed REST API fallback client (client.ts)
+│       ├── lib/
+│       │   ├── inertia.ts            # Unified Inertia server-props & CRUD resource hooks
+│       │   └── utils.ts              # Tailwind + clsx cn() class merger
 │       ├── components/
-│       │   └── ui/                   # Reusable UI Library (ModuleLauncherCard, Card, Badge, Button, DataTable, PageHeader)
+│       │   └── ui/
+│       │       ├── shadcn/           # Locked shadcn/ui base primitives (Button, Badge, Card, Dialog, Input, Label, Table)
+│       │       └── *.tsx             # Declarative ERP composites (CrudModal, DataTable, SummaryBanner, CascadingHorizontalMenu, ModuleLauncherCard, PageHeader, Pagination)
 │       ├── modules/                  # Dedicated Frontend Folders per Executive Module
-│       │   ├── CFO/                  # CfoModuleCard.tsx — CFO (Keuangan)
+│       │   ├── CFO/                  # CfoModuleCard, CompanyCrudModal, CapitalCompanyCrudModal
 │       │   ├── CHO/                  # ChoModuleCard.tsx — CHO (SDM)
 │       │   ├── CPO/                  # CpoModuleCard.tsx — CPO (Persediaan Barang Dagang)
 │       │   ├── CDO/                  # CdoModuleCard.tsx — CDO (Pemasaran)
 │       │   └── CMO/                  # CmoModuleCard.tsx — CMO (Penjualan)
-│       └── test/                     # Vitest + React Testing Library suites (4 suites, 8 tests)
-├── benchmarks/k6/                    # Grafana k6 smoke, load, and stress benchmark scripts + k6.d.ts types
+│       └── test/                     # Vitest + React Testing Library suites (5 suites, 18 tests)
+├── benchmarks/k6/                    # Grafana k6 smoke, load, and stress benchmark scripts
 ├── docker/                           # Nginx, PHP-FPM 8.4, MySQL 8.0 init, and Redis 7.4 configs
 ├── monitoring/                       # Prometheus scrape/alert rules & provisioned Grafana dashboards
 ├── docker-compose.yml                # Full-stack multi-container orchestration
@@ -75,24 +89,28 @@ erp_foodlab/
 
 ### Executive ERP Modules
 
-Visiting `http://localhost:5173/` displays the **PT. Slaras Nusa Foodlab** ERP Main Menu with minimalist launcher cards (large icon + title) for each module:
+Visiting `http://localhost:5173/` or `http://localhost:8000/` displays the **PT. Slaras Nusa Foodlab** ERP Main Menu with launcher cards and cascading submenus:
 
-1. **CFO (Keuangan)**: Financial management, cash flow, general ledger, and budgeting (`backend/app/Modules/CFO` & `frontend/src/modules/CFO`).
+1. **CFO (Keuangan)**: Financial management, cash flow, general ledger, company management (`Perusahaan` & `Input Pemegang Saham`), and capital portfolio overview (`Daftar Kapital Perusahaan` & `Detail Pemegang Saham`).
 2. **CHO (SDM)**: Human resources, attendance, payroll, and laboratory analyst KPIs (`backend/app/Modules/CHO` & `frontend/src/modules/CHO`).
 3. **CPO (Persediaan Barang Dagang)**: Warehouse stock control, food batches, laboratory reagents, and cold storage (`backend/app/Modules/CPO` & `frontend/src/modules/CPO`).
 4. **CDO (Pemasaran)**: Digital campaigns, B2B partner acquisition, branding, and market analytics (`backend/app/Modules/CDO` & `frontend/src/modules/CDO`).
 5. **CMO (Penjualan)**: Sales orders, retail distribution, contracts, and revenue targets (`backend/app/Modules/CMO` & `frontend/src/modules/CMO`).
 
-### Reusable UI Component Library (`frontend/src/components/ui/`)
+### Two-Tier `shadcn/ui` & Declarative ERP Component Architecture
 
-All UI primitives are exported from `frontend/src/components/ui/index.ts` for consistent reuse across every module:
+To keep AI agent token usage minimal during development (see [`AGENTS.md`](AGENTS.md)):
 
-- `ModuleLauncherCard`: Minimalist module launcher button rendering an 80x80 SVG icon badge and module title.
-- `Card` & `CardHeader`: Surface containers supporting default and highlighted variants, eyebrow labels, subtitles, and action slots.
-- `Button`: Styled action button supporting `primary`, `secondary`, and `ghost` variants.
-- `Badge`: Semantic status pill supporting `ok`, `err`, `warn`, `info`, and `neutral` variants.
-- `DataTable<T>`: Generic typed table component with column definitions and empty-state rendering.
-- `PageHeader`: Top-level page header with eyebrow, title, subtitle, and action bar.
+1. **Locked `shadcn/ui` Base Layer (`frontend/src/components/ui/shadcn/`)**:
+   - Standard Radix + Tailwind `shadcn/ui` primitives (`ShadcnButton`, `ShadcnBadge`, `ShadcnCard`, `Dialog`, `ShadcnInput`, `ShadcnLabel`, `ShadcnTable`).
+   - Add new primitives via `npx shadcn@latest add <component>` inside `frontend/`.
+2. **Declarative ERP Composite Layer (`frontend/src/components/ui/`)**:
+   - `CrudModal<T>` + `CrudFieldConfig<T>[]`: Schema-driven CRUD dialog supporting `text`, `number`, `decimal` (Indonesian dot-thousand / comma-decimal auto-formatter), and `select` fields, computed columns (`CrudComputedColumnConfig<T>`), custom row action buttons (`CrudRowActionConfig<T>`), read-only master-detail mode (`readOnly`), and client/server pagination.
+   - `SummaryBanner`: Highlighted KPI/capital summary bar inside modals and dashboards.
+   - `CascadingHorizontalMenu` & `HorizontalMenu`: Multi-level horizontal submenu navigation.
+   - `ModuleLauncherCard`, `PageHeader`, `Card`, `CardHeader`, `DataTable`, `Pagination`, `TableFilterBar`, `Badge`, `Button`.
+3. **Inertia Resource Bridge (`frontend/src/lib/inertia.ts`)**:
+   - Consumes Inertia server props (`modules`, `companies`, `capitalCompanies`) directly when rendered by Laravel Inertia and dispatches mutations via `router.post`, `router.put`, and `router.delete`, with automatic REST fallback for standalone Vite/Vitest execution.
 
 ## Install
 
@@ -111,7 +129,7 @@ Copy-Item backend/.env.example backend/.env
 Copy-Item frontend/.env.example frontend/.env
 ```
 
-2. Build and start all containers in detached mode (with isolated Linux volumes for `/var/www/html/vendor` and `/app/node_modules`):
+2. Build and start all containers in detached mode (using `-V` to initialize fresh `/var/www/html/vendor` and `/app/node_modules` anonymous volumes):
 
 ```powershell
 docker compose up -d --build -V
@@ -124,19 +142,19 @@ docker compose exec app php artisan key:generate
 docker compose exec app php artisan migrate --seed
 ```
 
-4. *(Optional — For PhpStorm / VS Code Host Indexing)* Populate `backend/vendor` and `frontend/node_modules` on your host machine so your IDE resolves all PHP and TypeScript types with zero warnings:
+4. *(Whenever you add new Composer or npm packages)* Rebuild and refresh the anonymous volumes so the running containers pick up the new dependencies:
 
 ```powershell
-docker cp erp_foodlab_app:/var/www/html/vendor/. ./backend/vendor
-cd frontend && npm install && cd ..
+docker compose up -d --build -V app frontend
 ```
 
 ### Service Endpoints
 
 | Service | URL | Credentials / Notes |
 | :--- | :--- | :--- |
-| **React ERP Main Menu** | `http://localhost:5173` | Vite HMR Development Server (`usePolling: true`) |
-| **Laravel API (Nginx)** | `http://localhost:8000/api/health` | REST API & Health Check |
+| **React ERP Dev Server** | `http://localhost:5173` | Vite HMR Development Server (`usePolling: true`) |
+| **Laravel Inertia Dashboard** | `http://localhost:8000` | Server-rendered Inertia.js entry point (`ErpInertiaController`) |
+| **Laravel Health Check** | `http://localhost:8000/api/health` | REST API & Infrastructure Health Check |
 | **ERP Modules API** | `http://localhost:8000/api/v1/modules` | Aggregated CFO, CHO, CPO, CDO, CMO JSON |
 | **Prometheus Metrics** | `http://localhost:8000/api/metrics` | OpenMetrics / Prometheus `0.0.4` text format |
 | **Prometheus UI** | `http://localhost:9090` | Targets, PromQL & Alert Rules |
@@ -148,7 +166,7 @@ cd frontend && npm install && cd ..
 
 ### Running Unit & Feature Tests
 
-**Backend (Pest PHP — 16 tests, 73 assertions)**:
+**Backend (Pest PHP — 9 suites, 31 tests, 244 assertions)**:
 
 Backend tests run in an isolated in-memory SQLite (`:memory:`) and `array` cache environment configured in `backend/tests/TestCase.php`, ensuring your seeded MySQL database is never wiped during test runs:
 
@@ -157,17 +175,17 @@ Backend tests run in an isolated in-memory SQLite (`:memory:`) and `array` cache
 docker compose exec app ./vendor/bin/pest
 
 # Or directly on the host
-cd backend && php ./vendor/bin/pest
+cd backend && ./vendor/bin/pest
 ```
 
-**Frontend (Vitest + React Testing Library — 4 suites, 8 tests)**:
+**Frontend (Vitest + React Testing Library — 5 suites, 18 tests)**:
 
 ```powershell
 # Inside Docker
 docker compose exec frontend npm run test:run
 
-# Or directly on the host (+ TypeScript check)
-cd frontend && npx tsc --noEmit && npm run test:run
+# Or directly on the host (+ production build check)
+cd frontend && npm run test:run && npm run build
 ```
 
 ### Running k6 Benchmarks
@@ -191,50 +209,26 @@ docker compose --profile benchmark run --rm k6 run /scripts/stress.test.js
 2. Navigate to **Dashboards -> ERP FoodLab -> ERP FoodLab - API & Redis Overview**.
 3. Run a k6 load test (`npm run k6:load`) to observe live request rates (`erp_foodlab_http_requests_total`), route latency, Redis memory usage (`redis_memory_used_bytes`), and sample status breakdown (`erp_foodlab_samples_total`).
 
-## API
+## API & Inertia Routes
 
-### `GET /api/v1/modules`
+### Inertia Web Routes (`backend/routes/web.php`)
 
-Returns the ERP Main Menu overview across all 5 executive modules (`CFO`, `CHO`, `CPO`, `CDO`, `CMO`), cached in Redis. Dedicated module endpoints are also mounted from each module's `routes.php`:
+- `GET /` — Renders the `Dashboard` Inertia page with `modules`, `companies`, and `capitalCompanies` props.
+- `POST /cfo/companies` — Creates a company and redirects back with updated Inertia props.
+- `PUT /cfo/companies/{company}` — Updates a company and redirects back.
+- `DELETE /cfo/companies/{company}` — Soft-deletes a company and redirects back.
+- `POST /cfo/capital-companies` — Adds a stakeholder capital record (`company_id`, `stakeholder_name`, `capital`) and redirects back.
+- `PUT /cfo/capital-companies/{capitalCompany}` — Updates a stakeholder capital record and redirects back.
+- `DELETE /cfo/capital-companies/{capitalCompany}` — Soft-deletes a stakeholder capital record and redirects back.
 
-- `GET /api/v1/modules/cfo` — **CFO (Keuangan)**
-- `GET /api/v1/modules/cho` — **CHO (SDM)**
-- `GET /api/v1/modules/cpo` — **CPO (Persediaan Barang Dagang)**
-- `GET /api/v1/modules/cdo` — **CDO (Pemasaran)**
-- `GET /api/v1/modules/cmo` — **CMO (Penjualan)**
+### REST API Endpoints (`backend/routes/api.php`)
 
-### `GET /api/health`
-
-Verifies connectivity to MySQL 8.0 and Redis 7.4:
-
-```json
-{
-  "status": "ok",
-  "service": "ERP FoodLab API",
-  "checks": {
-    "database": "ok",
-    "cache_redis": "ok"
-  },
-  "timestamp": "2026-11-18T09:40:00+00:00"
-}
-```
-
-### `GET /api/v1/samples`
-
-Returns the 50 most recent FoodLab quality control samples, cached in Redis under key `erp_foodlab:samples:list`.
-
-### `POST /api/v1/samples`
-
-Creates a new laboratory sample, computes its physicochemical quality grade (`PASS`, `REVIEW`, or `REJECT`), and invalidates the Redis sample list cache.
-
-### `GET /api/metrics`
-
-Exposes application counters and gauges in Prometheus `0.0.4` text format:
-
-- `erp_foodlab_http_requests_total{method,route,status}`
-- `erp_foodlab_http_request_duration_seconds_sum{method,route}`
-- `erp_foodlab_http_request_duration_seconds_count{method,route}`
-- `erp_foodlab_samples_total{status}`
+- `GET /api/v1/modules` — Returns the ERP Main Menu overview across all 5 executive modules (`CFO`, `CHO`, `CPO`, `CDO`, `CMO`), cached in Redis.
+- `GET|POST /api/v1/modules/cfo/companies` & `GET|PUT|DELETE /api/v1/modules/cfo/companies/{company}` — CFO Company CRUD JSON API.
+- `GET|POST /api/v1/modules/cfo/capital-companies` & `GET|PUT|DELETE /api/v1/modules/cfo/capital-companies/{capitalCompany}` — CFO Stakeholder & Capital CRUD JSON API.
+- `GET /api/health` — Verifies connectivity to MySQL 8.0 and Redis 7.4.
+- `GET|POST /api/v1/samples` — Lists and creates FoodLab quality control samples.
+- `GET /api/metrics` — Exposes application counters and histograms in Prometheus `0.0.4` text format.
 
 ## Maintainers
 
@@ -242,7 +236,7 @@ Exposes application counters and gauges in Prometheus `0.0.4` text format:
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing requirements, and pull request guidelines. Small note: If editing the README, please conform to the [standard-readme](https://github.com/RichardLitt/standard-readme) specification.
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md) for development setup, low-token component conventions, testing requirements, and pull request guidelines.
 
 ## License
 

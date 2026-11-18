@@ -14,13 +14,21 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   actions,
 }) => {
   return (
-    <header className="ui-page-header">
+    <header className="mb-7 flex flex-wrap items-center justify-between gap-4 border-b border-border pb-5">
       <div>
-        {eyebrow && <span className="ui-eyebrow">{eyebrow}</span>}
-        <h1 className="ui-page-title">{title}</h1>
-        {subtitle && <p className="ui-subtitle">{subtitle}</p>}
+        {eyebrow && (
+          <span className="block text-[11px] font-bold uppercase tracking-widest text-primary mb-1">
+            {eyebrow}
+          </span>
+        )}
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+          {title}
+        </h1>
+        {subtitle && (
+          <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+        )}
       </div>
-      {actions && <div className="ui-page-actions">{actions}</div>}
+      {actions && <div className="flex items-center gap-3">{actions}</div>}
     </header>
   );
 };

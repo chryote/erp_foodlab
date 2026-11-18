@@ -1,11 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  type CapitalCompany,
-  type Company,
-  fetchCapitalCompanies,
-  fetchCompanies,
-} from '../../api/client';
-import { type CrudFieldConfig, CrudModal } from '../../components/ui';
+import React, { useEffect, useMemo, useState } from 'react';
+import type { CapitalCompany, Company } from '@/api/client';
+import { type CrudFieldConfig, CrudModal } from '@/components/ui';
+import { useCapitalOverviewResource } from '@/lib/inertia';
 import { CompanyStakeholderModal } from './CompanyCrudModal';
 
 export function formatCapitalIdr(amount: number): string {
@@ -22,7 +18,11 @@ export function formatCapitalSharePercent(
   capital: number,
   totalCapital: number
 ): string {
-  if (!Number.isFinite(capital) || !Number.isFinite(totalCapital) || totalCapital <= 0) {
+  if (
+    !Number.isFinite(capital) ||
+    !Number.isFinite(totalCapital) ||
+    totalCapital <= 0
+  ) {
     return '0%';
   }
   const pct = (capital / totalCapital) * 100;
@@ -34,49 +34,28 @@ export function formatCapitalSharePercent(
 
 export interface CapitalCompanyCrudModalProps {
   isOpen: boolean;
+  initialCompanies?: Company[];
+  initialCapitalCompanies?: CapitalCompany[];
   onClose: () => void;
 }
 
 export const CapitalCompanyCrudModal: React.FC<
   CapitalCompanyCrudModalProps
-> = ({ isOpen, onClose }) => {
-  const [capitalCompanies, setCapitalCompanies] = useState<CapitalCompany[]>(
-    []
-  );
-  const [companies, setCompanies] = useState<Company[]>([]);
+> = ({ isOpen, initialCompanies, initialCapitalCompanies, onClose }) => {
+  const { capitalCompanies, companies, loading, error } =
+    useCapitalOverviewResource(
+      isOpen,
+      initialCompanies,
+      initialCapitalCompanies
+    );
   const [selectedDetailCompany, setSelectedDetailCompany] =
     useState<Company | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [capitalRes, companiesRes] = await Promise.all([
-        fetchCapitalCompanies(),
-        fetchCompanies(),
-      ]);
-      setCapitalCompanies(capitalRes.data);
-      setCompanies(companiesRes.data);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Gagal memuat data kapital perusahaan.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
-    if (isOpen) {
-      void loadData();
-    } else {
+    if (!isOpen) {
       setSelectedDetailCompany(null);
     }
-  }, [isOpen, loadData]);
+  }, [isOpen]);
 
   const companyById = useMemo(() => {
     const map = new Map<number, Company>();
@@ -132,8 +111,8 @@ export const CapitalCompanyCrudModal: React.FC<
     }));
   }, [capitalCompanies, companyById]);
 
-  const fields = useMemo<CrudFieldConfig<CapitalCompany>[]>(() => {
-    return [
+  const fields = useMemo<CrudFieldConfig<CapitalCompany>[]>(
+    () => [
       {
         key: 'company_id',
         label: 'Perusahaan',
@@ -145,10 +124,7 @@ export const CapitalCompanyCrudModal: React.FC<
         })),
         renderValue: (row) => {
           const company = row.company ?? companyById.get(row.company_id);
-          if (!company) {
-            return `#${row.company_id}`;
-          }
-          return company.name;
+          return company ? company.name : `#${row.company_id}`;
         },
         filterText: (row) => {
           const company = row.company ?? companyById.get(row.company_id);
@@ -170,8 +146,9 @@ export const CapitalCompanyCrudModal: React.FC<
         filterText: (row) =>
           `${row.capital} ${formatCapitalIdr(Number(row.capital))}`,
       },
-    ];
-  }, [companies, companyById]);
+    ],
+    [companies, companyById]
+  );
 
   return (
     <>
@@ -211,6 +188,7 @@ export const CapitalCompanyCrudModal: React.FC<
         isOpen={isOpen && selectedDetailCompany !== null}
         company={selectedDetailCompany}
         readOnly={true}
+        initialCapitalCompanies={initialCapitalCompanies}
         onClose={() => setSelectedDetailCompany(null)}
       />
     </>

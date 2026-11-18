@@ -1,23 +1,16 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  type CapitalCompany,
-  type Company,
-  createCapitalCompany,
-  createCompany,
-  deleteCapitalCompany,
-  deleteCompany,
-  fetchCapitalCompanies,
-  fetchCompanies,
-  updateCapitalCompany,
-  updateCompany,
-} from '../../api/client';
+import React, { useEffect, useMemo, useState } from 'react';
+import type { CapitalCompany, Company } from '@/api/client';
 import {
   Badge,
   type CrudComputedColumnConfig,
   type CrudFieldConfig,
   CrudModal,
   SummaryBanner,
-} from '../../components/ui';
+} from '@/components/ui';
+import {
+  useCompanyCrudResource,
+  useStakeholderCrudResource,
+} from '@/lib/inertia';
 import {
   formatCapitalIdr,
   formatCapitalSharePercent,
@@ -52,153 +45,43 @@ export interface CompanyStakeholderModalProps {
   isOpen: boolean;
   company: Company | null;
   readOnly?: boolean;
+  initialCapitalCompanies?: CapitalCompany[];
   onClose: () => void;
 }
 
 export const CompanyStakeholderModal: React.FC<
   CompanyStakeholderModalProps
-> = ({ isOpen, company, readOnly = false, onClose }) => {
-  const [stakeholders, setStakeholders] = useState<CapitalCompany[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+> = ({
+  isOpen,
+  company,
+  readOnly = false,
+  initialCapitalCompanies,
+  onClose,
+}) => {
+  const { stakeholders, loading, error, create, update, remove } =
+    useStakeholderCrudResource(isOpen, company, initialCapitalCompanies);
 
-  const loadStakeholders = useCallback(async () => {
-    if (!company) {
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetchCapitalCompanies();
-      setStakeholders(
-        res.data.filter((item) => item.company_id === company.id)
-      );
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Gagal memuat data pemegang saham.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [company]);
-
-  useEffect(() => {
-    if (isOpen && company) {
-      void loadStakeholders();
-    } else {
-      setStakeholders([]);
-      setError(null);
-    }
-  }, [isOpen, company, loadStakeholders]);
-
-  const totalCompanyCapital = useMemo(() => {
-    return stakeholders.reduce(
-      (sum, item) => sum + (Number(item.capital) || 0),
-      0
-    );
-  }, [stakeholders]);
+  const totalCompanyCapital = useMemo(
+    () =>
+      stakeholders.reduce((sum, item) => sum + (Number(item.capital) || 0), 0),
+    [stakeholders]
+  );
 
   const computedColumns = useMemo<
     CrudComputedColumnConfig<CapitalCompany>[]
-  >(() => {
-    return [
-      {
-        key: 'share_percent',
-        label: 'Porsi Kapital (%)',
-        render: (row) => (
-          <Badge variant="ok">
-            {formatCapitalSharePercent(
-              Number(row.capital),
-              totalCompanyCapital
-            )}
-          </Badge>
-        ),
-        filterText: (row) =>
-          formatCapitalSharePercent(Number(row.capital), totalCompanyCapital),
-      },
-    ];
-  }, [totalCompanyCapital]);
-
-  const handleCreate = async (values: Record<string, string>) => {
-    if (!company) {
-      return;
-    }
-    const stakeholderName = (values.stakeholder_name ?? '').trim();
-    const capital = parseFloat(values.capital ?? '');
-    if (!stakeholderName || !Number.isFinite(capital)) {
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await createCapitalCompany({
-        company_id: company.id,
-        stakeholder_name: stakeholderName,
-        capital,
-      });
-      setStakeholders((prev) => [res.data, ...prev]);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Gagal menambahkan pemegang saham.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpdate = async (id: number, values: Record<string, string>) => {
-    if (!company) {
-      return;
-    }
-    const stakeholderName = (values.stakeholder_name ?? '').trim();
-    const capital = parseFloat(values.capital ?? '');
-    if (!stakeholderName || !Number.isFinite(capital)) {
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await updateCapitalCompany(id, {
-        company_id: company.id,
-        stakeholder_name: stakeholderName,
-        capital,
-      });
-      setStakeholders((prev) =>
-        prev.map((item) => (item.id === id ? res.data : item))
-      );
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Gagal memperbarui pemegang saham.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDelete = async (id: number) => {
-    setLoading(true);
-    setError(null);
-    try {
-      await deleteCapitalCompany(id);
-      setStakeholders((prev) => prev.filter((item) => item.id !== id));
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Gagal menghapus pemegang saham.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  >(() => [
+    {
+      key: 'share_percent',
+      label: 'Porsi Kapital (%)',
+      render: (row) => (
+        <Badge variant="ok">
+          {formatCapitalSharePercent(Number(row.capital), totalCompanyCapital)}
+        </Badge>
+      ),
+      filterText: (row) =>
+        formatCapitalSharePercent(Number(row.capital), totalCompanyCapital),
+    },
+  ], [totalCompanyCapital]);
 
   return (
     <CrudModal
@@ -234,105 +117,48 @@ export const CompanyStakeholderModal: React.FC<
       error={error}
       readOnly={readOnly}
       onClose={onClose}
-      onCreate={handleCreate}
-      onUpdate={handleUpdate}
-      onDelete={handleDelete}
+      onCreate={async (values) => {
+        const name = (values.stakeholder_name ?? '').trim();
+        const capital = parseFloat(values.capital ?? '');
+        if (name && Number.isFinite(capital)) {
+          await create(name, capital);
+        }
+      }}
+      onUpdate={async (id, values) => {
+        const name = (values.stakeholder_name ?? '').trim();
+        const capital = parseFloat(values.capital ?? '');
+        if (name && Number.isFinite(capital)) {
+          await update(id, name, capital);
+        }
+      }}
+      onDelete={remove}
     />
   );
 };
 
 export interface CompanyCrudModalProps {
   isOpen: boolean;
+  initialCompanies?: Company[];
+  initialCapitalCompanies?: CapitalCompany[];
   onClose: () => void;
 }
 
 export const CompanyCrudModal: React.FC<CompanyCrudModalProps> = ({
   isOpen,
+  initialCompanies,
+  initialCapitalCompanies,
   onClose,
 }) => {
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const { companies, loading, error, create, update, remove } =
+    useCompanyCrudResource(isOpen, initialCompanies);
   const [selectedStakeholderCompany, setSelectedStakeholderCompany] =
     useState<Company | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadCompanies = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetchCompanies();
-      setCompanies(res.data);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Gagal memuat data perusahaan.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
-    if (isOpen) {
-      void loadCompanies();
-    } else {
+    if (!isOpen) {
       setSelectedStakeholderCompany(null);
     }
-  }, [isOpen, loadCompanies]);
-
-  const handleCreate = async (values: Record<string, string>) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await createCompany({
-        name: values.name ?? '',
-      });
-      setCompanies((prev) => [res.data, ...prev]);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Gagal menambahkan perusahaan.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpdate = async (id: number, values: Record<string, string>) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await updateCompany(id, {
-        name: values.name ?? '',
-      });
-      setCompanies((prev) =>
-        prev.map((item) => (item.id === id ? res.data : item))
-      );
-      setSelectedStakeholderCompany((prev) =>
-        prev?.id === id ? res.data : prev
-      );
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Gagal memperbarui perusahaan.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDelete = async (id: number) => {
-    setLoading(true);
-    setError(null);
-    try {
-      await deleteCompany(id);
-      setCompanies((prev) => prev.filter((item) => item.id !== id));
-      setSelectedStakeholderCompany((prev) => (prev?.id === id ? null : prev));
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Gagal menghapus perusahaan.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [isOpen]);
 
   return (
     <>
@@ -357,14 +183,31 @@ export const CompanyCrudModal: React.FC<CompanyCrudModalProps> = ({
         loading={loading}
         error={error}
         onClose={onClose}
-        onCreate={handleCreate}
-        onUpdate={handleUpdate}
-        onDelete={handleDelete}
+        onCreate={async (values) => {
+          await create(values.name ?? '');
+        }}
+        onUpdate={async (id, values) => {
+          const updated = await update(id, values.name ?? '');
+          if (updated) {
+            setSelectedStakeholderCompany((prev) =>
+              prev?.id === id ? updated : prev
+            );
+          }
+        }}
+        onDelete={async (id) => {
+          const ok = await remove(id);
+          if (ok) {
+            setSelectedStakeholderCompany((prev) =>
+              prev?.id === id ? null : prev
+            );
+          }
+        }}
       />
 
       <CompanyStakeholderModal
         isOpen={isOpen && selectedStakeholderCompany !== null}
         company={selectedStakeholderCompany}
+        initialCapitalCompanies={initialCapitalCompanies}
         onClose={() => setSelectedStakeholderCompany(null)}
       />
     </>

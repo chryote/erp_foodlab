@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { cn } from '@/lib/utils';
 import type { ModuleAccent } from './ModuleLauncherCard';
 
 export interface HorizontalMenuItem {
@@ -15,6 +16,14 @@ export interface HorizontalMenuCardProps {
   onClick?: () => void;
 }
 
+const ACCENT_SELECTED_CLASSES: Record<ModuleAccent, string> = {
+  cfo: 'border-emerald-500 bg-emerald-500/12 ring-2 ring-emerald-500/25',
+  cho: 'border-blue-500 bg-blue-500/12 ring-2 ring-blue-500/25',
+  cpo: 'border-amber-500 bg-amber-500/12 ring-2 ring-amber-500/25',
+  cdo: 'border-purple-500 bg-purple-500/12 ring-2 ring-purple-500/25',
+  cmo: 'border-rose-500 bg-rose-500/12 ring-2 ring-rose-500/25',
+};
+
 export const HorizontalMenuCard: React.FC<HorizontalMenuCardProps> = ({
   code,
   title,
@@ -27,10 +36,13 @@ export const HorizontalMenuCard: React.FC<HorizontalMenuCardProps> = ({
       type="button"
       data-testid={`horizontal-menu-card-${code}`}
       aria-pressed={isSelected}
-      className={`ui-horizontal-menu-card accent-${accent} ${isSelected ? 'selected' : ''}`.trim()}
+      className={cn(
+        'flex min-h-[54px] items-center justify-center rounded-xl border border-border bg-card px-4 py-3 text-center text-sm font-semibold text-card-foreground transition-all hover:-translate-y-0.5 hover:shadow-md cursor-pointer',
+        isSelected && ACCENT_SELECTED_CLASSES[accent]
+      )}
       onClick={onClick}
     >
-      <span className="ui-horizontal-menu-title">{title}</span>
+      <span>{title}</span>
     </button>
   );
 };
@@ -56,7 +68,7 @@ export const HorizontalMenu: React.FC<HorizontalMenuProps> = ({
     <nav
       aria-label={ariaLabel}
       data-testid={testId}
-      className="ui-horizontal-menu-grid"
+      className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-5"
     >
       {items.map((item) => (
         <HorizontalMenuCard
@@ -78,12 +90,12 @@ export interface HorizontalMenuStackProps
 }
 
 export const HorizontalMenuStack: React.FC<HorizontalMenuStackProps> = ({
-  className = '',
+  className,
   children,
   ...rest
 }) => {
   return (
-    <div className={`ui-horizontal-menu-stack ${className}`.trim()} {...rest}>
+    <div className={cn('flex flex-col gap-3', className)} {...rest}>
       {children}
     </div>
   );
