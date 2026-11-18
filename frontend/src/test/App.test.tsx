@@ -15,7 +15,7 @@ describe('App ERP Main Menu integration', () => {
     vi.resetAllMocks();
   });
 
-  it('renders all 5 ERP module cards (CFO, CHO, CPO, CDO, CMO) and opens selected module workspace', async () => {
+  it('renders PT. Slaras Nusa Foodlab header and all 5 ERP module cards (CFO, CHO, CPO, CDO, CMO)', async () => {
     vi.mocked(apiClient.fetchErpModules).mockResolvedValue({
       data: [
         DEFAULT_CFO_MODULE,
@@ -27,30 +27,9 @@ describe('App ERP Main Menu integration', () => {
       meta: { count: 5 },
     });
 
-    vi.mocked(apiClient.fetchHealthStatus).mockResolvedValue({
-      status: 'ok',
-      service: 'ERP FoodLab API',
-      checks: { database: 'ok', cache_redis: 'ok' },
-      timestamp: '2026-11-18T00:00:00Z',
-    });
-
-    vi.mocked(apiClient.fetchLabSamples).mockResolvedValue({
-      data: [
-        {
-          id: 10,
-          batch_code: 'FL-OLIVE-010',
-          product_name: 'Extra Virgin Olive Oil',
-          category: 'Oils',
-          ph_level: 5.5,
-          moisture_percent: 0.2,
-          status: 'approved',
-        },
-      ],
-      meta: { count: 1, cache_key: 'erp_foodlab:samples:list' },
-    });
-
     render(<App />);
 
+    expect(screen.getByText('PT. Slaras Nusa Foodlab')).toBeInTheDocument();
     expect(screen.getByText('CFO (Keuangan)')).toBeInTheDocument();
     expect(screen.getByText('CHO (SDM)')).toBeInTheDocument();
     expect(screen.getByText('CPO (Persediaan Barang Dagang)')).toBeInTheDocument();
@@ -58,7 +37,7 @@ describe('App ERP Main Menu integration', () => {
     expect(screen.getByText('CMO (Penjualan)')).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.getByText('Extra Virgin Olive Oil')).toBeInTheDocument();
+      expect(apiClient.fetchErpModules).toHaveBeenCalledTimes(1);
     });
 
     fireEvent.click(screen.getByTestId('module-card-CFO'));

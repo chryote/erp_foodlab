@@ -1,3 +1,4 @@
+/* global __ENV */
 export const BASE_URL = __ENV.K6_BASE_URL || 'http://localhost:8000';
 
 export const DEFAULT_HEADERS = {

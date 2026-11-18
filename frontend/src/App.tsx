@@ -1,8 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   fetchErpModules,
-  fetchHealthStatus,
-  fetchLabSamples,
   type ErpModuleCode,
   type ErpModuleOverview,
 } from './api/client';
@@ -11,7 +9,6 @@ import { ChoModuleCard } from './modules/CHO/ChoModuleCard';
 import { CpoModuleCard } from './modules/CPO/CpoModuleCard';
 import { CdoModuleCard } from './modules/CDO/CdoModuleCard';
 import { CmoModuleCard } from './modules/CMO/CmoModuleCard';
-
 import {
   Badge,
   Button,
@@ -30,28 +27,15 @@ export const App: React.FC = () => {
     useState<ErpModuleOverview | null>(null);
 
   const loadDashboardData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
     try {
-      const [modulesRes, healthData, samplesData] = await Promise.all([
-        fetchErpModules(),
-        fetchHealthStatus(),
-        fetchLabSamples(),
-      ]);
-
+      const modulesRes = await fetchErpModules();
       const nextMap: Partial<Record<ErpModuleCode, ErpModuleOverview>> = {};
       for (const mod of modulesRes.data) {
         nextMap[mod.code] = mod;
       }
       setModulesMap(nextMap);
-      setHealth(healthData);
-      setSamples(samplesData.data);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Unable to reach ERP FoodLab API'
-      );
-    } finally {
-      setLoading(false);
+    } catch {
+      // Fallback to default module definitions when API is unreachable
     }
   }, []);
 
@@ -140,10 +124,6 @@ export const App: React.FC = () => {
             />
           </Card>
         )}
-
-
-
-
       </main>
     </div>
   );
