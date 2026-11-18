@@ -88,8 +88,8 @@ export const App: React.FC = () => {
             data-testid="selected-module-panel"
           >
             <CardHeader
-              eyebrow={`WORKSPACE MODUL ${selectedModule.code}`}
-              title={selectedModule.title}
+              eyebrow= ""
+              title=""
               subtitle={selectedModule.subtitle}
               actions={
                 <Button
