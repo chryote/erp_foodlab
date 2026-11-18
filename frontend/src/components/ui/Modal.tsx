@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button } from './Button';
+import { Button, type ButtonVariant } from './Button';
 import { DataTable, type DataTableColumn } from './DataTable';
 import { Pagination } from './Pagination';
 
@@ -280,6 +280,14 @@ export interface CrudComputedColumnConfig<T> {
   filterText?: (row: T) => string;
 }
 
+export interface CrudRowActionConfig<T> {
+  key: string;
+  label: string;
+  variant?: ButtonVariant;
+  testId?: (row: T) => string;
+  onClick: (row: T) => void;
+}
+
 export interface CrudModalProps<T extends CrudEntity> {
   isOpen: boolean;
   title: string;
@@ -289,19 +297,21 @@ export interface CrudModalProps<T extends CrudEntity> {
   inputPlaceholder?: string;
   fields?: CrudFieldConfig<T>[];
   computedColumns?: CrudComputedColumnConfig<T>[];
+  rowActions?: CrudRowActionConfig<T>[];
   summary?: React.ReactNode;
   emptyMessage?: string;
   pageSize?: number;
   items: T[];
   loading?: boolean;
   error?: string | null;
+  readOnly?: boolean;
   onClose: () => void;
-  onCreate: (values: Record<string, string>) => Promise<void> | void;
-  onUpdate: (
+  onCreate?: (values: Record<string, string>) => Promise<void> | void;
+  onUpdate?: (
     id: number,
     values: Record<string, string>
   ) => Promise<void> | void;
-  onDelete: (id: number) => Promise<void> | void;
+  onDelete?: (id: number) => Promise<void> | void;
 }
 
 export function CrudModal<T extends CrudEntity>({
@@ -313,12 +323,14 @@ export function CrudModal<T extends CrudEntity>({
   inputPlaceholder = 'Masukkan nama...',
   fields,
   computedColumns = [],
+  rowActions = [],
   summary,
   emptyMessage = 'Belum ada data.',
   pageSize = 5,
   items,
   loading = false,
   error = null,
+  readOnly = false,
   onClose,
   onCreate,
   onUpdate,
@@ -377,6 +389,9 @@ export function CrudModal<T extends CrudEntity>({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (readOnly) {
+      return;
+    }
     const trimmedValues: Record<string, string> = {};
     for (const field of resolvedFields) {
       const val = (formValues[field.key] ?? '').trim();
@@ -387,11 +402,11 @@ export function CrudModal<T extends CrudEntity>({
     }
 
     if (editingItem) {
-      await onUpdate(editingItem.id, trimmedValues);
+      await onUpdate?.(editingItem.id, trimmedValues);
       setEditingItem(null);
       setFormValues(createEmptyFormValues());
     } else {
-      await onCreate(trimmedValues);
+      await onCreate?.(trimmedValues);
       setFormValues(createEmptyFormValues());
       setCurrentPage(1);
     }
@@ -445,28 +460,50 @@ export function CrudModal<T extends CrudEntity>({
       header: col.label,
       render: (row: T, index: number) => col.render(row, index),
     })),
-    {
-      key: 'actions',
-      header: 'Aksi',
-      render: (row) => (
-        <div className="ui-table-actions">
-          <Button
-            variant="secondary"
-            data-testid={`edit-row-${row.id}`}
-            onClick={() => handleStartEdit(row)}
-          >
-            Edit
-          </Button>
-          <Button
-            variant="ghost"
-            data-testid={`delete-row-${row.id}`}
-            onClick={() => void onDelete(row.id)}
-          >
-            Hapus
-          </Button>
-        </div>
-      ),
-    },
+    ...(!readOnly || rowActions.length > 0
+      ? [
+          {
+            key: 'actions',
+            header: 'Aksi',
+            render: (row: T) => (
+              <div className="ui-table-actions">
+                {rowActions.map((action) => (
+                  <Button
+                    key={action.key}
+                    variant={action.variant ?? 'secondary'}
+                    data-testid={
+                      action.testId
+                        ? action.testId(row)
+                        : `action-${action.key}-row-${row.id}`
+                    }
+                    onClick={() => action.onClick(row)}
+                  >
+                    {action.label}
+                  </Button>
+                ))}
+                {!readOnly && (
+                  <>
+                    <Button
+                      variant="secondary"
+                      data-testid={`edit-row-${row.id}`}
+                      onClick={() => handleStartEdit(row)}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      data-testid={`delete-row-${row.id}`}
+                      onClick={() => void onDelete?.(row.id)}
+                    >
+                      Hapus
+                    </Button>
+                  </>
+                )}
+              </div>
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -483,62 +520,64 @@ export function CrudModal<T extends CrudEntity>({
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="ui-crud-form">
-        {resolvedFields.map((field) => {
-          if (field.type === 'select') {
+      {!readOnly && (
+        <form onSubmit={handleSubmit} className="ui-crud-form">
+          {resolvedFields.map((field) => {
+            if (field.type === 'select') {
+              return (
+                <SelectInput
+                  key={field.key}
+                  id={`${testId}-${field.key}-input`}
+                  label={field.label}
+                  placeholder={field.placeholder}
+                  options={field.options ?? []}
+                  value={formValues[field.key] ?? ''}
+                  onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                />
+              );
+            }
+            if (field.type === 'decimal') {
+              return (
+                <DecimalInput
+                  key={field.key}
+                  id={`${testId}-${field.key}-input`}
+                  label={field.label}
+                  placeholder={field.placeholder}
+                  value={formValues[field.key] ?? ''}
+                  onChange={(rawVal) => handleFieldChange(field.key, rawVal)}
+                />
+              );
+            }
             return (
-              <SelectInput
+              <TextInput
                 key={field.key}
                 id={`${testId}-${field.key}-input`}
+                type={field.type ?? 'text'}
+                step={field.step}
+                min={field.min}
                 label={field.label}
                 placeholder={field.placeholder}
-                options={field.options ?? []}
                 value={formValues[field.key] ?? ''}
                 onChange={(e) => handleFieldChange(field.key, e.target.value)}
               />
             );
-          }
-          if (field.type === 'decimal') {
-            return (
-              <DecimalInput
-                key={field.key}
-                id={`${testId}-${field.key}-input`}
-                label={field.label}
-                placeholder={field.placeholder}
-                value={formValues[field.key] ?? ''}
-                onChange={(rawVal) => handleFieldChange(field.key, rawVal)}
-              />
-            );
-          }
-          return (
-            <TextInput
-              key={field.key}
-              id={`${testId}-${field.key}-input`}
-              type={field.type ?? 'text'}
-              step={field.step}
-              min={field.min}
-              label={field.label}
-              placeholder={field.placeholder}
-              value={formValues[field.key] ?? ''}
-              onChange={(e) => handleFieldChange(field.key, e.target.value)}
-            />
-          );
-        })}
-        <div className="ui-crud-form-actions">
-          <Button type="submit" variant="primary" disabled={loading}>
-            {editingItem ? 'Perbarui' : 'Tambah'}
-          </Button>
-          {editingItem && (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={handleCancelEdit}
-            >
-              Batal
+          })}
+          <div className="ui-crud-form-actions">
+            <Button type="submit" variant="primary" disabled={loading}>
+              {editingItem ? 'Perbarui' : 'Tambah'}
             </Button>
-          )}
-        </div>
-      </form>
+            {editingItem && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={handleCancelEdit}
+              >
+                Batal
+              </Button>
+            )}
+          </div>
+        </form>
+      )}
 
       {summary}
 

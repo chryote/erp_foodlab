@@ -31,7 +31,6 @@ describe('App ERP Main Menu integration', () => {
         {
           id: 1,
           name: 'PT. Slaras Nusa Foodlab',
-          stakeholder_name: 'Rian',
         },
       ],
       meta: { count: 1 },
@@ -40,18 +39,35 @@ describe('App ERP Main Menu integration', () => {
       data: {
         id: 2,
         name: 'PT. Pangan Nusantara',
-        stakeholder_name: 'Siti Aminah',
       },
     });
     vi.mocked(apiClient.updateCompany).mockResolvedValue({
       data: {
         id: 2,
         name: 'PT. Pangan Nusantara Baru',
-        stakeholder_name: 'Rina Kartika',
       },
     });
     vi.mocked(apiClient.deleteCompany).mockResolvedValue({
       message: 'Company deleted successfully.',
+    });
+    vi.mocked(apiClient.fetchCapitalCompanies).mockResolvedValue({
+      data: [
+        {
+          id: 101,
+          company_id: 1,
+          stakeholder_name: 'Rian',
+          capital: 100000000,
+        },
+      ],
+      meta: { count: 1 },
+    });
+    vi.mocked(apiClient.createCapitalCompany).mockResolvedValue({
+      data: {
+        id: 102,
+        company_id: 1,
+        stakeholder_name: 'Budi Santoso',
+        capital: 300000000.5,
+      },
     });
 
     render(<App />);
@@ -142,6 +158,44 @@ describe('App ERP Main Menu integration', () => {
       ).not.toBeInTheDocument();
     });
 
+    // Click "Input Pemegang Saham" button on company row 1 to open stakeholder modal
+    const stakeholderBtn = screen.getByTestId('stakeholder-row-1');
+    expect(stakeholderBtn).toHaveTextContent('Input Pemegang Saham');
+    fireEvent.click(stakeholderBtn);
+
+    const stakeholderModal = await screen.findByTestId(
+      'pemegang-saham-crud-modal'
+    );
+    expect(stakeholderModal).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(apiClient.fetchCapitalCompanies).toHaveBeenCalledTimes(1);
+      expect(screen.getByText('Rian')).toBeInTheDocument();
+    });
+
+    const stakeholderNameInput = screen.getByLabelText('Nama Pemegang Saham');
+    const stakeholderCapitalInput = screen.getByLabelText('Kapital (Rp)');
+    fireEvent.change(stakeholderNameInput, {
+      target: { value: 'Budi Santoso' },
+    });
+    fireEvent.change(stakeholderCapitalInput, {
+      target: { value: '300000000.5' },
+    });
+    const submitButtons = screen.getAllByRole('button', { name: 'Tambah' });
+    fireEvent.click(submitButtons[submitButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(apiClient.createCapitalCompany).toHaveBeenCalledWith({
+        company_id: 1,
+        stakeholder_name: 'Budi Santoso',
+        capital: 300000000.5,
+      });
+      expect(screen.getByText('Budi Santoso')).toBeInTheDocument();
+      expect(
+        screen.getByTestId('total-kapital-pemegang-saham-banner-value')
+      ).toHaveTextContent('Rp 400.000.000,5');
+    });
+
     fireEvent.click(
       screen.getByTestId('horizontal-menu-card-INPUT_OPERASIONAL')
     );
@@ -153,7 +207,7 @@ describe('App ERP Main Menu integration', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('opens Daftar Kapital Perusahaan modal and supports full CRUD using company selection and float capital', async () => {
+  it('opens Daftar Kapital Perusahaan modal as a read-only DataTable and opens Detail Pemegang Saham modal on Detail click', async () => {
     vi.mocked(apiClient.fetchErpModules).mockResolvedValue({
       data: [
         DEFAULT_CFO_MODULE,
@@ -169,12 +223,10 @@ describe('App ERP Main Menu integration', () => {
         {
           id: 1,
           name: 'PT. Slaras Nusa Foodlab',
-          stakeholder_name: 'Rian',
         },
         {
           id: 2,
           name: 'PT. Pangan Nusantara',
-          stakeholder_name: 'Siti Aminah',
         },
       ],
       meta: { count: 2 },
@@ -184,42 +236,35 @@ describe('App ERP Main Menu integration', () => {
         {
           id: 10,
           company_id: 1,
-          capital: 250000000.5,
+          stakeholder_name: 'Rian',
+          capital: 100000000,
           company: {
             id: 1,
             name: 'PT. Slaras Nusa Foodlab',
-            stakeholder_name: 'Rian',
+          },
+        },
+        {
+          id: 11,
+          company_id: 1,
+          stakeholder_name: 'Budi Santoso',
+          capital: 300000000.5,
+          company: {
+            id: 1,
+            name: 'PT. Slaras Nusa Foodlab',
+          },
+        },
+        {
+          id: 12,
+          company_id: 2,
+          stakeholder_name: 'Siti Aminah',
+          capital: 500000000.75,
+          company: {
+            id: 2,
+            name: 'PT. Pangan Nusantara',
           },
         },
       ],
-      meta: { count: 1 },
-    });
-    vi.mocked(apiClient.createCapitalCompany).mockResolvedValue({
-      data: {
-        id: 11,
-        company_id: 2,
-        capital: 500000000.75,
-        company: {
-          id: 2,
-          name: 'PT. Pangan Nusantara',
-          stakeholder_name: 'Siti Aminah',
-        },
-      },
-    });
-    vi.mocked(apiClient.updateCapitalCompany).mockResolvedValue({
-      data: {
-        id: 11,
-        company_id: 1,
-        capital: 625000000.25,
-        company: {
-          id: 1,
-          name: 'PT. Slaras Nusa Foodlab',
-          stakeholder_name: 'Rian',
-        },
-      },
-    });
-    vi.mocked(apiClient.deleteCapitalCompany).mockResolvedValue({
-      message: 'Capital company deleted successfully.',
+      meta: { count: 3 },
     });
 
     render(<App />);
@@ -240,52 +285,56 @@ describe('App ERP Main Menu integration', () => {
       expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(1);
     });
 
-    // Verify initial total capital and 100% share for the single company
+    // No input form, no Total Kapital Seluruh Perusahaan banner, and no Porsi Kapital (%) column
+    expect(screen.queryByLabelText('Perusahaan')).not.toBeInTheDocument();
     expect(
-      screen.getByTestId('total-kapital-perusahaan-banner-value')
-    ).toHaveTextContent('Rp 250.000.000,5');
-    expect(screen.getByText('100%')).toBeInTheDocument();
+      screen.queryByLabelText('Nama Pemegang Saham')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Kapital (Rp)')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Tambah' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('total-kapital-perusahaan-banner')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Porsi Kapital (%)')).not.toBeInTheDocument();
 
-    // Create capital company
-    const companySelect = screen.getByLabelText('Perusahaan');
-    const capitalInput = screen.getByLabelText(
-      'Kapital (Rp)'
-    ) as HTMLInputElement;
-    fireEvent.change(companySelect, { target: { value: '2' } });
-    fireEvent.change(capitalInput, { target: { value: '500000000.75' } });
-    expect(capitalInput.value).toBe('500.000.000,75');
-    fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
+    // Grouped per company with comma-separated stakeholders and summed capital
+    expect(screen.getByText('Rian, Budi Santoso')).toBeInTheDocument();
+    expect(screen.getByText('Rp 400.000.000,50')).toBeInTheDocument();
+    expect(screen.getByText('Siti Aminah')).toBeInTheDocument();
+    expect(screen.getByText('Rp 500.000.000,75')).toBeInTheDocument();
+
+    // Only "Detail" button in Aksi column (no Edit or Hapus)
+    const detailBtn1 = screen.getByTestId('detail-row-1');
+    expect(detailBtn1).toHaveTextContent('Detail');
+    expect(screen.queryByTestId('edit-row-1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('delete-row-1')).not.toBeInTheDocument();
+
+    // Click Detail to open read-only stakeholder modal for company 1
+    fireEvent.click(detailBtn1);
+
+    const detailModal = await screen.findByTestId(
+      'detail-pemegang-saham-modal'
+    );
+    expect(detailModal).toBeInTheDocument();
+    expect(screen.getByText('Detail Pemegang Saham')).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(apiClient.createCapitalCompany).toHaveBeenCalledWith({
-        company_id: 2,
-        capital: 500000000.75,
-      });
-      // Total capital is now 250,000,000.5 + 500,000,000.75 = 750,000,001.25
       expect(
-        screen.getByTestId('total-kapital-perusahaan-banner-value')
-      ).toHaveTextContent('Rp 750.000.001,25');
-      expect(screen.getByText('66,67%')).toBeInTheDocument();
-      expect(screen.getByText('33,33%')).toBeInTheDocument();
+        screen.getByTestId('total-kapital-detail-pemegang-saham-banner-value')
+      ).toHaveTextContent('Rp 400.000.000,50');
+      expect(screen.getByText('Rian')).toBeInTheDocument();
+      expect(screen.getByText('Budi Santoso')).toBeInTheDocument();
+      expect(screen.getByText('25,00%')).toBeInTheDocument();
+      expect(screen.getByText('75,00%')).toBeInTheDocument();
     });
 
-    // Update capital company
-    fireEvent.click(screen.getByTestId('edit-row-11'));
-    fireEvent.change(companySelect, { target: { value: '1' } });
-    fireEvent.change(capitalInput, { target: { value: '625000000.25' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Perbarui' }));
-
-    await waitFor(() => {
-      expect(apiClient.updateCapitalCompany).toHaveBeenCalledWith(11, {
-        company_id: 1,
-        capital: 625000000.25,
-      });
-    });
-
-    // Delete capital company
-    fireEvent.click(screen.getByTestId('delete-row-11'));
-    await waitFor(() => {
-      expect(apiClient.deleteCapitalCompany).toHaveBeenCalledWith(11);
-    });
+    // Read-only detail modal has no form and no Edit/Hapus buttons
+    expect(
+      screen.queryByRole('button', { name: 'Tambah' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('edit-row-10')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('delete-row-10')).not.toBeInTheDocument();
   });
 });

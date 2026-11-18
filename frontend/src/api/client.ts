@@ -60,7 +60,6 @@ export interface ErpModulesListResponse {
 export interface Company {
   id: number;
   name: string;
-  stakeholder_name?: string;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
@@ -81,6 +80,7 @@ export interface CompaniesListResponse {
 export interface CapitalCompany {
   id: number;
   company_id: number;
+  stakeholder_name: string;
   capital: number;
   company?: Company | null;
   created_at?: string;
@@ -175,7 +175,6 @@ export async function fetchCompanies(): Promise<CompaniesListResponse> {
 
 export async function createCompany(payload: {
   name: string;
-  stakeholder_name?: string;
 }): Promise<{ data: Company }> {
   return requestJson<{ data: Company }>(
     '/v1/modules/cfo/companies',
@@ -190,7 +189,7 @@ export async function createCompany(payload: {
 
 export async function updateCompany(
   id: number,
-  payload: { name: string; stakeholder_name?: string }
+  payload: { name: string }
 ): Promise<{ data: Company }> {
   return requestJson<{ data: Company }>(
     `/v1/modules/cfo/companies/${id}`,
@@ -223,6 +222,7 @@ export async function fetchCapitalCompanies(): Promise<CapitalCompaniesListRespo
 
 export async function createCapitalCompany(payload: {
   company_id: number;
+  stakeholder_name: string;
   capital: number;
 }): Promise<{ data: CapitalCompany }> {
   return requestJson<{ data: CapitalCompany }>(
@@ -238,7 +238,7 @@ export async function createCapitalCompany(payload: {
 
 export async function updateCapitalCompany(
   id: number,
-  payload: { company_id: number; capital: number }
+  payload: { company_id: number; stakeholder_name: string; capital: number }
 ): Promise<{ data: CapitalCompany }> {
   return requestJson<{ data: CapitalCompany }>(
     `/v1/modules/cfo/capital-companies/${id}`,

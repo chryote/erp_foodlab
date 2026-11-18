@@ -14,12 +14,14 @@ class DatabaseSeeder extends Seeder
         LabSample::factory()->count(15)->create();
 
         $company = Company::query()->updateOrCreate(
-            ['name' => 'PT. Slaras Nusa Foodlab'],
-            ['stakeholder_name' => 'Rian']
+            ['name' => 'PT. Slaras Nusa Foodlab']
         );
 
         CapitalCompany::query()->updateOrCreate(
-            ['company_id' => $company->id],
+            [
+                'company_id' => $company->id,
+                'stakeholder_name' => 'Rian',
+            ],
             ['capital' => 250000000.0]
         );
     }

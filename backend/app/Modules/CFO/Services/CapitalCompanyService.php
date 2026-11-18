@@ -21,24 +21,44 @@ class CapitalCompanyService
         });
     }
 
+    public function listCapitalCompaniesByCompany(int $companyId): Collection
+    {
+        return $this->listCapitalCompanies()
+            ->where('company_id', $companyId)
+            ->values();
+    }
+
     public function getTotalCapital(): float
     {
         return (float) $this->listCapitalCompanies()->sum('capital');
     }
 
-    public function paginateCapitalCompanies(?string $search = null, int $perPage = 10, int $page = 1): LengthAwarePaginator
+    public function getTotalCapitalForCompany(int $companyId): float
     {
+        return (float) $this->listCapitalCompaniesByCompany($companyId)->sum('capital');
+    }
+
+    public function paginateCapitalCompanies(
+        ?string $search = null,
+        int $perPage = 10,
+        int $page = 1,
+        ?int $companyId = null
+    ): LengthAwarePaginator {
         $query = CapitalCompany::query()
             ->with('company')
             ->orderByDesc('id');
 
+        if ($companyId !== null) {
+            $query->where('company_id', $companyId);
+        }
+
         if ($search !== null && trim($search) !== '') {
             $term = '%' . trim($search) . '%';
             $query->where(function ($q) use ($term) {
-                $q->where('capital', 'like', $term)
+                $q->where('stakeholder_name', 'like', $term)
+                    ->orWhere('capital', 'like', $term)
                     ->orWhereHas('company', function ($companyQuery) use ($term) {
-                        $companyQuery->where('name', 'like', $term)
-                            ->orWhere('stakeholder_name', 'like', $term);
+                        $companyQuery->where('name', 'like', $term);
                     });
             });
         }

@@ -17,6 +17,7 @@ class CapitalCompanyFactory extends Factory
     {
         return [
             'company_id' => Company::factory(),
+            'stakeholder_name' => $this->faker->name(),
             'capital' => $this->faker->randomFloat(2, 1000000, 1000000000),
         ];
     }

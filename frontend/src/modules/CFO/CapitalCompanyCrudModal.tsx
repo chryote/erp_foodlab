@@ -2,19 +2,11 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   type CapitalCompany,
   type Company,
-  createCapitalCompany,
-  deleteCapitalCompany,
   fetchCapitalCompanies,
   fetchCompanies,
-  updateCapitalCompany,
 } from '../../api/client';
-import {
-  Badge,
-  type CrudComputedColumnConfig,
-  type CrudFieldConfig,
-  CrudModal,
-  SummaryBanner,
-} from '../../components/ui';
+import { type CrudFieldConfig, CrudModal } from '../../components/ui';
+import { CompanyStakeholderModal } from './CompanyCrudModal';
 
 export function formatCapitalIdr(amount: number): string {
   if (!Number.isFinite(amount)) {
@@ -52,6 +44,8 @@ export const CapitalCompanyCrudModal: React.FC<
     []
   );
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [selectedDetailCompany, setSelectedDetailCompany] =
+    useState<Company | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,6 +73,8 @@ export const CapitalCompanyCrudModal: React.FC<
   useEffect(() => {
     if (isOpen) {
       void loadData();
+    } else {
+      setSelectedDetailCompany(null);
     }
   }, [isOpen, loadData]);
 
@@ -90,12 +86,51 @@ export const CapitalCompanyCrudModal: React.FC<
     return map;
   }, [companies]);
 
-  const totalCapital = useMemo(() => {
-    return capitalCompanies.reduce(
-      (sum, item) => sum + (Number(item.capital) || 0),
-      0
-    );
-  }, [capitalCompanies]);
+  const groupedCapitalCompanies = useMemo<CapitalCompany[]>(() => {
+    const groupedMap = new Map<
+      number,
+      {
+        company_id: number;
+        company?: Company | null;
+        stakeholders: string[];
+        totalCapital: number;
+      }
+    >();
+
+    for (const item of capitalCompanies) {
+      const existing = groupedMap.get(item.company_id);
+      const stakeholderName = (item.stakeholder_name ?? '').trim();
+      const amount = Number(item.capital) || 0;
+
+      if (existing) {
+        if (
+          stakeholderName &&
+          !existing.stakeholders.includes(stakeholderName)
+        ) {
+          existing.stakeholders.push(stakeholderName);
+        }
+        existing.totalCapital += amount;
+        if (!existing.company && item.company) {
+          existing.company = item.company;
+        }
+      } else {
+        groupedMap.set(item.company_id, {
+          company_id: item.company_id,
+          company: item.company ?? companyById.get(item.company_id) ?? null,
+          stakeholders: stakeholderName ? [stakeholderName] : [],
+          totalCapital: amount,
+        });
+      }
+    }
+
+    return Array.from(groupedMap.values()).map((group) => ({
+      id: group.company_id,
+      company_id: group.company_id,
+      stakeholder_name: group.stakeholders.join(', '),
+      capital: group.totalCapital,
+      company: group.company ?? companyById.get(group.company_id) ?? null,
+    }));
+  }, [capitalCompanies, companyById]);
 
   const fields = useMemo<CrudFieldConfig<CapitalCompany>[]>(() => {
     return [
@@ -106,23 +141,25 @@ export const CapitalCompanyCrudModal: React.FC<
         placeholder: 'Pilih Perusahaan...',
         options: companies.map((c) => ({
           value: String(c.id),
-          label: c.stakeholder_name
-            ? `${c.name} (${c.stakeholder_name})`
-            : c.name,
+          label: c.name,
         })),
         renderValue: (row) => {
           const company = row.company ?? companyById.get(row.company_id);
           if (!company) {
             return `#${row.company_id}`;
           }
-          return company.stakeholder_name
-            ? `${company.name} (${company.stakeholder_name})`
-            : company.name;
+          return company.name;
         },
         filterText: (row) => {
           const company = row.company ?? companyById.get(row.company_id);
-          return `${company?.name ?? ''} ${company?.stakeholder_name ?? ''} ${row.company_id}`;
+          return `${company?.name ?? ''} ${row.company_id}`;
         },
+      },
+      {
+        key: 'stakeholder_name',
+        label: 'Nama Pemegang Saham',
+        type: 'text',
+        placeholder: 'Contoh: Budi Santoso',
       },
       {
         key: 'capital',
@@ -136,119 +173,46 @@ export const CapitalCompanyCrudModal: React.FC<
     ];
   }, [companies, companyById]);
 
-  const computedColumns = useMemo<
-    CrudComputedColumnConfig<CapitalCompany>[]
-  >(() => {
-    return [
-      {
-        key: 'share_percent',
-        label: 'Porsi Kapital (%)',
-        render: (row) => (
-          <Badge variant="ok">
-            {formatCapitalSharePercent(Number(row.capital), totalCapital)}
-          </Badge>
-        ),
-        filterText: (row) =>
-          formatCapitalSharePercent(Number(row.capital), totalCapital),
-      },
-    ];
-  }, [totalCapital]);
-
-  const handleCreate = async (values: Record<string, string>) => {
-    const companyId = Number(values.company_id);
-    const capital = parseFloat(values.capital ?? '');
-    if (!Number.isFinite(companyId) || !Number.isFinite(capital)) {
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await createCapitalCompany({
-        company_id: companyId,
-        capital,
-      });
-      setCapitalCompanies((prev) => [res.data, ...prev]);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Gagal menambahkan kapital perusahaan.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpdate = async (id: number, values: Record<string, string>) => {
-    const companyId = Number(values.company_id);
-    const capital = parseFloat(values.capital ?? '');
-    if (!Number.isFinite(companyId) || !Number.isFinite(capital)) {
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await updateCapitalCompany(id, {
-        company_id: companyId,
-        capital,
-      });
-      setCapitalCompanies((prev) =>
-        prev.map((item) => (item.id === id ? res.data : item))
-      );
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Gagal memperbarui kapital perusahaan.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDelete = async (id: number) => {
-    setLoading(true);
-    setError(null);
-    try {
-      await deleteCapitalCompany(id);
-      setCapitalCompanies((prev) => prev.filter((item) => item.id !== id));
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Gagal menghapus kapital perusahaan.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
-    <CrudModal
-      isOpen={isOpen}
-      title="Daftar Kapital Perusahaan"
-      subtitle="Kelola data kapital (modal) perusahaan pada modul CFO (Input Modal)"
-      testId="daftar-kapital-perusahaan-crud-modal"
-      fields={fields}
-      computedColumns={computedColumns}
-      summary={
-        <SummaryBanner
-          label="Total Kapital Seluruh Perusahaan"
-          value={formatCapitalIdr(totalCapital)}
-          testId="total-kapital-perusahaan-banner"
-        />
-      }
-      emptyMessage="Belum ada data kapital perusahaan."
-      pageSize={5}
-      items={capitalCompanies}
-      loading={loading}
-      error={error}
-      onClose={onClose}
-      onCreate={handleCreate}
-      onUpdate={handleUpdate}
-      onDelete={handleDelete}
-    />
+    <>
+      <CrudModal
+        isOpen={isOpen}
+        title="Daftar Kapital Perusahaan"
+        subtitle="Kelola data kapital (modal) perusahaan pada modul CFO (Input Modal)"
+        testId="daftar-kapital-perusahaan-crud-modal"
+        fields={fields}
+        rowActions={[
+          {
+            key: 'detail',
+            label: 'Detail',
+            variant: 'secondary',
+            testId: (row) => `detail-row-${row.id}`,
+            onClick: (row) => {
+              const company =
+                row.company ??
+                companyById.get(row.company_id) ?? {
+                  id: row.company_id,
+                  name: `#${row.company_id}`,
+                };
+              setSelectedDetailCompany(company);
+            },
+          },
+        ]}
+        emptyMessage="Belum ada data kapital perusahaan."
+        pageSize={5}
+        items={groupedCapitalCompanies}
+        loading={loading}
+        error={error}
+        readOnly={true}
+        onClose={onClose}
+      />
+
+      <CompanyStakeholderModal
+        isOpen={isOpen && selectedDetailCompany !== null}
+        company={selectedDetailCompany}
+        readOnly={true}
+        onClose={() => setSelectedDetailCompany(null)}
+      />
+    </>
   );
 };

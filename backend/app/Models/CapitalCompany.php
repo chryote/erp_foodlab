@@ -15,6 +15,7 @@ class CapitalCompany extends Model
 
     protected $fillable = [
         'company_id',
+        'stakeholder_name',
         'capital',
     ];
 

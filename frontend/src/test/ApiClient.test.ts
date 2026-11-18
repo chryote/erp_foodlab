@@ -39,8 +39,16 @@ describe('General API Client Contract & Error Handling', () => {
     await updateCompany(1, { name: 'PT A2' });
     await deleteCompany(1);
     await fetchCapitalCompanies();
-    await createCapitalCompany({ company_id: 1, capital: 1000.5 });
-    await updateCapitalCompany(1, { company_id: 1, capital: 2000.75 });
+    await createCapitalCompany({
+      company_id: 1,
+      stakeholder_name: 'Rian',
+      capital: 1000.5,
+    });
+    await updateCapitalCompany(1, {
+      company_id: 1,
+      stakeholder_name: 'Siti Aminah',
+      capital: 2000.75,
+    });
     await deleteCapitalCompany(1);
 
     expect(globalThis.fetch).toHaveBeenCalledTimes(11);

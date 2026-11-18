@@ -15,7 +15,6 @@ class Company extends Model
 
     protected $fillable = [
         'name',
-        'stakeholder_name',
     ];
 
     public function capitalCompanies(): HasMany

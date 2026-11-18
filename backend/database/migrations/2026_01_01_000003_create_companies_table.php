@@ -11,7 +11,6 @@ return new class extends Migration
         Schema::create('companies', function (Blueprint $table) {
             $table->id();
             $table->string('name', 150)->index();
-            $table->string('stakeholder_name', 150)->nullable()->default('')->index();
             $table->timestamps();
             $table->softDeletes();
 

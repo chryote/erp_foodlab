@@ -16,7 +16,6 @@ class CompanyFactory extends Factory
     {
         return [
             'name' => $this->faker->company(),
-            'stakeholder_name' => $this->faker->name(),
         ];
     }
 }

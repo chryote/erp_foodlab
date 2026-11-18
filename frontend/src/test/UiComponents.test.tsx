@@ -139,20 +139,26 @@ describe('Reusable UI Components (src/components/ui)', () => {
     const onUpdate = vi.fn();
     const onDelete = vi.fn();
     const onClose = vi.fn();
+    const onRowAction = vi.fn();
 
     render(
       <CrudModal
         isOpen={true}
         title="Manajemen Perusahaan"
         pageSize={2}
-        fields={[
-          { key: 'name', label: 'Nama Perusahaan' },
-          { key: 'stakeholder_name', label: 'Nama Stakeholder' },
+        fields={[{ key: 'name', label: 'Nama Perusahaan' }]}
+        rowActions={[
+          {
+            key: 'stakeholder',
+            label: 'Input Pemegang Saham',
+            testId: (row) => `stakeholder-row-${row.id}`,
+            onClick: onRowAction,
+          },
         ]}
         items={[
-          { id: 10, name: 'PT. Contoh Satu', stakeholder_name: 'Andi' },
-          { id: 11, name: 'PT. Contoh Dua', stakeholder_name: 'Budi' },
-          { id: 12, name: 'PT. Contoh Tiga', stakeholder_name: 'Citra' },
+          { id: 10, name: 'PT. Contoh Satu' },
+          { id: 11, name: 'PT. Contoh Dua' },
+          { id: 12, name: 'PT. Contoh Tiga' },
         ]}
         onClose={onClose}
         onCreate={onCreate}
@@ -169,31 +175,33 @@ describe('Reusable UI Components (src/components/ui)', () => {
       'Halaman 1 dari 2 (3 data)'
     );
 
+    // Custom reusable row action button in Aksi column
+    fireEvent.click(screen.getByTestId('stakeholder-row-10'));
+    expect(onRowAction).toHaveBeenCalledWith({
+      id: 10,
+      name: 'PT. Contoh Satu',
+    });
+
     // Navigate to page 2
     fireEvent.click(screen.getByTestId('crud-modal-pagination-next'));
     expect(screen.getByText('PT. Contoh Tiga')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('crud-modal-pagination-prev'));
 
     const nameInput = screen.getByLabelText('Nama Perusahaan');
-    const stakeholderInput = screen.getByLabelText('Nama Stakeholder');
     fireEvent.change(nameInput, { target: { value: 'PT. Contoh Empat' } });
-    fireEvent.change(stakeholderInput, { target: { value: 'Dewi' } });
     fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
     await waitFor(() => {
       expect(onCreate).toHaveBeenCalledWith({
         name: 'PT. Contoh Empat',
-        stakeholder_name: 'Dewi',
       });
     });
 
     fireEvent.click(screen.getByTestId('edit-row-10'));
     fireEvent.change(nameInput, { target: { value: 'PT. Contoh Satu Revisi' } });
-    fireEvent.change(stakeholderInput, { target: { value: 'Andi Wijaya' } });
     fireEvent.click(screen.getByRole('button', { name: 'Perbarui' }));
     await waitFor(() => {
       expect(onUpdate).toHaveBeenCalledWith(10, {
         name: 'PT. Contoh Satu Revisi',
-        stakeholder_name: 'Andi Wijaya',
       });
     });
 
@@ -295,6 +303,56 @@ describe('Reusable UI Components (src/components/ui)', () => {
         company_id: '2',
         capital: '350000000.75',
       });
+    });
+  });
+
+  it('renders CrudModal in readOnly mode without form and without Edit/Hapus buttons', () => {
+    const onDetail = vi.fn();
+
+    render(
+      <CrudModal
+        isOpen={true}
+        title="Daftar Kapital Perusahaan"
+        readOnly={true}
+        fields={[
+          { key: 'company_name', label: 'Perusahaan' },
+          { key: 'stakeholder_name', label: 'Nama Pemegang Saham' },
+          { key: 'capital', label: 'Kapital (Rp)' },
+        ]}
+        rowActions={[
+          {
+            key: 'detail',
+            label: 'Detail',
+            testId: (row) => `detail-row-${row.id}`,
+            onClick: onDetail,
+          },
+        ]}
+        items={[
+          {
+            id: 1,
+            company_name: 'PT. Slaras Nusa Foodlab',
+            stakeholder_name: 'Rian, Budi',
+            capital: 400000000,
+          },
+        ]}
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Tambah' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('edit-row-1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('delete-row-1')).not.toBeInTheDocument();
+
+    const detailButton = screen.getByTestId('detail-row-1');
+    expect(detailButton).toHaveTextContent('Detail');
+    fireEvent.click(detailButton);
+    expect(onDetail).toHaveBeenCalledWith({
+      id: 1,
+      company_name: 'PT. Slaras Nusa Foodlab',
+      stakeholder_name: 'Rian, Budi',
+      capital: 400000000,
     });
   });
 });

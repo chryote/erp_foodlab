@@ -23,25 +23,21 @@ describe('CFO Company CRUD API (/api/v1/modules/cfo/companies)', function () {
         expect(Cache::has(CompanyService::CACHE_KEY_LIST))->toBeTrue();
     });
 
-    it('filters and paginates companies by name or stakeholder_name', function () {
+    it('filters and paginates companies by name', function () {
         Company::factory()->create([
             'name' => 'PT. Slaras Nusa Foodlab',
-            'stakeholder_name' => 'Rian',
         ]);
         Company::factory()->create([
             'name' => 'PT. Agro Pangan Sejahtera',
-            'stakeholder_name' => 'Siti Aminah',
         ]);
         Company::factory()->create([
             'name' => 'PT. Dairy Nusantara',
-            'stakeholder_name' => 'Andi Wijaya',
         ]);
 
-        $filtered = $this->getJson('/api/v1/modules/cfo/companies?search=Siti');
+        $filtered = $this->getJson('/api/v1/modules/cfo/companies?search=Agro');
         $filtered->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.name', 'PT. Agro Pangan Sejahtera')
-            ->assertJsonPath('data.0.stakeholder_name', 'Siti Aminah');
+            ->assertJsonPath('data.0.name', 'PT. Agro Pangan Sejahtera');
 
         $paginated = $this->getJson('/api/v1/modules/cfo/companies?page=1&per_page=2');
         $paginated->assertOk()
@@ -51,20 +47,18 @@ describe('CFO Company CRUD API (/api/v1/modules/cfo/companies)', function () {
             ->assertJsonPath('meta.last_page', 2);
     });
 
-    it('creates, updates, and soft-deletes a company without requiring stakeholder_name', function () {
+    it('creates, updates, and soft-deletes a company', function () {
         $createRes = $this->postJson('/api/v1/modules/cfo/companies', [
             'name' => 'PT. Slaras Nusa Foodlab',
         ]);
 
         $createRes->assertCreated()
-            ->assertJsonPath('data.name', 'PT. Slaras Nusa Foodlab')
-            ->assertJsonPath('data.stakeholder_name', '');
+            ->assertJsonPath('data.name', 'PT. Slaras Nusa Foodlab');
 
         $companyId = $createRes->json('data.id');
         $this->assertDatabaseHas('companies', [
             'id' => $companyId,
             'name' => 'PT. Slaras Nusa Foodlab',
-            'stakeholder_name' => '',
         ]);
 
         $updateRes = $this->putJson("/api/v1/modules/cfo/companies/{$companyId}", [
@@ -72,8 +66,7 @@ describe('CFO Company CRUD API (/api/v1/modules/cfo/companies)', function () {
         ]);
 
         $updateRes->assertOk()
-            ->assertJsonPath('data.name', 'PT. Slaras Nusa Foodlab Internasional')
-            ->assertJsonPath('data.stakeholder_name', '');
+            ->assertJsonPath('data.name', 'PT. Slaras Nusa Foodlab Internasional');
 
         $deleteRes = $this->deleteJson("/api/v1/modules/cfo/companies/{$companyId}");
         $deleteRes->assertOk();
@@ -84,12 +77,11 @@ describe('CFO Company CRUD API (/api/v1/modules/cfo/companies)', function () {
         $listRes->assertOk()->assertJsonCount(0, 'data');
     });
 
-    it('validates company name when creating or updating and allows optional stakeholder_name', function () {
+    it('validates company name when creating or updating', function () {
         $this->postJson('/api/v1/modules/cfo/companies', [
             'name' => '',
         ])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['name'])
-            ->assertJsonMissingValidationErrors(['stakeholder_name']);
+            ->assertJsonValidationErrors(['name']);
     });
 });

@@ -11,6 +11,7 @@ return new class extends Migration
         Schema::create('capital_companies', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete();
+            $table->string('stakeholder_name', 150)->index();
             $table->float('capital');
             $table->timestamps();
             $table->softDeletes();

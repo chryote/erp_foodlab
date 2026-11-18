@@ -13,7 +13,6 @@ describe('CFO CapitalCompany CRUD API (/api/v1/modules/cfo/capital-companies)', 
     it('lists capital companies with company relation and caches results', function () {
         $company = Company::factory()->create([
             'name' => 'PT. Slaras Nusa Foodlab',
-            'stakeholder_name' => 'Rian',
         ]);
         CapitalCompany::factory()->count(2)->create([
             'company_id' => $company->id,
@@ -32,38 +31,41 @@ describe('CFO CapitalCompany CRUD API (/api/v1/modules/cfo/capital-companies)', 
         expect(Cache::has(CapitalCompanyService::CACHE_KEY_LIST))->toBeTrue();
     });
 
-    it('filters and paginates capital companies by company name, stakeholder, or capital', function () {
+    it('filters and paginates capital companies by company_id, company name, stakeholder_name, or capital', function () {
         $c1 = Company::factory()->create([
             'name' => 'PT. Slaras Nusa Foodlab',
-            'stakeholder_name' => 'Rian',
         ]);
         $c2 = Company::factory()->create([
             'name' => 'PT. Agro Pangan Sejahtera',
-            'stakeholder_name' => 'Siti Aminah',
-        ]);
-        $c3 = Company::factory()->create([
-            'name' => 'PT. Dairy Nusantara',
-            'stakeholder_name' => 'Andi Wijaya',
         ]);
 
         CapitalCompany::factory()->create([
             'company_id' => $c1->id,
+            'stakeholder_name' => 'Rian',
             'capital' => 150000000.5,
         ]);
         CapitalCompany::factory()->create([
-            'company_id' => $c2->id,
+            'company_id' => $c1->id,
+            'stakeholder_name' => 'Siti Aminah',
             'capital' => 275000000.75,
         ]);
         CapitalCompany::factory()->create([
-            'company_id' => $c3->id,
+            'company_id' => $c2->id,
+            'stakeholder_name' => 'Andi Wijaya',
             'capital' => 500000000.0,
         ]);
 
-        $filtered = $this->getJson('/api/v1/modules/cfo/capital-companies?search=Siti');
-        $filtered->assertOk()
+        $filteredByStakeholder = $this->getJson('/api/v1/modules/cfo/capital-companies?search=Siti');
+        $filteredByStakeholder->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.company_id', $c2->id)
-            ->assertJsonPath('data.0.company.name', 'PT. Agro Pangan Sejahtera');
+            ->assertJsonPath('data.0.company_id', $c1->id)
+            ->assertJsonPath('data.0.stakeholder_name', 'Siti Aminah')
+            ->assertJsonPath('data.0.company.name', 'PT. Slaras Nusa Foodlab');
+
+        $filteredByCompany = $this->getJson("/api/v1/modules/cfo/capital-companies?company_id={$c1->id}");
+        $filteredByCompany->assertOk()
+            ->assertJsonCount(2, 'data');
+        expect((float) $filteredByCompany->json('meta.total_capital'))->toBe(425000001.25);
 
         $paginated = $this->getJson('/api/v1/modules/cfo/capital-companies?page=1&per_page=2');
         $paginated->assertOk()
@@ -73,23 +75,23 @@ describe('CFO CapitalCompany CRUD API (/api/v1/modules/cfo/capital-companies)', 
             ->assertJsonPath('meta.last_page', 2);
     });
 
-    it('creates, updates, shows, and soft-deletes a capital company with float capital', function () {
+    it('creates, updates, shows, and soft-deletes a capital company with stakeholder_name and float capital', function () {
         $companyA = Company::factory()->create([
             'name' => 'PT. Slaras Nusa Foodlab',
-            'stakeholder_name' => 'Rian',
         ]);
         $companyB = Company::factory()->create([
             'name' => 'PT. Pangan Nusantara',
-            'stakeholder_name' => 'Siti Aminah',
         ]);
 
         $createRes = $this->postJson('/api/v1/modules/cfo/capital-companies', [
             'company_id' => $companyA->id,
+            'stakeholder_name' => 'Rian',
             'capital' => 250000000.75,
         ]);
 
         $createRes->assertCreated()
             ->assertJsonPath('data.company_id', $companyA->id)
+            ->assertJsonPath('data.stakeholder_name', 'Rian')
             ->assertJsonPath('data.company.name', 'PT. Slaras Nusa Foodlab');
 
         expect((float) $createRes->json('data.capital'))->toBe(250000000.75);
@@ -98,20 +100,24 @@ describe('CFO CapitalCompany CRUD API (/api/v1/modules/cfo/capital-companies)', 
         $this->assertDatabaseHas('capital_companies', [
             'id' => $capitalCompanyId,
             'company_id' => $companyA->id,
+            'stakeholder_name' => 'Rian',
         ]);
 
         $showRes = $this->getJson("/api/v1/modules/cfo/capital-companies/{$capitalCompanyId}");
         $showRes->assertOk()
             ->assertJsonPath('data.id', $capitalCompanyId)
+            ->assertJsonPath('data.stakeholder_name', 'Rian')
             ->assertJsonPath('data.company.name', 'PT. Slaras Nusa Foodlab');
 
         $updateRes = $this->putJson("/api/v1/modules/cfo/capital-companies/{$capitalCompanyId}", [
             'company_id' => $companyB->id,
+            'stakeholder_name' => 'Siti Aminah',
             'capital' => 425500000.25,
         ]);
 
         $updateRes->assertOk()
             ->assertJsonPath('data.company_id', $companyB->id)
+            ->assertJsonPath('data.stakeholder_name', 'Siti Aminah')
             ->assertJsonPath('data.company.name', 'PT. Pangan Nusantara');
 
         expect((float) $updateRes->json('data.capital'))->toBe(425500000.25);
@@ -125,12 +131,13 @@ describe('CFO CapitalCompany CRUD API (/api/v1/modules/cfo/capital-companies)', 
         $listRes->assertOk()->assertJsonCount(0, 'data');
     });
 
-    it('validates company_id and float capital when creating or updating', function () {
+    it('validates company_id, stakeholder_name, and float capital when creating or updating', function () {
         $this->postJson('/api/v1/modules/cfo/capital-companies', [
             'company_id' => 999999,
+            'stakeholder_name' => '',
             'capital' => 'invalid-number',
         ])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['company_id', 'capital']);
+            ->assertJsonValidationErrors(['company_id', 'stakeholder_name', 'capital']);
     });
 });

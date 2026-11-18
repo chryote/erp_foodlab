@@ -18,6 +18,7 @@ class CapitalCompanyController extends Controller
     public function index(Request $request): JsonResponse
     {
         $search = $request->query('search');
+        $companyId = $request->query('company_id');
         $perPage = $request->query('per_page');
         $page = $request->query('page');
 
@@ -25,9 +26,12 @@ class CapitalCompanyController extends Controller
             $paginator = $this->capitalCompanyService->paginateCapitalCompanies(
                 is_string($search) ? $search : null,
                 max(1, (int) ($perPage ?? 10)),
-                max(1, (int) ($page ?? 1))
+                max(1, (int) ($page ?? 1)),
+                $companyId !== null ? (int) $companyId : null
             );
-            $totalCapital = $this->capitalCompanyService->getTotalCapital();
+            $totalCapital = $companyId !== null
+                ? $this->capitalCompanyService->getTotalCapitalForCompany((int) $companyId)
+                : $this->capitalCompanyService->getTotalCapital();
 
             return response()->json([
                 'data' => $paginator->items(),
@@ -43,7 +47,9 @@ class CapitalCompanyController extends Controller
             ]);
         }
 
-        $capitalCompanies = $this->capitalCompanyService->listCapitalCompanies();
+        $capitalCompanies = $companyId !== null
+            ? $this->capitalCompanyService->listCapitalCompaniesByCompany((int) $companyId)
+            : $this->capitalCompanyService->listCapitalCompanies();
         $totalCapital = (float) $capitalCompanies->sum('capital');
 
         return response()->json([
@@ -68,6 +74,7 @@ class CapitalCompanyController extends Controller
                 'integer',
                 Rule::exists('companies', 'id')->whereNull('deleted_at'),
             ],
+            'stakeholder_name' => ['required', 'string', 'max:150'],
             'capital' => ['required', 'numeric', 'min:0'],
         ]);
 
@@ -95,6 +102,7 @@ class CapitalCompanyController extends Controller
                 'integer',
                 Rule::exists('companies', 'id')->whereNull('deleted_at'),
             ],
+            'stakeholder_name' => ['required', 'string', 'max:150'],
             'capital' => ['required', 'numeric', 'min:0'],
         ]);
 
