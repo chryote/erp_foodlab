@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from './Button';
 import { DataTable, type DataTableColumn } from './DataTable';
-import { Pagination, TableFilterBar } from './Pagination';
+import { Pagination } from './Pagination';
 
 export interface ModalProps {
   isOpen: boolean;
@@ -291,8 +291,6 @@ export interface CrudModalProps<T extends CrudEntity> {
   computedColumns?: CrudComputedColumnConfig<T>[];
   summary?: React.ReactNode;
   emptyMessage?: string;
-  filterLabel?: string;
-  filterPlaceholder?: string;
   pageSize?: number;
   items: T[];
   loading?: boolean;
@@ -317,8 +315,6 @@ export function CrudModal<T extends CrudEntity>({
   computedColumns = [],
   summary,
   emptyMessage = 'Belum ada data.',
-  filterLabel = 'Filter Data',
-  filterPlaceholder = 'Cari berdasarkan nama...',
   pageSize = 5,
   items,
   loading = false,
@@ -353,50 +349,24 @@ export function CrudModal<T extends CrudEntity>({
     createEmptyFormValues
   );
   const [editingItem, setEditingItem] = useState<T | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     if (!isOpen) {
       setFormValues(createEmptyFormValues());
       setEditingItem(null);
-      setSearchQuery('');
       setCurrentPage(1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  const filteredItems = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) {
-      return items;
-    }
-    return items.filter(
-      (item) =>
-        resolvedFields.some((field) => {
-          if (field.filterText) {
-            return field.filterText(item).toLowerCase().includes(q);
-          }
-          const val = item[field.key];
-          return (
-            val !== null &&
-            val !== undefined &&
-            String(val).toLowerCase().includes(q)
-          );
-        }) ||
-        computedColumns.some((col) =>
-          col.filterText ? col.filterText(item).toLowerCase().includes(q) : false
-        )
-    );
-  }, [items, resolvedFields, computedColumns, searchQuery]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);
 
   const paginatedItems = useMemo(() => {
     const start = (safeCurrentPage - 1) * pageSize;
-    return filteredItems.slice(start, start + pageSize);
-  }, [filteredItems, safeCurrentPage, pageSize]);
+    return items.slice(start, start + pageSize);
+  }, [items, safeCurrentPage, pageSize]);
 
   const handleFieldChange = (key: string, value: string) => {
     setFormValues((prev) => ({
@@ -441,11 +411,6 @@ export function CrudModal<T extends CrudEntity>({
   const handleCancelEdit = () => {
     setEditingItem(null);
     setFormValues(createEmptyFormValues());
-  };
-
-  const handleSearchChange = (value: string) => {
-    setSearchQuery(value);
-    setCurrentPage(1);
   };
 
   const columns: DataTableColumn<T>[] = [
@@ -575,14 +540,6 @@ export function CrudModal<T extends CrudEntity>({
         </div>
       </form>
 
-      <TableFilterBar
-        searchValue={searchQuery}
-        onSearchChange={handleSearchChange}
-        searchLabel={filterLabel}
-        searchPlaceholder={filterPlaceholder}
-        testId={`${testId}-filter`}
-      />
-
       {summary}
 
       <DataTable
@@ -595,7 +552,7 @@ export function CrudModal<T extends CrudEntity>({
       <Pagination
         currentPage={safeCurrentPage}
         totalPages={totalPages}
-        totalItems={filteredItems.length}
+        totalItems={items.length}
         testId={`${testId}-pagination`}
         onPageChange={setCurrentPage}
       />

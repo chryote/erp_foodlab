@@ -59,7 +59,7 @@ class CompanyController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
-            'stakeholder_name' => ['required', 'string', 'max:150'],
+            'stakeholder_name' => ['nullable', 'string', 'max:150'],
         ]);
 
         $company = $this->companyService->createCompany($validated);
@@ -80,7 +80,7 @@ class CompanyController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
-            'stakeholder_name' => ['required', 'string', 'max:150'],
+            'stakeholder_name' => ['nullable', 'string', 'max:150'],
         ]);
 
         $updated = $this->companyService->updateCompany($company, $validated);

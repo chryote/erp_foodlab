@@ -172,14 +172,7 @@ describe('Reusable UI Components (src/components/ui)', () => {
     // Navigate to page 2
     fireEvent.click(screen.getByTestId('crud-modal-pagination-next'));
     expect(screen.getByText('PT. Contoh Tiga')).toBeInTheDocument();
-
-    // Filter by stakeholder
-    fireEvent.change(screen.getByLabelText('Filter Data'), {
-      target: { value: 'Andi' },
-    });
-    expect(screen.getByText('PT. Contoh Satu')).toBeInTheDocument();
-    expect(screen.queryByText('PT. Contoh Tiga')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Reset Filter' }));
+    fireEvent.click(screen.getByTestId('crud-modal-pagination-prev'));
 
     const nameInput = screen.getByLabelText('Nama Perusahaan');
     const stakeholderInput = screen.getByLabelText('Nama Stakeholder');

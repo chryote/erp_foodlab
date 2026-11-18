@@ -103,48 +103,34 @@ describe('App ERP Main Menu integration', () => {
     await waitFor(() => {
       expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(1);
     });
-    expect(screen.getByText('Rian')).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('Nama Stakeholder')
+    ).not.toBeInTheDocument();
 
-    // Create company with stakeholder_name
+    // Create company with only Nama Perusahaan
     const nameInput = screen.getByLabelText('Nama Perusahaan');
-    const stakeholderInput = screen.getByLabelText('Nama Stakeholder');
     fireEvent.change(nameInput, { target: { value: 'PT. Pangan Nusantara' } });
-    fireEvent.change(stakeholderInput, { target: { value: 'Siti Aminah' } });
     fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
 
     await waitFor(() => {
       expect(apiClient.createCompany).toHaveBeenCalledWith({
         name: 'PT. Pangan Nusantara',
-        stakeholder_name: 'Siti Aminah',
       });
       expect(screen.getByText('PT. Pangan Nusantara')).toBeInTheDocument();
-      expect(screen.getByText('Siti Aminah')).toBeInTheDocument();
     });
-
-    // Filter company table
-    const filterInput = screen.getByLabelText('Filter Perusahaan / Stakeholder');
-    fireEvent.change(filterInput, { target: { value: 'Siti' } });
-    expect(screen.getByText('PT. Pangan Nusantara')).toBeInTheDocument();
-    expect(screen.queryByText('Rian')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Reset Filter' }));
 
     // Update company
     fireEvent.click(screen.getByTestId('edit-row-2'));
     fireEvent.change(nameInput, {
       target: { value: 'PT. Pangan Nusantara Baru' },
     });
-    fireEvent.change(stakeholderInput, {
-      target: { value: 'Rina Kartika' },
-    });
     fireEvent.click(screen.getByRole('button', { name: 'Perbarui' }));
 
     await waitFor(() => {
       expect(apiClient.updateCompany).toHaveBeenCalledWith(2, {
         name: 'PT. Pangan Nusantara Baru',
-        stakeholder_name: 'Rina Kartika',
       });
       expect(screen.getByText('PT. Pangan Nusantara Baru')).toBeInTheDocument();
-      expect(screen.getByText('Rina Kartika')).toBeInTheDocument();
     });
 
     // Delete company

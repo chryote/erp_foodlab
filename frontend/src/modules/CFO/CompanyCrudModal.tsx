@@ -14,11 +14,6 @@ export const COMPANY_CRUD_FIELDS: CrudFieldConfig<Company>[] = [
     label: 'Nama Perusahaan',
     placeholder: 'Contoh: PT. ABC DEF',
   },
-  {
-    key: 'stakeholder_name',
-    label: 'Nama Stakeholder',
-    placeholder: 'Contoh: Agus',
-  },
 ];
 
 export interface CompanyCrudModalProps {
@@ -61,7 +56,6 @@ export const CompanyCrudModal: React.FC<CompanyCrudModalProps> = ({
     try {
       const res = await createCompany({
         name: values.name ?? '',
-        stakeholder_name: values.stakeholder_name ?? '',
       });
       setCompanies((prev) => [res.data, ...prev]);
     } catch (err) {
@@ -79,7 +73,6 @@ export const CompanyCrudModal: React.FC<CompanyCrudModalProps> = ({
     try {
       const res = await updateCompany(id, {
         name: values.name ?? '',
-        stakeholder_name: values.stakeholder_name ?? '',
       });
       setCompanies((prev) =>
         prev.map((item) => (item.id === id ? res.data : item))
@@ -112,11 +105,9 @@ export const CompanyCrudModal: React.FC<CompanyCrudModalProps> = ({
     <CrudModal
       isOpen={isOpen}
       title="Manajemen Perusahaan"
-      subtitle="Kelola data perusahaan dan stakeholder pada modul CFO (Input Modal)"
+      subtitle="Kelola data perusahaan pada modul CFO (Input Modal)"
       testId="perusahaan-crud-modal"
       fields={COMPANY_CRUD_FIELDS}
-      filterLabel="Filter Perusahaan / Stakeholder"
-      filterPlaceholder="Cari nama perusahaan atau stakeholder..."
       emptyMessage="Belum ada data perusahaan."
       pageSize={5}
       items={companies}

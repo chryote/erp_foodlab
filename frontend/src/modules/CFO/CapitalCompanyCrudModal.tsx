@@ -240,8 +240,6 @@ export const CapitalCompanyCrudModal: React.FC<
           testId="total-kapital-perusahaan-banner"
         />
       }
-      filterLabel="Filter Perusahaan / Kapital"
-      filterPlaceholder="Cari nama perusahaan, stakeholder, atau nominal kapital..."
       emptyMessage="Belum ada data kapital perusahaan."
       pageSize={5}
       items={capitalCompanies}

@@ -35,8 +35,8 @@ describe('General API Client Contract & Error Handling', () => {
     await fetchErpModules();
     await fetchLabSamples();
     await fetchCompanies();
-    await createCompany({ name: 'PT A', stakeholder_name: 'User A' });
-    await updateCompany(1, { name: 'PT A2', stakeholder_name: 'User A2' });
+    await createCompany({ name: 'PT A' });
+    await updateCompany(1, { name: 'PT A2' });
     await deleteCompany(1);
     await fetchCapitalCompanies();
     await createCapitalCompany({ company_id: 1, capital: 1000.5 });

@@ -51,31 +51,29 @@ describe('CFO Company CRUD API (/api/v1/modules/cfo/companies)', function () {
             ->assertJsonPath('meta.last_page', 2);
     });
 
-    it('creates, updates, and soft-deletes a company with stakeholder_name', function () {
+    it('creates, updates, and soft-deletes a company without requiring stakeholder_name', function () {
         $createRes = $this->postJson('/api/v1/modules/cfo/companies', [
             'name' => 'PT. Slaras Nusa Foodlab',
-            'stakeholder_name' => 'Rian',
         ]);
 
         $createRes->assertCreated()
             ->assertJsonPath('data.name', 'PT. Slaras Nusa Foodlab')
-            ->assertJsonPath('data.stakeholder_name', 'Rian');
+            ->assertJsonPath('data.stakeholder_name', '');
 
         $companyId = $createRes->json('data.id');
         $this->assertDatabaseHas('companies', [
             'id' => $companyId,
             'name' => 'PT. Slaras Nusa Foodlab',
-            'stakeholder_name' => 'Rian',
+            'stakeholder_name' => '',
         ]);
 
         $updateRes = $this->putJson("/api/v1/modules/cfo/companies/{$companyId}", [
             'name' => 'PT. Slaras Nusa Foodlab Internasional',
-            'stakeholder_name' => 'Rina Kartika',
         ]);
 
         $updateRes->assertOk()
             ->assertJsonPath('data.name', 'PT. Slaras Nusa Foodlab Internasional')
-            ->assertJsonPath('data.stakeholder_name', 'Rina Kartika');
+            ->assertJsonPath('data.stakeholder_name', '');
 
         $deleteRes = $this->deleteJson("/api/v1/modules/cfo/companies/{$companyId}");
         $deleteRes->assertOk();
@@ -86,12 +84,12 @@ describe('CFO Company CRUD API (/api/v1/modules/cfo/companies)', function () {
         $listRes->assertOk()->assertJsonCount(0, 'data');
     });
 
-    it('validates company name and stakeholder_name when creating or updating', function () {
+    it('validates company name when creating or updating and allows optional stakeholder_name', function () {
         $this->postJson('/api/v1/modules/cfo/companies', [
             'name' => '',
-            'stakeholder_name' => '',
         ])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['name', 'stakeholder_name']);
+            ->assertJsonValidationErrors(['name'])
+            ->assertJsonMissingValidationErrors(['stakeholder_name']);
     });
 });

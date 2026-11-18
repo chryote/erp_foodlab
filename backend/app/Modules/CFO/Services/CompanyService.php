@@ -37,6 +37,7 @@ class CompanyService
 
     public function createCompany(array $attributes): Company
     {
+        $attributes['stakeholder_name'] = $attributes['stakeholder_name'] ?? '';
         $company = Company::query()->create($attributes);
         Cache::forget(self::CACHE_KEY_LIST);
         Cache::forget(CapitalCompanyService::CACHE_KEY_LIST);
@@ -46,6 +47,9 @@ class CompanyService
 
     public function updateCompany(Company $company, array $attributes): Company
     {
+        if (array_key_exists('stakeholder_name', $attributes)) {
+            $attributes['stakeholder_name'] = $attributes['stakeholder_name'] ?? '';
+        }
         $company->update($attributes);
         Cache::forget(self::CACHE_KEY_LIST);
         Cache::forget(CapitalCompanyService::CACHE_KEY_LIST);
