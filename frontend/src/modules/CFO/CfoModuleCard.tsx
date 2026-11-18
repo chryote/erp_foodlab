@@ -1,6 +1,18 @@
 import React from 'react';
 import type { ErpModuleOverview } from '../../api/client';
-import { ModuleLauncherCard } from '../../components/ui';
+import {
+  HorizontalMenu,
+  type HorizontalMenuItem,
+  ModuleLauncherCard,
+} from '../../components/ui';
+
+export const CFO_MENU_ITEMS: HorizontalMenuItem[] = [
+  { code: 'INPUT_MODAL', title: 'Input Modal' },
+  { code: 'INPUT_OPERASIONAL', title: 'Input Operasional' },
+  { code: 'INPUT_ASET', title: 'Input Aset' },
+  { code: 'LABA_RUGI', title: 'Laba Rugi' },
+  { code: 'NERACA', title: 'Neraca' },
+];
 
 export const DEFAULT_CFO_MODULE: ErpModuleOverview = {
   code: 'CFO',
@@ -60,6 +72,27 @@ export const CfoModuleCard: React.FC<CfoModuleCardProps> = ({
       accent="cfo"
       isSelected={isSelected}
       onClick={() => onSelect?.(data)}
+    />
+  );
+};
+
+interface CfoHorizontalMenuProps {
+  selectedCode?: string | null;
+  onSelect?: (item: HorizontalMenuItem) => void;
+}
+
+export const CfoHorizontalMenu: React.FC<CfoHorizontalMenuProps> = ({
+  selectedCode = null,
+  onSelect,
+}) => {
+  return (
+    <HorizontalMenu
+      items={CFO_MENU_ITEMS}
+      accent="cfo"
+      selectedCode={selectedCode}
+      ariaLabel="CFO Submenu"
+      testId="cfo-horizontal-menu"
+      onSelect={onSelect}
     />
   );
 };

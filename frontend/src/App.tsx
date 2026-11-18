@@ -4,17 +4,16 @@ import {
   type ErpModuleCode,
   type ErpModuleOverview,
 } from './api/client';
-import { CfoModuleCard } from './modules/CFO/CfoModuleCard';
+import {
+  CfoHorizontalMenu,
+  CfoModuleCard,
+} from './modules/CFO/CfoModuleCard';
 import { ChoModuleCard } from './modules/CHO/ChoModuleCard';
 import { CpoModuleCard } from './modules/CPO/CpoModuleCard';
 import { CdoModuleCard } from './modules/CDO/CdoModuleCard';
 import { CmoModuleCard } from './modules/CMO/CmoModuleCard';
 import {
-  Badge,
-  Button,
-  Card,
-  CardHeader,
-  DataTable,
+  type HorizontalMenuItem,
   PageHeader,
 } from './components/ui';
 import './App.css';
@@ -25,6 +24,17 @@ export const App: React.FC = () => {
   >({});
   const [selectedModule, setSelectedModule] =
     useState<ErpModuleOverview | null>(null);
+  const [selectedSubMenu, setSelectedSubMenu] =
+    useState<HorizontalMenuItem | null>(null);
+
+  const handleSelectModule = useCallback((mod: ErpModuleOverview) => {
+    setSelectedModule((prev) => {
+      if (prev?.code !== mod.code) {
+        setSelectedSubMenu(null);
+      }
+      return mod;
+    });
+  }, []);
 
   const loadDashboardData = useCallback(async () => {
     try {
@@ -56,73 +66,38 @@ export const App: React.FC = () => {
             <CfoModuleCard
               data={modulesMap.CFO}
               isSelected={selectedModule?.code === 'CFO'}
-              onSelect={setSelectedModule}
+              onSelect={handleSelectModule}
             />
             <ChoModuleCard
               data={modulesMap.CHO}
               isSelected={selectedModule?.code === 'CHO'}
-              onSelect={setSelectedModule}
+              onSelect={handleSelectModule}
             />
             <CpoModuleCard
               data={modulesMap.CPO}
               isSelected={selectedModule?.code === 'CPO'}
-              onSelect={setSelectedModule}
+              onSelect={handleSelectModule}
             />
             <CdoModuleCard
               data={modulesMap.CDO}
               isSelected={selectedModule?.code === 'CDO'}
-              onSelect={setSelectedModule}
+              onSelect={handleSelectModule}
             />
             <CmoModuleCard
               data={modulesMap.CMO}
               isSelected={selectedModule?.code === 'CMO'}
-              onSelect={setSelectedModule}
+              onSelect={handleSelectModule}
             />
           </div>
         </section>
 
-        {selectedModule && (
-          <Card
-            variant="highlighted"
-            aria-label="Selected Module Workspace"
-            data-testid="selected-module-panel"
-          >
-            <CardHeader
-              eyebrow= ""
-              title=""
-              subtitle={selectedModule.subtitle}
-              actions={
-                <Button
-                  variant="secondary"
-                  onClick={() => setSelectedModule(null)}
-                >
-                  Tutup Detail
-                </Button>
-              }
+        {selectedModule?.code === 'CFO' && (
+          <section aria-label="CFO Module Navigation">
+            <CfoHorizontalMenu
+              selectedCode={selectedSubMenu?.code ?? null}
+              onSelect={setSelectedSubMenu}
             />
-
-            <DataTable
-              columns={[
-                {
-                  key: 'id',
-                  header: 'ID Dokumen',
-                  render: (item) => <code>{item.id}</code>,
-                },
-                {
-                  key: 'name',
-                  header: 'Deskripsi Aktivitas',
-                  render: (item) => item.name,
-                },
-                {
-                  key: 'status',
-                  header: 'Status',
-                  render: (item) => <Badge variant="ok">{item.status}</Badge>,
-                },
-              ]}
-              data={selectedModule.recent_items}
-              rowKey={(item) => item.id}
-            />
-          </Card>
+          </section>
         )}
       </main>
     </div>

@@ -6,6 +6,8 @@ import {
   Card,
   CardHeader,
   DataTable,
+  HorizontalMenu,
+  HorizontalMenuCard,
   ModuleLauncherCard,
 } from '../components/ui';
 
@@ -61,5 +63,40 @@ describe('Reusable UI Components (src/components/ui)', () => {
     expect(screen.getByRole('button', { name: 'Tambah' })).toBeInTheDocument();
     expect(screen.getByText('Laporan Kas')).toBeInTheDocument();
     expect(screen.getByText('Verified')).toBeInTheDocument();
+  });
+
+  it('renders reusable HorizontalMenuCard and HorizontalMenu with text-only items', () => {
+    const onSelect = vi.fn();
+    const items = [
+      { code: 'INPUT_MODAL', title: 'Input Modal' },
+      { code: 'NERACA', title: 'Neraca' },
+    ];
+
+    render(
+      <>
+        <HorizontalMenuCard
+          code="STANDALONE"
+          title="Standalone Menu"
+          isSelected={true}
+        />
+        <HorizontalMenu
+          items={items}
+          selectedCode="INPUT_MODAL"
+          onSelect={onSelect}
+        />
+      </>
+    );
+
+    const standalone = screen.getByTestId('horizontal-menu-card-STANDALONE');
+    expect(standalone).toHaveTextContent('Standalone Menu');
+    expect(standalone).toHaveAttribute('aria-pressed', 'true');
+
+    const modalCard = screen.getByTestId('horizontal-menu-card-INPUT_MODAL');
+    const neracaCard = screen.getByTestId('horizontal-menu-card-NERACA');
+    expect(modalCard).toHaveAttribute('aria-pressed', 'true');
+    expect(neracaCard).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(neracaCard);
+    expect(onSelect).toHaveBeenCalledWith({ code: 'NERACA', title: 'Neraca' });
   });
 });

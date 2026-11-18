@@ -136,6 +136,46 @@ body {
   line-height: 1.35;
 }
 
+/* Reusable Horizontal Menu Card (Text Only) */
+.ui-horizontal-menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1.25rem;
+}
+
+.ui-horizontal-menu-card {
+  appearance: none;
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 1.35rem 1.15rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.ui-horizontal-menu-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
+}
+
+.ui-horizontal-menu-card.selected {
+  border-color: #0f172a;
+  box-shadow: 0 0 0 2px #0f172a;
+}
+
+.ui-horizontal-menu-title {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.35;
+}
+
 /* Reusable Card & CardHeader */
 .ui-card {
   background: #ffffff;

@@ -40,9 +40,20 @@ describe('App ERP Main Menu integration', () => {
       expect(apiClient.fetchErpModules).toHaveBeenCalledTimes(1);
     });
 
+    expect(screen.queryByTestId('cfo-horizontal-menu')).not.toBeInTheDocument();
+
     fireEvent.click(screen.getByTestId('module-card-CFO'));
-    expect(screen.getByTestId('selected-module-panel')).toHaveTextContent(
-      'Jurnal Penutupan Bulanan FoodLab'
-    );
+
+    const cfoSubMenu = screen.getByTestId('cfo-horizontal-menu');
+    expect(cfoSubMenu).toBeInTheDocument();
+    expect(screen.getByText('Input Modal')).toBeInTheDocument();
+    expect(screen.getByText('Input Operasional')).toBeInTheDocument();
+    expect(screen.getByText('Input Aset')).toBeInTheDocument();
+    expect(screen.getByText('Laba Rugi')).toBeInTheDocument();
+    expect(screen.getByText('Neraca')).toBeInTheDocument();
+
+    const inputModalCard = screen.getByTestId('horizontal-menu-card-INPUT_MODAL');
+    fireEvent.click(inputModalCard);
+    expect(inputModalCard).toHaveAttribute('aria-pressed', 'true');
   });
 });
