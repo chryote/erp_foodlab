@@ -57,6 +57,22 @@ export interface ErpModulesListResponse {
   };
 }
 
+export interface Company {
+  id: number;
+  name: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface CompaniesListResponse {
+  data: Company[];
+  meta: {
+    count: number;
+    cache_key?: string;
+  };
+}
+
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
@@ -88,4 +104,69 @@ export async function fetchLabSamples(): Promise<SamplesListResponse> {
     throw new Error(`Failed to fetch samples: ${response.status}`);
   }
   return response.json();
+}
+
+export async function fetchCompanies(): Promise<CompaniesListResponse> {
+  const response = await fetch(`${API_BASE_URL}/v1/modules/cfo/companies`, {
+    headers: { Accept: 'application/json' },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch companies: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function createCompany(payload: {
+  name: string;
+}): Promise<{ data: Company }> {
+  const response = await fetch(`${API_BASE_URL}/v1/modules/cfo/companies`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to create company: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function updateCompany(
+  id: number,
+  payload: { name: string }
+): Promise<{ data: Company }> {
+  const response = await fetch(
+    `${API_BASE_URL}/v1/modules/cfo/companies/${id}`,
+    {
+      method: 'PUT',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    }
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to update company: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function deleteCompany(
+  id: number
+): Promise<{ message: string }> {
+  const response = await fetch(
+    `${API_BASE_URL}/v1/modules/cfo/companies/${id}`,
+    {
+      method: 'DELETE',
+      headers: { Accept: 'application/json' },
+    }
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to delete company: ${response.status}`);
+  }
+  return response.json();
+
 }

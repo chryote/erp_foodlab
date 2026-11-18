@@ -1,8 +1,16 @@
 <?php
 
 use App\Modules\CFO\Controllers\CfoController;
+use App\Modules\CFO\Controllers\CompanyController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('cfo')->group(function () {
     Route::get('/', [CfoController::class, 'index'])->name('api.modules.cfo.index');
+
+    Route::get('/companies', [CompanyController::class, 'index'])->name('api.modules.cfo.companies.index');
+    Route::post('/companies', [CompanyController::class, 'store'])->name('api.modules.cfo.companies.store');
+    Route::get('/companies/{company}', [CompanyController::class, 'show'])->name('api.modules.cfo.companies.show');
+    Route::put('/companies/{company}', [CompanyController::class, 'update'])->name('api.modules.cfo.companies.update');
+    Route::patch('/companies/{company}', [CompanyController::class, 'update'])->name('api.modules.cfo.companies.patch');
+    Route::delete('/companies/{company}', [CompanyController::class, 'destroy'])->name('api.modules.cfo.companies.destroy');
 });

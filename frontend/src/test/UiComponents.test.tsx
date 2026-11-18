@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import {
   Badge,
@@ -6,6 +6,7 @@ import {
   Card,
   CardHeader,
   CascadingHorizontalMenu,
+  CrudModal,
   DataTable,
   HorizontalMenu,
   HorizontalMenuCard,
@@ -108,7 +109,6 @@ describe('Reusable UI Components (src/components/ui)', () => {
         title: 'Input Modal',
         children: [
           { code: 'PERUSAHAAN', title: 'Perusahaan' },
-          { code: 'NAMA_STAKEHOLDER', title: 'Nama Stakeholder' },
           {
             code: 'DAFTAR_SAHAM_PERUSAHAAN',
             title: 'Daftar Saham Perusahaan',
@@ -130,7 +130,46 @@ describe('Reusable UI Components (src/components/ui)', () => {
       screen.getByTestId('horizontal-submenu-INPUT_MODAL')
     ).toBeInTheDocument();
     expect(screen.getByText('Perusahaan')).toBeInTheDocument();
-    expect(screen.getByText('Nama Stakeholder')).toBeInTheDocument();
     expect(screen.getByText('Daftar Saham Perusahaan')).toBeInTheDocument();
+  });
+
+  it('renders reusable CrudModal and triggers create, update, and delete callbacks', async () => {
+    const onCreate = vi.fn();
+    const onUpdate = vi.fn();
+    const onDelete = vi.fn();
+    const onClose = vi.fn();
+
+    render(
+      <CrudModal
+        isOpen={true}
+        title="Manajemen Perusahaan"
+        inputLabel="Nama Perusahaan"
+        items={[{ id: 10, name: 'PT. Contoh Satu' }]}
+        onClose={onClose}
+        onCreate={onCreate}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+      />
+    );
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText('PT. Contoh Satu')).toBeInTheDocument();
+
+    const input = screen.getByLabelText('Nama Perusahaan');
+    fireEvent.change(input, { target: { value: 'PT. Contoh Dua' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
+    await waitFor(() => {
+      expect(onCreate).toHaveBeenCalledWith('PT. Contoh Dua');
+    });
+
+    fireEvent.click(screen.getByTestId('edit-row-10'));
+    fireEvent.change(input, { target: { value: 'PT. Contoh Satu Revisi' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Perbarui' }));
+    await waitFor(() => {
+      expect(onUpdate).toHaveBeenCalledWith(10, 'PT. Contoh Satu Revisi');
+    });
+
+    fireEvent.click(screen.getByTestId('delete-row-10'));
+    expect(onDelete).toHaveBeenCalledWith(10);
   });
 });

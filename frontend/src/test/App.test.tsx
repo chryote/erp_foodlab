@@ -26,6 +26,19 @@ describe('App ERP Main Menu integration', () => {
       ],
       meta: { count: 5 },
     });
+    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
+      data: [{ id: 1, name: 'PT. Slaras Nusa Foodlab' }],
+      meta: { count: 1 },
+    });
+    vi.mocked(apiClient.createCompany).mockResolvedValue({
+      data: { id: 2, name: 'PT. Pangan Nusantara' },
+    });
+    vi.mocked(apiClient.updateCompany).mockResolvedValue({
+      data: { id: 2, name: 'PT. Pangan Nusantara Baru' },
+    });
+    vi.mocked(apiClient.deleteCompany).mockResolvedValue({
+      message: 'Company deleted successfully.',
+    });
 
     render(<App />);
 
@@ -65,18 +78,59 @@ describe('App ERP Main Menu integration', () => {
     );
     expect(inputModalSubMenu).toBeInTheDocument();
     expect(screen.getByText('Perusahaan')).toBeInTheDocument();
-    expect(screen.getByText('Nama Stakeholder')).toBeInTheDocument();
     expect(screen.getByText('Daftar Saham Perusahaan')).toBeInTheDocument();
 
     const perusahaanCard = screen.getByTestId('horizontal-menu-card-PERUSAHAAN');
     fireEvent.click(perusahaanCard);
     expect(perusahaanCard).toHaveAttribute('aria-pressed', 'true');
 
+    const modal = await screen.findByTestId('perusahaan-crud-modal');
+    expect(modal).toBeInTheDocument();
+    await waitFor(() => {
+      expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(1);
+    });
+
+    // Create company
+    const input = screen.getByLabelText('Nama Perusahaan');
+    fireEvent.change(input, { target: { value: 'PT. Pangan Nusantara' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
+
+    await waitFor(() => {
+      expect(apiClient.createCompany).toHaveBeenCalledWith({
+        name: 'PT. Pangan Nusantara',
+      });
+      expect(screen.getByText('PT. Pangan Nusantara')).toBeInTheDocument();
+    });
+
+    // Update company
+    fireEvent.click(screen.getByTestId('edit-row-2'));
+    fireEvent.change(input, { target: { value: 'PT. Pangan Nusantara Baru' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Perbarui' }));
+
+    await waitFor(() => {
+      expect(apiClient.updateCompany).toHaveBeenCalledWith(2, {
+        name: 'PT. Pangan Nusantara Baru',
+      });
+      expect(screen.getByText('PT. Pangan Nusantara Baru')).toBeInTheDocument();
+    });
+
+    // Delete company
+    fireEvent.click(screen.getByTestId('delete-row-2'));
+    await waitFor(() => {
+      expect(apiClient.deleteCompany).toHaveBeenCalledWith(2);
+      expect(
+        screen.queryByText('PT. Pangan Nusantara Baru')
+      ).not.toBeInTheDocument();
+    });
+
     fireEvent.click(
       screen.getByTestId('horizontal-menu-card-INPUT_OPERASIONAL')
     );
     expect(
       screen.queryByTestId('horizontal-submenu-INPUT_MODAL')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('perusahaan-crud-modal')
     ).not.toBeInTheDocument();
   });
 });
