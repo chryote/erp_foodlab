@@ -8,7 +8,7 @@ import {
 
 export const CFO_INPUT_MODAL_ITEMS: HorizontalMenuItem[] = [
   { code: 'PERUSAHAAN', title: 'Perusahaan' },
-  { code: 'DAFTAR_SAHAM_PERUSAHAAN', title: 'Daftar Saham Perusahaan' },
+  { code: 'DAFTAR_KAPITAL_PERUSAHAAN', title: 'Daftar Modal Perusahaan' },
 ];
 
 export const CFO_MENU_ITEMS: HorizontalMenuItem[] = [

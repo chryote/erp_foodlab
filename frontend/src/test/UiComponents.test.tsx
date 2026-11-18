@@ -110,8 +110,8 @@ describe('Reusable UI Components (src/components/ui)', () => {
         children: [
           { code: 'PERUSAHAAN', title: 'Perusahaan' },
           {
-            code: 'DAFTAR_SAHAM_PERUSAHAAN',
-            title: 'Daftar Saham Perusahaan',
+            code: 'DAFTAR_KAPITAL_PERUSAHAAN',
+            title: 'Daftar Modal Perusahaan',
           },
         ],
       },
@@ -130,7 +130,7 @@ describe('Reusable UI Components (src/components/ui)', () => {
       screen.getByTestId('horizontal-submenu-INPUT_MODAL')
     ).toBeInTheDocument();
     expect(screen.getByText('Perusahaan')).toBeInTheDocument();
-    expect(screen.getByText('Daftar Saham Perusahaan')).toBeInTheDocument();
+    expect(screen.getByText('Daftar Modal Perusahaan')).toBeInTheDocument();
   });
 
   it('renders reusable CrudModal and triggers create, update, delete, filter, and pagination', async () => {

@@ -258,9 +258,11 @@ export function CrudModal<T extends NamedCrudEntity>({
 
   const columns: DataTableColumn<T>[] = [
     {
-      key: 'id',
-      header: 'ID',
-      render: (row) => <code>{row.id}</code>,
+      key: 'no',
+      header: 'No',
+      render: (_row, index) => (
+        <code>{(safeCurrentPage - 1) * pageSize + index + 1}</code>
+      ),
     },
     ...resolvedFields.map((field) => ({
       key: field.key,

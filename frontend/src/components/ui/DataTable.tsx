@@ -3,7 +3,7 @@ import React from 'react';
 export interface DataTableColumn<T> {
   key: string;
   header: string;
-  render: (row: T) => React.ReactNode;
+  render: (row: T, index: number) => React.ReactNode;
 }
 
 export interface DataTableProps<T> {
@@ -40,10 +40,10 @@ export function DataTable<T>({
           </tr>
         </thead>
         <tbody>
-          {data.map((row) => (
+          {data.map((row, index) => (
             <tr key={rowKey(row)}>
               {columns.map((col) => (
-                <td key={col.key}>{col.render(row)}</td>
+                <td key={col.key}>{col.render(row, index)}</td>
               ))}
             </tr>
           ))}
