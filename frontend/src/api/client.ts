@@ -78,101 +78,185 @@ export interface CompaniesListResponse {
   };
 }
 
+export interface CapitalCompany {
+  id: number;
+  company_id: number;
+  capital: number;
+  company?: Company | null;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface CapitalCompaniesListResponse {
+  data: CapitalCompany[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
-export async function fetchHealthStatus(): Promise<HealthResponse> {
-  const response = await fetch(`${API_BASE_URL}/health`, {
-    headers: { Accept: 'application/json' },
-  });
-  if (!response.ok) {
-    throw new Error(`Health check failed with status ${response.status}`);
+async function requestJson<T>(
+  endpoint: string,
+  options: RequestInit = {},
+  errorPrefix = 'Request failed'
+): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        Accept: 'application/json',
+        ...(options.headers ?? {}),
+      },
+    });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Tidak dapat terhubung ke server API (${API_BASE_URL}${endpoint}): ${detail}`
+    );
   }
-  return response.json();
+
+  if (!response.ok) {
+    let serverMessage = '';
+    try {
+      const errBody = (await response.json()) as { message?: string };
+      if (errBody?.message) {
+        serverMessage = ` - ${errBody.message.split('\n')[0]}`;
+      }
+    } catch {
+      // Ignore non-JSON error bodies
+    }
+    throw new Error(`${errorPrefix}: ${response.status}${serverMessage}`);
+  }
+
+  return response.json() as Promise<T>;
+}
+
+export async function fetchHealthStatus(): Promise<HealthResponse> {
+  return requestJson<HealthResponse>(
+    '/health',
+    {},
+    'Health check failed with status'
+  );
 }
 
 export async function fetchErpModules(): Promise<ErpModulesListResponse> {
-  const response = await fetch(`${API_BASE_URL}/v1/modules`, {
-    headers: { Accept: 'application/json' },
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ERP modules: ${response.status}`);
-  }
-  return response.json();
+  return requestJson<ErpModulesListResponse>(
+    '/v1/modules',
+    {},
+    'Failed to fetch ERP modules'
+  );
 }
 
 export async function fetchLabSamples(): Promise<SamplesListResponse> {
-  const response = await fetch(`${API_BASE_URL}/v1/samples`, {
-    headers: { Accept: 'application/json' },
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to fetch samples: ${response.status}`);
-  }
-  return response.json();
+  return requestJson<SamplesListResponse>(
+    '/v1/samples',
+    {},
+    'Failed to fetch samples'
+  );
 }
 
 export async function fetchCompanies(): Promise<CompaniesListResponse> {
-  const response = await fetch(`${API_BASE_URL}/v1/modules/cfo/companies`, {
-    headers: { Accept: 'application/json' },
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to fetch companies: ${response.status}`);
-  }
-  return response.json();
+  return requestJson<CompaniesListResponse>(
+    '/v1/modules/cfo/companies',
+    {},
+    'Failed to fetch companies'
+  );
 }
 
 export async function createCompany(payload: {
   name: string;
   stakeholder_name: string;
 }): Promise<{ data: Company }> {
-  const response = await fetch(`${API_BASE_URL}/v1/modules/cfo/companies`, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
+  return requestJson<{ data: Company }>(
+    '/v1/modules/cfo/companies',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to create company: ${response.status}`);
-  }
-  return response.json();
+    'Failed to create company'
+  );
 }
 
 export async function updateCompany(
   id: number,
   payload: { name: string; stakeholder_name: string }
 ): Promise<{ data: Company }> {
-  const response = await fetch(
-    `${API_BASE_URL}/v1/modules/cfo/companies/${id}`,
+  return requestJson<{ data: Company }>(
+    `/v1/modules/cfo/companies/${id}`,
     {
       method: 'PUT',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-    }
+    },
+    'Failed to update company'
   );
-  if (!response.ok) {
-    throw new Error(`Failed to update company: ${response.status}`);
-  }
-  return response.json();
 }
 
 export async function deleteCompany(
   id: number
 ): Promise<{ message: string }> {
-  const response = await fetch(
-    `${API_BASE_URL}/v1/modules/cfo/companies/${id}`,
-    {
-      method: 'DELETE',
-      headers: { Accept: 'application/json' },
-    }
+  return requestJson<{ message: string }>(
+    `/v1/modules/cfo/companies/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete company'
   );
-  if (!response.ok) {
-    throw new Error(`Failed to delete company: ${response.status}`);
-  }
-  return response.json();
-
 }
+
+export async function fetchCapitalCompanies(): Promise<CapitalCompaniesListResponse> {
+  return requestJson<CapitalCompaniesListResponse>(
+    '/v1/modules/cfo/capital-companies',
+    {},
+    'Failed to fetch capital companies'
+  );
+}
+
+export async function createCapitalCompany(payload: {
+  company_id: number;
+  capital: number;
+}): Promise<{ data: CapitalCompany }> {
+  return requestJson<{ data: CapitalCompany }>(
+    '/v1/modules/cfo/capital-companies',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create capital company'
+  );
+}
+
+export async function updateCapitalCompany(
+  id: number,
+  payload: { company_id: number; capital: number }
+): Promise<{ data: CapitalCompany }> {
+  return requestJson<{ data: CapitalCompany }>(
+    `/v1/modules/cfo/capital-companies/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update capital company'
+  );
+}
+
+export async function deleteCapitalCompany(
+  id: number
+): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/cfo/capital-companies/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete capital company'
+  );
+}
+

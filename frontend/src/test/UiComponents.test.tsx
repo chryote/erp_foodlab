@@ -206,4 +206,61 @@ describe('Reusable UI Components (src/components/ui)', () => {
     fireEvent.click(screen.getByTestId('delete-row-10'));
     expect(onDelete).toHaveBeenCalledWith(10);
   });
+
+  it('renders reusable CrudModal with select and number fields', async () => {
+    const onCreate = vi.fn();
+    const onUpdate = vi.fn();
+    const onDelete = vi.fn();
+    const onClose = vi.fn();
+
+    render(
+      <CrudModal
+        isOpen={true}
+        title="Daftar Kapital Perusahaan"
+        fields={[
+          {
+            key: 'company_id',
+            label: 'Perusahaan',
+            type: 'select',
+            placeholder: 'Pilih Perusahaan...',
+            options: [
+              { value: '1', label: 'PT. Slaras Nusa Foodlab (Rian)' },
+              { value: '2', label: 'PT. Pangan Nusantara (Siti Aminah)' },
+            ],
+          },
+          {
+            key: 'capital',
+            label: 'Kapital (Rp)',
+            type: 'number',
+            step: 'any',
+            placeholder: 'Contoh: 250000000.5',
+          },
+        ]}
+        items={[{ id: 100, company_id: 1, capital: 250000000.5 }]}
+        onClose={onClose}
+        onCreate={onCreate}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+      />
+    );
+
+    expect(
+      screen.getAllByText('PT. Slaras Nusa Foodlab (Rian)').length
+    ).toBeGreaterThanOrEqual(1);
+
+    fireEvent.change(screen.getByLabelText('Perusahaan'), {
+      target: { value: '2' },
+    });
+    fireEvent.change(screen.getByLabelText('Kapital (Rp)'), {
+      target: { value: '350000000.75' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
+
+    await waitFor(() => {
+      expect(onCreate).toHaveBeenCalledWith({
+        company_id: '2',
+        capital: '350000000.75',
+      });
+    });
+  });
 });

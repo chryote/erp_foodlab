@@ -89,20 +89,72 @@ export const TextInput: React.FC<TextInputProps> = ({
   );
 };
 
-export interface NamedCrudEntity {
+export interface SelectOption {
+  value: string;
+  label: string;
+}
+
+export interface SelectInputProps
+  extends React.SelectHTMLAttributes<HTMLSelectElement> {
+  label?: string;
+  placeholder?: string;
+  options: SelectOption[];
+}
+
+export const SelectInput: React.FC<SelectInputProps> = ({
+  label,
+  id,
+  placeholder = 'Pilih opsi...',
+  options,
+  className = '',
+  ...rest
+}) => {
+  return (
+    <div className="ui-input-group">
+      {label && (
+        <label htmlFor={id} className="ui-input-label">
+          {label}
+        </label>
+      )}
+      <select
+        id={id}
+        className={`ui-input ${className}`.trim()}
+        {...rest}
+      >
+        <option value="">{placeholder}</option>
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+};
+
+export interface CrudEntity {
   id: number;
-  name: string;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface NamedCrudEntity extends CrudEntity {
+  name: string;
 }
 
 export interface CrudFieldConfig<T> {
   key: keyof T & string;
   label: string;
   placeholder?: string;
+  type?: 'text' | 'number' | 'select';
+  step?: string | number;
+  min?: string | number;
+  options?: SelectOption[];
+  renderValue?: (row: T) => React.ReactNode;
+  filterText?: (row: T) => string;
 }
 
-export interface CrudModalProps<T extends NamedCrudEntity> {
+export interface CrudModalProps<T extends CrudEntity> {
   isOpen: boolean;
   title: string;
   subtitle?: string;
@@ -126,7 +178,7 @@ export interface CrudModalProps<T extends NamedCrudEntity> {
   onDelete: (id: number) => Promise<void> | void;
 }
 
-export function CrudModal<T extends NamedCrudEntity>({
+export function CrudModal<T extends CrudEntity>({
   isOpen,
   title,
   subtitle,
@@ -191,10 +243,11 @@ export function CrudModal<T extends NamedCrudEntity>({
     }
     return items.filter((item) =>
       resolvedFields.some((field) => {
+        if (field.filterText) {
+          return field.filterText(item).toLowerCase().includes(q);
+        }
         const val = item[field.key];
-        return (
-          typeof val === 'string' && val.toLowerCase().includes(q)
-        );
+        return val !== null && val !== undefined && String(val).toLowerCase().includes(q);
       })
     );
   }, [items, resolvedFields, searchQuery]);
@@ -241,7 +294,8 @@ export function CrudModal<T extends NamedCrudEntity>({
     const nextValues: Record<string, string> = {};
     for (const field of resolvedFields) {
       const raw = item[field.key];
-      nextValues[field.key] = typeof raw === 'string' ? raw : '';
+      nextValues[field.key] =
+        raw !== null && raw !== undefined ? String(raw) : '';
     }
     setFormValues(nextValues);
   };
@@ -267,7 +321,21 @@ export function CrudModal<T extends NamedCrudEntity>({
     ...resolvedFields.map((field) => ({
       key: field.key,
       header: field.label,
-      render: (row: T) => String(row[field.key] ?? ''),
+      render: (row: T) => {
+        if (field.renderValue) {
+          return field.renderValue(row);
+        }
+        const raw = row[field.key];
+        if (field.type === 'select' && field.options) {
+          const match = field.options.find(
+            (opt) => opt.value === String(raw ?? '')
+          );
+          if (match) {
+            return match.label;
+          }
+        }
+        return String(raw ?? '');
+      },
     })),
     {
       key: 'actions',
@@ -308,16 +376,31 @@ export function CrudModal<T extends NamedCrudEntity>({
       )}
 
       <form onSubmit={handleSubmit} className="ui-crud-form">
-        {resolvedFields.map((field) => (
-          <TextInput
-            key={field.key}
-            id={`${testId}-${field.key}-input`}
-            label={field.label}
-            placeholder={field.placeholder}
-            value={formValues[field.key] ?? ''}
-            onChange={(e) => handleFieldChange(field.key, e.target.value)}
-          />
-        ))}
+        {resolvedFields.map((field) =>
+          field.type === 'select' ? (
+            <SelectInput
+              key={field.key}
+              id={`${testId}-${field.key}-input`}
+              label={field.label}
+              placeholder={field.placeholder}
+              options={field.options ?? []}
+              value={formValues[field.key] ?? ''}
+              onChange={(e) => handleFieldChange(field.key, e.target.value)}
+            />
+          ) : (
+            <TextInput
+              key={field.key}
+              id={`${testId}-${field.key}-input`}
+              type={field.type ?? 'text'}
+              step={field.step}
+              min={field.min}
+              label={field.label}
+              placeholder={field.placeholder}
+              value={formValues[field.key] ?? ''}
+              onChange={(e) => handleFieldChange(field.key, e.target.value)}
+            />
+          )
+        )}
         <div className="ui-crud-form-actions">
           <Button type="submit" variant="primary" disabled={loading}>
             {editingItem ? 'Perbarui' : 'Tambah'}

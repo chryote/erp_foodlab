@@ -39,6 +39,7 @@ class CompanyService
     {
         $company = Company::query()->create($attributes);
         Cache::forget(self::CACHE_KEY_LIST);
+        Cache::forget(CapitalCompanyService::CACHE_KEY_LIST);
 
         return $company;
     }
@@ -47,6 +48,7 @@ class CompanyService
     {
         $company->update($attributes);
         Cache::forget(self::CACHE_KEY_LIST);
+        Cache::forget(CapitalCompanyService::CACHE_KEY_LIST);
 
         return $company->refresh();
     }
@@ -55,5 +57,6 @@ class CompanyService
     {
         $company->delete();
         Cache::forget(self::CACHE_KEY_LIST);
+        Cache::forget(CapitalCompanyService::CACHE_KEY_LIST);
     }
 }

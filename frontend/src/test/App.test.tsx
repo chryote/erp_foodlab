@@ -31,7 +31,7 @@ describe('App ERP Main Menu integration', () => {
         {
           id: 1,
           name: 'PT. Slaras Nusa Foodlab',
-          stakeholder_name: 'Budi Santoso',
+          stakeholder_name: 'Rian',
         },
       ],
       meta: { count: 1 },
@@ -103,7 +103,7 @@ describe('App ERP Main Menu integration', () => {
     await waitFor(() => {
       expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(1);
     });
-    expect(screen.getByText('Budi Santoso')).toBeInTheDocument();
+    expect(screen.getByText('Rian')).toBeInTheDocument();
 
     // Create company with stakeholder_name
     const nameInput = screen.getByLabelText('Nama Perusahaan');
@@ -125,7 +125,7 @@ describe('App ERP Main Menu integration', () => {
     const filterInput = screen.getByLabelText('Filter Perusahaan / Stakeholder');
     fireEvent.change(filterInput, { target: { value: 'Siti' } });
     expect(screen.getByText('PT. Pangan Nusantara')).toBeInTheDocument();
-    expect(screen.queryByText('Budi Santoso')).not.toBeInTheDocument();
+    expect(screen.queryByText('Rian')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Reset Filter' }));
 
     // Update company
@@ -165,5 +165,126 @@ describe('App ERP Main Menu integration', () => {
     expect(
       screen.queryByTestId('perusahaan-crud-modal')
     ).not.toBeInTheDocument();
+  });
+
+  it('opens Daftar Kapital Perusahaan modal and supports full CRUD using company selection and float capital', async () => {
+    vi.mocked(apiClient.fetchErpModules).mockResolvedValue({
+      data: [
+        DEFAULT_CFO_MODULE,
+        DEFAULT_CHO_MODULE,
+        DEFAULT_CPO_MODULE,
+        DEFAULT_CDO_MODULE,
+        DEFAULT_CMO_MODULE,
+      ],
+      meta: { count: 5 },
+    });
+    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          name: 'PT. Slaras Nusa Foodlab',
+          stakeholder_name: 'Rian',
+        },
+        {
+          id: 2,
+          name: 'PT. Pangan Nusantara',
+          stakeholder_name: 'Siti Aminah',
+        },
+      ],
+      meta: { count: 2 },
+    });
+    vi.mocked(apiClient.fetchCapitalCompanies).mockResolvedValue({
+      data: [
+        {
+          id: 10,
+          company_id: 1,
+          capital: 250000000.5,
+          company: {
+            id: 1,
+            name: 'PT. Slaras Nusa Foodlab',
+            stakeholder_name: 'Rian',
+          },
+        },
+      ],
+      meta: { count: 1 },
+    });
+    vi.mocked(apiClient.createCapitalCompany).mockResolvedValue({
+      data: {
+        id: 11,
+        company_id: 2,
+        capital: 500000000.75,
+        company: {
+          id: 2,
+          name: 'PT. Pangan Nusantara',
+          stakeholder_name: 'Siti Aminah',
+        },
+      },
+    });
+    vi.mocked(apiClient.updateCapitalCompany).mockResolvedValue({
+      data: {
+        id: 11,
+        company_id: 1,
+        capital: 625000000.25,
+        company: {
+          id: 1,
+          name: 'PT. Slaras Nusa Foodlab',
+          stakeholder_name: 'Rian',
+        },
+      },
+    });
+    vi.mocked(apiClient.deleteCapitalCompany).mockResolvedValue({
+      message: 'Capital company deleted successfully.',
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByTestId('module-card-CFO'));
+    fireEvent.click(screen.getByTestId('horizontal-menu-card-INPUT_MODAL'));
+    fireEvent.click(
+      screen.getByTestId('horizontal-menu-card-DAFTAR_KAPITAL_PERUSAHAAN')
+    );
+
+    const modal = await screen.findByTestId(
+      'daftar-kapital-perusahaan-crud-modal'
+    );
+    expect(modal).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(apiClient.fetchCapitalCompanies).toHaveBeenCalledTimes(1);
+      expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(1);
+    });
+
+    // Create capital company
+    const companySelect = screen.getByLabelText('Perusahaan');
+    const capitalInput = screen.getByLabelText('Kapital (Rp)');
+    fireEvent.change(companySelect, { target: { value: '2' } });
+    fireEvent.change(capitalInput, { target: { value: '500000000.75' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
+
+    await waitFor(() => {
+      expect(apiClient.createCapitalCompany).toHaveBeenCalledWith({
+        company_id: 2,
+        capital: 500000000.75,
+      });
+    });
+
+    // Update capital company
+    fireEvent.click(screen.getByTestId('edit-row-11'));
+    fireEvent.change(companySelect, { target: { value: '1' } });
+    fireEvent.change(capitalInput, { target: { value: '625000000.25' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Perbarui' }));
+
+    await waitFor(() => {
+      expect(apiClient.updateCapitalCompany).toHaveBeenCalledWith(11, {
+        company_id: 1,
+        capital: 625000000.25,
+      });
+    });
+
+    // Delete capital company
+    fireEvent.click(screen.getByTestId('delete-row-11'));
+    await waitFor(() => {
+      expect(apiClient.deleteCapitalCompany).toHaveBeenCalledWith(11);
+    });
   });
 });

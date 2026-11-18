@@ -8,6 +8,7 @@ import {
   CfoHorizontalMenu,
   CfoModuleCard,
 } from './modules/CFO/CfoModuleCard';
+import { CapitalCompanyCrudModal } from './modules/CFO/CapitalCompanyCrudModal';
 import { CompanyCrudModal } from './modules/CFO/CompanyCrudModal';
 import { ChoModuleCard } from './modules/CHO/ChoModuleCard';
 import { CpoModuleCard } from './modules/CPO/CpoModuleCard';
@@ -117,6 +118,11 @@ export const App: React.FC = () => {
 
         <CompanyCrudModal
           isOpen={selectedChildSubMenu?.code === 'PERUSAHAAN'}
+          onClose={() => setSelectedChildSubMenu(null)}
+        />
+
+        <CapitalCompanyCrudModal
+          isOpen={selectedChildSubMenu?.code === 'DAFTAR_KAPITAL_PERUSAHAAN'}
           onClose={() => setSelectedChildSubMenu(null)}
         />
       </main>
