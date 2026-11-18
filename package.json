@@ -1,0 +1,18 @@
+{
+  "name": "erp_foodlab",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Production-ready ERP FoodLab scaffolder with Laravel, React.js, Docker, MySQL, Redis, Pest/Vitest, k6, and Prometheus + Grafana.",
+  "scripts": {
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "test:backend": "cd backend && ./vendor/bin/pest",
+    "test:frontend": "cd frontend && npm run test:run",
+    "test": "npm run test:backend && npm run test:frontend",
+    "k6:smoke": "docker compose --profile benchmark run --rm k6 run /scripts/smoke.test.js",
+    "k6:load": "docker compose --profile benchmark run --rm k6 run /scripts/load.test.js",
+    "k6:stress": "docker compose --profile benchmark run --rm k6 run /scripts/stress.test.js"
+  },
+  "license": "MIT"
+}

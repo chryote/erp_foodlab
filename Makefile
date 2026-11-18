@@ -1,0 +1,49 @@
+.PHONY: help setup up down restart ps logs test test-backend test-frontend k6-smoke k6-load k6-stress migrate seed
+
+help: ## Show available Make targets
+	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-18s\033[0m %s\n", $$1, $$2}'
+
+setup: ## Copy environment files and start all containers
+	cp -n .env.example .env || true
+	cp -n backend/.env.example backend/.env || true
+	cp -n frontend/.env.example frontend/.env || true
+	docker compose up -d --build
+	docker compose exec app php artisan key:generate
+	docker compose exec app php artisan migrate --seed
+
+up: ## Start all Docker services in detached mode
+	docker compose up -d --build
+
+down: ## Stop and remove Docker containers
+	docker compose down
+
+restart: down up ## Restart all Docker services
+
+ps: ## List running containers
+	docker compose ps
+
+logs: ## Follow container logs
+	docker compose logs -f
+
+migrate: ## Run Laravel database migrations
+	docker compose exec app php artisan migrate
+
+seed: ## Seed Laravel database with sample FoodLab data
+	docker compose exec app php artisan db:seed
+
+test: test-backend test-frontend ## Run both Backend (Pest) and Frontend (Vitest) unit tests
+
+test-backend: ## Run Laravel Pest PHP unit & feature tests
+	docker compose exec app ./vendor/bin/pest
+
+test-frontend: ## Run React Vitest unit tests
+	docker compose exec frontend npm run test:run
+
+k6-smoke: ## Run k6 smoke benchmark
+	docker compose --profile benchmark run --rm k6 run /scripts/smoke.test.js
+
+k6-load: ## Run k6 load benchmark
+	docker compose --profile benchmark run --rm k6 run /scripts/load.test.js
+
+k6-stress: ## Run k6 stress benchmark
+	docker compose --profile benchmark run --rm k6 run /scripts/stress.test.js

@@ -1,0 +1,29 @@
+groups:
+  - name: erp_foodlab_alerts
+    rules:
+      - alert: LaravelApiDown
+        expr: up{job="laravel_api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ERP FoodLab Laravel API is unreachable"
+          description: "Prometheus could not scrape /api/metrics on nginx:80 for over 1 minute."
+
+      - alert: RedisInstanceDown
+        expr: redis_up == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis instance is down"
+          description: "Redis exporter reports redis_up == 0."
+
+      - alert: HighHttpErrorRate
+        expr: sum(rate(erp_foodlab_http_requests_total{status=~"5.."}[5m])) / clamp_min(sum(rate(erp_foodlab_http_requests_total[5m])), 1) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP 5xx error rate (>5%)"
+          description: "More than 5% of HTTP requests to ERP FoodLab API have returned 5xx over the last 5 minutes."
