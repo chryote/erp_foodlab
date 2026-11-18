@@ -89,6 +89,101 @@ export const TextInput: React.FC<TextInputProps> = ({
   );
 };
 
+export interface DecimalInputProps
+  extends Omit<
+    React.InputHTMLAttributes<HTMLInputElement>,
+    'type' | 'value' | 'onChange'
+  > {
+  label?: string;
+  value: string;
+  onChange: (rawValue: string) => void;
+}
+
+export function formatDecimalInputDisplay(raw: string): string {
+  if (!raw) {
+    return '';
+  }
+  const normalized = raw.trim().replace(/,/g, '.');
+  const [intPart = '', fracPart] = normalized.split('.');
+  const digitsOnlyInt = intPart.replace(/\D/g, '');
+  if (!digitsOnlyInt && fracPart === undefined) {
+    return '';
+  }
+  const formattedInt = (digitsOnlyInt || '0').replace(
+    /\B(?=(\d{3})+(?!\d))/g,
+    '.'
+  );
+  if (fracPart !== undefined) {
+    const cleanFrac = fracPart.replace(/\D/g, '');
+    return `${formattedInt},${cleanFrac}`;
+  }
+  return formattedInt;
+}
+
+export function parseDecimalInputRaw(displayValue: string): string {
+  if (!displayValue) {
+    return '';
+  }
+  const trimmed = displayValue.trim();
+
+  // In Indonesian format, comma (,) is the decimal separator and dots (.) are thousand separators
+  if (trimmed.includes(',')) {
+    const [intSide = '', ...fracParts] = trimmed.split(',');
+    const cleanInt = intSide.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+    const cleanFrac = fracParts.join('').replace(/\D/g, '');
+    return `${cleanInt || '0'}.${cleanFrac}`;
+  }
+
+  // If a plain decimal number with a single dot is pasted/set at once (e.g. "500000000.75" or "625000000.25")
+  const dotParts = trimmed.split('.');
+  if (dotParts.length === 2) {
+    const [left = '', right = ''] = dotParts;
+    if (left.length > 3 && right.length > 0 && right.length <= 2) {
+      const cleanLeft = left.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+      const cleanRight = right.replace(/\D/g, '');
+      return `${cleanLeft || '0'}.${cleanRight}`;
+    }
+  }
+
+  // Otherwise, all dots in displayValue are thousand separators; strip non-digits
+  return trimmed.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+}
+
+export const DecimalInput: React.FC<DecimalInputProps> = ({
+  label,
+  id,
+  value,
+  onChange,
+  className = '',
+  ...rest
+}) => {
+  const displayValue = useMemo(() => formatDecimalInputDisplay(value), [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const nextRaw = parseDecimalInputRaw(e.target.value);
+    onChange(nextRaw);
+  };
+
+  return (
+    <div className="ui-input-group">
+      {label && (
+        <label htmlFor={id} className="ui-input-label">
+          {label}
+        </label>
+      )}
+      <input
+        id={id}
+        type="text"
+        inputMode="decimal"
+        className={`ui-input ${className}`.trim()}
+        value={displayValue}
+        onChange={handleChange}
+        {...rest}
+      />
+    </div>
+  );
+};
+
 export interface SelectOption {
   value: string;
   label: string;
@@ -132,6 +227,30 @@ export const SelectInput: React.FC<SelectInputProps> = ({
   );
 };
 
+export interface SummaryBannerProps {
+  label: string;
+  value: React.ReactNode;
+  testId?: string;
+}
+
+export const SummaryBanner: React.FC<SummaryBannerProps> = ({
+  label,
+  value,
+  testId = 'ui-summary-banner',
+}) => {
+  return (
+    <div className="ui-summary-banner" data-testid={testId}>
+      <span className="ui-summary-banner-label">{label}</span>
+      <strong
+        className="ui-summary-banner-value"
+        data-testid={`${testId}-value`}
+      >
+        {value}
+      </strong>
+    </div>
+  );
+};
+
 export interface CrudEntity {
   id: number;
   created_at?: string;
@@ -146,11 +265,18 @@ export interface CrudFieldConfig<T> {
   key: keyof T & string;
   label: string;
   placeholder?: string;
-  type?: 'text' | 'number' | 'select';
+  type?: 'text' | 'number' | 'decimal' | 'select';
   step?: string | number;
   min?: string | number;
   options?: SelectOption[];
   renderValue?: (row: T) => React.ReactNode;
+  filterText?: (row: T) => string;
+}
+
+export interface CrudComputedColumnConfig<T> {
+  key: string;
+  label: string;
+  render: (row: T, index: number) => React.ReactNode;
   filterText?: (row: T) => string;
 }
 
@@ -162,6 +288,8 @@ export interface CrudModalProps<T extends CrudEntity> {
   inputLabel?: string;
   inputPlaceholder?: string;
   fields?: CrudFieldConfig<T>[];
+  computedColumns?: CrudComputedColumnConfig<T>[];
+  summary?: React.ReactNode;
   emptyMessage?: string;
   filterLabel?: string;
   filterPlaceholder?: string;
@@ -186,6 +314,8 @@ export function CrudModal<T extends CrudEntity>({
   inputLabel = 'Nama',
   inputPlaceholder = 'Masukkan nama...',
   fields,
+  computedColumns = [],
+  summary,
   emptyMessage = 'Belum ada data.',
   filterLabel = 'Filter Data',
   filterPlaceholder = 'Cari berdasarkan nama...',
@@ -241,16 +371,24 @@ export function CrudModal<T extends CrudEntity>({
     if (!q) {
       return items;
     }
-    return items.filter((item) =>
-      resolvedFields.some((field) => {
-        if (field.filterText) {
-          return field.filterText(item).toLowerCase().includes(q);
-        }
-        const val = item[field.key];
-        return val !== null && val !== undefined && String(val).toLowerCase().includes(q);
-      })
+    return items.filter(
+      (item) =>
+        resolvedFields.some((field) => {
+          if (field.filterText) {
+            return field.filterText(item).toLowerCase().includes(q);
+          }
+          const val = item[field.key];
+          return (
+            val !== null &&
+            val !== undefined &&
+            String(val).toLowerCase().includes(q)
+          );
+        }) ||
+        computedColumns.some((col) =>
+          col.filterText ? col.filterText(item).toLowerCase().includes(q) : false
+        )
     );
-  }, [items, resolvedFields, searchQuery]);
+  }, [items, resolvedFields, computedColumns, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -337,6 +475,11 @@ export function CrudModal<T extends CrudEntity>({
         return String(raw ?? '');
       },
     })),
+    ...computedColumns.map((col) => ({
+      key: col.key,
+      header: col.label,
+      render: (row: T, index: number) => col.render(row, index),
+    })),
     {
       key: 'actions',
       header: 'Aksi',
@@ -376,18 +519,33 @@ export function CrudModal<T extends CrudEntity>({
       )}
 
       <form onSubmit={handleSubmit} className="ui-crud-form">
-        {resolvedFields.map((field) =>
-          field.type === 'select' ? (
-            <SelectInput
-              key={field.key}
-              id={`${testId}-${field.key}-input`}
-              label={field.label}
-              placeholder={field.placeholder}
-              options={field.options ?? []}
-              value={formValues[field.key] ?? ''}
-              onChange={(e) => handleFieldChange(field.key, e.target.value)}
-            />
-          ) : (
+        {resolvedFields.map((field) => {
+          if (field.type === 'select') {
+            return (
+              <SelectInput
+                key={field.key}
+                id={`${testId}-${field.key}-input`}
+                label={field.label}
+                placeholder={field.placeholder}
+                options={field.options ?? []}
+                value={formValues[field.key] ?? ''}
+                onChange={(e) => handleFieldChange(field.key, e.target.value)}
+              />
+            );
+          }
+          if (field.type === 'decimal') {
+            return (
+              <DecimalInput
+                key={field.key}
+                id={`${testId}-${field.key}-input`}
+                label={field.label}
+                placeholder={field.placeholder}
+                value={formValues[field.key] ?? ''}
+                onChange={(rawVal) => handleFieldChange(field.key, rawVal)}
+              />
+            );
+          }
+          return (
             <TextInput
               key={field.key}
               id={`${testId}-${field.key}-input`}
@@ -399,8 +557,8 @@ export function CrudModal<T extends CrudEntity>({
               value={formValues[field.key] ?? ''}
               onChange={(e) => handleFieldChange(field.key, e.target.value)}
             />
-          )
-        )}
+          );
+        })}
         <div className="ui-crud-form-actions">
           <Button type="submit" variant="primary" disabled={loading}>
             {editingItem ? 'Perbarui' : 'Tambah'}
@@ -424,6 +582,8 @@ export function CrudModal<T extends CrudEntity>({
         searchPlaceholder={filterPlaceholder}
         testId={`${testId}-filter`}
       />
+
+      {summary}
 
       <DataTable
         columns={columns}

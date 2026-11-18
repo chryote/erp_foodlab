@@ -254,11 +254,20 @@ describe('App ERP Main Menu integration', () => {
       expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(1);
     });
 
+    // Verify initial total capital and 100% share for the single company
+    expect(
+      screen.getByTestId('total-kapital-perusahaan-banner-value')
+    ).toHaveTextContent('Rp 250.000.000,5');
+    expect(screen.getByText('100%')).toBeInTheDocument();
+
     // Create capital company
     const companySelect = screen.getByLabelText('Perusahaan');
-    const capitalInput = screen.getByLabelText('Kapital (Rp)');
+    const capitalInput = screen.getByLabelText(
+      'Kapital (Rp)'
+    ) as HTMLInputElement;
     fireEvent.change(companySelect, { target: { value: '2' } });
     fireEvent.change(capitalInput, { target: { value: '500000000.75' } });
+    expect(capitalInput.value).toBe('500.000.000,75');
     fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
 
     await waitFor(() => {
@@ -266,6 +275,12 @@ describe('App ERP Main Menu integration', () => {
         company_id: 2,
         capital: 500000000.75,
       });
+      // Total capital is now 250,000,000.5 + 500,000,000.75 = 750,000,001.25
+      expect(
+        screen.getByTestId('total-kapital-perusahaan-banner-value')
+      ).toHaveTextContent('Rp 750.000.001,25');
+      expect(screen.getByText('66,67%')).toBeInTheDocument();
+      expect(screen.getByText('33,33%')).toBeInTheDocument();
     });
 
     // Update capital company

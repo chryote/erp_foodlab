@@ -27,12 +27,14 @@ class CapitalCompanyController extends Controller
                 max(1, (int) ($perPage ?? 10)),
                 max(1, (int) ($page ?? 1))
             );
+            $totalCapital = $this->capitalCompanyService->getTotalCapital();
 
             return response()->json([
                 'data' => $paginator->items(),
                 'meta' => [
                     'count' => count($paginator->items()),
                     'total' => $paginator->total(),
+                    'total_capital' => $totalCapital,
                     'page' => $paginator->currentPage(),
                     'per_page' => $paginator->perPage(),
                     'last_page' => $paginator->lastPage(),
@@ -42,12 +44,14 @@ class CapitalCompanyController extends Controller
         }
 
         $capitalCompanies = $this->capitalCompanyService->listCapitalCompanies();
+        $totalCapital = (float) $capitalCompanies->sum('capital');
 
         return response()->json([
             'data' => $capitalCompanies,
             'meta' => [
                 'count' => $capitalCompanies->count(),
                 'total' => $capitalCompanies->count(),
+                'total_capital' => $totalCapital,
                 'page' => 1,
                 'per_page' => max(1, $capitalCompanies->count()),
                 'last_page' => 1,

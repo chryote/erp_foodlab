@@ -28,6 +28,7 @@ describe('CFO CapitalCompany CRUD API (/api/v1/modules/cfo/capital-companies)', 
             ->assertJsonPath('data.0.company.name', 'PT. Slaras Nusa Foodlab')
             ->assertJsonPath('meta.cache_key', CapitalCompanyService::CACHE_KEY_LIST);
 
+        expect((float) $response->json('meta.total_capital'))->toBeGreaterThan(0.0);
         expect(Cache::has(CapitalCompanyService::CACHE_KEY_LIST))->toBeTrue();
     });
 

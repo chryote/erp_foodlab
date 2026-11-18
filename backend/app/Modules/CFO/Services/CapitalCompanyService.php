@@ -21,6 +21,11 @@ class CapitalCompanyService
         });
     }
 
+    public function getTotalCapital(): float
+    {
+        return (float) $this->listCapitalCompanies()->sum('capital');
+    }
+
     public function paginateCapitalCompanies(?string $search = null, int $perPage = 10, int $page = 1): LengthAwarePaginator
     {
         $query = CapitalCompany::query()

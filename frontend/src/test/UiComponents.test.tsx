@@ -11,6 +11,7 @@ import {
   HorizontalMenu,
   HorizontalMenuCard,
   ModuleLauncherCard,
+  SummaryBanner,
 } from '../components/ui';
 
 describe('Reusable UI Components (src/components/ui)', () => {
@@ -231,12 +232,24 @@ describe('Reusable UI Components (src/components/ui)', () => {
           {
             key: 'capital',
             label: 'Kapital (Rp)',
-            type: 'number',
-            step: 'any',
-            placeholder: 'Contoh: 250000000.5',
+            type: 'decimal',
+            placeholder: 'Contoh: 250.000.000',
           },
         ]}
         items={[{ id: 100, company_id: 1, capital: 250000000.5 }]}
+        computedColumns={[
+          {
+            key: 'share_percent',
+            label: 'Porsi Kapital (%)',
+            render: () => '100%',
+          },
+        ]}
+        summary={
+          <SummaryBanner
+            label="Total Kapital Seluruh Perusahaan"
+            value="Rp 250.000.000,50"
+          />
+        }
         onClose={onClose}
         onCreate={onCreate}
         onUpdate={onUpdate}
@@ -245,15 +258,43 @@ describe('Reusable UI Components (src/components/ui)', () => {
     );
 
     expect(
+      screen.getByText('Total Kapital Seluruh Perusahaan')
+    ).toBeInTheDocument();
+    expect(screen.getByText('100%')).toBeInTheDocument();
+
+    expect(
       screen.getAllByText('PT. Slaras Nusa Foodlab (Rian)').length
     ).toBeGreaterThanOrEqual(1);
 
+    const capitalInput = screen.getByLabelText(
+      'Kapital (Rp)'
+    ) as HTMLInputElement;
     fireEvent.change(screen.getByLabelText('Perusahaan'), {
       target: { value: '2' },
     });
-    fireEvent.change(screen.getByLabelText('Kapital (Rp)'), {
-      target: { value: '350000000.75' },
+
+    // Simulate character-by-character typing: 5 -> 50 -> 500 -> 5.000 -> 50.000 -> 500.000.000
+    for (const typed of [
+      '5',
+      '50',
+      '500',
+      '5000',
+      '5.0000',
+      '50.0000',
+      '500.0000',
+      '5.000.0000',
+      '50.000.0000',
+    ]) {
+      fireEvent.change(capitalInput, { target: { value: typed } });
+    }
+    expect(capitalInput.value).toBe('500.000.000');
+
+    fireEvent.change(capitalInput, {
+      target: { value: '350000000,75' },
     });
+    // Auto-formatted display value uses dot thousand separators
+    expect(capitalInput.value).toBe('350.000.000,75');
+
     fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
 
     await waitFor(() => {

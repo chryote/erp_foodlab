@@ -8,7 +8,13 @@ import {
   fetchCompanies,
   updateCapitalCompany,
 } from '../../api/client';
-import { type CrudFieldConfig, CrudModal } from '../../components/ui';
+import {
+  Badge,
+  type CrudComputedColumnConfig,
+  type CrudFieldConfig,
+  CrudModal,
+  SummaryBanner,
+} from '../../components/ui';
 
 export function formatCapitalIdr(amount: number): string {
   if (!Number.isFinite(amount)) {
@@ -18,6 +24,20 @@ export function formatCapitalIdr(amount: number): string {
     minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+export function formatCapitalSharePercent(
+  capital: number,
+  totalCapital: number
+): string {
+  if (!Number.isFinite(capital) || !Number.isFinite(totalCapital) || totalCapital <= 0) {
+    return '0%';
+  }
+  const pct = (capital / totalCapital) * 100;
+  return `${pct.toLocaleString('id-ID', {
+    minimumFractionDigits: Number.isInteger(pct) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}%`;
 }
 
 export interface CapitalCompanyCrudModalProps {
@@ -70,6 +90,13 @@ export const CapitalCompanyCrudModal: React.FC<
     return map;
   }, [companies]);
 
+  const totalCapital = useMemo(() => {
+    return capitalCompanies.reduce(
+      (sum, item) => sum + (Number(item.capital) || 0),
+      0
+    );
+  }, [capitalCompanies]);
+
   const fields = useMemo<CrudFieldConfig<CapitalCompany>[]>(() => {
     return [
       {
@@ -100,16 +127,32 @@ export const CapitalCompanyCrudModal: React.FC<
       {
         key: 'capital',
         label: 'Kapital (Rp)',
-        type: 'number',
-        step: 'any',
-        min: '0',
-        placeholder: 'Contoh: 250000000.5',
+        type: 'decimal',
+        placeholder: 'Contoh: 250.000.000',
         renderValue: (row) => formatCapitalIdr(Number(row.capital)),
         filterText: (row) =>
           `${row.capital} ${formatCapitalIdr(Number(row.capital))}`,
       },
     ];
   }, [companies, companyById]);
+
+  const computedColumns = useMemo<
+    CrudComputedColumnConfig<CapitalCompany>[]
+  >(() => {
+    return [
+      {
+        key: 'share_percent',
+        label: 'Porsi Kapital (%)',
+        render: (row) => (
+          <Badge variant="ok">
+            {formatCapitalSharePercent(Number(row.capital), totalCapital)}
+          </Badge>
+        ),
+        filterText: (row) =>
+          formatCapitalSharePercent(Number(row.capital), totalCapital),
+      },
+    ];
+  }, [totalCapital]);
 
   const handleCreate = async (values: Record<string, string>) => {
     const companyId = Number(values.company_id);
@@ -189,6 +232,14 @@ export const CapitalCompanyCrudModal: React.FC<
       subtitle="Kelola data kapital (modal) perusahaan pada modul CFO (Input Modal)"
       testId="daftar-kapital-perusahaan-crud-modal"
       fields={fields}
+      computedColumns={computedColumns}
+      summary={
+        <SummaryBanner
+          label="Total Kapital Seluruh Perusahaan"
+          value={formatCapitalIdr(totalCapital)}
+          testId="total-kapital-perusahaan-banner"
+        />
+      }
       filterLabel="Filter Perusahaan / Kapital"
       filterPlaceholder="Cari nama perusahaan, stakeholder, atau nominal kapital..."
       emptyMessage="Belum ada data kapital perusahaan."

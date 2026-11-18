@@ -93,6 +93,7 @@ export interface CapitalCompaniesListResponse {
   meta: {
     count: number;
     total?: number;
+    total_capital?: number;
     page?: number;
     per_page?: number;
     last_page?: number;
