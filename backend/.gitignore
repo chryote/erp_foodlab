@@ -4,6 +4,7 @@
 .env.production
 .phpunit.result.cache
 .phpunit.cache
+/phpunit.xml
 /storage/*.key
 Homestead.json
 Homestead.yaml
