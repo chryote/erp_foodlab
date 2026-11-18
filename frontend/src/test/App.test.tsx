@@ -92,7 +92,7 @@ describe('App ERP Main Menu integration', () => {
     );
     expect(inputModalSubMenu).toBeInTheDocument();
     expect(screen.getByText('Perusahaan')).toBeInTheDocument();
-    expect(screen.getByText('Daftar Modal Perusahaan')).toBeInTheDocument();
+    expect(screen.getByText('Daftar Kapital Perusahaan')).toBeInTheDocument();
 
     const perusahaanCard = screen.getByTestId('horizontal-menu-card-PERUSAHAAN');
     fireEvent.click(perusahaanCard);
