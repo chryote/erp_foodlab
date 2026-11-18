@@ -9,7 +9,7 @@ This repository uses **Laravel 11 + Inertia.js (React 18) + Tailwind CSS v4 + `s
 
 ## 2. Prefer Declarative ERP Composite Components Over Raw JSX
 - Import high-level reusable ERP components from `@/components/ui`:
-  - `CrudModal`, `CrudFieldConfig`, `CrudComputedColumnConfig`, `CrudRowActionConfig`, `SummaryBanner`
+  - `CrudModal`, `ConfirmDialog`, `CrudFieldConfig`, `CrudComputedColumnConfig`, `CrudRowActionConfig`, `SummaryBanner`
   - `DataTable`, `Pagination`, `TableFilterBar`
   - `PageHeader`, `Card`, `CardHeader`, `Badge`, `Button`
   - `ModuleLauncherCard`, `HorizontalMenu`, `CascadingHorizontalMenu`
@@ -18,3 +18,7 @@ This repository uses **Laravel 11 + Inertia.js (React 18) + Tailwind CSS v4 + `s
 ## 3. Use Inertia Server Props & Resource Hooks (`@/lib/inertia`)
 - Laravel web routes (`backend/routes/web.php` -> `ErpInertiaController`) pass `modules`, `companies`, `capitalCompanies`, and future module data directly via `Inertia::render('Dashboard', [...])`.
 - On the frontend (`frontend/src/Pages/Dashboard.tsx` and `frontend/src/lib/inertia.ts`), consume Inertia props and trigger mutations via `router.post`, `router.put`, and `router.delete` rather than writing manual `useState` / `useEffect` / `try-catch` boilerplate in feature modals.
+
+## 4. Mandatory Confirmation Dialog for All User-Triggered CRUD Actions
+- All CRUD actions clicked by the user (Create / `Tambah`, Update / `Perbarui`, Delete / `Hapus`) **must** display a confirmation dialog (`ConfirmDialog`) and wait for explicit user confirmation before executing the mutation.
+- `<CrudModal />` enforces this confirmation dialog automatically for `onCreate`, `onUpdate`, and `onDelete` actions. Any custom CRUD mutation outside `<CrudModal />` must wrap its trigger with `<ConfirmDialog />` from `@/components/ui`.

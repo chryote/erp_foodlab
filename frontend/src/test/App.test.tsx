@@ -123,10 +123,13 @@ describe('App ERP Main Menu integration', () => {
       screen.queryByLabelText('Nama Stakeholder')
     ).not.toBeInTheDocument();
 
-    // Create company with only Nama Perusahaan
+    // Create company with only Nama Perusahaan (requires confirmation dialog)
     const nameInput = screen.getByLabelText('Nama Perusahaan');
     fireEvent.change(nameInput, { target: { value: 'PT. Pangan Nusantara' } });
     fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
+    expect(apiClient.createCompany).not.toHaveBeenCalled();
+    expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
 
     await waitFor(() => {
       expect(apiClient.createCompany).toHaveBeenCalledWith({
@@ -135,12 +138,15 @@ describe('App ERP Main Menu integration', () => {
       expect(screen.getByText('PT. Pangan Nusantara')).toBeInTheDocument();
     });
 
-    // Update company
+    // Update company (requires confirmation dialog)
     fireEvent.click(screen.getByTestId('edit-row-2'));
     fireEvent.change(nameInput, {
       target: { value: 'PT. Pangan Nusantara Baru' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Perbarui' }));
+    expect(apiClient.updateCompany).not.toHaveBeenCalled();
+    expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
 
     await waitFor(() => {
       expect(apiClient.updateCompany).toHaveBeenCalledWith(2, {
@@ -149,8 +155,11 @@ describe('App ERP Main Menu integration', () => {
       expect(screen.getByText('PT. Pangan Nusantara Baru')).toBeInTheDocument();
     });
 
-    // Delete company
+    // Delete company (requires confirmation dialog)
     fireEvent.click(screen.getByTestId('delete-row-2'));
+    expect(apiClient.deleteCompany).not.toHaveBeenCalled();
+    expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
     await waitFor(() => {
       expect(apiClient.deleteCompany).toHaveBeenCalledWith(2);
       expect(
@@ -183,6 +192,8 @@ describe('App ERP Main Menu integration', () => {
     });
     const submitButtons = screen.getAllByRole('button', { name: 'Tambah' });
     fireEvent.click(submitButtons[submitButtons.length - 1]);
+    expect(apiClient.createCapitalCompany).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
 
     await waitFor(() => {
       expect(apiClient.createCapitalCompany).toHaveBeenCalledWith({

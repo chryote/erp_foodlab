@@ -190,6 +190,13 @@ describe('Reusable UI Components (src/components/ui)', () => {
     const nameInput = screen.getByLabelText('Nama Perusahaan');
     fireEvent.change(nameInput, { target: { value: 'PT. Contoh Empat' } });
     fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
+    expect(onCreate).not.toHaveBeenCalled();
+    expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('confirm-dialog-cancel'));
+    expect(onCreate).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
     await waitFor(() => {
       expect(onCreate).toHaveBeenCalledWith({
         name: 'PT. Contoh Empat',
@@ -199,6 +206,12 @@ describe('Reusable UI Components (src/components/ui)', () => {
     fireEvent.click(screen.getByTestId('edit-row-10'));
     fireEvent.change(nameInput, { target: { value: 'PT. Contoh Satu Revisi' } });
     fireEvent.click(screen.getByRole('button', { name: 'Perbarui' }));
+    expect(onUpdate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('confirm-dialog-cancel'));
+    expect(onUpdate).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Perbarui' }));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
     await waitFor(() => {
       expect(onUpdate).toHaveBeenCalledWith(10, {
         name: 'PT. Contoh Satu Revisi',
@@ -206,6 +219,12 @@ describe('Reusable UI Components (src/components/ui)', () => {
     });
 
     fireEvent.click(screen.getByTestId('delete-row-10'));
+    expect(onDelete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('confirm-dialog-cancel'));
+    expect(onDelete).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId('delete-row-10'));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
     expect(onDelete).toHaveBeenCalledWith(10);
   });
 
@@ -297,6 +316,8 @@ describe('Reusable UI Components (src/components/ui)', () => {
     expect(capitalInput.value).toBe('350.000.000,75');
 
     fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
+    expect(onCreate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
 
     await waitFor(() => {
       expect(onCreate).toHaveBeenCalledWith({

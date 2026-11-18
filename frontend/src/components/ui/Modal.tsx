@@ -251,6 +251,82 @@ export const SummaryBanner: React.FC<SummaryBannerProps> = ({
   );
 };
 
+export interface ConfirmDialogProps {
+  isOpen: boolean;
+  title: string;
+  message: React.ReactNode;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  confirmVariant?: ButtonVariant;
+  testId?: string;
+  loading?: boolean;
+  onConfirm: () => Promise<void> | void;
+  onCancel: () => void;
+}
+
+export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
+  isOpen,
+  title,
+  message,
+  confirmLabel = 'Konfirmasi',
+  cancelLabel = 'Batal',
+  confirmVariant = 'primary',
+  testId = 'confirm-dialog',
+  loading = false,
+  onConfirm,
+  onCancel,
+}) => {
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-60 flex items-center justify-center bg-black/75 p-6 backdrop-blur-xs"
+      data-testid={`${testId}-backdrop`}
+      onClick={onCancel}
+    >
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-label={title}
+        data-testid={testId}
+        className="flex w-full max-w-md flex-col overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="border-b border-border px-6 py-4">
+          <h3 className="text-base font-bold tracking-tight">{title}</h3>
+        </div>
+
+        <div className="px-6 py-4 text-sm text-muted-foreground">
+          {message}
+        </div>
+
+        <div className="flex justify-end gap-2.5 border-t border-border px-6 py-3.5">
+          <Button
+            type="button"
+            variant="secondary"
+            data-testid={`${testId}-cancel`}
+            disabled={loading}
+            onClick={onCancel}
+          >
+            {cancelLabel}
+          </Button>
+          <Button
+            type="button"
+            variant={confirmVariant}
+            data-testid={`${testId}-confirm`}
+            disabled={loading}
+            onClick={() => void onConfirm()}
+          >
+            {confirmLabel}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export interface CrudEntity {
   id: number;
   created_at?: string;
@@ -285,8 +361,21 @@ export interface CrudRowActionConfig<T> {
   label: string;
   variant?: ButtonVariant;
   testId?: (row: T) => string;
+  requireConfirm?: boolean;
+  confirmTitle?: string;
+  confirmMessage?: string;
   onClick: (row: T) => void;
 }
+
+type PendingCrudAction<T> =
+  | { type: 'create'; values: Record<string, string> }
+  | { type: 'update'; id: number; values: Record<string, string> }
+  | { type: 'delete'; id: number }
+  | {
+      type: 'rowAction';
+      action: CrudRowActionConfig<T>;
+      row: T;
+    };
 
 export interface CrudModalProps<T extends CrudEntity> {
   isOpen: boolean;
@@ -362,12 +451,15 @@ export function CrudModal<T extends CrudEntity>({
   );
   const [editingItem, setEditingItem] = useState<T | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pendingAction, setPendingAction] =
+    useState<PendingCrudAction<T> | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
       setFormValues(createEmptyFormValues());
       setEditingItem(null);
       setCurrentPage(1);
+      setPendingAction(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
@@ -387,7 +479,7 @@ export function CrudModal<T extends CrudEntity>({
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (readOnly) {
       return;
@@ -402,15 +494,76 @@ export function CrudModal<T extends CrudEntity>({
     }
 
     if (editingItem) {
-      await onUpdate?.(editingItem.id, trimmedValues);
-      setEditingItem(null);
-      setFormValues(createEmptyFormValues());
+      setPendingAction({
+        type: 'update',
+        id: editingItem.id,
+        values: trimmedValues,
+      });
     } else {
-      await onCreate?.(trimmedValues);
-      setFormValues(createEmptyFormValues());
-      setCurrentPage(1);
+      setPendingAction({
+        type: 'create',
+        values: trimmedValues,
+      });
     }
   };
+
+  const handleConfirmPendingAction = async () => {
+    if (!pendingAction) {
+      return;
+    }
+    const currentAction = pendingAction;
+    setPendingAction(null);
+
+    if (currentAction.type === 'create') {
+      await onCreate?.(currentAction.values);
+      setFormValues(createEmptyFormValues());
+      setCurrentPage(1);
+    } else if (currentAction.type === 'update') {
+      await onUpdate?.(currentAction.id, currentAction.values);
+      setEditingItem(null);
+      setFormValues(createEmptyFormValues());
+    } else if (currentAction.type === 'delete') {
+      await onDelete?.(currentAction.id);
+      if (editingItem?.id === currentAction.id) {
+        setEditingItem(null);
+        setFormValues(createEmptyFormValues());
+      }
+    } else if (currentAction.type === 'rowAction') {
+      currentAction.action.onClick(currentAction.row);
+    }
+  };
+
+  const confirmDialogConfig = useMemo(() => {
+    if (!pendingAction) {
+      return { title: '', message: '' };
+    }
+    if (pendingAction.type === 'create') {
+      return {
+        title: 'Konfirmasi Tambah Data',
+        message: 'Apakah Anda yakin ingin menambahkan data ini?',
+      };
+    }
+    if (pendingAction.type === 'update') {
+      return {
+        title: 'Konfirmasi Perbarui Data',
+        message: 'Apakah Anda yakin ingin memperbarui data ini?',
+      };
+    }
+    if (pendingAction.type === 'delete') {
+      return {
+        title: 'Konfirmasi Hapus Data',
+        message: 'Apakah Anda yakin ingin menghapus data ini?',
+      };
+    }
+    return {
+      title:
+        pendingAction.action.confirmTitle ??
+        `Konfirmasi ${pendingAction.action.label}`,
+      message:
+        pendingAction.action.confirmMessage ??
+        `Apakah Anda yakin ingin menjalankan aksi "${pendingAction.action.label}"?`,
+    };
+  }, [pendingAction]);
 
   const handleStartEdit = (item: T) => {
     setEditingItem(item);
@@ -476,7 +629,13 @@ export function CrudModal<T extends CrudEntity>({
                         ? action.testId(row)
                         : `action-${action.key}-row-${row.id}`
                     }
-                    onClick={() => action.onClick(row)}
+                    onClick={() => {
+                      if (action.requireConfirm) {
+                        setPendingAction({ type: 'rowAction', action, row });
+                      } else {
+                        action.onClick(row);
+                      }
+                    }}
                   >
                     {action.label}
                   </Button>
@@ -493,7 +652,9 @@ export function CrudModal<T extends CrudEntity>({
                     <Button
                       variant="ghost"
                       data-testid={`delete-row-${row.id}`}
-                      onClick={() => void onDelete?.(row.id)}
+                      onClick={() =>
+                        setPendingAction({ type: 'delete', id: row.id })
+                      }
                     >
                       Hapus
                     </Button>
@@ -507,100 +668,111 @@ export function CrudModal<T extends CrudEntity>({
   ];
 
   return (
-    <Modal
-      isOpen={isOpen}
-      title={title}
-      subtitle={subtitle}
-      testId={testId}
-      onClose={onClose}
-    >
-      {error && (
-        <div
-          role="alert"
-          className="rounded-lg border border-red-500/40 bg-red-500/15 px-3.5 py-2.5 text-sm text-red-400"
-        >
-          {error}
-        </div>
-      )}
+    <>
+      <Modal
+        isOpen={isOpen}
+        title={title}
+        subtitle={subtitle}
+        testId={testId}
+        onClose={onClose}
+      >
+        {error && (
+          <div
+            role="alert"
+            className="rounded-lg border border-red-500/40 bg-red-500/15 px-3.5 py-2.5 text-sm text-red-400"
+          >
+            {error}
+          </div>
+        )}
 
-      {!readOnly && (
-        <form
-          onSubmit={handleSubmit}
-          className="flex flex-wrap items-end gap-2.5 border-b border-border pb-4"
-        >
-          {resolvedFields.map((field) => {
-            if (field.type === 'select') {
+        {!readOnly && (
+          <form
+            onSubmit={handleSubmit}
+            className="flex flex-wrap items-end gap-2.5 border-b border-border pb-4"
+          >
+            {resolvedFields.map((field) => {
+              if (field.type === 'select') {
+                return (
+                  <SelectInput
+                    key={field.key}
+                    id={`${testId}-${field.key}-input`}
+                    label={field.label}
+                    placeholder={field.placeholder}
+                    options={field.options ?? []}
+                    value={formValues[field.key] ?? ''}
+                    onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                  />
+                );
+              }
+              if (field.type === 'decimal') {
+                return (
+                  <DecimalInput
+                    key={field.key}
+                    id={`${testId}-${field.key}-input`}
+                    label={field.label}
+                    placeholder={field.placeholder}
+                    value={formValues[field.key] ?? ''}
+                    onChange={(rawVal) => handleFieldChange(field.key, rawVal)}
+                  />
+                );
+              }
               return (
-                <SelectInput
+                <TextInput
                   key={field.key}
                   id={`${testId}-${field.key}-input`}
+                  type={field.type ?? 'text'}
+                  step={field.step}
+                  min={field.min}
                   label={field.label}
                   placeholder={field.placeholder}
-                  options={field.options ?? []}
                   value={formValues[field.key] ?? ''}
                   onChange={(e) => handleFieldChange(field.key, e.target.value)}
                 />
               );
-            }
-            if (field.type === 'decimal') {
-              return (
-                <DecimalInput
-                  key={field.key}
-                  id={`${testId}-${field.key}-input`}
-                  label={field.label}
-                  placeholder={field.placeholder}
-                  value={formValues[field.key] ?? ''}
-                  onChange={(rawVal) => handleFieldChange(field.key, rawVal)}
-                />
-              );
-            }
-            return (
-              <TextInput
-                key={field.key}
-                id={`${testId}-${field.key}-input`}
-                type={field.type ?? 'text'}
-                step={field.step}
-                min={field.min}
-                label={field.label}
-                placeholder={field.placeholder}
-                value={formValues[field.key] ?? ''}
-                onChange={(e) => handleFieldChange(field.key, e.target.value)}
-              />
-            );
-          })}
-          <div className="flex items-center gap-2">
-            <Button type="submit" variant="primary" disabled={loading}>
-              {editingItem ? 'Perbarui' : 'Tambah'}
-            </Button>
-            {editingItem && (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={handleCancelEdit}
-              >
-                Batal
+            })}
+            <div className="flex items-center gap-2">
+              <Button type="submit" variant="primary" disabled={loading}>
+                {editingItem ? 'Perbarui' : 'Tambah'}
               </Button>
-            )}
-          </div>
-        </form>
-      )}
+              {editingItem && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleCancelEdit}
+                >
+                  Batal
+                </Button>
+              )}
+            </div>
+          </form>
+        )}
 
-      {summary}
+        {summary}
 
-      <DataTable
-        columns={columns}
-        data={paginatedItems}
-        rowKey={(row) => row.id}
-        emptyMessage={emptyMessage}
+        <DataTable
+          columns={columns}
+          data={paginatedItems}
+          rowKey={(row) => row.id}
+          emptyMessage={emptyMessage}
+        />
+
+        <Pagination
+          currentPage={safeCurrentPage}
+          totalPages={totalPages}
+          totalItems={items.length}
+          testId={`${testId}-pagination`}
+          onPageChange={setCurrentPage}
+        />
+      </Modal>
+
+      <ConfirmDialog
+        isOpen={isOpen && pendingAction !== null}
+        title={confirmDialogConfig.title}
+        message={confirmDialogConfig.message}
+        loading={loading}
+        onConfirm={handleConfirmPendingAction}
+        onCancel={() => setPendingAction(null)}
       />
-
-      <Pagination
-        currentPage={safeCurrentPage}
-        totalPages={totalPages}
-        totalItems={items.length}
-        testId={`${testId}-pagination`}
-        onPageChange={setCurrentPage}
-      />
-    </Modal>
+    </>
   );
 }
