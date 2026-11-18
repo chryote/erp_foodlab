@@ -37,18 +37,22 @@ describe('Inertia ERP Dashboard & CFO CRUD Routes', function () {
     it('creates, updates, and deletes companies and capital companies via Inertia web routes', function () {
         $storeCompanyRes = $this->from('/')->post('/cfo/companies', [
             'name' => 'PT. Slaras Nusa Foodlab',
+            'series' => 1,
         ]);
         $storeCompanyRes->assertRedirect('/');
 
         $company = Company::query()->where('name', 'PT. Slaras Nusa Foodlab')->firstOrFail();
+        expect($company->series)->toBe(1);
 
         $updateCompanyRes = $this->from('/')->put("/cfo/companies/{$company->id}", [
             'name' => 'PT. Slaras Nusa Foodlab Baru',
+            'series' => 2,
         ]);
         $updateCompanyRes->assertRedirect('/');
         $this->assertDatabaseHas('companies', [
             'id' => $company->id,
             'name' => 'PT. Slaras Nusa Foodlab Baru',
+            'series' => 2,
         ]);
 
         $storeCapRes = $this->from('/')->post('/cfo/capital-companies', [

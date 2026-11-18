@@ -60,6 +60,7 @@ export interface ErpModulesListResponse {
 export interface Company {
   id: number;
   name: string;
+  series?: number;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
@@ -175,6 +176,7 @@ export async function fetchCompanies(): Promise<CompaniesListResponse> {
 
 export async function createCompany(payload: {
   name: string;
+  series?: number;
 }): Promise<{ data: Company }> {
   return requestJson<{ data: Company }>(
     '/v1/modules/cfo/companies',
@@ -189,7 +191,7 @@ export async function createCompany(payload: {
 
 export async function updateCompany(
   id: number,
-  payload: { name: string }
+  payload: { name: string; series?: number }
 ): Promise<{ data: Company }> {
   return requestJson<{ data: Company }>(
     `/v1/modules/cfo/companies/${id}`,

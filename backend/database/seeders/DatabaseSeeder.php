@@ -14,7 +14,8 @@ class DatabaseSeeder extends Seeder
         LabSample::factory()->count(15)->create();
 
         $company = Company::query()->updateOrCreate(
-            ['name' => 'PT. Slaras Nusa Foodlab']
+            ['name' => 'PT. Slaras Nusa Foodlab'],
+            ['series' => 1]
         );
 
         CapitalCompany::query()->updateOrCreate(

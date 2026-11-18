@@ -44,24 +44,6 @@ export const DEFAULT_CFO_MODULE: ErpModuleOverview = {
   ],
 };
 
-const CfoIcon = (
-  <svg
-    viewBox="0 0 24 24"
-    width="40"
-    height="40"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.8"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <rect x="2" y="5" width="20" height="14" rx="2" />
-    <line x1="2" y1="10" x2="22" y2="10" />
-    <path d="M7 15h.01" />
-    <path d="M11 15h2" />
-  </svg>
-);
-
 interface CfoModuleCardProps {
   data?: ErpModuleOverview;
   isSelected?: boolean;
@@ -77,7 +59,6 @@ export const CfoModuleCard: React.FC<CfoModuleCardProps> = ({
     <ModuleLauncherCard
       code={data.code}
       title={data.title}
-      icon={CfoIcon}
       accent="cfo"
       isSelected={isSelected}
       onClick={() => onSelect?.(data)}

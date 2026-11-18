@@ -48,6 +48,7 @@ class ErpInertiaController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
+            'series' => ['sometimes', 'required', 'integer', 'min:1'],
         ]);
 
         $this->companyService->createCompany($validated);
@@ -59,6 +60,7 @@ class ErpInertiaController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
+            'series' => ['sometimes', 'required', 'integer', 'min:1'],
         ]);
 
         $this->companyService->updateCompany($company, $validated);

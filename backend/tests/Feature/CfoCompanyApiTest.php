@@ -50,23 +50,28 @@ describe('CFO Company CRUD API (/api/v1/modules/cfo/companies)', function () {
     it('creates, updates, and soft-deletes a company', function () {
         $createRes = $this->postJson('/api/v1/modules/cfo/companies', [
             'name' => 'PT. Slaras Nusa Foodlab',
+            'series' => 2,
         ]);
 
         $createRes->assertCreated()
-            ->assertJsonPath('data.name', 'PT. Slaras Nusa Foodlab');
+            ->assertJsonPath('data.name', 'PT. Slaras Nusa Foodlab')
+            ->assertJsonPath('data.series', 2);
 
         $companyId = $createRes->json('data.id');
         $this->assertDatabaseHas('companies', [
             'id' => $companyId,
             'name' => 'PT. Slaras Nusa Foodlab',
+            'series' => 2,
         ]);
 
         $updateRes = $this->putJson("/api/v1/modules/cfo/companies/{$companyId}", [
             'name' => 'PT. Slaras Nusa Foodlab Internasional',
+            'series' => 3,
         ]);
 
         $updateRes->assertOk()
-            ->assertJsonPath('data.name', 'PT. Slaras Nusa Foodlab Internasional');
+            ->assertJsonPath('data.name', 'PT. Slaras Nusa Foodlab Internasional')
+            ->assertJsonPath('data.series', 3);
 
         $deleteRes = $this->deleteJson("/api/v1/modules/cfo/companies/{$companyId}");
         $deleteRes->assertOk();
@@ -77,11 +82,12 @@ describe('CFO Company CRUD API (/api/v1/modules/cfo/companies)', function () {
         $listRes->assertOk()->assertJsonCount(0, 'data');
     });
 
-    it('validates company name when creating or updating', function () {
+    it('validates company name and series when creating or updating', function () {
         $this->postJson('/api/v1/modules/cfo/companies', [
             'name' => '',
+            'series' => 0,
         ])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['name']);
+            ->assertJsonValidationErrors(['name', 'series']);
     });
 });

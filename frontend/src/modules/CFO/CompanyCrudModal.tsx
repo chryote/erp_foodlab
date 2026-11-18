@@ -8,6 +8,7 @@ import {
   SummaryBanner,
 } from '@/components/ui';
 import {
+  type CompanyCrudResource,
   useCompanyCrudResource,
   useStakeholderCrudResource,
 } from '@/lib/inertia';
@@ -21,6 +22,17 @@ export const COMPANY_CRUD_FIELDS: CrudFieldConfig<Company>[] = [
     key: 'name',
     label: 'Nama Perusahaan',
     placeholder: 'Contoh: PT. ABC DEF',
+  },
+  {
+    key: 'series',
+    label: 'Seri',
+    type: 'number',
+    min: 1,
+    step: 1,
+    defaultValue: '1',
+    placeholder: 'Contoh: 1',
+    renderValue: (row) => `Seri ${row.series ?? 1}`,
+    filterText: (row) => `Seri ${row.series ?? 1}`,
   },
 ];
 
@@ -140,6 +152,7 @@ export interface CompanyCrudModalProps {
   isOpen: boolean;
   initialCompanies?: Company[];
   initialCapitalCompanies?: CapitalCompany[];
+  companyResource?: CompanyCrudResource;
   onClose: () => void;
 }
 
@@ -147,10 +160,15 @@ export const CompanyCrudModal: React.FC<CompanyCrudModalProps> = ({
   isOpen,
   initialCompanies,
   initialCapitalCompanies,
+  companyResource,
   onClose,
 }) => {
+  const fallbackResource = useCompanyCrudResource(
+    isOpen && !companyResource,
+    initialCompanies
+  );
   const { companies, loading, error, create, update, remove } =
-    useCompanyCrudResource(isOpen, initialCompanies);
+    companyResource ?? fallbackResource;
   const [selectedStakeholderCompany, setSelectedStakeholderCompany] =
     useState<Company | null>(null);
 
@@ -184,10 +202,20 @@ export const CompanyCrudModal: React.FC<CompanyCrudModalProps> = ({
         error={error}
         onClose={onClose}
         onCreate={async (values) => {
-          await create(values.name ?? '');
+          const parsedSeries = parseInt(values.series ?? '1', 10);
+          const series =
+            Number.isFinite(parsedSeries) && parsedSeries >= 1
+              ? parsedSeries
+              : 1;
+          await create(values.name ?? '', series);
         }}
         onUpdate={async (id, values) => {
-          const updated = await update(id, values.name ?? '');
+          const parsedSeries = parseInt(values.series ?? '1', 10);
+          const series =
+            Number.isFinite(parsedSeries) && parsedSeries >= 1
+              ? parsedSeries
+              : 1;
+          const updated = await update(id, values.name ?? '', series);
           if (updated) {
             setSelectedStakeholderCompany((prev) =>
               prev?.id === id ? updated : prev

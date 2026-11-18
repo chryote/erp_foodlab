@@ -47,7 +47,7 @@ export function useCompanyCrudResource(
   }, [initialCompanies]);
 
   const reload = useCallback(async () => {
-    if (initialCompanies !== undefined && isInertiaActive()) {
+    if (initialCompanies !== undefined) {
       return;
     }
     setLoading(true);
@@ -70,15 +70,19 @@ export function useCompanyCrudResource(
     }
   }, [isOpen, reload]);
 
-  const create = useCallback(async (name: string) => {
+  const create = useCallback(async (name: string, series = 1) => {
     if (isInertiaActive()) {
-      router.post('/cfo/companies', { name }, { preserveScroll: true });
+      router.post(
+        '/cfo/companies',
+        { name, series },
+        { preserveScroll: true }
+      );
       return null;
     }
     setLoading(true);
     setError(null);
     try {
-      const res = await createCompany({ name });
+      const res = await createCompany({ name, series });
       setCompanies((prev) => [res.data, ...prev]);
       return res.data;
     } catch (err) {
@@ -91,15 +95,19 @@ export function useCompanyCrudResource(
     }
   }, []);
 
-  const update = useCallback(async (id: number, name: string) => {
+  const update = useCallback(async (id: number, name: string, series = 1) => {
     if (isInertiaActive()) {
-      router.put(`/cfo/companies/${id}`, { name }, { preserveScroll: true });
+      router.put(
+        `/cfo/companies/${id}`,
+        { name, series },
+        { preserveScroll: true }
+      );
       return null;
     }
     setLoading(true);
     setError(null);
     try {
-      const res = await updateCompany(id, { name });
+      const res = await updateCompany(id, { name, series });
       setCompanies((prev) =>
         prev.map((item) => (item.id === id ? res.data : item))
       );
@@ -137,6 +145,8 @@ export function useCompanyCrudResource(
 
   return { companies, loading, error, create, update, remove };
 }
+
+export type CompanyCrudResource = ReturnType<typeof useCompanyCrudResource>;
 
 export function useStakeholderCrudResource(
   isOpen: boolean,
@@ -293,6 +303,7 @@ export function useCapitalOverviewResource(
   const [companies, setCompanies] = useState<Company[]>(initialCompanies ?? []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasExternalCompanies = initialCompanies !== undefined;
 
   useEffect(() => {
     if (initialCompanies) setCompanies(initialCompanies);
@@ -304,7 +315,7 @@ export function useCapitalOverviewResource(
 
   const loadData = useCallback(async () => {
     if (
-      initialCompanies !== undefined &&
+      hasExternalCompanies &&
       initialCapitalCompanies !== undefined &&
       isInertiaActive()
     ) {
@@ -313,12 +324,17 @@ export function useCapitalOverviewResource(
     setLoading(true);
     setError(null);
     try {
-      const [capitalRes, companiesRes] = await Promise.all([
-        fetchCapitalCompanies(),
-        fetchCompanies(),
-      ]);
-      setCapitalCompanies(capitalRes.data);
-      setCompanies(companiesRes.data);
+      if (hasExternalCompanies) {
+        const capitalRes = await fetchCapitalCompanies();
+        setCapitalCompanies(capitalRes.data);
+      } else {
+        const [capitalRes, companiesRes] = await Promise.all([
+          fetchCapitalCompanies(),
+          fetchCompanies(),
+        ]);
+        setCapitalCompanies(capitalRes.data);
+        setCompanies(companiesRes.data);
+      }
     } catch (err) {
       setError(
         err instanceof Error
@@ -328,7 +344,7 @@ export function useCapitalOverviewResource(
     } finally {
       setLoading(false);
     }
-  }, [initialCompanies, initialCapitalCompanies]);
+  }, [hasExternalCompanies, initialCapitalCompanies]);
 
   useEffect(() => {
     if (isOpen) {

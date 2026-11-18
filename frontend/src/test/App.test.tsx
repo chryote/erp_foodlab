@@ -31,6 +31,7 @@ describe('App ERP Main Menu integration', () => {
         {
           id: 1,
           name: 'PT. Slaras Nusa Foodlab',
+          series: 1,
         },
       ],
       meta: { count: 1 },
@@ -39,12 +40,14 @@ describe('App ERP Main Menu integration', () => {
       data: {
         id: 2,
         name: 'PT. Pangan Nusantara',
+        series: 2,
       },
     });
     vi.mocked(apiClient.updateCompany).mockResolvedValue({
       data: {
         id: 2,
         name: 'PT. Pangan Nusantara Baru',
+        series: 2,
       },
     });
     vi.mocked(apiClient.deleteCompany).mockResolvedValue({
@@ -123,9 +126,11 @@ describe('App ERP Main Menu integration', () => {
       screen.queryByLabelText('Nama Stakeholder')
     ).not.toBeInTheDocument();
 
-    // Create company with only Nama Perusahaan (requires confirmation dialog)
+    // Create company with Nama Perusahaan and Seri (requires confirmation dialog)
     const nameInput = screen.getByLabelText('Nama Perusahaan');
+    const seriesInput = screen.getByLabelText('Seri');
     fireEvent.change(nameInput, { target: { value: 'PT. Pangan Nusantara' } });
+    fireEvent.change(seriesInput, { target: { value: '2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
     expect(apiClient.createCompany).not.toHaveBeenCalled();
     expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
@@ -134,15 +139,29 @@ describe('App ERP Main Menu integration', () => {
     await waitFor(() => {
       expect(apiClient.createCompany).toHaveBeenCalledWith({
         name: 'PT. Pangan Nusantara',
+        series: 2,
       });
       expect(screen.getByText('PT. Pangan Nusantara')).toBeInTheDocument();
+      expect(screen.getByTestId('series-tab-1')).toHaveTextContent('Seri 1');
+      expect(screen.getByTestId('series-tab-2')).toHaveTextContent('Seri 2');
     });
+
+    // Switch primary series tab to Seri 2 and verify secondary company tab
+    fireEvent.click(screen.getByTestId('series-tab-2'));
+    expect(screen.getByTestId('company-tab-2')).toHaveTextContent(
+      'PT. Pangan Nusantara'
+    );
+    fireEvent.click(screen.getByTestId('series-tab-1'));
+    expect(screen.getByTestId('company-tab-1')).toHaveTextContent(
+      'PT. Slaras Nusa Foodlab'
+    );
 
     // Update company (requires confirmation dialog)
     fireEvent.click(screen.getByTestId('edit-row-2'));
     fireEvent.change(nameInput, {
       target: { value: 'PT. Pangan Nusantara Baru' },
     });
+    fireEvent.change(seriesInput, { target: { value: '2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Perbarui' }));
     expect(apiClient.updateCompany).not.toHaveBeenCalled();
     expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
@@ -151,6 +170,7 @@ describe('App ERP Main Menu integration', () => {
     await waitFor(() => {
       expect(apiClient.updateCompany).toHaveBeenCalledWith(2, {
         name: 'PT. Pangan Nusantara Baru',
+        series: 2,
       });
       expect(screen.getByText('PT. Pangan Nusantara Baru')).toBeInTheDocument();
     });

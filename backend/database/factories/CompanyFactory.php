@@ -16,6 +16,7 @@ class CompanyFactory extends Factory
     {
         return [
             'name' => $this->faker->company(),
+            'series' => 1,
         ];
     }
 }

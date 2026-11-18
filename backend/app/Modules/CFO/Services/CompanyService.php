@@ -34,6 +34,7 @@ class CompanyService
 
     public function createCompany(array $attributes): Company
     {
+        $attributes['series'] = isset($attributes['series']) ? (int) $attributes['series'] : 1;
         $company = Company::query()->create($attributes);
         Cache::forget(self::CACHE_KEY_LIST);
         Cache::forget(CapitalCompanyService::CACHE_KEY_LIST);
@@ -43,6 +44,9 @@ class CompanyService
 
     public function updateCompany(Company $company, array $attributes): Company
     {
+        if (isset($attributes['series'])) {
+            $attributes['series'] = (int) $attributes['series'];
+        }
         $company->update($attributes);
         Cache::forget(self::CACHE_KEY_LIST);
         Cache::forget(CapitalCompanyService::CACHE_KEY_LIST);

@@ -341,6 +341,7 @@ export interface CrudFieldConfig<T> {
   key: keyof T & string;
   label: string;
   placeholder?: string;
+  defaultValue?: string;
   type?: 'text' | 'number' | 'decimal' | 'select';
   step?: string | number;
   min?: string | number;
@@ -441,7 +442,7 @@ export function CrudModal<T extends CrudEntity>({
   const createEmptyFormValues = () => {
     const initial: Record<string, string> = {};
     for (const f of resolvedFields) {
-      initial[f.key] = '';
+      initial[f.key] = f.defaultValue ?? '';
     }
     return initial;
   };
@@ -571,7 +572,9 @@ export function CrudModal<T extends CrudEntity>({
     for (const field of resolvedFields) {
       const raw = item[field.key];
       nextValues[field.key] =
-        raw !== null && raw !== undefined ? String(raw) : '';
+        raw !== null && raw !== undefined
+          ? String(raw)
+          : (field.defaultValue ?? '');
     }
     setFormValues(nextValues);
   };

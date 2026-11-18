@@ -23,22 +23,6 @@ export const DEFAULT_CDO_MODULE: ErpModuleOverview = {
   ],
 };
 
-const CdoIcon = (
-  <svg
-    viewBox="0 0 24 24"
-    width="40"
-    height="40"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.8"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="m3 11 18-5v12L3 14v-3z" />
-    <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
-  </svg>
-);
-
 interface CdoModuleCardProps {
   data?: ErpModuleOverview;
   isSelected?: boolean;
@@ -54,7 +38,6 @@ export const CdoModuleCard: React.FC<CdoModuleCardProps> = ({
     <ModuleLauncherCard
       code={data.code}
       title={data.title}
-      icon={CdoIcon}
       accent="cdo"
       isSelected={isSelected}
       onClick={() => onSelect?.(data)}

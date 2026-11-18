@@ -11,17 +11,17 @@ import {
   HorizontalMenu,
   HorizontalMenuCard,
   ModuleLauncherCard,
+  PageHeader,
   SummaryBanner,
 } from '../components/ui';
 
 describe('Reusable UI Components (src/components/ui)', () => {
-  it('renders ModuleLauncherCard with only big icon and title', () => {
+  it('renders ModuleLauncherCard with text-only title and compact 50% smaller height', () => {
     const onClick = vi.fn();
     render(
       <ModuleLauncherCard
         code="CFO"
         title="CFO (Keuangan)"
-        icon={<svg data-testid="cfo-svg" />}
         accent="cfo"
         isSelected={true}
         onClick={onClick}
@@ -31,7 +31,7 @@ describe('Reusable UI Components (src/components/ui)', () => {
     const button = screen.getByTestId('module-card-CFO');
     expect(button).toHaveTextContent('CFO (Keuangan)');
     expect(button).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('cfo-svg')).toBeInTheDocument();
+    expect(button.querySelector('svg')).toBeNull();
 
     fireEvent.click(button);
     expect(onClick).toHaveBeenCalledTimes(1);
@@ -375,5 +375,52 @@ describe('Reusable UI Components (src/components/ui)', () => {
       stakeholder_name: 'Rian, Budi',
       capital: 400000000,
     });
+  });
+
+  it('renders PageHeader tiered tabs with primary series tabs and secondary company tabs', () => {
+    const onSelectSeries = vi.fn();
+    const onSelectCompany = vi.fn();
+
+    render(
+      <PageHeader
+        eyebrow="ENTERPRISE RESOURCE PLANNING"
+        title="PT. Slaras Nusa Foodlab"
+        companies={[
+          { id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1 },
+          { id: 2, name: 'PT. Agro Pangan', series: 1 },
+          { id: 3, name: 'PT. Dairy Nusantara', series: 2 },
+        ]}
+        onSelectSeries={onSelectSeries}
+        onSelectCompany={onSelectCompany}
+      />
+    );
+
+    expect(screen.getByTestId('series-tab-1')).toHaveTextContent('Seri 1');
+    expect(screen.getByTestId('series-tab-2')).toHaveTextContent('Seri 2');
+
+    // Seri 1 companies are shown by default
+    expect(screen.getByTestId('company-tab-1')).toHaveTextContent(
+      'PT. Slaras Nusa Foodlab'
+    );
+    expect(screen.getByTestId('company-tab-2')).toHaveTextContent(
+      'PT. Agro Pangan'
+    );
+    expect(screen.queryByTestId('company-tab-3')).not.toBeInTheDocument();
+
+    // Select second company in Seri 1
+    fireEvent.click(screen.getByTestId('company-tab-2'));
+    expect(onSelectCompany).toHaveBeenCalledWith({
+      id: 2,
+      name: 'PT. Agro Pangan',
+      series: 1,
+    });
+
+    // Switch primary tab to Seri 2
+    fireEvent.click(screen.getByTestId('series-tab-2'));
+    expect(onSelectSeries).toHaveBeenCalledWith(2);
+    expect(screen.getByTestId('company-tab-3')).toHaveTextContent(
+      'PT. Dairy Nusantara'
+    );
+    expect(screen.queryByTestId('company-tab-1')).not.toBeInTheDocument();
   });
 });

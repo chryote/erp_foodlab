@@ -15,7 +15,15 @@ class Company extends Model
 
     protected $fillable = [
         'name',
+        'series',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'series' => 'integer',
+        ];
+    }
 
     public function capitalCompanies(): HasMany
     {

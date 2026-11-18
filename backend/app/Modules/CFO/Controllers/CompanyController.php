@@ -59,6 +59,7 @@ class CompanyController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
+            'series' => ['sometimes', 'required', 'integer', 'min:1'],
         ]);
 
         $company = $this->companyService->createCompany($validated);
@@ -79,6 +80,7 @@ class CompanyController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
+            'series' => ['sometimes', 'required', 'integer', 'min:1'],
         ]);
 
         $updated = $this->companyService->updateCompany($company, $validated);

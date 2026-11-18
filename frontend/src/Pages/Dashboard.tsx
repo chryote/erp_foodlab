@@ -8,7 +8,10 @@ import {
   type HorizontalMenuItem,
   PageHeader,
 } from '@/components/ui';
-import type { ErpDashboardPageProps } from '@/lib/inertia';
+import {
+  type ErpDashboardPageProps,
+  useCompanyCrudResource,
+} from '@/lib/inertia';
 import { CdoModuleCard } from '@/modules/CDO/CdoModuleCard';
 import { CapitalCompanyCrudModal } from '@/modules/CFO/CapitalCompanyCrudModal';
 import {
@@ -43,6 +46,7 @@ export const Dashboard: React.FC<ErpDashboardPageProps> = ({
     useState<HorizontalMenuItem | null>(null);
   const [selectedChildSubMenu, setSelectedChildSubMenu] =
     useState<HorizontalMenuItem | null>(null);
+  const companyResource = useCompanyCrudResource(true, initialCompanies);
 
   useEffect(() => {
     if (initialModules) {
@@ -98,6 +102,7 @@ export const Dashboard: React.FC<ErpDashboardPageProps> = ({
       <PageHeader
         eyebrow="ENTERPRISE RESOURCE PLANNING"
         title="PT. Slaras Nusa Foodlab"
+        companies={companyResource.companies}
       />
 
       <main className="grid grid-cols-1 gap-6">
@@ -146,12 +151,13 @@ export const Dashboard: React.FC<ErpDashboardPageProps> = ({
           isOpen={selectedChildSubMenu?.code === 'PERUSAHAAN'}
           initialCompanies={initialCompanies}
           initialCapitalCompanies={initialCapitalCompanies}
+          companyResource={companyResource}
           onClose={() => setSelectedChildSubMenu(null)}
         />
 
         <CapitalCompanyCrudModal
           isOpen={selectedChildSubMenu?.code === 'DAFTAR_KAPITAL_PERUSAHAAN'}
-          initialCompanies={initialCompanies}
+          initialCompanies={companyResource.companies}
           initialCapitalCompanies={initialCapitalCompanies}
           onClose={() => setSelectedChildSubMenu(null)}
         />
