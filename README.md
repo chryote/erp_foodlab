@@ -39,7 +39,9 @@ Modern laboratory and ERP workflows require low-latency reads, strict data integ
 ```text
 erp_foodlab/
 ├── backend/                  # Laravel 11 API, MySQL models, Redis cache-aside, Pest PHP tests
+│   └── app/Modules/          # Modular backend architecture (CFO, CHO, CPO, CDO, CMO)
 ├── frontend/                 # React 18 + Vite + TypeScript SPA, Vitest + Testing Library
+│   └── src/modules/          # Modular frontend cards & views (CFO, CHO, CPO, CDO, CMO)
 ├── benchmarks/k6/            # Grafana k6 smoke, load, and stress benchmark scripts
 ├── docker/                   # Nginx, PHP-FPM 8.4, MySQL 8.0 init, and Redis 7.4 configs
 ├── monitoring/               # Prometheus scrape/alert rules & provisioned Grafana dashboards
@@ -160,6 +162,16 @@ Verifies connectivity to MySQL and Redis.
   "timestamp": "2026-11-18T09:40:00+00:00"
 }
 ```
+
+### `GET /api/v1/modules`
+
+Returns the ERP Main Menu summary across all 5 executive modules (`CFO`, `CHO`, `CPO`, `CDO`, `CMO`), with individual module endpoints also available at:
+
+- `GET /api/v1/modules/cfo` — **CFO (Keuangan)**
+- `GET /api/v1/modules/cho` — **CHO (SDM)**
+- `GET /api/v1/modules/cpo` — **CPO (Persediaan Barang Dagang)**
+- `GET /api/v1/modules/cdo` — **CDO (Pemasaran)**
+- `GET /api/v1/modules/cmo` — **CMO (Penjualan)**
 
 ### `GET /api/v1/samples`
 

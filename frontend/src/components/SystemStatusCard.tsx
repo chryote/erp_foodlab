@@ -1,5 +1,6 @@
 import React from 'react';
 import type { HealthResponse } from '../api/client';
+import { Badge, Button, Card, CardHeader } from './ui';
 
 interface SystemStatusCardProps {
   health: HealthResponse | null;
@@ -15,18 +16,15 @@ export const SystemStatusCard: React.FC<SystemStatusCardProps> = ({
   onRefresh,
 }) => {
   return (
-    <section className="card" aria-label="System Infrastructure Status">
-      <div className="card-header">
-        <h2>Infrastructure &amp; Telemetry Status</h2>
-        <button
-          type="button"
-          className="btn-secondary"
-          onClick={onRefresh}
-          disabled={loading}
-        >
-          {loading ? 'Checking...' : 'Refresh Status'}
-        </button>
-      </div>
+    <Card aria-label="System Infrastructure Status">
+      <CardHeader
+        title="Infrastructure & Telemetry Status"
+        actions={
+          <Button variant="secondary" onClick={onRefresh} disabled={loading}>
+            {loading ? 'Checking...' : 'Refresh Status'}
+          </Button>
+        }
+      />
 
       {error && (
         <div role="alert" className="alert-error">
@@ -38,33 +36,33 @@ export const SystemStatusCard: React.FC<SystemStatusCardProps> = ({
         <div className="status-grid">
           <div className="status-item">
             <span className="status-label">API Overall</span>
-            <span
+            <Badge
               data-testid="overall-status"
-              className={`badge ${health.status === 'ok' ? 'badge-ok' : 'badge-err'}`}
+              variant={health.status === 'ok' ? 'ok' : 'err'}
             >
               {health.status.toUpperCase()}
-            </span>
+            </Badge>
           </div>
           <div className="status-item">
             <span className="status-label">MySQL 8.0</span>
-            <span
+            <Badge
               data-testid="mysql-status"
-              className={`badge ${health.checks.database === 'ok' ? 'badge-ok' : 'badge-err'}`}
+              variant={health.checks.database === 'ok' ? 'ok' : 'err'}
             >
               {health.checks.database.toUpperCase()}
-            </span>
+            </Badge>
           </div>
           <div className="status-item">
             <span className="status-label">Redis Cache</span>
-            <span
+            <Badge
               data-testid="redis-status"
-              className={`badge ${health.checks.cache_redis === 'ok' ? 'badge-ok' : 'badge-err'}`}
+              variant={health.checks.cache_redis === 'ok' ? 'ok' : 'err'}
             >
               {health.checks.cache_redis.toUpperCase()}
-            </span>
+            </Badge>
           </div>
         </div>
       )}
-    </section>
+    </Card>
   );
 };

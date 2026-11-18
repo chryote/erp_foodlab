@@ -1,28 +1,49 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  fetchErpModules,
   fetchHealthStatus,
   fetchLabSamples,
-  type HealthResponse,
-  type LabSample,
+  type ErpModuleCode,
+  type ErpModuleOverview,
 } from './api/client';
-import { SystemStatusCard } from './components/SystemStatusCard';
-import { LabSampleTable } from './components/LabSampleTable';
+import { CfoModuleCard } from './modules/CFO/CfoModuleCard';
+import { ChoModuleCard } from './modules/CHO/ChoModuleCard';
+import { CpoModuleCard } from './modules/CPO/CpoModuleCard';
+import { CdoModuleCard } from './modules/CDO/CdoModuleCard';
+import { CmoModuleCard } from './modules/CMO/CmoModuleCard';
+
+import {
+  Badge,
+  Button,
+  Card,
+  CardHeader,
+  DataTable,
+  PageHeader,
+} from './components/ui';
 import './App.css';
 
 export const App: React.FC = () => {
-  const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [samples, setSamples] = useState<LabSample[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [modulesMap, setModulesMap] = useState<
+    Partial<Record<ErpModuleCode, ErpModuleOverview>>
+  >({});
+  const [selectedModule, setSelectedModule] =
+    useState<ErpModuleOverview | null>(null);
 
   const loadDashboardData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [healthData, samplesData] = await Promise.all([
+      const [modulesRes, healthData, samplesData] = await Promise.all([
+        fetchErpModules(),
         fetchHealthStatus(),
         fetchLabSamples(),
       ]);
+
+      const nextMap: Partial<Record<ErpModuleCode, ErpModuleOverview>> = {};
+      for (const mod of modulesRes.data) {
+        nextMap[mod.code] = mod;
+      }
+      setModulesMap(nextMap);
       setHealth(healthData);
       setSamples(samplesData.data);
     } catch (err) {
@@ -40,39 +61,89 @@ export const App: React.FC = () => {
 
   return (
     <div className="app-container">
-      <header className="app-header">
-        <div>
-          <h1>ERP FoodLab Console</h1>
-          <p className="subtitle">
-            Laravel 11 API &bull; React &bull; MySQL 8.0 &bull; Redis &bull; k6 &bull; Prometheus &amp; Grafana
-          </p>
-        </div>
-        <nav className="external-links" aria-label="Observability Links">
-          <a
-            href={import.meta.env.VITE_PROMETHEUS_URL || 'http://localhost:9090'}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Prometheus
-          </a>
-          <a
-            href={import.meta.env.VITE_GRAFANA_URL || 'http://localhost:3000'}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Grafana Dashboard
-          </a>
-        </nav>
-      </header>
+      <PageHeader
+        eyebrow="ENTERPRISE RESOURCE PLANNING"
+        title="PT. Slaras Nusa Foodlab"
+      />
 
       <main className="main-grid">
-        <SystemStatusCard
-          health={health}
-          loading={loading}
-          error={error}
-          onRefresh={loadDashboardData}
-        />
-        <LabSampleTable samples={samples} />
+        <section aria-label="ERP Executive Modules">
+          <div className="erp-modules-grid">
+            <CfoModuleCard
+              data={modulesMap.CFO}
+              isSelected={selectedModule?.code === 'CFO'}
+              onSelect={setSelectedModule}
+            />
+            <ChoModuleCard
+              data={modulesMap.CHO}
+              isSelected={selectedModule?.code === 'CHO'}
+              onSelect={setSelectedModule}
+            />
+            <CpoModuleCard
+              data={modulesMap.CPO}
+              isSelected={selectedModule?.code === 'CPO'}
+              onSelect={setSelectedModule}
+            />
+            <CdoModuleCard
+              data={modulesMap.CDO}
+              isSelected={selectedModule?.code === 'CDO'}
+              onSelect={setSelectedModule}
+            />
+            <CmoModuleCard
+              data={modulesMap.CMO}
+              isSelected={selectedModule?.code === 'CMO'}
+              onSelect={setSelectedModule}
+            />
+          </div>
+        </section>
+
+        {selectedModule && (
+          <Card
+            variant="highlighted"
+            aria-label="Selected Module Workspace"
+            data-testid="selected-module-panel"
+          >
+            <CardHeader
+              eyebrow={`WORKSPACE MODUL ${selectedModule.code}`}
+              title={selectedModule.title}
+              subtitle={selectedModule.subtitle}
+              actions={
+                <Button
+                  variant="secondary"
+                  onClick={() => setSelectedModule(null)}
+                >
+                  Tutup Detail
+                </Button>
+              }
+            />
+
+            <DataTable
+              columns={[
+                {
+                  key: 'id',
+                  header: 'ID Dokumen',
+                  render: (item) => <code>{item.id}</code>,
+                },
+                {
+                  key: 'name',
+                  header: 'Deskripsi Aktivitas',
+                  render: (item) => item.name,
+                },
+                {
+                  key: 'status',
+                  header: 'Status',
+                  render: (item) => <Badge variant="ok">{item.status}</Badge>,
+                },
+              ]}
+              data={selectedModule.recent_items}
+              rowKey={(item) => item.id}
+            />
+          </Card>
+        )}
+
+
+
+
       </main>
     </div>
   );
