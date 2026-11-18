@@ -36,8 +36,12 @@ COPY composer.json ./
 RUN composer install --no-interaction --prefer-dist --no-scripts --no-autoloader
 
 COPY . .
-RUN composer dump-autoload --optimize \
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
+    && chmod +x /usr/local/bin/docker-entrypoint.sh \
+    && composer dump-autoload --optimize \
     && chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
 EXPOSE 9000
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["php-fpm"]

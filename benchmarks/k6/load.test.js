@@ -1,3 +1,4 @@
+/* global __VU, __ITER */
 import http from 'k6/http';
 import { check, group, sleep } from 'k6';
 import { Rate, Trend } from 'k6/metrics';
