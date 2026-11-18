@@ -79,9 +79,10 @@ cp frontend/.env.example frontend/.env
 docker compose up -d --build
 ```
 
-3. Run database migrations and seed initial FoodLab sample records:
+3. Install Composer dependencies (if not already populated on host), generate the app key, and run database migrations & seeders:
 
 ```bash
+docker compose exec app composer install
 docker compose exec app php artisan key:generate
 docker compose exec app php artisan migrate --seed
 ```

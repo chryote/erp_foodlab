@@ -8,6 +8,7 @@ setup: ## Copy environment files and start all containers
 	cp -n backend/.env.example backend/.env || true
 	cp -n frontend/.env.example frontend/.env || true
 	docker compose up -d --build
+	docker compose exec app composer install --no-interaction --prefer-dist
 	docker compose exec app php artisan key:generate
 	docker compose exec app php artisan migrate --seed
 
