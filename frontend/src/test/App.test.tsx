@@ -53,7 +53,30 @@ describe('App ERP Main Menu integration', () => {
     expect(screen.getByText('Neraca')).toBeInTheDocument();
 
     const inputModalCard = screen.getByTestId('horizontal-menu-card-INPUT_MODAL');
+    expect(
+      screen.queryByTestId('horizontal-submenu-INPUT_MODAL')
+    ).not.toBeInTheDocument();
+
     fireEvent.click(inputModalCard);
     expect(inputModalCard).toHaveAttribute('aria-pressed', 'true');
+
+    const inputModalSubMenu = screen.getByTestId(
+      'horizontal-submenu-INPUT_MODAL'
+    );
+    expect(inputModalSubMenu).toBeInTheDocument();
+    expect(screen.getByText('Perusahaan')).toBeInTheDocument();
+    expect(screen.getByText('Nama Stakeholder')).toBeInTheDocument();
+    expect(screen.getByText('Daftar Saham Perusahaan')).toBeInTheDocument();
+
+    const perusahaanCard = screen.getByTestId('horizontal-menu-card-PERUSAHAAN');
+    fireEvent.click(perusahaanCard);
+    expect(perusahaanCard).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(
+      screen.getByTestId('horizontal-menu-card-INPUT_OPERASIONAL')
+    );
+    expect(
+      screen.queryByTestId('horizontal-submenu-INPUT_MODAL')
+    ).not.toBeInTheDocument();
   });
 });

@@ -137,6 +137,12 @@ body {
 }
 
 /* Reusable Horizontal Menu Card (Text Only) */
+.ui-horizontal-menu-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
 .ui-horizontal-menu-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

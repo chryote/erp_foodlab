@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   CardHeader,
+  CascadingHorizontalMenu,
   DataTable,
   HorizontalMenu,
   HorizontalMenuCard,
@@ -98,5 +99,38 @@ describe('Reusable UI Components (src/components/ui)', () => {
 
     fireEvent.click(neracaCard);
     expect(onSelect).toHaveBeenCalledWith({ code: 'NERACA', title: 'Neraca' });
+  });
+
+  it('renders CascadingHorizontalMenu and expands child submenu row on selection', () => {
+    const items = [
+      {
+        code: 'INPUT_MODAL',
+        title: 'Input Modal',
+        children: [
+          { code: 'PERUSAHAAN', title: 'Perusahaan' },
+          { code: 'NAMA_STAKEHOLDER', title: 'Nama Stakeholder' },
+          {
+            code: 'DAFTAR_SAHAM_PERUSAHAAN',
+            title: 'Daftar Saham Perusahaan',
+          },
+        ],
+      },
+      { code: 'NERACA', title: 'Neraca' },
+    ];
+
+    render(<CascadingHorizontalMenu items={items} />);
+
+    expect(
+      screen.queryByTestId('horizontal-submenu-INPUT_MODAL')
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('horizontal-menu-card-INPUT_MODAL'));
+
+    expect(
+      screen.getByTestId('horizontal-submenu-INPUT_MODAL')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Perusahaan')).toBeInTheDocument();
+    expect(screen.getByText('Nama Stakeholder')).toBeInTheDocument();
+    expect(screen.getByText('Daftar Saham Perusahaan')).toBeInTheDocument();
   });
 });

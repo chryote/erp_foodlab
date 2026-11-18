@@ -26,13 +26,25 @@ export const App: React.FC = () => {
     useState<ErpModuleOverview | null>(null);
   const [selectedSubMenu, setSelectedSubMenu] =
     useState<HorizontalMenuItem | null>(null);
+  const [selectedChildSubMenu, setSelectedChildSubMenu] =
+    useState<HorizontalMenuItem | null>(null);
 
   const handleSelectModule = useCallback((mod: ErpModuleOverview) => {
     setSelectedModule((prev) => {
       if (prev?.code !== mod.code) {
         setSelectedSubMenu(null);
+        setSelectedChildSubMenu(null);
       }
       return mod;
+    });
+  }, []);
+
+  const handleSelectSubMenu = useCallback((item: HorizontalMenuItem) => {
+    setSelectedSubMenu((prev) => {
+      if (prev?.code !== item.code) {
+        setSelectedChildSubMenu(null);
+      }
+      return item;
     });
   }, []);
 
@@ -95,7 +107,9 @@ export const App: React.FC = () => {
           <section aria-label="CFO Module Navigation">
             <CfoHorizontalMenu
               selectedCode={selectedSubMenu?.code ?? null}
-              onSelect={setSelectedSubMenu}
+              selectedChildCode={selectedChildSubMenu?.code ?? null}
+              onSelect={handleSelectSubMenu}
+              onSelectChild={setSelectedChildSubMenu}
             />
           </section>
         )}
