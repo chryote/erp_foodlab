@@ -1,12 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type {
-  Company,
-  ExpenseCategory,
-  ExpenseItem,
-  ExpenseType,
-} from '@/api/client';
+import type { Company, ExpenseCategory, ExpenseType } from '@/api/client';
 import { type CrudFieldConfig, CrudModal } from '@/components/ui';
-import { useMasterOperasionalCrudResource } from '@/lib/inertia';
+import { useMasterOperasionalCrudResource } from '@/lib/cfoResources';
 import { cn } from '@/lib/utils';
 
 export type MasterOperasionalTabKey = 'kategori' | 'tipe';
@@ -23,23 +18,12 @@ export interface MasterOperasionalCrudModalProps {
   isOpen: boolean;
   company: Company | null;
   companies?: Company[];
-  initialExpenseCategories?: ExpenseCategory[];
-  initialExpenseTypes?: ExpenseType[];
-  initialExpenseItems?: ExpenseItem[];
   onClose: () => void;
 }
 
 export const MasterOperasionalCrudModal: React.FC<
   MasterOperasionalCrudModalProps
-> = ({
-  isOpen,
-  company,
-  companies,
-  initialExpenseCategories,
-  initialExpenseTypes,
-  initialExpenseItems,
-  onClose,
-}) => {
+> = ({ isOpen, company, companies, onClose }) => {
   const [activeTab, setActiveTab] =
     useState<MasterOperasionalTabKey>('kategori');
 
@@ -54,13 +38,7 @@ export const MasterOperasionalCrudModal: React.FC<
     createType,
     updateType,
     removeType,
-  } = useMasterOperasionalCrudResource(
-    isOpen,
-    company,
-    initialExpenseCategories,
-    initialExpenseTypes,
-    initialExpenseItems
-  );
+  } = useMasterOperasionalCrudResource(isOpen, company);
 
   useEffect(() => {
     if (!isOpen) {

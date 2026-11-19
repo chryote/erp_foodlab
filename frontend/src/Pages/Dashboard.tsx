@@ -1,18 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import type { Company, ErpModuleOverview } from '@/api/client';
+import { type HorizontalMenuItem, PageHeader } from '@/components/ui';
 import {
-  fetchErpModules,
-  type Company,
-  type ErpModuleCode,
-  type ErpModuleOverview,
-} from '@/api/client';
-import {
-  type HorizontalMenuItem,
-  PageHeader,
-} from '@/components/ui';
-import {
-  type ErpDashboardPageProps,
   useCompanyCrudResource,
-} from '@/lib/inertia';
+  useErpModulesQuery,
+} from '@/lib/cfoResources';
 import { CdoModuleCard } from '@/modules/CDO/CdoModuleCard';
 import { CapitalCompanyCrudModal } from '@/modules/CFO/CapitalCompanyCrudModal';
 import {
@@ -28,25 +20,8 @@ import { CmoModuleCard } from '@/modules/CMO/CmoModuleCard';
 import { CpoModuleCard } from '@/modules/CPO/CpoModuleCard';
 import '@/App.css';
 
-export const Dashboard: React.FC<ErpDashboardPageProps> = ({
-  modules: initialModules,
-  companies: initialCompanies,
-  capitalCompanies: initialCapitalCompanies,
-  expenseCategories: initialExpenseCategories,
-  expenseTypes: initialExpenseTypes,
-  expenseItems: initialExpenseItems,
-}) => {
-  const [modulesMap, setModulesMap] = useState<
-    Partial<Record<ErpModuleCode, ErpModuleOverview>>
-  >(() => {
-    const map: Partial<Record<ErpModuleCode, ErpModuleOverview>> = {};
-    if (initialModules) {
-      for (const mod of initialModules) {
-        map[mod.code] = mod;
-      }
-    }
-    return map;
-  });
+export const Dashboard: React.FC = () => {
+  const { modulesMap } = useErpModulesQuery();
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [selectedModule, setSelectedModule] =
     useState<ErpModuleOverview | null>(null);
@@ -54,7 +29,7 @@ export const Dashboard: React.FC<ErpDashboardPageProps> = ({
     useState<HorizontalMenuItem | null>(null);
   const [selectedChildSubMenu, setSelectedChildSubMenu] =
     useState<HorizontalMenuItem | null>(null);
-  const companyResource = useCompanyCrudResource(true, initialCompanies);
+  const companyResource = useCompanyCrudResource(true);
 
   useEffect(() => {
     if (!selectedCompany || companyResource.companies.length === 0) {
@@ -81,16 +56,6 @@ export const Dashboard: React.FC<ErpDashboardPageProps> = ({
     setSelectedSubMenu(null);
     setSelectedChildSubMenu(null);
   }, [companyResource.companies, selectedCompany]);
-
-  useEffect(() => {
-    if (initialModules) {
-      const nextMap: Partial<Record<ErpModuleCode, ErpModuleOverview>> = {};
-      for (const mod of initialModules) {
-        nextMap[mod.code] = mod;
-      }
-      setModulesMap(nextMap);
-    }
-  }, [initialModules]);
 
   const handleSelectSeries = useCallback(() => {
     setSelectedCompany(null);
@@ -128,26 +93,6 @@ export const Dashboard: React.FC<ErpDashboardPageProps> = ({
       return item;
     });
   }, []);
-
-  const loadDashboardData = useCallback(async () => {
-    if (initialModules !== undefined) {
-      return;
-    }
-    try {
-      const modulesRes = await fetchErpModules();
-      const nextMap: Partial<Record<ErpModuleCode, ErpModuleOverview>> = {};
-      for (const mod of modulesRes.data) {
-        nextMap[mod.code] = mod;
-      }
-      setModulesMap(nextMap);
-    } catch {
-      // Fallback to default module definitions when API is unreachable
-    }
-  }, [initialModules]);
-
-  useEffect(() => {
-    void loadDashboardData();
-  }, [loadDashboardData]);
 
   return (
     <div className="mx-auto max-w-[1360px] px-6 py-8">
@@ -206,8 +151,6 @@ export const Dashboard: React.FC<ErpDashboardPageProps> = ({
 
             <CompanyCrudModal
               isOpen={selectedChildSubMenu?.code === 'PERUSAHAAN'}
-              initialCompanies={initialCompanies}
-              initialCapitalCompanies={initialCapitalCompanies}
               companyResource={companyResource}
               onClose={() => setSelectedChildSubMenu(null)}
             />
@@ -216,8 +159,6 @@ export const Dashboard: React.FC<ErpDashboardPageProps> = ({
               isOpen={
                 selectedChildSubMenu?.code === 'DAFTAR_KAPITAL_PERUSAHAAN'
               }
-              initialCompanies={companyResource.companies}
-              initialCapitalCompanies={initialCapitalCompanies}
               onClose={() => setSelectedChildSubMenu(null)}
             />
 
@@ -225,18 +166,12 @@ export const Dashboard: React.FC<ErpDashboardPageProps> = ({
               isOpen={selectedChildSubMenu?.code === 'MASTER_OPERASIONAL'}
               company={selectedCompany}
               companies={companyResource.companies}
-              initialExpenseCategories={initialExpenseCategories}
-              initialExpenseTypes={initialExpenseTypes}
-              initialExpenseItems={initialExpenseItems}
               onClose={() => setSelectedChildSubMenu(null)}
             />
 
             <ViewOperasionalModal
               isOpen={selectedChildSubMenu?.code === 'VIEW_OPERASIONAL'}
               company={selectedCompany}
-              initialExpenseCategories={initialExpenseCategories}
-              initialExpenseTypes={initialExpenseTypes}
-              initialExpenseItems={initialExpenseItems}
               onClose={() => setSelectedChildSubMenu(null)}
             />
 
@@ -244,9 +179,6 @@ export const Dashboard: React.FC<ErpDashboardPageProps> = ({
               isOpen={selectedChildSubMenu?.code === 'ITEM_OPERASIONAL'}
               company={selectedCompany}
               companies={companyResource.companies}
-              initialExpenseCategories={initialExpenseCategories}
-              initialExpenseTypes={initialExpenseTypes}
-              initialExpenseItems={initialExpenseItems}
               onClose={() => setSelectedChildSubMenu(null)}
             />
           </>

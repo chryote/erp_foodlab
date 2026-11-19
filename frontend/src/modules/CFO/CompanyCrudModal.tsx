@@ -11,7 +11,7 @@ import {
   type CompanyCrudResource,
   useCompanyCrudResource,
   useStakeholderCrudResource,
-} from '@/lib/inertia';
+} from '@/lib/cfoResources';
 import {
   formatCapitalIdr,
   formatCapitalSharePercent,
@@ -57,21 +57,14 @@ export interface CompanyStakeholderModalProps {
   isOpen: boolean;
   company: Company | null;
   readOnly?: boolean;
-  initialCapitalCompanies?: CapitalCompany[];
   onClose: () => void;
 }
 
 export const CompanyStakeholderModal: React.FC<
   CompanyStakeholderModalProps
-> = ({
-  isOpen,
-  company,
-  readOnly = false,
-  initialCapitalCompanies,
-  onClose,
-}) => {
+> = ({ isOpen, company, readOnly = false, onClose }) => {
   const { stakeholders, loading, error, create, update, remove } =
-    useStakeholderCrudResource(isOpen, company, initialCapitalCompanies);
+    useStakeholderCrudResource(isOpen, company);
 
   const totalCompanyCapital = useMemo(
     () =>
@@ -143,30 +136,25 @@ export const CompanyStakeholderModal: React.FC<
           await update(id, name, capital);
         }
       }}
-      onDelete={remove}
+      onDelete={async (id) => {
+        await remove(id);
+      }}
     />
   );
 };
 
 export interface CompanyCrudModalProps {
   isOpen: boolean;
-  initialCompanies?: Company[];
-  initialCapitalCompanies?: CapitalCompany[];
   companyResource?: CompanyCrudResource;
   onClose: () => void;
 }
 
 export const CompanyCrudModal: React.FC<CompanyCrudModalProps> = ({
   isOpen,
-  initialCompanies,
-  initialCapitalCompanies,
   companyResource,
   onClose,
 }) => {
-  const fallbackResource = useCompanyCrudResource(
-    isOpen && !companyResource,
-    initialCompanies
-  );
+  const fallbackResource = useCompanyCrudResource(isOpen && !companyResource);
   const { companies, loading, error, create, update, remove } =
     companyResource ?? fallbackResource;
   const [selectedStakeholderCompany, setSelectedStakeholderCompany] =
@@ -235,7 +223,6 @@ export const CompanyCrudModal: React.FC<CompanyCrudModalProps> = ({
       <CompanyStakeholderModal
         isOpen={isOpen && selectedStakeholderCompany !== null}
         company={selectedStakeholderCompany}
-        initialCapitalCompanies={initialCapitalCompanies}
         onClose={() => setSelectedStakeholderCompany(null)}
       />
     </>

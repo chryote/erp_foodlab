@@ -1,9 +1,6 @@
 <?php
 
 use App\Models\Company;
-use App\Models\ExpenseCategory;
-use App\Models\ExpenseItem;
-use App\Models\ExpenseType;
 use Illuminate\Support\Facades\Cache;
 
 describe('CFO Expense Category, Type, and Item CRUD scoped by company_id', function () {
@@ -146,41 +143,5 @@ describe('CFO Expense Category, Type, and Item CRUD scoped by company_id', funct
 
         $this->deleteJson("/api/v1/modules/cfo/expense-categories/{$catAId}")->assertOk();
         $this->assertSoftDeleted('expense_categories', ['id' => $catAId]);
-    });
-
-    it('creates, updates, and deletes company-scoped expense entities via Inertia web routes', function () {
-        $company = Company::factory()->create(['name' => 'PT. Slaras Nusa Foodlab']);
-
-        $this->from('/')->post('/cfo/expense-categories', [
-            'company_id' => $company->id,
-            'name' => 'Operasional',
-        ])->assertRedirect('/');
-
-        $category = ExpenseCategory::query()->where('company_id', $company->id)->firstOrFail();
-
-        $this->from('/')->post('/cfo/expense-types', [
-            'company_id' => $company->id,
-            'expense_category_id' => $category->id,
-            'name' => 'Franchise',
-        ])->assertRedirect('/');
-
-        $type = ExpenseType::query()->where('company_id', $company->id)->firstOrFail();
-
-        $this->from('/')->post('/cfo/expense-items', [
-            'company_id' => $company->id,
-            'expense_category_id' => $category->id,
-            'expense_type_id' => $type->id,
-            'name' => 'Franchise Outlet',
-            'amount' => 15000000,
-            'purchased_on' => '2026-11-19',
-            'detail' => 'Biaya lisensi outlet',
-        ])->assertRedirect('/');
-
-        $item = ExpenseItem::query()->where('company_id', $company->id)->firstOrFail();
-        expect($item->expense_category_id)->toBe($category->id)
-            ->and($item->expense_type_id)->toBe($type->id)
-            ->and((float) $item->amount)->toBe(15000000.0)
-            ->and($item->purchased_on?->format('Y-m-d'))->toBe('2026-11-19')
-            ->and($item->detail)->toBe('Biaya lisensi outlet');
     });
 });

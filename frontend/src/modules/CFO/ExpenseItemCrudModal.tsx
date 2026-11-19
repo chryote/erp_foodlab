@@ -1,12 +1,7 @@
 import React, { useMemo } from 'react';
-import type {
-  Company,
-  ExpenseCategory,
-  ExpenseItem,
-  ExpenseType,
-} from '@/api/client';
+import type { Company, ExpenseItem } from '@/api/client';
 import { type CrudFieldConfig, CrudModal } from '@/components/ui';
-import { useMasterOperasionalCrudResource } from '@/lib/inertia';
+import { useMasterOperasionalCrudResource } from '@/lib/cfoResources';
 import { formatCapitalIdr } from './CapitalCompanyCrudModal';
 
 function getTodayDateString(): string {
@@ -21,9 +16,6 @@ export interface ExpenseItemCrudModalProps {
   isOpen: boolean;
   company: Company | null;
   companies?: Company[];
-  initialExpenseCategories?: ExpenseCategory[];
-  initialExpenseTypes?: ExpenseType[];
-  initialExpenseItems?: ExpenseItem[];
   onClose: () => void;
 }
 
@@ -31,9 +23,6 @@ export const ExpenseItemCrudModal: React.FC<ExpenseItemCrudModalProps> = ({
   isOpen,
   company,
   companies,
-  initialExpenseCategories,
-  initialExpenseTypes,
-  initialExpenseItems,
   onClose,
 }) => {
   const {
@@ -45,13 +34,7 @@ export const ExpenseItemCrudModal: React.FC<ExpenseItemCrudModalProps> = ({
     createItem,
     updateItem,
     removeItem,
-  } = useMasterOperasionalCrudResource(
-    isOpen,
-    company,
-    initialExpenseCategories,
-    initialExpenseTypes,
-    initialExpenseItems
-  );
+  } = useMasterOperasionalCrudResource(isOpen, company);
 
   const availableCompanies = useMemo<Company[]>(() => {
     if (companies && companies.length > 0) {
@@ -152,7 +135,7 @@ export const ExpenseItemCrudModal: React.FC<ExpenseItemCrudModalProps> = ({
       },
       {
         key: 'purchased_on',
-        label: 'Tanggal Beli',
+        label: 'Tanggal Transaksi',
         type: 'date',
         defaultValue: todayDate,
         renderValue: (row) => row.purchased_on ?? '-',

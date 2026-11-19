@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { CapitalCompany, Company } from '@/api/client';
 import { type CrudFieldConfig, CrudModal } from '@/components/ui';
-import { useCapitalOverviewResource } from '@/lib/inertia';
+import { useCapitalOverviewResource } from '@/lib/cfoResources';
 import { CompanyStakeholderModal } from './CompanyCrudModal';
 
 export function formatCapitalIdr(amount: number): string {
@@ -34,20 +34,14 @@ export function formatCapitalSharePercent(
 
 export interface CapitalCompanyCrudModalProps {
   isOpen: boolean;
-  initialCompanies?: Company[];
-  initialCapitalCompanies?: CapitalCompany[];
   onClose: () => void;
 }
 
 export const CapitalCompanyCrudModal: React.FC<
   CapitalCompanyCrudModalProps
-> = ({ isOpen, initialCompanies, initialCapitalCompanies, onClose }) => {
+> = ({ isOpen, onClose }) => {
   const { capitalCompanies, companies, loading, error } =
-    useCapitalOverviewResource(
-      isOpen,
-      initialCompanies,
-      initialCapitalCompanies
-    );
+    useCapitalOverviewResource(isOpen);
   const [selectedDetailCompany, setSelectedDetailCompany] =
     useState<Company | null>(null);
 
@@ -188,7 +182,6 @@ export const CapitalCompanyCrudModal: React.FC<
         isOpen={isOpen && selectedDetailCompany !== null}
         company={selectedDetailCompany}
         readOnly={true}
-        initialCapitalCompanies={initialCapitalCompanies}
         onClose={() => setSelectedDetailCompany(null)}
       />
     </>

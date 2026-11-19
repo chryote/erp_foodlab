@@ -11,7 +11,7 @@ import {
   Modal,
   SummaryBanner,
 } from '@/components/ui';
-import { useMasterOperasionalCrudResource } from '@/lib/inertia';
+import { useMasterOperasionalCrudResource } from '@/lib/cfoResources';
 import { formatCapitalIdr } from './CapitalCompanyCrudModal';
 
 export function formatOperasionalNumber(amount: number): string {
@@ -80,9 +80,6 @@ type SelectedOperasionalDetail =
 export interface ViewOperasionalModalProps {
   isOpen: boolean;
   company: Company | null;
-  initialExpenseCategories?: ExpenseCategory[];
-  initialExpenseTypes?: ExpenseType[];
-  initialExpenseItems?: ExpenseItem[];
   referenceDate?: Date;
   onClose: () => void;
 }
@@ -90,20 +87,11 @@ export interface ViewOperasionalModalProps {
 export const ViewOperasionalModal: React.FC<ViewOperasionalModalProps> = ({
   isOpen,
   company,
-  initialExpenseCategories,
-  initialExpenseTypes,
-  initialExpenseItems,
   referenceDate,
   onClose,
 }) => {
   const { categories, types, items, loading, error } =
-    useMasterOperasionalCrudResource(
-      isOpen,
-      company,
-      initialExpenseCategories,
-      initialExpenseTypes,
-      initialExpenseItems
-    );
+    useMasterOperasionalCrudResource(isOpen, company);
 
   const [selectedDetail, setSelectedDetail] =
     useState<SelectedOperasionalDetail | null>(null);
@@ -204,7 +192,7 @@ export const ViewOperasionalModal: React.FC<ViewOperasionalModalProps> = ({
     () => [
       {
         key: 'purchased_on',
-        label: 'Tanggal Beli',
+        label: 'Tanggal Transaksi',
         renderValue: (row) => row.purchased_on ?? '-',
       },
       {

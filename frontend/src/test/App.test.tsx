@@ -27,52 +27,68 @@ describe('App ERP Main Menu integration', () => {
       ],
       meta: { count: 5 },
     });
-    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
-      data: [
-        {
-          id: 1,
-          name: 'PT. Slaras Nusa Foodlab',
-          series: 1,
-        },
-      ],
-      meta: { count: 1 },
-    });
-    vi.mocked(apiClient.createCompany).mockResolvedValue({
-      data: {
-        id: 2,
-        name: 'PT. Pangan Nusantara',
-        series: 2,
+    let companiesStore: apiClient.Company[] = [
+      {
+        id: 1,
+        name: 'PT. Slaras Nusa Foodlab',
+        series: 1,
       },
-    });
-    vi.mocked(apiClient.updateCompany).mockResolvedValue({
-      data: {
-        id: 2,
-        name: 'PT. Pangan Nusantara Baru',
-        series: 2,
-      },
-    });
-    vi.mocked(apiClient.deleteCompany).mockResolvedValue({
-      message: 'Company deleted successfully.',
-    });
-    vi.mocked(apiClient.fetchCapitalCompanies).mockResolvedValue({
-      data: [
-        {
-          id: 101,
-          company_id: 1,
-          stakeholder_name: 'Rian',
-          capital: 100000000,
-        },
-      ],
-      meta: { count: 1 },
-    });
-    vi.mocked(apiClient.createCapitalCompany).mockResolvedValue({
-      data: {
-        id: 102,
+    ];
+    let capitalStore: apiClient.CapitalCompany[] = [
+      {
+        id: 101,
         company_id: 1,
-        stakeholder_name: 'Budi Santoso',
-        capital: 300000000.5,
+        stakeholder_name: 'Rian',
+        capital: 100000000,
       },
+    ];
+
+    vi.mocked(apiClient.fetchCompanies).mockImplementation(async () => ({
+      data: [...companiesStore],
+      meta: { count: companiesStore.length },
+    }));
+    vi.mocked(apiClient.createCompany).mockImplementation(async (payload) => {
+      const created: apiClient.Company = {
+        id: 2,
+        name: payload.name,
+        series: payload.series ?? 1,
+      };
+      companiesStore = [created, ...companiesStore];
+      return { data: created };
     });
+    vi.mocked(apiClient.updateCompany).mockImplementation(
+      async (id, payload) => {
+        const updated: apiClient.Company = {
+          id,
+          name: payload.name,
+          series: payload.series ?? 1,
+        };
+        companiesStore = companiesStore.map((c) => (c.id === id ? updated : c));
+        return { data: updated };
+      }
+    );
+    vi.mocked(apiClient.deleteCompany).mockImplementation(async (id) => {
+      companiesStore = companiesStore.filter((c) => c.id !== id);
+      return { message: 'Company deleted successfully.' };
+    });
+    vi.mocked(apiClient.fetchCapitalCompanies).mockImplementation(
+      async () => ({
+        data: [...capitalStore],
+        meta: { count: capitalStore.length },
+      })
+    );
+    vi.mocked(apiClient.createCapitalCompany).mockImplementation(
+      async (payload) => {
+        const created: apiClient.CapitalCompany = {
+          id: 102,
+          company_id: payload.company_id,
+          stakeholder_name: payload.stakeholder_name,
+          capital: payload.capital,
+        };
+        capitalStore = [created, ...capitalStore];
+        return { data: created };
+      }
+    );
 
     render(<App />);
 
@@ -92,7 +108,7 @@ describe('App ERP Main Menu integration', () => {
       expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(1);
     });
 
-    const companyTab1 = screen.getByTestId('company-tab-1');
+    const companyTab1 = await screen.findByTestId('company-tab-1');
     expect(companyTab1).toHaveAttribute('aria-selected', 'false');
     fireEvent.click(companyTab1);
     expect(companyTab1).toHaveAttribute('aria-selected', 'true');
@@ -317,7 +333,7 @@ describe('App ERP Main Menu integration', () => {
       expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(1);
     });
 
-    fireEvent.click(screen.getByTestId('company-tab-1'));
+    fireEvent.click(await screen.findByTestId('company-tab-1'));
     fireEvent.click(screen.getByTestId('module-card-CFO'));
     fireEvent.click(screen.getByTestId('horizontal-menu-card-INPUT_MODAL'));
     fireEvent.click(
@@ -387,43 +403,40 @@ describe('App ERP Main Menu integration', () => {
     expect(screen.queryByTestId('delete-row-10')).not.toBeInTheDocument();
   });
 
-  it('hydrates directly from Inertia server props without calling fetchErpModules and keeps ModuleCards hidden until company tab is clicked', () => {
-    render(
-      <App
-        modules={[
-          DEFAULT_CFO_MODULE,
-          DEFAULT_CHO_MODULE,
-          DEFAULT_CPO_MODULE,
-          DEFAULT_CDO_MODULE,
-          DEFAULT_CMO_MODULE,
-        ]}
-        companies={[
-          { id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1 },
-          { id: 2, name: 'PT. Pangan Nusantara', series: 2 },
-        ]}
-        capitalCompanies={[
-          {
-            id: 10,
-            company_id: 1,
-            stakeholder_name: 'Rian',
-            capital: 250000000,
-          },
-        ]}
-      />
-    );
+  it('loads dashboard via REST API and keeps ModuleCards hidden until company tab is clicked', async () => {
+    vi.mocked(apiClient.fetchErpModules).mockResolvedValue({
+      data: [
+        DEFAULT_CFO_MODULE,
+        DEFAULT_CHO_MODULE,
+        DEFAULT_CPO_MODULE,
+        DEFAULT_CDO_MODULE,
+        DEFAULT_CMO_MODULE,
+      ],
+      meta: { count: 5 },
+    });
+    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
+      data: [
+        { id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1 },
+        { id: 2, name: 'PT. Pangan Nusantara', series: 2 },
+      ],
+      meta: { count: 2 },
+    });
+
+    render(<App />);
 
     expect(screen.getByText('PT. Slaras Nusa Foodlab')).toBeInTheDocument();
-    expect(apiClient.fetchErpModules).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(apiClient.fetchErpModules).toHaveBeenCalledTimes(1);
+      expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(1);
+    });
 
     // ModuleCards hidden by default
     expect(screen.queryByTestId('module-card-CFO')).not.toBeInTheDocument();
-    expect(screen.getByTestId('company-tab-1')).toHaveAttribute(
-      'aria-selected',
-      'false'
-    );
+    const companyTab1 = await screen.findByTestId('company-tab-1');
+    expect(companyTab1).toHaveAttribute('aria-selected', 'false');
 
     // Clicking secondary company tab reveals ModuleCards
-    fireEvent.click(screen.getByTestId('company-tab-1'));
+    fireEvent.click(companyTab1);
     expect(screen.getByTestId('company-tab-1')).toHaveAttribute(
       'aria-selected',
       'true'
@@ -460,106 +473,151 @@ describe('App ERP Main Menu integration', () => {
       ],
       meta: { count: 2 },
     });
-    vi.mocked(apiClient.fetchExpenseCategories).mockResolvedValue({
-      data: [
-        { id: 10, company_id: 1, name: 'Bahan Baku' },
-        { id: 12, company_id: 1, name: 'Lainnya' },
-        { id: 13, company_id: 2, name: 'Kategori Perusahaan 2' },
-      ],
-      meta: { count: 3 },
-    });
-    vi.mocked(apiClient.createExpenseCategory).mockResolvedValue({
-      data: { id: 11, company_id: 1, name: 'Utilitas' },
-    });
-    vi.mocked(apiClient.updateExpenseCategory).mockResolvedValue({
-      data: { id: 11, company_id: 1, name: 'Utilitas Pabrik' },
-    });
-    vi.mocked(apiClient.deleteExpenseCategory).mockResolvedValue({
-      message: 'Expense category deleted successfully.',
-    });
-    vi.mocked(apiClient.fetchExpenseTypes).mockResolvedValue({
-      data: [
-        { id: 20, company_id: 1, expense_category_id: 10, name: 'Dairy' },
-        { id: 22, company_id: 1, expense_category_id: 12, name: 'Listrik' },
-        {
-          id: 23,
-          company_id: 2,
-          expense_category_id: 13,
-          name: 'Tipe Perusahaan 2',
-        },
-      ],
-      meta: { count: 3 },
-    });
-    vi.mocked(apiClient.createExpenseType).mockResolvedValue({
-      data: {
-        id: 21,
-        company_id: 1,
-        expense_category_id: 10,
-        name: 'Kemasan',
+    let categoriesStore: apiClient.ExpenseCategory[] = [
+      { id: 10, company_id: 1, name: 'Bahan Baku' },
+      { id: 12, company_id: 1, name: 'Lainnya' },
+      { id: 13, company_id: 2, name: 'Kategori Perusahaan 2' },
+    ];
+    let typesStore: apiClient.ExpenseType[] = [
+      { id: 20, company_id: 1, expense_category_id: 10, name: 'Dairy' },
+      { id: 22, company_id: 1, expense_category_id: 12, name: 'Listrik' },
+      {
+        id: 23,
+        company_id: 2,
+        expense_category_id: 13,
+        name: 'Tipe Perusahaan 2',
       },
-    });
-    vi.mocked(apiClient.updateExpenseType).mockResolvedValue({
-      data: {
-        id: 21,
-        company_id: 1,
-        expense_category_id: 10,
-        name: 'Kemasan Botol',
-      },
-    });
-    vi.mocked(apiClient.deleteExpenseType).mockResolvedValue({
-      message: 'Expense type deleted successfully.',
-    });
-    vi.mocked(apiClient.fetchExpenseItems).mockResolvedValue({
-      data: [
-        {
-          id: 30,
-          expense_category_id: 10,
-          expense_type_id: 20,
-          company_id: 1,
-          name: 'Susu Segar',
-          amount: 1500000,
-          purchased_on: '2026-11-18',
-          detail: 'Stok susu pagi',
-        },
-        {
-          id: 31,
-          expense_category_id: 10,
-          expense_type_id: 20,
-          company_id: 2,
-          name: 'Krim Kental',
-          amount: 2500000,
-          purchased_on: '2026-11-18',
-          detail: 'Stok krim cabang 2',
-        },
-      ],
-      meta: { count: 2 },
-    });
-    vi.mocked(apiClient.createExpenseItem).mockResolvedValue({
-      data: {
-        id: 32,
+    ];
+    let itemsStore: apiClient.ExpenseItem[] = [
+      {
+        id: 30,
         expense_category_id: 10,
         expense_type_id: 20,
         company_id: 1,
-        name: 'Keju Mozzarella',
-        amount: 3250000,
-        purchased_on: '2026-11-19',
-        detail: 'Pembelian bahan pizza',
+        name: 'Susu Segar',
+        amount: 1500000,
+        purchased_on: '2026-11-18',
+        detail: 'Stok susu pagi',
       },
-    });
-    vi.mocked(apiClient.updateExpenseItem).mockResolvedValue({
-      data: {
-        id: 32,
+      {
+        id: 31,
         expense_category_id: 10,
         expense_type_id: 20,
-        company_id: 1,
-        name: 'Keju Cheddar',
-        amount: 3500000,
-        purchased_on: '2026-11-20',
-        detail: 'Update bahan keju',
+        company_id: 2,
+        name: 'Krim Kental',
+        amount: 2500000,
+        purchased_on: '2026-11-18',
+        detail: 'Stok krim cabang 2',
       },
+    ];
+
+    vi.mocked(apiClient.fetchExpenseCategories).mockImplementation(
+      async () => ({
+        data: [...categoriesStore],
+        meta: { count: categoriesStore.length },
+      })
+    );
+    vi.mocked(apiClient.createExpenseCategory).mockImplementation(
+      async (payload) => {
+        const created: apiClient.ExpenseCategory = {
+          id: 11,
+          company_id: payload.company_id,
+          name: payload.name,
+        };
+        categoriesStore = [created, ...categoriesStore];
+        return { data: created };
+      }
+    );
+    vi.mocked(apiClient.updateExpenseCategory).mockImplementation(
+      async (id, payload) => {
+        const updated: apiClient.ExpenseCategory = {
+          id,
+          company_id: payload.company_id,
+          name: payload.name,
+        };
+        categoriesStore = categoriesStore.map((c) =>
+          c.id === id ? updated : c
+        );
+        return { data: updated };
+      }
+    );
+    vi.mocked(apiClient.deleteExpenseCategory).mockImplementation(
+      async (id) => {
+        categoriesStore = categoriesStore.filter((c) => c.id !== id);
+        return { message: 'Expense category deleted successfully.' };
+      }
+    );
+    vi.mocked(apiClient.fetchExpenseTypes).mockImplementation(async () => ({
+      data: [...typesStore],
+      meta: { count: typesStore.length },
+    }));
+    vi.mocked(apiClient.createExpenseType).mockImplementation(
+      async (payload) => {
+        const created: apiClient.ExpenseType = {
+          id: 21,
+          company_id: payload.company_id,
+          expense_category_id: payload.expense_category_id,
+          name: payload.name,
+        };
+        typesStore = [created, ...typesStore];
+        return { data: created };
+      }
+    );
+    vi.mocked(apiClient.updateExpenseType).mockImplementation(
+      async (id, payload) => {
+        const updated: apiClient.ExpenseType = {
+          id,
+          company_id: payload.company_id,
+          expense_category_id: payload.expense_category_id,
+          name: payload.name,
+        };
+        typesStore = typesStore.map((t) => (t.id === id ? updated : t));
+        return { data: updated };
+      }
+    );
+    vi.mocked(apiClient.deleteExpenseType).mockImplementation(async (id) => {
+      typesStore = typesStore.filter((t) => t.id !== id);
+      return { message: 'Expense type deleted successfully.' };
     });
-    vi.mocked(apiClient.deleteExpenseItem).mockResolvedValue({
-      message: 'Expense item deleted successfully.',
+    vi.mocked(apiClient.fetchExpenseItems).mockImplementation(async () => ({
+      data: [...itemsStore],
+      meta: { count: itemsStore.length },
+    }));
+    vi.mocked(apiClient.createExpenseItem).mockImplementation(
+      async (payload) => {
+        const created: apiClient.ExpenseItem = {
+          id: 32,
+          expense_category_id: payload.expense_category_id ?? 10,
+          expense_type_id: payload.expense_type_id,
+          company_id: payload.company_id,
+          name: payload.name,
+          amount: payload.amount,
+          purchased_on: payload.purchased_on,
+          detail: payload.detail ?? null,
+        };
+        itemsStore = [created, ...itemsStore];
+        return { data: created };
+      }
+    );
+    vi.mocked(apiClient.updateExpenseItem).mockImplementation(
+      async (id, payload) => {
+        const updated: apiClient.ExpenseItem = {
+          id,
+          expense_category_id: payload.expense_category_id ?? 10,
+          expense_type_id: payload.expense_type_id,
+          company_id: payload.company_id,
+          name: payload.name,
+          amount: payload.amount,
+          purchased_on: payload.purchased_on,
+          detail: payload.detail ?? null,
+        };
+        itemsStore = itemsStore.map((item) => (item.id === id ? updated : item));
+        return { data: updated };
+      }
+    );
+    vi.mocked(apiClient.deleteExpenseItem).mockImplementation(async (id) => {
+      itemsStore = itemsStore.filter((item) => item.id !== id);
+      return { message: 'Expense item deleted successfully.' };
     });
 
     render(<App />);
@@ -569,7 +627,7 @@ describe('App ERP Main Menu integration', () => {
     });
 
     // Select active company tab 1 -> CFO -> Input Operasional -> Master Operasional
-    fireEvent.click(screen.getByTestId('company-tab-1'));
+    fireEvent.click(await screen.findByTestId('company-tab-1'));
     fireEvent.click(screen.getByTestId('module-card-CFO'));
     fireEvent.click(
       screen.getByTestId('horizontal-menu-card-INPUT_OPERASIONAL')
@@ -728,7 +786,7 @@ describe('App ERP Main Menu integration', () => {
       'Pilih Tipe'
     ) as HTMLSelectElement;
     const itemDateInput = screen.getByLabelText(
-      'Tanggal Beli'
+      'Tanggal Transaksi'
     ) as HTMLInputElement;
     expect(itemCompanySelect.value).toBe('1');
     expect(itemDateInput.type).toBe('date');
@@ -948,7 +1006,7 @@ describe('App ERP Main Menu integration', () => {
       expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(1);
     });
 
-    fireEvent.click(screen.getByTestId('company-tab-1'));
+    fireEvent.click(await screen.findByTestId('company-tab-1'));
     fireEvent.click(screen.getByTestId('module-card-CFO'));
     fireEvent.click(
       screen.getByTestId('horizontal-menu-card-INPUT_OPERASIONAL')
