@@ -108,6 +108,18 @@ describe('CFO Expense Category, Type, and Item CRUD scoped by company_id', funct
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', $itemAId);
 
+        $this->getJson("/api/v1/modules/cfo/expense-categories/{$catAId}")
+            ->assertOk()
+            ->assertJsonPath('data.id', $catAId);
+
+        $this->getJson("/api/v1/modules/cfo/expense-types/{$typeAId}")
+            ->assertOk()
+            ->assertJsonPath('data.id', $typeAId);
+
+        $this->getJson("/api/v1/modules/cfo/expense-items/{$itemAId}")
+            ->assertOk()
+            ->assertJsonPath('data.id', $itemAId);
+
         $this->putJson("/api/v1/modules/cfo/expense-categories/{$catAId}", [
             'company_id' => $companyA->id,
             'name' => 'Bahan Baku Revisi',
