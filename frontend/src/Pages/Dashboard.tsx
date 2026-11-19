@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   fetchErpModules,
+  type Company,
   type ErpModuleCode,
   type ErpModuleOverview,
 } from '@/api/client';
@@ -40,6 +41,7 @@ export const Dashboard: React.FC<ErpDashboardPageProps> = ({
     }
     return map;
   });
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [selectedModule, setSelectedModule] =
     useState<ErpModuleOverview | null>(null);
   const [selectedSubMenu, setSelectedSubMenu] =
@@ -47,6 +49,32 @@ export const Dashboard: React.FC<ErpDashboardPageProps> = ({
   const [selectedChildSubMenu, setSelectedChildSubMenu] =
     useState<HorizontalMenuItem | null>(null);
   const companyResource = useCompanyCrudResource(true, initialCompanies);
+
+  useEffect(() => {
+    if (!selectedCompany || companyResource.companies.length === 0) {
+      return;
+    }
+    const matched = companyResource.companies.find(
+      (c) => c.id === selectedCompany.id
+    );
+    if (matched) {
+      if (
+        matched.name !== selectedCompany.name ||
+        matched.series !== selectedCompany.series
+      ) {
+        setSelectedCompany(matched);
+      }
+      return;
+    }
+    if (selectedCompany.id === 0) {
+      setSelectedCompany(companyResource.companies[0]);
+      return;
+    }
+    setSelectedCompany(null);
+    setSelectedModule(null);
+    setSelectedSubMenu(null);
+    setSelectedChildSubMenu(null);
+  }, [companyResource.companies, selectedCompany]);
 
   useEffect(() => {
     if (initialModules) {
@@ -57,6 +85,24 @@ export const Dashboard: React.FC<ErpDashboardPageProps> = ({
       setModulesMap(nextMap);
     }
   }, [initialModules]);
+
+  const handleSelectSeries = useCallback(() => {
+    setSelectedCompany(null);
+    setSelectedModule(null);
+    setSelectedSubMenu(null);
+    setSelectedChildSubMenu(null);
+  }, []);
+
+  const handleSelectCompany = useCallback((company: Company) => {
+    setSelectedCompany((prev) => {
+      if (prev?.id !== company.id) {
+        setSelectedModule(null);
+        setSelectedSubMenu(null);
+        setSelectedChildSubMenu(null);
+      }
+      return company;
+    });
+  }, []);
 
   const handleSelectModule = useCallback((mod: ErpModuleOverview) => {
     setSelectedModule((prev) => {
@@ -103,64 +149,73 @@ export const Dashboard: React.FC<ErpDashboardPageProps> = ({
         eyebrow="ENTERPRISE RESOURCE PLANNING"
         title="PT. Slaras Nusa Foodlab"
         companies={companyResource.companies}
+        selectedCompanyId={selectedCompany?.id ?? null}
+        onSelectSeries={handleSelectSeries}
+        onSelectCompany={handleSelectCompany}
       />
 
       <main className="grid grid-cols-1 gap-6">
-        <section aria-label="ERP Executive Modules">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-5">
-            <CfoModuleCard
-              data={modulesMap.CFO}
-              isSelected={selectedModule?.code === 'CFO'}
-              onSelect={handleSelectModule}
-            />
-            <ChoModuleCard
-              data={modulesMap.CHO}
-              isSelected={selectedModule?.code === 'CHO'}
-              onSelect={handleSelectModule}
-            />
-            <CpoModuleCard
-              data={modulesMap.CPO}
-              isSelected={selectedModule?.code === 'CPO'}
-              onSelect={handleSelectModule}
-            />
-            <CdoModuleCard
-              data={modulesMap.CDO}
-              isSelected={selectedModule?.code === 'CDO'}
-              onSelect={handleSelectModule}
-            />
-            <CmoModuleCard
-              data={modulesMap.CMO}
-              isSelected={selectedModule?.code === 'CMO'}
-              onSelect={handleSelectModule}
-            />
-          </div>
-        </section>
+        {selectedCompany && (
+          <>
+            <section aria-label="ERP Executive Modules">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-5">
+                <CfoModuleCard
+                  data={modulesMap.CFO}
+                  isSelected={selectedModule?.code === 'CFO'}
+                  onSelect={handleSelectModule}
+                />
+                <ChoModuleCard
+                  data={modulesMap.CHO}
+                  isSelected={selectedModule?.code === 'CHO'}
+                  onSelect={handleSelectModule}
+                />
+                <CpoModuleCard
+                  data={modulesMap.CPO}
+                  isSelected={selectedModule?.code === 'CPO'}
+                  onSelect={handleSelectModule}
+                />
+                <CdoModuleCard
+                  data={modulesMap.CDO}
+                  isSelected={selectedModule?.code === 'CDO'}
+                  onSelect={handleSelectModule}
+                />
+                <CmoModuleCard
+                  data={modulesMap.CMO}
+                  isSelected={selectedModule?.code === 'CMO'}
+                  onSelect={handleSelectModule}
+                />
+              </div>
+            </section>
 
-        {selectedModule?.code === 'CFO' && (
-          <section aria-label="CFO Module Navigation">
-            <CfoHorizontalMenu
-              selectedCode={selectedSubMenu?.code ?? null}
-              selectedChildCode={selectedChildSubMenu?.code ?? null}
-              onSelect={handleSelectSubMenu}
-              onSelectChild={setSelectedChildSubMenu}
+            {selectedModule?.code === 'CFO' && (
+              <section aria-label="CFO Module Navigation">
+                <CfoHorizontalMenu
+                  selectedCode={selectedSubMenu?.code ?? null}
+                  selectedChildCode={selectedChildSubMenu?.code ?? null}
+                  onSelect={handleSelectSubMenu}
+                  onSelectChild={setSelectedChildSubMenu}
+                />
+              </section>
+            )}
+
+            <CompanyCrudModal
+              isOpen={selectedChildSubMenu?.code === 'PERUSAHAAN'}
+              initialCompanies={initialCompanies}
+              initialCapitalCompanies={initialCapitalCompanies}
+              companyResource={companyResource}
+              onClose={() => setSelectedChildSubMenu(null)}
             />
-          </section>
+
+            <CapitalCompanyCrudModal
+              isOpen={
+                selectedChildSubMenu?.code === 'DAFTAR_KAPITAL_PERUSAHAAN'
+              }
+              initialCompanies={companyResource.companies}
+              initialCapitalCompanies={initialCapitalCompanies}
+              onClose={() => setSelectedChildSubMenu(null)}
+            />
+          </>
         )}
-
-        <CompanyCrudModal
-          isOpen={selectedChildSubMenu?.code === 'PERUSAHAAN'}
-          initialCompanies={initialCompanies}
-          initialCapitalCompanies={initialCapitalCompanies}
-          companyResource={companyResource}
-          onClose={() => setSelectedChildSubMenu(null)}
-        />
-
-        <CapitalCompanyCrudModal
-          isOpen={selectedChildSubMenu?.code === 'DAFTAR_KAPITAL_PERUSAHAAN'}
-          initialCompanies={companyResource.companies}
-          initialCapitalCompanies={initialCapitalCompanies}
-          onClose={() => setSelectedChildSubMenu(null)}
-        />
       </main>
     </div>
   );

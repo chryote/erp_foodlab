@@ -31,7 +31,7 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-6 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-6 backdrop-blur-xs"
       data-testid={`${testId}-backdrop`}
       onClick={onClose}
     >
@@ -40,7 +40,7 @@ export const Modal: React.FC<ModalProps> = ({
         aria-modal="true"
         aria-label={title}
         data-testid={testId}
-        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl"
+        className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-4">
@@ -242,7 +242,7 @@ export const SummaryBanner: React.FC<SummaryBannerProps> = ({
         {label}
       </span>
       <strong
-        className="text-base font-bold text-emerald-400"
+        className="text-base font-bold text-emerald-700"
         data-testid={`${testId}-value`}
       >
         {value}
@@ -282,7 +282,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-60 flex items-center justify-center bg-black/75 p-6 backdrop-blur-xs"
+      className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/45 p-6 backdrop-blur-xs"
       data-testid={`${testId}-backdrop`}
       onClick={onCancel}
     >
@@ -622,11 +622,15 @@ export function CrudModal<T extends CrudEntity>({
             key: 'actions',
             header: 'Aksi',
             render: (row: T) => (
-              <div className="flex flex-wrap items-center gap-2">
+              <div
+                className="flex flex-nowrap items-center gap-1.5 whitespace-nowrap"
+                data-testid={`actions-row-${row.id}`}
+              >
                 {rowActions.map((action) => (
                   <Button
                     key={action.key}
                     variant={action.variant ?? 'secondary'}
+                    className="whitespace-nowrap"
                     data-testid={
                       action.testId
                         ? action.testId(row)
@@ -647,6 +651,7 @@ export function CrudModal<T extends CrudEntity>({
                   <>
                     <Button
                       variant="secondary"
+                      className="h-7 px-2.5 py-1 text-xs"
                       data-testid={`edit-row-${row.id}`}
                       onClick={() => handleStartEdit(row)}
                     >
@@ -654,6 +659,7 @@ export function CrudModal<T extends CrudEntity>({
                     </Button>
                     <Button
                       variant="ghost"
+                      className="h-7 px-2.5 py-1 text-xs"
                       data-testid={`delete-row-${row.id}`}
                       onClick={() =>
                         setPendingAction({ type: 'delete', id: row.id })
@@ -682,7 +688,7 @@ export function CrudModal<T extends CrudEntity>({
         {error && (
           <div
             role="alert"
-            className="rounded-lg border border-red-500/40 bg-red-500/15 px-3.5 py-2.5 text-sm text-red-400"
+            className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700"
           >
             {error}
           </div>

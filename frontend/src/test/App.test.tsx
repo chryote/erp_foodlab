@@ -76,15 +76,31 @@ describe('App ERP Main Menu integration', () => {
     render(<App />);
 
     expect(screen.getByText('PT. Slaras Nusa Foodlab')).toBeInTheDocument();
+    // Main ModuleCards are hidden by default until a secondary company tab is clicked
+    expect(screen.queryByTestId('module-card-CFO')).not.toBeInTheDocument();
+    expect(screen.queryByText('CFO (Keuangan)')).not.toBeInTheDocument();
+    expect(screen.queryByText('CHO (SDM)')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('CPO (Persediaan Barang Dagang)')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('CDO (Pemasaran)')).not.toBeInTheDocument();
+    expect(screen.queryByText('CMO (Penjualan)')).not.toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(apiClient.fetchErpModules).toHaveBeenCalledTimes(1);
+      expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(1);
+    });
+
+    const companyTab1 = screen.getByTestId('company-tab-1');
+    expect(companyTab1).toHaveAttribute('aria-selected', 'false');
+    fireEvent.click(companyTab1);
+    expect(companyTab1).toHaveAttribute('aria-selected', 'true');
+
     expect(screen.getByText('CFO (Keuangan)')).toBeInTheDocument();
     expect(screen.getByText('CHO (SDM)')).toBeInTheDocument();
     expect(screen.getByText('CPO (Persediaan Barang Dagang)')).toBeInTheDocument();
     expect(screen.getByText('CDO (Pemasaran)')).toBeInTheDocument();
     expect(screen.getByText('CMO (Penjualan)')).toBeInTheDocument();
-
-    await waitFor(() => {
-      expect(apiClient.fetchErpModules).toHaveBeenCalledTimes(1);
-    });
 
     expect(screen.queryByTestId('cfo-horizontal-menu')).not.toBeInTheDocument();
 
@@ -145,16 +161,6 @@ describe('App ERP Main Menu integration', () => {
       expect(screen.getByTestId('series-tab-1')).toHaveTextContent('Seri 1');
       expect(screen.getByTestId('series-tab-2')).toHaveTextContent('Seri 2');
     });
-
-    // Switch primary series tab to Seri 2 and verify secondary company tab
-    fireEvent.click(screen.getByTestId('series-tab-2'));
-    expect(screen.getByTestId('company-tab-2')).toHaveTextContent(
-      'PT. Pangan Nusantara'
-    );
-    fireEvent.click(screen.getByTestId('series-tab-1'));
-    expect(screen.getByTestId('company-tab-1')).toHaveTextContent(
-      'PT. Slaras Nusa Foodlab'
-    );
 
     // Update company (requires confirmation dialog)
     fireEvent.click(screen.getByTestId('edit-row-2'));
@@ -300,6 +306,11 @@ describe('App ERP Main Menu integration', () => {
 
     render(<App />);
 
+    await waitFor(() => {
+      expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(1);
+    });
+
+    fireEvent.click(screen.getByTestId('company-tab-1'));
     fireEvent.click(screen.getByTestId('module-card-CFO'));
     fireEvent.click(screen.getByTestId('horizontal-menu-card-INPUT_MODAL'));
     fireEvent.click(
@@ -369,7 +380,7 @@ describe('App ERP Main Menu integration', () => {
     expect(screen.queryByTestId('delete-row-10')).not.toBeInTheDocument();
   });
 
-  it('hydrates directly from Inertia server props without calling fetchErpModules', () => {
+  it('hydrates directly from Inertia server props without calling fetchErpModules and keeps ModuleCards hidden until company tab is clicked', () => {
     render(
       <App
         modules={[
@@ -379,7 +390,10 @@ describe('App ERP Main Menu integration', () => {
           DEFAULT_CDO_MODULE,
           DEFAULT_CMO_MODULE,
         ]}
-        companies={[{ id: 1, name: 'PT. Slaras Nusa Foodlab' }]}
+        companies={[
+          { id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1 },
+          { id: 2, name: 'PT. Pangan Nusantara', series: 2 },
+        ]}
         capitalCompanies={[
           {
             id: 10,
@@ -393,5 +407,31 @@ describe('App ERP Main Menu integration', () => {
 
     expect(screen.getByText('PT. Slaras Nusa Foodlab')).toBeInTheDocument();
     expect(apiClient.fetchErpModules).not.toHaveBeenCalled();
+
+    // ModuleCards hidden by default
+    expect(screen.queryByTestId('module-card-CFO')).not.toBeInTheDocument();
+    expect(screen.getByTestId('company-tab-1')).toHaveAttribute(
+      'aria-selected',
+      'false'
+    );
+
+    // Clicking secondary company tab reveals ModuleCards
+    fireEvent.click(screen.getByTestId('company-tab-1'));
+    expect(screen.getByTestId('company-tab-1')).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(screen.getByTestId('module-card-CFO')).toBeInTheDocument();
+    expect(screen.getByTestId('module-card-CMO')).toBeInTheDocument();
+
+    // Switching primary series tab hides ModuleCards until a company in that series is clicked
+    fireEvent.click(screen.getByTestId('series-tab-2'));
+    expect(screen.queryByTestId('module-card-CFO')).not.toBeInTheDocument();
+    const companyTab2 = screen.getByTestId('company-tab-2');
+    expect(companyTab2).toHaveAttribute('aria-selected', 'false');
+
+    fireEvent.click(companyTab2);
+    expect(companyTab2).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('module-card-CFO')).toBeInTheDocument();
   });
 });

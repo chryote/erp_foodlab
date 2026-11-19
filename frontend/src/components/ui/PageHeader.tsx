@@ -9,7 +9,7 @@ export interface PageHeaderProps {
   actions?: React.ReactNode;
   companies?: Company[];
   selectedSeries?: number;
-  selectedCompanyId?: number;
+  selectedCompanyId?: number | null;
   onSelectSeries?: (series: number) => void;
   onSelectCompany?: (company: Company) => void;
 }
@@ -67,11 +67,14 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   );
 
   const activeCompany = useMemo<Company | undefined>(() => {
+    if (controlledCompanyId === null) {
+      return undefined;
+    }
     const targetId =
       controlledCompanyId !== undefined ? controlledCompanyId : internalCompanyId;
     return (
       companiesInActiveSeries.find((c) => c.id === targetId) ??
-      companiesInActiveSeries[0]
+      (controlledCompanyId === undefined ? companiesInActiveSeries[0] : undefined)
     );
   }, [companiesInActiveSeries, controlledCompanyId, internalCompanyId]);
 
@@ -93,12 +96,14 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   const handleSeriesClick = (series: number) => {
     setInternalSeries(series);
     onSelectSeries?.(series);
-    const firstInSeries = resolvedCompanies.find(
-      (c) => (c.series ?? 1) === series
-    );
-    if (firstInSeries) {
-      setInternalCompanyId(firstInSeries.id);
-      onSelectCompany?.(firstInSeries);
+    if (controlledCompanyId === undefined) {
+      const firstInSeries = resolvedCompanies.find(
+        (c) => (c.series ?? 1) === series
+      );
+      if (firstInSeries) {
+        setInternalCompanyId(firstInSeries.id);
+        onSelectCompany?.(firstInSeries);
+      }
     }
   };
 
@@ -138,7 +143,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
                     'cursor-pointer rounded-t-lg border px-4 py-1.5 text-xs transition-colors',
                     isSelected
                       ? 'relative z-10 -mb-px border-border border-b-card bg-card font-bold text-primary shadow-2xs'
-                      : 'border-transparent bg-muted/40 font-medium text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+                      : 'border-transparent bg-slate-200/60 font-medium text-muted-foreground hover:bg-slate-200 hover:text-foreground'
                   )}
                 >
                   {`Seri ${series}`}
@@ -168,7 +173,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
                     'cursor-pointer rounded-md border px-4 py-1.5 text-left transition-colors',
                     isSelected
                       ? 'border-primary/40 bg-primary/15 text-base font-bold tracking-tight text-foreground shadow-2xs'
-                      : 'border-transparent bg-muted/30 text-sm font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+                      : 'border-border/80 bg-muted/60 text-sm font-medium text-foreground/80 hover:border-primary/40 hover:bg-primary/5 hover:text-foreground'
                   )}
                 >
                   {company.name}

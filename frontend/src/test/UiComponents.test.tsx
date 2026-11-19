@@ -175,7 +175,12 @@ describe('Reusable UI Components (src/components/ui)', () => {
       'Halaman 1 dari 2 (3 data)'
     );
 
-    // Custom reusable row action button in Aksi column
+    // Custom reusable row action button in Aksi column (horizontal, Edit/Hapus smaller)
+    const actionsRow = screen.getByTestId('actions-row-10');
+    expect(actionsRow).toHaveClass('flex-nowrap', 'whitespace-nowrap');
+    expect(screen.getByTestId('edit-row-10')).toHaveClass('h-7', 'text-xs');
+    expect(screen.getByTestId('delete-row-10')).toHaveClass('h-7', 'text-xs');
+    expect(screen.getByTestId('stakeholder-row-10')).not.toHaveClass('h-7');
     fireEvent.click(screen.getByTestId('stakeholder-row-10'));
     expect(onRowAction).toHaveBeenCalledWith({
       id: 10,
@@ -422,5 +427,44 @@ describe('Reusable UI Components (src/components/ui)', () => {
       'PT. Dairy Nusantara'
     );
     expect(screen.queryByTestId('company-tab-1')).not.toBeInTheDocument();
+  });
+
+  it('keeps secondary company tabs unselected when selectedCompanyId is null', () => {
+    const onSelectSeries = vi.fn();
+    const onSelectCompany = vi.fn();
+
+    render(
+      <PageHeader
+        eyebrow="ENTERPRISE RESOURCE PLANNING"
+        title="PT. Slaras Nusa Foodlab"
+        selectedCompanyId={null}
+        companies={[
+          { id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1 },
+          { id: 2, name: 'PT. Dairy Nusantara', series: 2 },
+        ]}
+        onSelectSeries={onSelectSeries}
+        onSelectCompany={onSelectCompany}
+      />
+    );
+
+    expect(screen.getByTestId('company-tab-1')).toHaveAttribute(
+      'aria-selected',
+      'false'
+    );
+
+    fireEvent.click(screen.getByTestId('series-tab-2'));
+    expect(onSelectSeries).toHaveBeenCalledWith(2);
+    expect(onSelectCompany).not.toHaveBeenCalled();
+    expect(screen.getByTestId('company-tab-2')).toHaveAttribute(
+      'aria-selected',
+      'false'
+    );
+
+    fireEvent.click(screen.getByTestId('company-tab-2'));
+    expect(onSelectCompany).toHaveBeenCalledWith({
+      id: 2,
+      name: 'PT. Dairy Nusantara',
+      series: 2,
+    });
   });
 });
