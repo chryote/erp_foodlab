@@ -23,6 +23,10 @@ class ExpenseItemFactory extends Factory
             'company_id' => Company::factory(),
             'name' => $this->faker->words(2, true),
             'amount' => $this->faker->randomFloat(2, 1000000, 1000000000),
+            'purchased_on' => now()->toDateString(),
+            'closing_date' => null,
+            'employee_id' => null,
+            'detail' => $this->faker->sentence(),
         ];
     }
 }

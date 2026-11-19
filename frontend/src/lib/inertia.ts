@@ -639,28 +639,62 @@ export function useMasterOperasionalCrudResource(
     }
   }, []);
 
-  const createItem = useCallback(
-    async (
-      expenseTypeId: number,
-      name: string,
-      amount: number,
-      expenseCategoryId?: number,
-      companyId?: number
-    ) => {
-      const resolvedCompanyId = companyId ?? company?.id;
-      if (!resolvedCompanyId) return null;
-      const matchedType = allTypes.find((t) => t.id === expenseTypeId);
+  const buildExpenseItemPayload = useCallback(
+    (input: {
+      companyId?: number;
+      expenseCategoryId?: number;
+      expenseTypeId: number;
+      name: string;
+      amount: number;
+      purchasedOn: string;
+      closingDate?: string | null;
+      employeeId?: number | null;
+      detail?: string | null;
+    }) => {
+      const resolvedCompanyId = input.companyId ?? company?.id;
+      if (!resolvedCompanyId) {
+        return null;
+      }
+      const matchedType = allTypes.find((t) => t.id === input.expenseTypeId);
       const resolvedCategoryId =
-        expenseCategoryId ?? matchedType?.expense_category_id;
-      const payload = {
+        input.expenseCategoryId ?? matchedType?.expense_category_id;
+      return {
         ...(resolvedCategoryId
           ? { expense_category_id: resolvedCategoryId }
           : {}),
-        expense_type_id: expenseTypeId,
+        expense_type_id: input.expenseTypeId,
         company_id: resolvedCompanyId,
-        name,
-        amount,
+        name: input.name,
+        amount: input.amount,
+        purchased_on: input.purchasedOn,
+        ...(input.closingDate !== undefined
+          ? { closing_date: input.closingDate }
+          : {}),
+        ...(input.employeeId !== undefined
+          ? { employee_id: input.employeeId }
+          : {}),
+        ...(input.detail !== undefined
+          ? { detail: input.detail || null }
+          : {}),
       };
+    },
+    [company, allTypes]
+  );
+
+  const createItem = useCallback(
+    async (input: {
+      companyId?: number;
+      expenseCategoryId?: number;
+      expenseTypeId: number;
+      name: string;
+      amount: number;
+      purchasedOn: string;
+      closingDate?: string | null;
+      employeeId?: number | null;
+      detail?: string | null;
+    }) => {
+      const payload = buildExpenseItemPayload(input);
+      if (!payload) return null;
       if (isInertiaActive()) {
         router.post('/cfo/expense-items', payload, { preserveScroll: true });
         return null;
@@ -680,32 +714,26 @@ export function useMasterOperasionalCrudResource(
         setLoading(false);
       }
     },
-    [company, allTypes]
+    [buildExpenseItemPayload]
   );
 
   const updateItem = useCallback(
     async (
       id: number,
-      expenseTypeId: number,
-      name: string,
-      amount: number,
-      expenseCategoryId?: number,
-      companyId?: number
+      input: {
+        companyId?: number;
+        expenseCategoryId?: number;
+        expenseTypeId: number;
+        name: string;
+        amount: number;
+        purchasedOn: string;
+        closingDate?: string | null;
+        employeeId?: number | null;
+        detail?: string | null;
+      }
     ) => {
-      const resolvedCompanyId = companyId ?? company?.id;
-      if (!resolvedCompanyId) return null;
-      const matchedType = allTypes.find((t) => t.id === expenseTypeId);
-      const resolvedCategoryId =
-        expenseCategoryId ?? matchedType?.expense_category_id;
-      const payload = {
-        ...(resolvedCategoryId
-          ? { expense_category_id: resolvedCategoryId }
-          : {}),
-        expense_type_id: expenseTypeId,
-        company_id: resolvedCompanyId,
-        name,
-        amount,
-      };
+      const payload = buildExpenseItemPayload(input);
+      if (!payload) return null;
       if (isInertiaActive()) {
         router.put(`/cfo/expense-items/${id}`, payload, {
           preserveScroll: true,
@@ -729,7 +757,7 @@ export function useMasterOperasionalCrudResource(
         setLoading(false);
       }
     },
-    [company, allTypes]
+    [buildExpenseItemPayload]
   );
 
   const removeItem = useCallback(async (id: number) => {

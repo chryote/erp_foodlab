@@ -11,6 +11,7 @@ export interface ModalProps {
   title: string;
   subtitle?: string;
   testId?: string;
+  maxWidthClass?: string;
   onClose: () => void;
   children: React.ReactNode;
   footer?: React.ReactNode;
@@ -21,6 +22,7 @@ export const Modal: React.FC<ModalProps> = ({
   title,
   subtitle,
   testId = 'ui-modal',
+  maxWidthClass = 'max-w-3xl',
   onClose,
   children,
   footer,
@@ -40,7 +42,10 @@ export const Modal: React.FC<ModalProps> = ({
         aria-modal="true"
         aria-label={title}
         data-testid={testId}
-        className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl"
+        className={cn(
+          'flex max-h-[85vh] w-full flex-col overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl',
+          maxWidthClass
+        )}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-4">
@@ -85,7 +90,7 @@ export const TextInput: React.FC<TextInputProps> = ({
   ...rest
 }) => {
   return (
-    <div className="flex flex-1 flex-col gap-1.5">
+    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
       {label && <ShadcnLabel htmlFor={id}>{label}</ShadcnLabel>}
       <ShadcnInput id={id} className={className} {...rest} />
     </div>
@@ -165,7 +170,7 @@ export const DecimalInput: React.FC<DecimalInputProps> = ({
   };
 
   return (
-    <div className="flex flex-1 flex-col gap-1.5">
+    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
       {label && <ShadcnLabel htmlFor={id}>{label}</ShadcnLabel>}
       <ShadcnInput
         id={id}
@@ -201,7 +206,7 @@ export const SelectInput: React.FC<SelectInputProps> = ({
   ...rest
 }) => {
   return (
-    <div className="flex flex-1 flex-col gap-1.5">
+    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
       {label && <ShadcnLabel htmlFor={id}>{label}</ShadcnLabel>}
       <select
         id={id}
@@ -342,7 +347,8 @@ export interface CrudFieldConfig<T> {
   label: string;
   placeholder?: string;
   defaultValue?: string;
-  type?: 'text' | 'number' | 'decimal' | 'select';
+  type?: 'text' | 'number' | 'decimal' | 'select' | 'date';
+  optional?: boolean;
   step?: string | number;
   min?: string | number;
   options?:
@@ -506,7 +512,7 @@ export function CrudModal<T extends CrudEntity>({
     const trimmedValues: Record<string, string> = {};
     for (const field of resolvedFields) {
       const val = (formValues[field.key] ?? '').trim();
-      if (!val) {
+      if (!val && !field.optional) {
         return;
       }
       trimmedValues[field.key] = val;
@@ -589,10 +595,13 @@ export function CrudModal<T extends CrudEntity>({
     const nextValues: Record<string, string> = {};
     for (const field of resolvedFields) {
       const raw = item[field.key];
-      nextValues[field.key] =
-        raw !== null && raw !== undefined
-          ? String(raw)
-          : (field.defaultValue ?? '');
+      if (raw !== null && raw !== undefined) {
+        const stringified = String(raw);
+        nextValues[field.key] =
+          field.type === 'date' ? stringified.slice(0, 10) : stringified;
+      } else {
+        nextValues[field.key] = field.defaultValue ?? '';
+      }
     }
     setFormValues(nextValues);
   };
@@ -698,6 +707,8 @@ export function CrudModal<T extends CrudEntity>({
       : []),
   ];
 
+  const isMultiRowForm = resolvedFields.length > 4;
+
   return (
     <>
       <Modal
@@ -705,6 +716,7 @@ export function CrudModal<T extends CrudEntity>({
         title={title}
         subtitle={subtitle}
         testId={testId}
+        maxWidthClass={isMultiRowForm ? 'max-w-5xl' : 'max-w-3xl'}
         onClose={onClose}
       >
         {tabs}
@@ -721,7 +733,12 @@ export function CrudModal<T extends CrudEntity>({
         {!readOnly && (
           <form
             onSubmit={handleSubmit}
-            className="flex flex-wrap items-end gap-2.5 border-b border-border pb-4"
+            data-testid={`${testId}-form`}
+            className={
+              isMultiRowForm
+                ? 'grid grid-cols-1 items-end gap-3 border-b border-border pb-4 sm:grid-cols-2 md:grid-cols-4'
+                : 'flex flex-wrap items-end gap-2.5 border-b border-border pb-4'
+            }
           >
             {resolvedFields.map((field) => {
               const isFieldDisabled =
@@ -772,7 +789,13 @@ export function CrudModal<T extends CrudEntity>({
                 />
               );
             })}
-            <div className="flex items-center gap-2">
+            <div
+              className={
+                isMultiRowForm
+                  ? 'flex items-center justify-end gap-2 md:justify-start'
+                  : 'flex items-center gap-2'
+              }
+            >
               <Button type="submit" variant="primary" disabled={loading}>
                 {editingItem ? 'Perbarui' : 'Tambah'}
               </Button>

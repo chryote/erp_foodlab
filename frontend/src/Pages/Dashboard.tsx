@@ -20,6 +20,7 @@ import {
   CfoModuleCard,
 } from '@/modules/CFO/CfoModuleCard';
 import { CompanyCrudModal } from '@/modules/CFO/CompanyCrudModal';
+import { ExpenseItemCrudModal } from '@/modules/CFO/ExpenseItemCrudModal';
 import { MasterOperasionalCrudModal } from '@/modules/CFO/MasterOperasionalCrudModal';
 import { ViewOperasionalModal } from '@/modules/CFO/ViewOperasionalModal';
 import { ChoModuleCard } from '@/modules/CHO/ChoModuleCard';
@@ -233,6 +234,16 @@ export const Dashboard: React.FC<ErpDashboardPageProps> = ({
             <ViewOperasionalModal
               isOpen={selectedChildSubMenu?.code === 'VIEW_OPERASIONAL'}
               company={selectedCompany}
+              initialExpenseCategories={initialExpenseCategories}
+              initialExpenseTypes={initialExpenseTypes}
+              initialExpenseItems={initialExpenseItems}
+              onClose={() => setSelectedChildSubMenu(null)}
+            />
+
+            <ExpenseItemCrudModal
+              isOpen={selectedChildSubMenu?.code === 'ITEM_OPERASIONAL'}
+              company={selectedCompany}
+              companies={companyResource.companies}
               initialExpenseCategories={initialExpenseCategories}
               initialExpenseTypes={initialExpenseTypes}
               initialExpenseItems={initialExpenseItems}

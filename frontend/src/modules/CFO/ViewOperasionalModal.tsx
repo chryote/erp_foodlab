@@ -38,11 +38,18 @@ export function formatCurrentMonthDateRange(
 }
 
 function isInMonth(
-  dateValue: string | undefined,
+  dateValue: string | null | undefined,
   referenceDate: Date
 ): boolean {
   if (!dateValue) {
     return true;
+  }
+  const ymdMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateValue.trim());
+  if (ymdMatch && !dateValue.includes('T')) {
+    return (
+      Number(ymdMatch[1]) === referenceDate.getFullYear() &&
+      Number(ymdMatch[2]) - 1 === referenceDate.getMonth()
+    );
   }
   const parsed = new Date(dateValue);
   if (Number.isNaN(parsed.getTime())) {
@@ -122,7 +129,10 @@ export const ViewOperasionalModal: React.FC<ViewOperasionalModalProps> = ({
   );
 
   const currentMonthItems = useMemo(
-    () => items.filter((item) => isInMonth(item.created_at, effectiveDate)),
+    () =>
+      items.filter((item) =>
+        isInMonth(item.purchased_on || item.created_at, effectiveDate)
+      ),
     [items, effectiveDate]
   );
 
@@ -193,6 +203,11 @@ export const ViewOperasionalModal: React.FC<ViewOperasionalModalProps> = ({
   const detailFields = useMemo<CrudFieldConfig<ExpenseItem>[]>(
     () => [
       {
+        key: 'purchased_on',
+        label: 'Tanggal Beli',
+        renderValue: (row) => row.purchased_on ?? '-',
+      },
+      {
         key: 'expense_type_id',
         label: 'Tipe',
         renderValue: (row) =>
@@ -203,6 +218,11 @@ export const ViewOperasionalModal: React.FC<ViewOperasionalModalProps> = ({
       {
         key: 'name',
         label: 'Nama Item',
+      },
+      {
+        key: 'detail',
+        label: 'Keterangan',
+        renderValue: (row) => (row.detail ? row.detail : '-'),
       },
       {
         key: 'amount',

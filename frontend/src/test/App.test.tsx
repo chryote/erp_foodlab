@@ -245,6 +245,7 @@ describe('App ERP Main Menu integration', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Master Operasional')).toBeInTheDocument();
     expect(screen.getByText('View Operasional')).toBeInTheDocument();
+    expect(screen.getByText('Item Operasional')).toBeInTheDocument();
     expect(
       screen.queryByTestId('perusahaan-crud-modal')
     ).not.toBeInTheDocument();
@@ -517,6 +518,8 @@ describe('App ERP Main Menu integration', () => {
           company_id: 1,
           name: 'Susu Segar',
           amount: 1500000,
+          purchased_on: '2026-11-18',
+          detail: 'Stok susu pagi',
         },
         {
           id: 31,
@@ -525,6 +528,8 @@ describe('App ERP Main Menu integration', () => {
           company_id: 2,
           name: 'Krim Kental',
           amount: 2500000,
+          purchased_on: '2026-11-18',
+          detail: 'Stok krim cabang 2',
         },
       ],
       meta: { count: 2 },
@@ -537,6 +542,8 @@ describe('App ERP Main Menu integration', () => {
         company_id: 1,
         name: 'Keju Mozzarella',
         amount: 3250000,
+        purchased_on: '2026-11-19',
+        detail: 'Pembelian bahan pizza',
       },
     });
     vi.mocked(apiClient.updateExpenseItem).mockResolvedValue({
@@ -547,6 +554,8 @@ describe('App ERP Main Menu integration', () => {
         company_id: 1,
         name: 'Keju Cheddar',
         amount: 3500000,
+        purchased_on: '2026-11-20',
+        detail: 'Update bahan keju',
       },
     });
     vi.mocked(apiClient.deleteExpenseItem).mockResolvedValue({
@@ -572,13 +581,14 @@ describe('App ERP Main Menu integration', () => {
     const modal = await screen.findByTestId('master-operasional-crud-modal');
     expect(modal).toBeInTheDocument();
 
-    // 3 primary tabs: Kategori, Tipe, Item
+    // 2 primary tabs: Kategori, Tipe (Item tab removed)
     const tabKategori = screen.getByTestId('master-operasional-tab-kategori');
     const tabTipe = screen.getByTestId('master-operasional-tab-tipe');
-    const tabItem = screen.getByTestId('master-operasional-tab-item');
     expect(tabKategori).toHaveTextContent('Kategori');
     expect(tabTipe).toHaveTextContent('Tipe');
-    expect(tabItem).toHaveTextContent('Item');
+    expect(
+      screen.queryByTestId('master-operasional-tab-item')
+    ).not.toBeInTheDocument();
     expect(tabKategori).toHaveAttribute('aria-selected', 'true');
 
     await waitFor(() => {
@@ -689,11 +699,24 @@ describe('App ERP Main Menu integration', () => {
       expect(screen.queryByText('Kemasan Botol')).not.toBeInTheDocument();
     });
 
-    // CRUD on Tab 3: Item
-    fireEvent.click(tabItem);
-    expect(tabItem).toHaveAttribute('aria-selected', 'true');
+    // Close Master Operasional modal and open independent Item Operasional card beside View Operasional
+    fireEvent.click(screen.getByRole('button', { name: 'Tutup Modal' }));
+    expect(
+      screen.queryByTestId('master-operasional-crud-modal')
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByTestId('horizontal-menu-card-ITEM_OPERASIONAL')
+    );
+    const itemModal = await screen.findByTestId('expense-item-crud-modal');
+    expect(itemModal).toBeInTheDocument();
+    expect(itemModal).toHaveClass('max-w-5xl');
+    expect(
+      screen.getByTestId('expense-item-crud-modal-form')
+    ).toHaveClass('grid', 'md:grid-cols-4');
     expect(screen.getByText('Susu Segar')).toBeInTheDocument();
     expect(screen.getByText('Krim Kental')).toBeInTheDocument();
+    expect(screen.getByText('Stok susu pagi')).toBeInTheDocument();
 
     const itemCompanySelect = screen.getByLabelText(
       'Pilih Perusahaan'
@@ -704,7 +727,11 @@ describe('App ERP Main Menu integration', () => {
     const itemTypeSelect = screen.getByLabelText(
       'Pilih Tipe'
     ) as HTMLSelectElement;
+    const itemDateInput = screen.getByLabelText(
+      'Tanggal Beli'
+    ) as HTMLInputElement;
     expect(itemCompanySelect.value).toBe('1');
+    expect(itemDateInput.type).toBe('date');
     expect(itemTypeSelect).toBeDisabled();
 
     // Switching company updates category options and clears category & type
@@ -746,11 +773,17 @@ describe('App ERP Main Menu integration', () => {
     fireEvent.change(itemTypeSelect, {
       target: { value: '20' },
     });
+    fireEvent.change(itemDateInput, {
+      target: { value: '2026-11-19' },
+    });
     fireEvent.change(screen.getByLabelText('Nama Item'), {
       target: { value: 'Keju Mozzarella' },
     });
     fireEvent.change(screen.getByLabelText('Nominal'), {
       target: { value: '3250000' },
+    });
+    fireEvent.change(screen.getByLabelText('Keterangan'), {
+      target: { value: 'Pembelian bahan pizza' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
     fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
@@ -759,18 +792,27 @@ describe('App ERP Main Menu integration', () => {
         expense_category_id: 10,
         expense_type_id: 20,
         company_id: 1,
+        purchased_on: '2026-11-19',
         name: 'Keju Mozzarella',
         amount: 3250000,
+        detail: 'Pembelian bahan pizza',
       });
       expect(screen.getByText('Keju Mozzarella')).toBeInTheDocument();
+      expect(screen.getByText('Pembelian bahan pizza')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByTestId('edit-row-32'));
+    fireEvent.change(itemDateInput, {
+      target: { value: '2026-11-20' },
+    });
     fireEvent.change(screen.getByLabelText('Nama Item'), {
       target: { value: 'Keju Cheddar' },
     });
     fireEvent.change(screen.getByLabelText('Nominal'), {
       target: { value: '3500000' },
+    });
+    fireEvent.change(screen.getByLabelText('Keterangan'), {
+      target: { value: 'Update bahan keju' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Perbarui' }));
     fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
@@ -779,10 +821,13 @@ describe('App ERP Main Menu integration', () => {
         expense_category_id: 10,
         expense_type_id: 20,
         company_id: 1,
+        purchased_on: '2026-11-20',
         name: 'Keju Cheddar',
         amount: 3500000,
+        detail: 'Update bahan keju',
       });
       expect(screen.getByText('Keju Cheddar')).toBeInTheDocument();
+      expect(screen.getByText('Update bahan keju')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByTestId('delete-row-32'));

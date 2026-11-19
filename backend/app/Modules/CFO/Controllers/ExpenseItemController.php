@@ -93,6 +93,10 @@ class ExpenseItemController extends Controller
             ],
             'name' => ['required', 'string', 'max:150'],
             'amount' => ['required', 'numeric', 'min:0'],
+            'purchased_on' => ['required', 'date_format:Y-m-d'],
+            'closing_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
+            'employee_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'detail' => ['sometimes', 'nullable', 'string', 'max:500'],
         ]);
 
         $validated['name'] = (string) $validated['name'];
@@ -139,6 +143,10 @@ class ExpenseItemController extends Controller
             ],
             'name' => ['required', 'string', 'max:150'],
             'amount' => ['required', 'numeric', 'min:0'],
+            'purchased_on' => ['required', 'date_format:Y-m-d'],
+            'closing_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
+            'employee_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'detail' => ['sometimes', 'nullable', 'string', 'max:500'],
         ]);
 
         $validated['name'] = (string) $validated['name'];
