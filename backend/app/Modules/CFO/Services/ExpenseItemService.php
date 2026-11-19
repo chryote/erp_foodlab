@@ -2,7 +2,6 @@
 
 namespace App\Modules\CFO\Services;
 
-use App\Models\CapitalCompany;
 use App\Models\ExpenseItem;
 use App\Models\ExpenseType;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -17,23 +16,22 @@ class ExpenseItemService
     {
         return Cache::remember(self::CACHE_KEY_LIST, 60, function () {
             return ExpenseItem::query()
-                ->with('expenseCategory')
-                ->with('expenseType')
+                ->with(['expenseCategory', 'expenseType', 'company'])
                 ->orderByDesc('id')
                 ->get();
         });
     }
 
-    public function listFilteredExpenseItems(?int $expenseCategoryId = null, ?int $expenseTypeId = null)
-    {
-        return ExpenseItem::query()
-            ->when($expenseCategoryId !== null, function ($query) use ($expenseCategoryId) {
-                $query->where('expense_category_id', $expenseCategoryId);
-            })
-            ->when($expenseTypeId !== null, function ($query) use ($expenseTypeId) {
-                $query->where('expense_type_id', $expenseTypeId);
-            })
-            ->get();
+    public function listFilteredExpenseItems(
+        ?int $expenseCategoryId = null,
+        ?int $expenseTypeId = null,
+        ?int $companyId = null
+    ): Collection {
+        return $this->listExpenseItems()
+            ->when($expenseCategoryId !== null, fn (Collection $items) => $items->where('expense_category_id', $expenseCategoryId))
+            ->when($expenseTypeId !== null, fn (Collection $items) => $items->where('expense_type_id', $expenseTypeId))
+            ->when($companyId !== null, fn (Collection $items) => $items->where('company_id', $companyId))
+            ->values();
     }
 
     public function listExpenseItemByExpenseCategory(int $expenseCategoryId): Collection
@@ -55,19 +53,23 @@ class ExpenseItemService
         int $perPage = 10,
         int $page = 1,
         ?int $expenseCategoryId = null,
-        ?int $expenseTypeId = null
+        ?int $expenseTypeId = null,
+        ?int $companyId = null
     ): LengthAwarePaginator {
-        $query = ExpenseType::query()
-            ->with('expenseCategory')
-            ->with('expenseType')
+        $query = ExpenseItem::query()
+            ->with(['expenseCategory', 'expenseType', 'company'])
             ->orderByDesc('id');
 
         if ($expenseCategoryId !== null) {
-            $query->where('_id', $expenseCategoryId);
+            $query->where('expense_category_id', $expenseCategoryId);
         }
 
         if ($expenseTypeId !== null) {
-            $query->where('_id', $expenseTypeId);
+            $query->where('expense_type_id', $expenseTypeId);
+        }
+
+        if ($companyId !== null) {
+            $query->where('company_id', $companyId);
         }
 
         if ($search !== null && trim($search) !== '') {
@@ -88,18 +90,28 @@ class ExpenseItemService
 
     public function createExpenseItem(array $attributes): ExpenseItem
     {
-        $expenseItem = ExpenseType::query()->create($attributes);
+        if (empty($attributes['expense_category_id']) && ! empty($attributes['expense_type_id'])) {
+            $type = ExpenseType::query()->findOrFail($attributes['expense_type_id']);
+            $attributes['expense_category_id'] = $type->expense_category_id;
+        }
+
+        $expenseItem = ExpenseItem::query()->create($attributes);
         Cache::forget(self::CACHE_KEY_LIST);
 
-        return $expenseItem->load('expenseCategory', 'expenseType');
+        return $expenseItem->load(['expenseCategory', 'expenseType', 'company']);
     }
 
     public function updateExpenseItem(ExpenseItem $expenseItem, array $attributes): ExpenseItem
     {
+        if (empty($attributes['expense_category_id']) && ! empty($attributes['expense_type_id'])) {
+            $type = ExpenseType::query()->findOrFail($attributes['expense_type_id']);
+            $attributes['expense_category_id'] = $type->expense_category_id;
+        }
+
         $expenseItem->update($attributes);
         Cache::forget(self::CACHE_KEY_LIST);
 
-        return $expenseItem->refresh()->load('expenseCategory', 'expenseType');
+        return $expenseItem->refresh()->load(['expenseCategory', 'expenseType', 'company']);
     }
 
     public function deleteExpenseItem(ExpenseItem $expenseItem): void

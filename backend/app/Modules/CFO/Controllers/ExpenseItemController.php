@@ -20,6 +20,7 @@ class ExpenseItemController extends Controller
         $search = $request->query('search');
         $expenseCategoryId = $request->query('expense_category_id');
         $expenseTypeId = $request->query('expense_type_id');
+        $companyId = $request->query('company_id');
         $perPage = $request->query('per_page');
         $page = $request->query('page');
 
@@ -29,7 +30,8 @@ class ExpenseItemController extends Controller
                 max(1, (int) ($perPage ?? 10)),
                 max(1, (int) ($page ?? 1)),
                 $expenseCategoryId !== null ? (int) $expenseCategoryId : null,
-                $expenseTypeId !== null ? (int) $expenseTypeId : null
+                $expenseTypeId !== null ? (int) $expenseTypeId : null,
+                $companyId !== null ? (int) $companyId : null
             );
 
             return response()->json([
@@ -47,7 +49,8 @@ class ExpenseItemController extends Controller
 
         $expenseItems = $this->expenseItemService->listFilteredExpenseItems(
             $expenseCategoryId !== null ? (int) $expenseCategoryId : null,
-            $expenseTypeId !== null ? (int) $expenseTypeId : null
+            $expenseTypeId !== null ? (int) $expenseTypeId : null,
+            $companyId !== null ? (int) $companyId : null
         );
 
         return response()->json([
@@ -67,46 +70,8 @@ class ExpenseItemController extends Controller
     {
         $validated = $request->validate([
             'expense_category_id' => [
-                'required',
-                'integer',
-                Rule::exists('expense_categories', 'id')->whereNull('deleted_at'),
-            ],
-            'expense_type_id' => [
-                'required',
-                'integer',
-                Rule::exists('expense_type', 'id')->whereNull('deleted_at'),
-            ],
-            'company_id' => [
-                'required',
-                'integer',
-                Rule::exists('companies', 'id')->whereNull('deleted_at'),
-            ],
-            'name' => ['required', 'string', 'max:150'],
-            'amount' => ['required', 'float'],
-        ]);
-
-        $validated['name'] = (string) $validated['name'];
-        $validated['amount'] = (float) $validated['float'];
-
-        $expenseItem = $this->expenseItemService->createExpenseItem($validated);
-
-        return response()->json([
-            'data' => $expenseItem,
-        ], 201);
-    }
-
-    public function show(ExpenseItem $expenseItem): JsonResponse
-    {
-        return response()->json([
-            'data' => $expenseItem->load('expenseCategory', 'expenseType'),
-        ]);
-    }
-
-    public function update(Request $request, ExpenseItem $expenseItem): JsonResponse
-    {
-        $validated = $request->validate([
-            'expense_category_id' => [
-                'required',
+                'sometimes',
+                'nullable',
                 'integer',
                 Rule::exists('expense_categories', 'id')->whereNull('deleted_at'),
             ],
@@ -121,7 +86,47 @@ class ExpenseItemController extends Controller
                 Rule::exists('companies', 'id')->whereNull('deleted_at'),
             ],
             'name' => ['required', 'string', 'max:150'],
-            'amount' => ['required', 'float'],
+            'amount' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $validated['name'] = (string) $validated['name'];
+        $validated['amount'] = (float) $validated['amount'];
+
+        $expenseItem = $this->expenseItemService->createExpenseItem($validated);
+
+        return response()->json([
+            'data' => $expenseItem,
+        ], 201);
+    }
+
+    public function show(ExpenseItem $expenseItem): JsonResponse
+    {
+        return response()->json([
+            'data' => $expenseItem->load(['expenseCategory', 'expenseType', 'company']),
+        ]);
+    }
+
+    public function update(Request $request, ExpenseItem $expenseItem): JsonResponse
+    {
+        $validated = $request->validate([
+            'expense_category_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists('expense_categories', 'id')->whereNull('deleted_at'),
+            ],
+            'expense_type_id' => [
+                'required',
+                'integer',
+                Rule::exists('expense_types', 'id')->whereNull('deleted_at'),
+            ],
+            'company_id' => [
+                'required',
+                'integer',
+                Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
+            'name' => ['required', 'string', 'max:150'],
+            'amount' => ['required', 'numeric', 'min:0'],
         ]);
 
         $validated['name'] = (string) $validated['name'];

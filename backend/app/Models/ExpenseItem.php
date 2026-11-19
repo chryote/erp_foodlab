@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ExpenseItem extends Model
@@ -17,8 +16,16 @@ class ExpenseItem extends Model
     protected $fillable = [
         'expense_category_id',
         'expense_type_id',
+        'company_id',
         'name',
         'amount',
+    ];
+
+    protected $casts = [
+        'expense_category_id' => 'integer',
+        'expense_type_id' => 'integer',
+        'company_id' => 'integer',
+        'amount' => 'float',
     ];
 
     public function expenseCategory(): BelongsTo
@@ -30,5 +37,9 @@ class ExpenseItem extends Model
     {
         return $this->belongsTo(ExpenseType::class);
     }
-}
 
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
+    }
+}

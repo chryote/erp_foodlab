@@ -126,8 +126,8 @@ describe('App ERP Main Menu integration', () => {
       'horizontal-submenu-INPUT_MODAL'
     );
     expect(inputModalSubMenu).toBeInTheDocument();
-    expect(screen.getByText('Perusahaan')).toBeInTheDocument();
-    expect(screen.getByText('Daftar Kapital Perusahaan')).toBeInTheDocument();
+    expect(screen.getByText('Master Modal')).toBeInTheDocument();
+    expect(screen.getByText('View Modal')).toBeInTheDocument();
 
     const perusahaanCard = screen.getByTestId('horizontal-menu-card-PERUSAHAAN');
     fireEvent.click(perusahaanCard);
@@ -239,6 +239,11 @@ describe('App ERP Main Menu integration', () => {
     expect(
       screen.queryByTestId('horizontal-submenu-INPUT_MODAL')
     ).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId('horizontal-submenu-INPUT_OPERASIONAL')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Master Operasional')).toBeInTheDocument();
+    expect(screen.getByText('View Operasional')).toBeInTheDocument();
     expect(
       screen.queryByTestId('perusahaan-crud-modal')
     ).not.toBeInTheDocument();
@@ -433,5 +438,258 @@ describe('App ERP Main Menu integration', () => {
     fireEvent.click(companyTab2);
     expect(companyTab2).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByTestId('module-card-CFO')).toBeInTheDocument();
+  });
+
+  it('opens Master Operasional modal with 3 primary tabs (Kategori, Tipe, Item) and performs CRUD on each tab scoped to active company_id', async () => {
+    vi.mocked(apiClient.fetchErpModules).mockResolvedValue({
+      data: [
+        DEFAULT_CFO_MODULE,
+        DEFAULT_CHO_MODULE,
+        DEFAULT_CPO_MODULE,
+        DEFAULT_CDO_MODULE,
+        DEFAULT_CMO_MODULE,
+      ],
+      meta: { count: 5 },
+    });
+    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
+      data: [
+        { id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1 },
+        { id: 2, name: 'PT. Pangan Nusantara', series: 1 },
+      ],
+      meta: { count: 2 },
+    });
+    vi.mocked(apiClient.fetchExpenseCategories).mockResolvedValue({
+      data: [{ id: 10, name: 'Bahan Baku' }],
+      meta: { count: 1 },
+    });
+    vi.mocked(apiClient.createExpenseCategory).mockResolvedValue({
+      data: { id: 11, name: 'Utilitas' },
+    });
+    vi.mocked(apiClient.updateExpenseCategory).mockResolvedValue({
+      data: { id: 11, name: 'Utilitas Pabrik' },
+    });
+    vi.mocked(apiClient.deleteExpenseCategory).mockResolvedValue({
+      message: 'Expense category deleted successfully.',
+    });
+    vi.mocked(apiClient.fetchExpenseTypes).mockResolvedValue({
+      data: [{ id: 20, expense_category_id: 10, name: 'Dairy' }],
+      meta: { count: 1 },
+    });
+    vi.mocked(apiClient.createExpenseType).mockResolvedValue({
+      data: { id: 21, expense_category_id: 10, name: 'Kemasan' },
+    });
+    vi.mocked(apiClient.updateExpenseType).mockResolvedValue({
+      data: { id: 21, expense_category_id: 10, name: 'Kemasan Botol' },
+    });
+    vi.mocked(apiClient.deleteExpenseType).mockResolvedValue({
+      message: 'Expense type deleted successfully.',
+    });
+    vi.mocked(apiClient.fetchExpenseItems).mockResolvedValue({
+      data: [
+        {
+          id: 30,
+          expense_category_id: 10,
+          expense_type_id: 20,
+          company_id: 1,
+          name: 'Susu Segar',
+          amount: 1500000,
+        },
+        {
+          id: 31,
+          expense_category_id: 10,
+          expense_type_id: 20,
+          company_id: 2,
+          name: 'Krim Kental',
+          amount: 2500000,
+        },
+      ],
+      meta: { count: 2 },
+    });
+    vi.mocked(apiClient.createExpenseItem).mockResolvedValue({
+      data: {
+        id: 32,
+        expense_category_id: 10,
+        expense_type_id: 20,
+        company_id: 1,
+        name: 'Keju Mozzarella',
+        amount: 3250000,
+      },
+    });
+    vi.mocked(apiClient.updateExpenseItem).mockResolvedValue({
+      data: {
+        id: 32,
+        expense_category_id: 10,
+        expense_type_id: 20,
+        company_id: 1,
+        name: 'Keju Cheddar',
+        amount: 3500000,
+      },
+    });
+    vi.mocked(apiClient.deleteExpenseItem).mockResolvedValue({
+      message: 'Expense item deleted successfully.',
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(1);
+    });
+
+    // Select active company tab 1 -> CFO -> Input Operasional -> Master Operasional
+    fireEvent.click(screen.getByTestId('company-tab-1'));
+    fireEvent.click(screen.getByTestId('module-card-CFO'));
+    fireEvent.click(
+      screen.getByTestId('horizontal-menu-card-INPUT_OPERASIONAL')
+    );
+    fireEvent.click(
+      screen.getByTestId('horizontal-menu-card-MASTER_OPERASIONAL')
+    );
+
+    const modal = await screen.findByTestId('master-operasional-crud-modal');
+    expect(modal).toBeInTheDocument();
+
+    // 3 primary tabs: Kategori, Tipe, Item
+    const tabKategori = screen.getByTestId('master-operasional-tab-kategori');
+    const tabTipe = screen.getByTestId('master-operasional-tab-tipe');
+    const tabItem = screen.getByTestId('master-operasional-tab-item');
+    expect(tabKategori).toHaveTextContent('Kategori');
+    expect(tabTipe).toHaveTextContent('Tipe');
+    expect(tabItem).toHaveTextContent('Item');
+    expect(tabKategori).toHaveAttribute('aria-selected', 'true');
+
+    await waitFor(() => {
+      expect(screen.getByText('Bahan Baku')).toBeInTheDocument();
+    });
+
+    // CRUD on Tab 1: Kategori
+    fireEvent.change(screen.getByLabelText('Nama Kategori'), {
+      target: { value: 'Utilitas' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+    await waitFor(() => {
+      expect(apiClient.createExpenseCategory).toHaveBeenCalledWith({
+        name: 'Utilitas',
+      });
+      expect(screen.getByText('Utilitas')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('edit-row-11'));
+    fireEvent.change(screen.getByLabelText('Nama Kategori'), {
+      target: { value: 'Utilitas Pabrik' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Perbarui' }));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+    await waitFor(() => {
+      expect(apiClient.updateExpenseCategory).toHaveBeenCalledWith(11, {
+        name: 'Utilitas Pabrik',
+      });
+      expect(screen.getByText('Utilitas Pabrik')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('delete-row-11'));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+    await waitFor(() => {
+      expect(apiClient.deleteExpenseCategory).toHaveBeenCalledWith(11);
+      expect(screen.queryByText('Utilitas Pabrik')).not.toBeInTheDocument();
+    });
+
+    // CRUD on Tab 2: Tipe
+    fireEvent.click(tabTipe);
+    expect(tabTipe).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('Dairy')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Pilih Kategori'), {
+      target: { value: '10' },
+    });
+    fireEvent.change(screen.getByLabelText('Nama Tipe'), {
+      target: { value: 'Kemasan' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+    await waitFor(() => {
+      expect(apiClient.createExpenseType).toHaveBeenCalledWith({
+        expense_category_id: 10,
+        name: 'Kemasan',
+      });
+      expect(screen.getByText('Kemasan')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('edit-row-21'));
+    fireEvent.change(screen.getByLabelText('Nama Tipe'), {
+      target: { value: 'Kemasan Botol' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Perbarui' }));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+    await waitFor(() => {
+      expect(apiClient.updateExpenseType).toHaveBeenCalledWith(21, {
+        expense_category_id: 10,
+        name: 'Kemasan Botol',
+      });
+      expect(screen.getByText('Kemasan Botol')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('delete-row-21'));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+    await waitFor(() => {
+      expect(apiClient.deleteExpenseType).toHaveBeenCalledWith(21);
+      expect(screen.queryByText('Kemasan Botol')).not.toBeInTheDocument();
+    });
+
+    // CRUD on Tab 3: Item (scoped to active company_id = 1)
+    fireEvent.click(tabItem);
+    expect(tabItem).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('Susu Segar')).toBeInTheDocument();
+    // Item from company_id = 2 is not shown when company 1 is active
+    expect(screen.queryByText('Krim Kental')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Pilih Tipe'), {
+      target: { value: '20' },
+    });
+    fireEvent.change(screen.getByLabelText('Nama Item'), {
+      target: { value: 'Keju Mozzarella' },
+    });
+    fireEvent.change(screen.getByLabelText('Nominal'), {
+      target: { value: '3250000' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+    await waitFor(() => {
+      expect(apiClient.createExpenseItem).toHaveBeenCalledWith({
+        expense_category_id: 10,
+        expense_type_id: 20,
+        company_id: 1,
+        name: 'Keju Mozzarella',
+        amount: 3250000,
+      });
+      expect(screen.getByText('Keju Mozzarella')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('edit-row-32'));
+    fireEvent.change(screen.getByLabelText('Nama Item'), {
+      target: { value: 'Keju Cheddar' },
+    });
+    fireEvent.change(screen.getByLabelText('Nominal'), {
+      target: { value: '3500000' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Perbarui' }));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+    await waitFor(() => {
+      expect(apiClient.updateExpenseItem).toHaveBeenCalledWith(32, {
+        expense_category_id: 10,
+        expense_type_id: 20,
+        company_id: 1,
+        name: 'Keju Cheddar',
+        amount: 3500000,
+      });
+      expect(screen.getByText('Keju Cheddar')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('delete-row-32'));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+    await waitFor(() => {
+      expect(apiClient.deleteExpenseItem).toHaveBeenCalledWith(32);
+      expect(screen.queryByText('Keju Cheddar')).not.toBeInTheDocument();
+    });
   });
 });

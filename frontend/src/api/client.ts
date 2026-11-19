@@ -102,6 +102,75 @@ export interface CapitalCompaniesListResponse {
   };
 }
 
+export interface ExpenseCategory {
+  id: number;
+  name: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface ExpenseCategoriesListResponse {
+  data: ExpenseCategory[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
+export interface ExpenseType {
+  id: number;
+  expense_category_id: number;
+  name: string;
+  expense_category?: ExpenseCategory | null;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface ExpenseTypesListResponse {
+  data: ExpenseType[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
+export interface ExpenseItem {
+  id: number;
+  expense_category_id: number;
+  expense_type_id: number;
+  company_id: number;
+  name: string;
+  amount: number;
+  expense_category?: ExpenseCategory | null;
+  expense_type?: ExpenseType | null;
+  company?: Company | null;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface ExpenseItemsListResponse {
+  data: ExpenseItem[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
@@ -263,3 +332,154 @@ export async function deleteCapitalCompany(
   );
 }
 
+export async function fetchExpenseCategories(): Promise<ExpenseCategoriesListResponse> {
+  return requestJson<ExpenseCategoriesListResponse>(
+    '/v1/modules/cfo/expense-categories',
+    {},
+    'Failed to fetch expense categories'
+  );
+}
+
+export async function createExpenseCategory(payload: {
+  name: string;
+}): Promise<{ data: ExpenseCategory }> {
+  return requestJson<{ data: ExpenseCategory }>(
+    '/v1/modules/cfo/expense-categories',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create expense category'
+  );
+}
+
+export async function updateExpenseCategory(
+  id: number,
+  payload: { name: string }
+): Promise<{ data: ExpenseCategory }> {
+  return requestJson<{ data: ExpenseCategory }>(
+    `/v1/modules/cfo/expense-categories/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update expense category'
+  );
+}
+
+export async function deleteExpenseCategory(
+  id: number
+): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/cfo/expense-categories/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete expense category'
+  );
+}
+
+export async function fetchExpenseTypes(): Promise<ExpenseTypesListResponse> {
+  return requestJson<ExpenseTypesListResponse>(
+    '/v1/modules/cfo/expense-types',
+    {},
+    'Failed to fetch expense types'
+  );
+}
+
+export async function createExpenseType(payload: {
+  expense_category_id: number;
+  name: string;
+}): Promise<{ data: ExpenseType }> {
+  return requestJson<{ data: ExpenseType }>(
+    '/v1/modules/cfo/expense-types',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create expense type'
+  );
+}
+
+export async function updateExpenseType(
+  id: number,
+  payload: { expense_category_id: number; name: string }
+): Promise<{ data: ExpenseType }> {
+  return requestJson<{ data: ExpenseType }>(
+    `/v1/modules/cfo/expense-types/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update expense type'
+  );
+}
+
+export async function deleteExpenseType(
+  id: number
+): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/cfo/expense-types/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete expense type'
+  );
+}
+
+export async function fetchExpenseItems(): Promise<ExpenseItemsListResponse> {
+  return requestJson<ExpenseItemsListResponse>(
+    '/v1/modules/cfo/expense-items',
+    {},
+    'Failed to fetch expense items'
+  );
+}
+
+export async function createExpenseItem(payload: {
+  expense_category_id?: number;
+  expense_type_id: number;
+  company_id: number;
+  name: string;
+  amount: number;
+}): Promise<{ data: ExpenseItem }> {
+  return requestJson<{ data: ExpenseItem }>(
+    '/v1/modules/cfo/expense-items',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create expense item'
+  );
+}
+
+export async function updateExpenseItem(
+  id: number,
+  payload: {
+    expense_category_id?: number;
+    expense_type_id: number;
+    company_id: number;
+    name: string;
+    amount: number;
+  }
+): Promise<{ data: ExpenseItem }> {
+  return requestJson<{ data: ExpenseItem }>(
+    `/v1/modules/cfo/expense-items/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update expense item'
+  );
+}
+
+export async function deleteExpenseItem(
+  id: number
+): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/cfo/expense-items/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete expense item'
+  );
+}

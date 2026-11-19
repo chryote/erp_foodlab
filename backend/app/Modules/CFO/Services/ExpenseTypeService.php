@@ -2,7 +2,6 @@
 
 namespace App\Modules\CFO\Services;
 
-use App\Models\CapitalCompany;
 use App\Models\ExpenseType;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -40,7 +39,7 @@ class ExpenseTypeService
             ->orderByDesc('id');
 
         if ($expenseCategoryId !== null) {
-            $query->where('_id', $expenseCategoryId);
+            $query->where('expense_category_id', $expenseCategoryId);
         }
 
         if ($search !== null && trim($search) !== '') {
@@ -60,6 +59,7 @@ class ExpenseTypeService
     {
         $expenseType = ExpenseType::query()->create($attributes);
         Cache::forget(self::CACHE_KEY_LIST);
+        Cache::forget(ExpenseItemService::CACHE_KEY_LIST);
 
         return $expenseType->load('expenseCategory');
     }
@@ -68,6 +68,7 @@ class ExpenseTypeService
     {
         $expenseType->update($attributes);
         Cache::forget(self::CACHE_KEY_LIST);
+        Cache::forget(ExpenseItemService::CACHE_KEY_LIST);
 
         return $expenseType->refresh()->load('expenseCategory');
     }
@@ -76,5 +77,6 @@ class ExpenseTypeService
     {
         $expenseType->delete();
         Cache::forget(self::CACHE_KEY_LIST);
+        Cache::forget(ExpenseItemService::CACHE_KEY_LIST);
     }
 }

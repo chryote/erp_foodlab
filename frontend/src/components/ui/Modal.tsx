@@ -383,6 +383,8 @@ export interface CrudModalProps<T extends CrudEntity> {
   title: string;
   subtitle?: string;
   testId?: string;
+  tabs?: React.ReactNode;
+  resetKey?: string;
   inputLabel?: string;
   inputPlaceholder?: string;
   fields?: CrudFieldConfig<T>[];
@@ -409,6 +411,8 @@ export function CrudModal<T extends CrudEntity>({
   title,
   subtitle,
   testId = 'crud-modal',
+  tabs,
+  resetKey,
   inputLabel = 'Nama',
   inputPlaceholder = 'Masukkan nama...',
   fields,
@@ -456,14 +460,12 @@ export function CrudModal<T extends CrudEntity>({
     useState<PendingCrudAction<T> | null>(null);
 
   useEffect(() => {
-    if (!isOpen) {
-      setFormValues(createEmptyFormValues());
-      setEditingItem(null);
-      setCurrentPage(1);
-      setPendingAction(null);
-    }
+    setFormValues(createEmptyFormValues());
+    setEditingItem(null);
+    setCurrentPage(1);
+    setPendingAction(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, resetKey]);
 
   const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -685,6 +687,8 @@ export function CrudModal<T extends CrudEntity>({
         testId={testId}
         onClose={onClose}
       >
+        {tabs}
+
         {error && (
           <div
             role="alert"

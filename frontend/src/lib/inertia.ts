@@ -1,23 +1,41 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { router } from '@inertiajs/react';
 import {
   type CapitalCompany,
   type Company,
   type ErpModuleOverview,
+  type ExpenseCategory,
+  type ExpenseItem,
+  type ExpenseType,
   createCapitalCompany,
   createCompany,
+  createExpenseCategory,
+  createExpenseItem,
+  createExpenseType,
   deleteCapitalCompany,
   deleteCompany,
+  deleteExpenseCategory,
+  deleteExpenseItem,
+  deleteExpenseType,
   fetchCapitalCompanies,
   fetchCompanies,
+  fetchExpenseCategories,
+  fetchExpenseItems,
+  fetchExpenseTypes,
   updateCapitalCompany,
   updateCompany,
+  updateExpenseCategory,
+  updateExpenseItem,
+  updateExpenseType,
 } from '@/api/client';
 
 export interface ErpDashboardPageProps {
   modules?: ErpModuleOverview[];
   companies?: Company[];
   capitalCompanies?: CapitalCompany[];
+  expenseCategories?: ExpenseCategory[];
+  expenseTypes?: ExpenseType[];
+  expenseItems?: ExpenseItem[];
   flash?: {
     success?: string | null;
     error?: string | null;
@@ -353,4 +371,350 @@ export function useCapitalOverviewResource(
   }, [isOpen, loadData]);
 
   return { capitalCompanies, companies, loading, error };
+}
+
+export function useMasterOperasionalCrudResource(
+  isOpen: boolean,
+  company: Company | null,
+  initialCategories?: ExpenseCategory[],
+  initialTypes?: ExpenseType[],
+  initialItems?: ExpenseItem[]
+) {
+  const [categories, setCategories] = useState<ExpenseCategory[]>(
+    initialCategories ?? []
+  );
+  const [types, setTypes] = useState<ExpenseType[]>(initialTypes ?? []);
+  const [allItems, setAllItems] = useState<ExpenseItem[]>(initialItems ?? []);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialCategories) setCategories(initialCategories);
+  }, [initialCategories]);
+
+  useEffect(() => {
+    if (initialTypes) setTypes(initialTypes);
+  }, [initialTypes]);
+
+  useEffect(() => {
+    if (initialItems) setAllItems(initialItems);
+  }, [initialItems]);
+
+  const loadData = useCallback(async () => {
+    if (
+      initialCategories !== undefined &&
+      initialTypes !== undefined &&
+      initialItems !== undefined
+    ) {
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const [catRes, typeRes, itemRes] = await Promise.all([
+        fetchExpenseCategories(),
+        fetchExpenseTypes(),
+        fetchExpenseItems(),
+      ]);
+      setCategories(catRes?.data ?? []);
+      setTypes(typeRes?.data ?? []);
+      setAllItems(itemRes?.data ?? []);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Gagal memuat data master operasional.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [initialCategories, initialTypes, initialItems]);
+
+  useEffect(() => {
+    if (isOpen) {
+      void loadData();
+    }
+  }, [isOpen, loadData]);
+
+  const items = useMemo<ExpenseItem[]>(() => {
+    if (!company) {
+      return allItems;
+    }
+    return allItems.filter((item) => Number(item.company_id) === company.id);
+  }, [allItems, company]);
+
+  const createCategory = useCallback(async (name: string) => {
+    if (isInertiaActive()) {
+      router.post(
+        '/cfo/expense-categories',
+        { name },
+        { preserveScroll: true }
+      );
+      return null;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await createExpenseCategory({ name });
+      setCategories((prev) => [res.data, ...prev]);
+      return res.data;
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Gagal menambahkan kategori.'
+      );
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const updateCategory = useCallback(async (id: number, name: string) => {
+    if (isInertiaActive()) {
+      router.put(
+        `/cfo/expense-categories/${id}`,
+        { name },
+        { preserveScroll: true }
+      );
+      return null;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await updateExpenseCategory(id, { name });
+      setCategories((prev) =>
+        prev.map((item) => (item.id === id ? res.data : item))
+      );
+      return res.data;
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Gagal memperbarui kategori.'
+      );
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const removeCategory = useCallback(async (id: number) => {
+    if (isInertiaActive()) {
+      router.delete(`/cfo/expense-categories/${id}`, { preserveScroll: true });
+      return true;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      await deleteExpenseCategory(id);
+      setCategories((prev) => prev.filter((item) => item.id !== id));
+      setTypes((prev) =>
+        prev.filter((item) => Number(item.expense_category_id) !== id)
+      );
+      setAllItems((prev) =>
+        prev.filter((item) => Number(item.expense_category_id) !== id)
+      );
+      return true;
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Gagal menghapus kategori.'
+      );
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const createType = useCallback(
+    async (expenseCategoryId: number, name: string) => {
+      if (isInertiaActive()) {
+        router.post(
+          '/cfo/expense-types',
+          { expense_category_id: expenseCategoryId, name },
+          { preserveScroll: true }
+        );
+        return null;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await createExpenseType({
+          expense_category_id: expenseCategoryId,
+          name,
+        });
+        setTypes((prev) => [res.data, ...prev]);
+        return res.data;
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : 'Gagal menambahkan tipe.'
+        );
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  const updateType = useCallback(
+    async (id: number, expenseCategoryId: number, name: string) => {
+      if (isInertiaActive()) {
+        router.put(
+          `/cfo/expense-types/${id}`,
+          { expense_category_id: expenseCategoryId, name },
+          { preserveScroll: true }
+        );
+        return null;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await updateExpenseType(id, {
+          expense_category_id: expenseCategoryId,
+          name,
+        });
+        setTypes((prev) =>
+          prev.map((item) => (item.id === id ? res.data : item))
+        );
+        return res.data;
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : 'Gagal memperbarui tipe.'
+        );
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  const removeType = useCallback(async (id: number) => {
+    if (isInertiaActive()) {
+      router.delete(`/cfo/expense-types/${id}`, { preserveScroll: true });
+      return true;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      await deleteExpenseType(id);
+      setTypes((prev) => prev.filter((item) => item.id !== id));
+      setAllItems((prev) =>
+        prev.filter((item) => Number(item.expense_type_id) !== id)
+      );
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal menghapus tipe.');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const createItem = useCallback(
+    async (expenseTypeId: number, name: string, amount: number) => {
+      if (!company) return null;
+      const matchedType = types.find((t) => t.id === expenseTypeId);
+      const payload = {
+        ...(matchedType?.expense_category_id
+          ? { expense_category_id: matchedType.expense_category_id }
+          : {}),
+        expense_type_id: expenseTypeId,
+        company_id: company.id,
+        name,
+        amount,
+      };
+      if (isInertiaActive()) {
+        router.post('/cfo/expense-items', payload, { preserveScroll: true });
+        return null;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await createExpenseItem(payload);
+        setAllItems((prev) => [res.data, ...prev]);
+        return res.data;
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : 'Gagal menambahkan item.'
+        );
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [company, types]
+  );
+
+  const updateItem = useCallback(
+    async (id: number, expenseTypeId: number, name: string, amount: number) => {
+      if (!company) return null;
+      const matchedType = types.find((t) => t.id === expenseTypeId);
+      const payload = {
+        ...(matchedType?.expense_category_id
+          ? { expense_category_id: matchedType.expense_category_id }
+          : {}),
+        expense_type_id: expenseTypeId,
+        company_id: company.id,
+        name,
+        amount,
+      };
+      if (isInertiaActive()) {
+        router.put(`/cfo/expense-items/${id}`, payload, {
+          preserveScroll: true,
+        });
+        return null;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await updateExpenseItem(id, payload);
+        setAllItems((prev) =>
+          prev.map((item) => (item.id === id ? res.data : item))
+        );
+        return res.data;
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : 'Gagal memperbarui item.'
+        );
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [company, types]
+  );
+
+  const removeItem = useCallback(async (id: number) => {
+    if (isInertiaActive()) {
+      router.delete(`/cfo/expense-items/${id}`, { preserveScroll: true });
+      return true;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      await deleteExpenseItem(id);
+      setAllItems((prev) => prev.filter((item) => item.id !== id));
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal menghapus item.');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return {
+    categories,
+    types,
+    items,
+    loading,
+    error,
+    createCategory,
+    updateCategory,
+    removeCategory,
+    createType,
+    updateType,
+    removeType,
+    createItem,
+    updateItem,
+    removeItem,
+  };
 }

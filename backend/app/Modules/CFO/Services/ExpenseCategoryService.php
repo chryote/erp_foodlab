@@ -2,7 +2,6 @@
 
 namespace App\Modules\CFO\Services;
 
-use App\Models\Company;
 use App\Models\ExpenseCategory;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -15,7 +14,7 @@ class ExpenseCategoryService
     public function listExpenseCategories(): Collection
     {
         return Cache::remember(self::CACHE_KEY_LIST, 60, function () {
-            return Company::query()
+            return ExpenseCategory::query()
                 ->orderByDesc('id')
                 ->get();
         });
@@ -37,7 +36,8 @@ class ExpenseCategoryService
     {
         $expenseCategory = ExpenseCategory::query()->create($attributes);
         Cache::forget(self::CACHE_KEY_LIST);
-        Cache::forget(ExpenseCategoryService::CACHE_KEY_LIST);
+        Cache::forget(ExpenseTypeService::CACHE_KEY_LIST);
+        Cache::forget(ExpenseItemService::CACHE_KEY_LIST);
 
         return $expenseCategory;
     }
@@ -46,7 +46,8 @@ class ExpenseCategoryService
     {
         $expenseCategory->update($attributes);
         Cache::forget(self::CACHE_KEY_LIST);
-        Cache::forget(ExpenseCategoryService::CACHE_KEY_LIST);
+        Cache::forget(ExpenseTypeService::CACHE_KEY_LIST);
+        Cache::forget(ExpenseItemService::CACHE_KEY_LIST);
 
         return $expenseCategory->refresh();
     }
@@ -55,6 +56,7 @@ class ExpenseCategoryService
     {
         $expenseCategory->delete();
         Cache::forget(self::CACHE_KEY_LIST);
-        Cache::forget(ExpenseCategoryService::CACHE_KEY_LIST);
+        Cache::forget(ExpenseTypeService::CACHE_KEY_LIST);
+        Cache::forget(ExpenseItemService::CACHE_KEY_LIST);
     }
 }

@@ -7,8 +7,13 @@ import {
 } from '../../components/ui';
 
 export const CFO_INPUT_MODAL_ITEMS: HorizontalMenuItem[] = [
-  { code: 'PERUSAHAAN', title: 'Perusahaan' },
-  { code: 'DAFTAR_KAPITAL_PERUSAHAAN', title: 'Daftar Kapital Perusahaan' },
+  { code: 'PERUSAHAAN', title: 'Master Modal' },
+  { code: 'DAFTAR_KAPITAL_PERUSAHAAN', title: 'View Modal' },
+];
+
+export const CFO_INPUT_OPERASIONAL_ITEMS: HorizontalMenuItem[] = [
+  { code: 'MASTER_OPERASIONAL', title: 'Master Operasional' },
+  { code: 'VIEW_OPERASIONAL', title: 'View Operasional' },
 ];
 
 export const CFO_MENU_ITEMS: HorizontalMenuItem[] = [
@@ -17,7 +22,11 @@ export const CFO_MENU_ITEMS: HorizontalMenuItem[] = [
     title: 'Input Modal',
     children: CFO_INPUT_MODAL_ITEMS,
   },
-  { code: 'INPUT_OPERASIONAL', title: 'Input Operasional' },
+  {
+    code: 'INPUT_OPERASIONAL',
+    title: 'Input Operasional',
+    children: CFO_INPUT_OPERASIONAL_ITEMS,
+  },
   { code: 'INPUT_ASET', title: 'Input Aset' },
   { code: 'LABA_RUGI', title: 'Laba Rugi' },
   { code: 'NERACA', title: 'Neraca' },

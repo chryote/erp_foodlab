@@ -4,7 +4,7 @@ namespace App\Modules\CFO\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\ExpenseCategory;
-use App\Modules\CFO\Services\expenseCategoryService;
+use App\Modules\CFO\Services\ExpenseCategoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -59,7 +59,6 @@ class ExpenseCategoryController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
-            'series' => ['sometimes', 'required', 'integer', 'min:1'],
         ]);
 
         $expenseCategory = $this->expenseCategoryService->createExpenseCategory($validated);
@@ -80,7 +79,6 @@ class ExpenseCategoryController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
-            'series' => ['sometimes', 'required', 'integer', 'min:1'],
         ]);
 
         $updated = $this->expenseCategoryService->updateExpenseCategory($expenseCategory, $validated);
