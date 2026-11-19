@@ -43,6 +43,12 @@ describe('LabSample API (/api/v1/samples)', function () {
 
         expect(Cache::has(LabSampleService::CACHE_KEY_LIST))->toBeFalse();
         $this->assertDatabaseHas('lab_samples', ['batch_code' => 'FL-TEST-2026']);
+
+        $sampleId = $response->json('data.id');
+        $this->getJson("/api/v1/samples/{$sampleId}")
+            ->assertOk()
+            ->assertJsonPath('data.batch_code', 'FL-TEST-2026')
+            ->assertJsonPath('quality_grade', 'PASS');
     });
 
     it('validates input fields when creating a lab sample', function () {

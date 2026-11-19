@@ -3,6 +3,7 @@
 namespace App\Modules\CFO\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ExpenseCategoryResource;
 use App\Models\ExpenseCategory;
 use App\Modules\CFO\Services\ExpenseCategoryService;
 use Illuminate\Http\JsonResponse;
@@ -31,7 +32,7 @@ class ExpenseCategoryController extends Controller
             );
 
             return response()->json([
-                'data' => $paginator->items(),
+                'data' => ExpenseCategoryResource::collection($paginator->items()),
                 'meta' => [
                     'count' => count($paginator->items()),
                     'total' => $paginator->total(),
@@ -48,7 +49,7 @@ class ExpenseCategoryController extends Controller
         );
 
         return response()->json([
-            'data' => $expenseCategories,
+            'data' => ExpenseCategoryResource::collection($expenseCategories),
             'meta' => [
                 'count' => $expenseCategories->count(),
                 'total' => $expenseCategories->count(),
@@ -75,16 +76,14 @@ class ExpenseCategoryController extends Controller
 
         $expenseCategory = $this->expenseCategoryService->createExpenseCategory($validated);
 
-        return response()->json([
-            'data' => $expenseCategory,
-        ], 201);
+        return (new ExpenseCategoryResource($expenseCategory))
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function show(ExpenseCategory $expenseCategory): JsonResponse
     {
-        return response()->json([
-            'data' => $expenseCategory->load('company'),
-        ]);
+        return (new ExpenseCategoryResource($expenseCategory->load('company')))->response();
     }
 
     public function update(Request $request, ExpenseCategory $expenseCategory): JsonResponse
@@ -102,9 +101,7 @@ class ExpenseCategoryController extends Controller
 
         $updated = $this->expenseCategoryService->updateExpenseCategory($expenseCategory, $validated);
 
-        return response()->json([
-            'data' => $updated,
-        ]);
+        return (new ExpenseCategoryResource($updated))->response();
     }
 
     public function destroy(ExpenseCategory $expenseCategory): JsonResponse

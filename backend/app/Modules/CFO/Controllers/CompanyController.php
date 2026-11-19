@@ -3,6 +3,7 @@
 namespace App\Modules\CFO\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\CompanyResource;
 use App\Models\Company;
 use App\Modules\CFO\Services\CompanyService;
 use Illuminate\Http\JsonResponse;
@@ -28,7 +29,7 @@ class CompanyController extends Controller
             );
 
             return response()->json([
-                'data' => $paginator->items(),
+                'data' => CompanyResource::collection($paginator->items()),
                 'meta' => [
                     'count' => count($paginator->items()),
                     'total' => $paginator->total(),
@@ -43,7 +44,7 @@ class CompanyController extends Controller
         $companies = $this->companyService->listCompanies();
 
         return response()->json([
-            'data' => $companies,
+            'data' => CompanyResource::collection($companies),
             'meta' => [
                 'count' => $companies->count(),
                 'total' => $companies->count(),
@@ -64,16 +65,14 @@ class CompanyController extends Controller
 
         $company = $this->companyService->createCompany($validated);
 
-        return response()->json([
-            'data' => $company,
-        ], 201);
+        return (new CompanyResource($company))
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function show(Company $company): JsonResponse
     {
-        return response()->json([
-            'data' => $company,
-        ]);
+        return (new CompanyResource($company))->response();
     }
 
     public function update(Request $request, Company $company): JsonResponse
@@ -85,9 +84,7 @@ class CompanyController extends Controller
 
         $updated = $this->companyService->updateCompany($company, $validated);
 
-        return response()->json([
-            'data' => $updated,
-        ]);
+        return (new CompanyResource($updated))->response();
     }
 
     public function destroy(Company $company): JsonResponse

@@ -3,6 +3,7 @@
 namespace App\Modules\CFO\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\CapitalCompanyResource;
 use App\Models\CapitalCompany;
 use App\Modules\CFO\Services\CapitalCompanyService;
 use Illuminate\Http\JsonResponse;
@@ -34,7 +35,7 @@ class CapitalCompanyController extends Controller
                 : $this->capitalCompanyService->getTotalCapital();
 
             return response()->json([
-                'data' => $paginator->items(),
+                'data' => CapitalCompanyResource::collection($paginator->items()),
                 'meta' => [
                     'count' => count($paginator->items()),
                     'total' => $paginator->total(),
@@ -53,7 +54,7 @@ class CapitalCompanyController extends Controller
         $totalCapital = (float) $capitalCompanies->sum('capital');
 
         return response()->json([
-            'data' => $capitalCompanies,
+            'data' => CapitalCompanyResource::collection($capitalCompanies),
             'meta' => [
                 'count' => $capitalCompanies->count(),
                 'total' => $capitalCompanies->count(),
@@ -82,16 +83,14 @@ class CapitalCompanyController extends Controller
 
         $capitalCompany = $this->capitalCompanyService->createCapitalCompany($validated);
 
-        return response()->json([
-            'data' => $capitalCompany,
-        ], 201);
+        return (new CapitalCompanyResource($capitalCompany))
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function show(CapitalCompany $capitalCompany): JsonResponse
     {
-        return response()->json([
-            'data' => $capitalCompany->load('company'),
-        ]);
+        return (new CapitalCompanyResource($capitalCompany->load('company')))->response();
     }
 
     public function update(Request $request, CapitalCompany $capitalCompany): JsonResponse
@@ -110,9 +109,7 @@ class CapitalCompanyController extends Controller
 
         $updated = $this->capitalCompanyService->updateCapitalCompany($capitalCompany, $validated);
 
-        return response()->json([
-            'data' => $updated,
-        ]);
+        return (new CapitalCompanyResource($updated))->response();
     }
 
     public function destroy(CapitalCompany $capitalCompany): JsonResponse

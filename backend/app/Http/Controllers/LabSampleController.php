@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\LabSampleResource;
 use App\Models\LabSample;
 use App\Services\LabSampleService;
 use Illuminate\Http\JsonResponse;
@@ -18,7 +19,7 @@ class LabSampleController extends Controller
         $samples = $this->labSampleService->listRecentSamples();
 
         return response()->json([
-            'data' => $samples,
+            'data' => LabSampleResource::collection($samples),
             'meta' => [
                 'count' => $samples->count(),
                 'cache_key' => LabSampleService::CACHE_KEY_LIST,
@@ -42,23 +43,26 @@ class LabSampleController extends Controller
             'status' => $validated['status'] ?? 'pending',
         ]);
 
-        return response()->json([
-            'data' => $sample,
-            'quality_grade' => $this->labSampleService->evaluateQualityGrade(
-                (float) $sample->ph_level,
-                (float) $sample->moisture_percent
-            ),
-        ], 201);
+        return (new LabSampleResource($sample))
+            ->additional([
+                'quality_grade' => $this->labSampleService->evaluateQualityGrade(
+                    (float) $sample->ph_level,
+                    (float) $sample->moisture_percent
+                ),
+            ])
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function show(LabSample $labSample): JsonResponse
     {
-        return response()->json([
-            'data' => $labSample,
-            'quality_grade' => $this->labSampleService->evaluateQualityGrade(
-                (float) $labSample->ph_level,
-                (float) $labSample->moisture_percent
-            ),
-        ]);
+        return (new LabSampleResource($labSample))
+            ->additional([
+                'quality_grade' => $this->labSampleService->evaluateQualityGrade(
+                    (float) $labSample->ph_level,
+                    (float) $labSample->moisture_percent
+                ),
+            ])
+            ->response();
     }
 }

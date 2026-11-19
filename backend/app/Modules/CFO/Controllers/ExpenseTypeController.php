@@ -3,6 +3,7 @@
 namespace App\Modules\CFO\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ExpenseTypeResource;
 use App\Models\ExpenseType;
 use App\Modules\CFO\Services\ExpenseTypeService;
 use Illuminate\Http\JsonResponse;
@@ -33,7 +34,7 @@ class ExpenseTypeController extends Controller
             );
 
             return response()->json([
-                'data' => $paginator->items(),
+                'data' => ExpenseTypeResource::collection($paginator->items()),
                 'meta' => [
                     'count' => count($paginator->items()),
                     'total' => $paginator->total(),
@@ -51,7 +52,7 @@ class ExpenseTypeController extends Controller
         );
 
         return response()->json([
-            'data' => $expenseTypes,
+            'data' => ExpenseTypeResource::collection($expenseTypes),
             'meta' => [
                 'count' => $expenseTypes->count(),
                 'total' => $expenseTypes->count(),
@@ -87,16 +88,14 @@ class ExpenseTypeController extends Controller
 
         $expenseType = $this->expenseTypeService->createExpenseType($validated);
 
-        return response()->json([
-            'data' => $expenseType,
-        ], 201);
+        return (new ExpenseTypeResource($expenseType))
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function show(ExpenseType $expenseType): JsonResponse
     {
-        return response()->json([
-            'data' => $expenseType->load(['expenseCategory', 'company']),
-        ]);
+        return (new ExpenseTypeResource($expenseType->load(['expenseCategory', 'company'])))->response();
     }
 
     public function update(Request $request, ExpenseType $expenseType): JsonResponse
@@ -123,9 +122,7 @@ class ExpenseTypeController extends Controller
 
         $updated = $this->expenseTypeService->updateExpenseType($expenseType, $validated);
 
-        return response()->json([
-            'data' => $updated,
-        ]);
+        return (new ExpenseTypeResource($updated))->response();
     }
 
     public function destroy(ExpenseType $expenseType): JsonResponse

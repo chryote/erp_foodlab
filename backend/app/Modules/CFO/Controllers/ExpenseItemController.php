@@ -3,6 +3,7 @@
 namespace App\Modules\CFO\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ExpenseItemResource;
 use App\Models\ExpenseItem;
 use App\Modules\CFO\Services\ExpenseItemService;
 use Illuminate\Http\JsonResponse;
@@ -35,7 +36,7 @@ class ExpenseItemController extends Controller
             );
 
             return response()->json([
-                'data' => $paginator->items(),
+                'data' => ExpenseItemResource::collection($paginator->items()),
                 'meta' => [
                     'count' => count($paginator->items()),
                     'total' => $paginator->total(),
@@ -54,7 +55,7 @@ class ExpenseItemController extends Controller
         );
 
         return response()->json([
-            'data' => $expenseItems,
+            'data' => ExpenseItemResource::collection($expenseItems),
             'meta' => [
                 'count' => $expenseItems->count(),
                 'total' => $expenseItems->count(),
@@ -104,16 +105,16 @@ class ExpenseItemController extends Controller
 
         $expenseItem = $this->expenseItemService->createExpenseItem($validated);
 
-        return response()->json([
-            'data' => $expenseItem,
-        ], 201);
+        return (new ExpenseItemResource($expenseItem))
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function show(ExpenseItem $expenseItem): JsonResponse
     {
-        return response()->json([
-            'data' => $expenseItem->load(['expenseCategory', 'expenseType', 'company']),
-        ]);
+        return (new ExpenseItemResource(
+            $expenseItem->load(['expenseCategory', 'expenseType', 'company'])
+        ))->response();
     }
 
     public function update(Request $request, ExpenseItem $expenseItem): JsonResponse
@@ -154,9 +155,7 @@ class ExpenseItemController extends Controller
 
         $updated = $this->expenseItemService->updateExpenseItem($expenseItem, $validated);
 
-        return response()->json([
-            'data' => $updated,
-        ]);
+        return (new ExpenseItemResource($updated))->response();
     }
 
     public function destroy(ExpenseItem $expenseItem): JsonResponse
