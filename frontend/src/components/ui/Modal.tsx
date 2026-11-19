@@ -206,7 +206,7 @@ export const SelectInput: React.FC<SelectInputProps> = ({
       <select
         id={id}
         className={cn(
-          'flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1.5 text-sm text-foreground shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          'flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1.5 text-sm text-foreground shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60',
           className
         )}
         {...rest}
@@ -345,7 +345,11 @@ export interface CrudFieldConfig<T> {
   type?: 'text' | 'number' | 'decimal' | 'select';
   step?: string | number;
   min?: string | number;
-  options?: SelectOption[];
+  options?:
+    | SelectOption[]
+    | ((values: Record<string, string>) => SelectOption[]);
+  disabled?: boolean | ((values: Record<string, string>) => boolean);
+  resetFieldsOnChange?: (keyof T & string)[];
   renderValue?: (row: T) => React.ReactNode;
   filterText?: (row: T) => string;
 }
@@ -476,10 +480,22 @@ export function CrudModal<T extends CrudEntity>({
   }, [items, safeCurrentPage, pageSize]);
 
   const handleFieldChange = (key: string, value: string) => {
-    setFormValues((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
+    const fieldConfig = resolvedFields.find((f) => f.key === key);
+    setFormValues((prev) => {
+      if (prev[key] === value) {
+        return prev;
+      }
+      const next: Record<string, string> = {
+        ...prev,
+        [key]: value,
+      };
+      if (fieldConfig?.resetFieldsOnChange) {
+        for (const targetKey of fieldConfig.resetFieldsOnChange) {
+          next[targetKey] = '';
+        }
+      }
+      return next;
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -603,7 +619,11 @@ export function CrudModal<T extends CrudEntity>({
         }
         const raw = row[field.key];
         if (field.type === 'select' && field.options) {
-          const match = field.options.find(
+          const resolvedOptions =
+            typeof field.options === 'function'
+              ? field.options({})
+              : field.options;
+          const match = resolvedOptions.find(
             (opt) => opt.value === String(raw ?? '')
           );
           if (match) {
@@ -704,14 +724,23 @@ export function CrudModal<T extends CrudEntity>({
             className="flex flex-wrap items-end gap-2.5 border-b border-border pb-4"
           >
             {resolvedFields.map((field) => {
+              const isFieldDisabled =
+                typeof field.disabled === 'function'
+                  ? field.disabled(formValues)
+                  : field.disabled;
               if (field.type === 'select') {
+                const resolvedOptions =
+                  typeof field.options === 'function'
+                    ? field.options(formValues)
+                    : (field.options ?? []);
                 return (
                   <SelectInput
                     key={field.key}
                     id={`${testId}-${field.key}-input`}
                     label={field.label}
                     placeholder={field.placeholder}
-                    options={field.options ?? []}
+                    options={resolvedOptions}
+                    disabled={isFieldDisabled}
                     value={formValues[field.key] ?? ''}
                     onChange={(e) => handleFieldChange(field.key, e.target.value)}
                   />

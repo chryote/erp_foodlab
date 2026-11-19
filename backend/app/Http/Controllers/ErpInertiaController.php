@@ -59,6 +59,11 @@ class ErpInertiaController extends Controller
     public function storeExpenseCategory(Request $request): RedirectResponse
     {
         $validated = $request->validate([
+            'company_id' => [
+                'required',
+                'integer',
+                Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
             'name' => ['required', 'string', 'max:150'],
         ]);
 
@@ -70,6 +75,11 @@ class ErpInertiaController extends Controller
     public function updateExpenseCategory(Request $request, ExpenseCategory $expenseCategory): RedirectResponse
     {
         $validated = $request->validate([
+            'company_id' => [
+                'required',
+                'integer',
+                Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
             'name' => ['required', 'string', 'max:150'],
         ]);
 
@@ -87,11 +97,20 @@ class ErpInertiaController extends Controller
 
     public function storeExpenseType(Request $request): RedirectResponse
     {
+        $companyId = (int) $request->input('company_id');
+
         $validated = $request->validate([
+            'company_id' => [
+                'required',
+                'integer',
+                Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
             'expense_category_id' => [
                 'required',
                 'integer',
-                Rule::exists('expense_categories', 'id')->whereNull('deleted_at'),
+                Rule::exists('expense_categories', 'id')
+                    ->whereNull('deleted_at')
+                    ->where('company_id', $companyId),
             ],
             'name' => ['required', 'string', 'max:150'],
         ]);
@@ -103,11 +122,20 @@ class ErpInertiaController extends Controller
 
     public function updateExpenseType(Request $request, ExpenseType $expenseType): RedirectResponse
     {
+        $companyId = (int) $request->input('company_id');
+
         $validated = $request->validate([
+            'company_id' => [
+                'required',
+                'integer',
+                Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
             'expense_category_id' => [
                 'required',
                 'integer',
-                Rule::exists('expense_categories', 'id')->whereNull('deleted_at'),
+                Rule::exists('expense_categories', 'id')
+                    ->whereNull('deleted_at')
+                    ->where('company_id', $companyId),
             ],
             'name' => ['required', 'string', 'max:150'],
         ]);
@@ -126,22 +154,28 @@ class ErpInertiaController extends Controller
 
     public function storeExpenseItem(Request $request): RedirectResponse
     {
+        $companyId = (int) $request->input('company_id');
+
         $validated = $request->validate([
-            'expense_category_id' => [
-                'sometimes',
-                'nullable',
-                'integer',
-                Rule::exists('expense_categories', 'id')->whereNull('deleted_at'),
-            ],
-            'expense_type_id' => [
-                'required',
-                'integer',
-                Rule::exists('expense_types', 'id')->whereNull('deleted_at'),
-            ],
             'company_id' => [
                 'required',
                 'integer',
                 Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
+            'expense_category_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists('expense_categories', 'id')
+                    ->whereNull('deleted_at')
+                    ->where('company_id', $companyId),
+            ],
+            'expense_type_id' => [
+                'required',
+                'integer',
+                Rule::exists('expense_types', 'id')
+                    ->whereNull('deleted_at')
+                    ->where('company_id', $companyId),
             ],
             'name' => ['required', 'string', 'max:150'],
             'amount' => ['required', 'numeric', 'min:0'],
@@ -156,22 +190,28 @@ class ErpInertiaController extends Controller
 
     public function updateExpenseItem(Request $request, ExpenseItem $expenseItem): RedirectResponse
     {
+        $companyId = (int) $request->input('company_id');
+
         $validated = $request->validate([
-            'expense_category_id' => [
-                'sometimes',
-                'nullable',
-                'integer',
-                Rule::exists('expense_categories', 'id')->whereNull('deleted_at'),
-            ],
-            'expense_type_id' => [
-                'required',
-                'integer',
-                Rule::exists('expense_types', 'id')->whereNull('deleted_at'),
-            ],
             'company_id' => [
                 'required',
                 'integer',
                 Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
+            'expense_category_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists('expense_categories', 'id')
+                    ->whereNull('deleted_at')
+                    ->where('company_id', $companyId),
+            ],
+            'expense_type_id' => [
+                'required',
+                'integer',
+                Rule::exists('expense_types', 'id')
+                    ->whereNull('deleted_at')
+                    ->where('company_id', $companyId),
             ],
             'name' => ['required', 'string', 'max:150'],
             'amount' => ['required', 'numeric', 'min:0'],

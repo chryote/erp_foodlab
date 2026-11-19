@@ -15,14 +15,32 @@ class ExpenseCategoryService
     {
         return Cache::remember(self::CACHE_KEY_LIST, 60, function () {
             return ExpenseCategory::query()
+                ->with('company')
                 ->orderByDesc('id')
                 ->get();
         });
     }
 
-    public function paginateExpenseCategories(?string $search = null, int $perPage = 10, int $page = 1): LengthAwarePaginator
+    public function listFilteredExpenseCategories(?int $companyId = null): Collection
     {
-        $query = ExpenseCategory::query()->orderByDesc('id');
+        return $this->listExpenseCategories()
+            ->when($companyId !== null, fn (Collection $categories) => $categories->where('company_id', $companyId))
+            ->values();
+    }
+
+    public function paginateExpenseCategories(
+        ?string $search = null,
+        int $perPage = 10,
+        int $page = 1,
+        ?int $companyId = null
+    ): LengthAwarePaginator {
+        $query = ExpenseCategory::query()
+            ->with('company')
+            ->orderByDesc('id');
+
+        if ($companyId !== null) {
+            $query->where('company_id', $companyId);
+        }
 
         if ($search !== null && trim($search) !== '') {
             $term = '%' . trim($search) . '%';
@@ -39,7 +57,7 @@ class ExpenseCategoryService
         Cache::forget(ExpenseTypeService::CACHE_KEY_LIST);
         Cache::forget(ExpenseItemService::CACHE_KEY_LIST);
 
-        return $expenseCategory;
+        return $expenseCategory->load('company');
     }
 
     public function updateExpenseCategory(ExpenseCategory $expenseCategory, array $attributes): ExpenseCategory
@@ -49,7 +67,7 @@ class ExpenseCategoryService
         Cache::forget(ExpenseTypeService::CACHE_KEY_LIST);
         Cache::forget(ExpenseItemService::CACHE_KEY_LIST);
 
-        return $expenseCategory->refresh();
+        return $expenseCategory->refresh()->load('company');
     }
 
     public function deleteExpenseCategory(ExpenseCategory $expenseCategory): void

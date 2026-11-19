@@ -15,15 +15,22 @@ class ExpenseType extends Model
 
     protected $fillable = [
         'expense_category_id',
+        'company_id',
         'name',
     ];
 
     protected $casts = [
         'expense_category_id' => 'integer',
+        'company_id' => 'integer',
     ];
 
     public function expenseCategory(): BelongsTo
     {
         return $this->belongsTo(ExpenseCategory::class);
+    }
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
     }
 }

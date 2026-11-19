@@ -90,9 +90,10 @@ class ExpenseItemService
 
     public function createExpenseItem(array $attributes): ExpenseItem
     {
-        if (empty($attributes['expense_category_id']) && ! empty($attributes['expense_type_id'])) {
+        if ((empty($attributes['expense_category_id']) || empty($attributes['company_id'])) && ! empty($attributes['expense_type_id'])) {
             $type = ExpenseType::query()->findOrFail($attributes['expense_type_id']);
-            $attributes['expense_category_id'] = $type->expense_category_id;
+            $attributes['expense_category_id'] = $attributes['expense_category_id'] ?? $type->expense_category_id;
+            $attributes['company_id'] = $attributes['company_id'] ?? $type->company_id;
         }
 
         $expenseItem = ExpenseItem::query()->create($attributes);
@@ -103,9 +104,10 @@ class ExpenseItemService
 
     public function updateExpenseItem(ExpenseItem $expenseItem, array $attributes): ExpenseItem
     {
-        if (empty($attributes['expense_category_id']) && ! empty($attributes['expense_type_id'])) {
+        if ((empty($attributes['expense_category_id']) || empty($attributes['company_id'])) && ! empty($attributes['expense_type_id'])) {
             $type = ExpenseType::query()->findOrFail($attributes['expense_type_id']);
-            $attributes['expense_category_id'] = $type->expense_category_id;
+            $attributes['expense_category_id'] = $attributes['expense_category_id'] ?? $type->expense_category_id;
+            $attributes['company_id'] = $attributes['company_id'] ?? $type->company_id;
         }
 
         $expenseItem->update($attributes);

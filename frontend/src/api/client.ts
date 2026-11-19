@@ -104,7 +104,9 @@ export interface CapitalCompaniesListResponse {
 
 export interface ExpenseCategory {
   id: number;
+  company_id: number;
   name: string;
+  company?: Company | null;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
@@ -125,8 +127,10 @@ export interface ExpenseCategoriesListResponse {
 export interface ExpenseType {
   id: number;
   expense_category_id: number;
+  company_id: number;
   name: string;
   expense_category?: ExpenseCategory | null;
+  company?: Company | null;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
@@ -341,6 +345,7 @@ export async function fetchExpenseCategories(): Promise<ExpenseCategoriesListRes
 }
 
 export async function createExpenseCategory(payload: {
+  company_id: number;
   name: string;
 }): Promise<{ data: ExpenseCategory }> {
   return requestJson<{ data: ExpenseCategory }>(
@@ -356,7 +361,7 @@ export async function createExpenseCategory(payload: {
 
 export async function updateExpenseCategory(
   id: number,
-  payload: { name: string }
+  payload: { company_id: number; name: string }
 ): Promise<{ data: ExpenseCategory }> {
   return requestJson<{ data: ExpenseCategory }>(
     `/v1/modules/cfo/expense-categories/${id}`,
@@ -388,6 +393,7 @@ export async function fetchExpenseTypes(): Promise<ExpenseTypesListResponse> {
 }
 
 export async function createExpenseType(payload: {
+  company_id: number;
   expense_category_id: number;
   name: string;
 }): Promise<{ data: ExpenseType }> {
@@ -404,7 +410,7 @@ export async function createExpenseType(payload: {
 
 export async function updateExpenseType(
   id: number,
-  payload: { expense_category_id: number; name: string }
+  payload: { company_id: number; expense_category_id: number; name: string }
 ): Promise<{ data: ExpenseType }> {
   return requestJson<{ data: ExpenseType }>(
     `/v1/modules/cfo/expense-types/${id}`,

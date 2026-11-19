@@ -7,6 +7,7 @@ use App\Models\ExpenseCategory;
 use App\Modules\CFO\Services\ExpenseCategoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ExpenseCategoryController extends Controller
 {
@@ -17,6 +18,7 @@ class ExpenseCategoryController extends Controller
     public function index(Request $request): JsonResponse
     {
         $search = $request->query('search');
+        $companyId = $request->query('company_id');
         $perPage = $request->query('per_page');
         $page = $request->query('page');
 
@@ -24,7 +26,8 @@ class ExpenseCategoryController extends Controller
             $paginator = $this->expenseCategoryService->paginateExpenseCategories(
                 is_string($search) ? $search : null,
                 max(1, (int) ($perPage ?? 10)),
-                max(1, (int) ($page ?? 1))
+                max(1, (int) ($page ?? 1)),
+                $companyId !== null ? (int) $companyId : null
             );
 
             return response()->json([
@@ -40,7 +43,9 @@ class ExpenseCategoryController extends Controller
             ]);
         }
 
-        $expenseCategories = $this->expenseCategoryService->listExpenseCategories();
+        $expenseCategories = $this->expenseCategoryService->listFilteredExpenseCategories(
+            $companyId !== null ? (int) $companyId : null
+        );
 
         return response()->json([
             'data' => $expenseCategories,
@@ -58,8 +63,15 @@ class ExpenseCategoryController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
+            'company_id' => [
+                'required',
+                'integer',
+                Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
             'name' => ['required', 'string', 'max:150'],
         ]);
+
+        $validated['name'] = (string) $validated['name'];
 
         $expenseCategory = $this->expenseCategoryService->createExpenseCategory($validated);
 
@@ -71,15 +83,22 @@ class ExpenseCategoryController extends Controller
     public function show(ExpenseCategory $expenseCategory): JsonResponse
     {
         return response()->json([
-            'data' => $expenseCategory,
+            'data' => $expenseCategory->load('company'),
         ]);
     }
 
     public function update(Request $request, ExpenseCategory $expenseCategory): JsonResponse
     {
         $validated = $request->validate([
+            'company_id' => [
+                'required',
+                'integer',
+                Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
             'name' => ['required', 'string', 'max:150'],
         ]);
+
+        $validated['name'] = (string) $validated['name'];
 
         $updated = $this->expenseCategoryService->updateExpenseCategory($expenseCategory, $validated);
 

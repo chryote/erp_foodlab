@@ -19,6 +19,7 @@ class ExpenseTypeController extends Controller
     {
         $search = $request->query('search');
         $expenseCategoryId = $request->query('expense_category_id');
+        $companyId = $request->query('company_id');
         $perPage = $request->query('per_page');
         $page = $request->query('page');
 
@@ -27,7 +28,8 @@ class ExpenseTypeController extends Controller
                 is_string($search) ? $search : null,
                 max(1, (int) ($perPage ?? 10)),
                 max(1, (int) ($page ?? 1)),
-                $expenseCategoryId !== null ? (int) $expenseCategoryId : null
+                $expenseCategoryId !== null ? (int) $expenseCategoryId : null,
+                $companyId !== null ? (int) $companyId : null
             );
 
             return response()->json([
@@ -43,9 +45,10 @@ class ExpenseTypeController extends Controller
             ]);
         }
 
-        $expenseTypes = $expenseCategoryId !== null
-            ? $this->expenseTypeService->listExpenseTypeByExpenseCategory((int) $expenseCategoryId)
-            : $this->expenseTypeService->listExpenseTypes();
+        $expenseTypes = $this->expenseTypeService->listFilteredExpenseTypes(
+            $expenseCategoryId !== null ? (int) $expenseCategoryId : null,
+            $companyId !== null ? (int) $companyId : null
+        );
 
         return response()->json([
             'data' => $expenseTypes,
@@ -62,11 +65,20 @@ class ExpenseTypeController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $companyId = (int) $request->input('company_id');
+
         $validated = $request->validate([
+            'company_id' => [
+                'required',
+                'integer',
+                Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
             'expense_category_id' => [
                 'required',
                 'integer',
-                Rule::exists('expense_categories', 'id')->whereNull('deleted_at'),
+                Rule::exists('expense_categories', 'id')
+                    ->whereNull('deleted_at')
+                    ->where('company_id', $companyId),
             ],
             'name' => ['required', 'string', 'max:150'],
         ]);
@@ -83,17 +95,26 @@ class ExpenseTypeController extends Controller
     public function show(ExpenseType $expenseType): JsonResponse
     {
         return response()->json([
-            'data' => $expenseType->load('expenseCategory'),
+            'data' => $expenseType->load(['expenseCategory', 'company']),
         ]);
     }
 
     public function update(Request $request, ExpenseType $expenseType): JsonResponse
     {
+        $companyId = (int) $request->input('company_id');
+
         $validated = $request->validate([
+            'company_id' => [
+                'required',
+                'integer',
+                Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
             'expense_category_id' => [
                 'required',
                 'integer',
-                Rule::exists('expense_categories', 'id')->whereNull('deleted_at'),
+                Rule::exists('expense_categories', 'id')
+                    ->whereNull('deleted_at')
+                    ->where('company_id', $companyId),
             ],
             'name' => ['required', 'string', 'max:150'],
         ]);

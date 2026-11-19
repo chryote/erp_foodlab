@@ -2,14 +2,13 @@
 
 namespace Database\Factories;
 
-use App\Models\CapitalCompany;
 use App\Models\Company;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseType;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<CapitalCompany>
+ * @extends Factory<ExpenseType>
  */
 class ExpenseTypeFactory extends Factory
 {
@@ -19,7 +18,8 @@ class ExpenseTypeFactory extends Factory
     {
         return [
             'expense_category_id' => ExpenseCategory::factory(),
-            'name' => $this->faker->name(),
+            'company_id' => Company::factory(),
+            'name' => $this->faker->words(2, true),
         ];
     }
 }

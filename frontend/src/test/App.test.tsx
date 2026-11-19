@@ -7,6 +7,7 @@ import { DEFAULT_CHO_MODULE } from '../modules/CHO/ChoModuleCard';
 import { DEFAULT_CPO_MODULE } from '../modules/CPO/CpoModuleCard';
 import { DEFAULT_CDO_MODULE } from '../modules/CDO/CdoModuleCard';
 import { DEFAULT_CMO_MODULE } from '../modules/CMO/CmoModuleCard';
+import { formatCurrentMonthDateRange } from '../modules/CFO/ViewOperasionalModal';
 
 vi.mock('../api/client');
 
@@ -459,27 +460,50 @@ describe('App ERP Main Menu integration', () => {
       meta: { count: 2 },
     });
     vi.mocked(apiClient.fetchExpenseCategories).mockResolvedValue({
-      data: [{ id: 10, name: 'Bahan Baku' }],
-      meta: { count: 1 },
+      data: [
+        { id: 10, company_id: 1, name: 'Bahan Baku' },
+        { id: 12, company_id: 1, name: 'Lainnya' },
+        { id: 13, company_id: 2, name: 'Kategori Perusahaan 2' },
+      ],
+      meta: { count: 3 },
     });
     vi.mocked(apiClient.createExpenseCategory).mockResolvedValue({
-      data: { id: 11, name: 'Utilitas' },
+      data: { id: 11, company_id: 1, name: 'Utilitas' },
     });
     vi.mocked(apiClient.updateExpenseCategory).mockResolvedValue({
-      data: { id: 11, name: 'Utilitas Pabrik' },
+      data: { id: 11, company_id: 1, name: 'Utilitas Pabrik' },
     });
     vi.mocked(apiClient.deleteExpenseCategory).mockResolvedValue({
       message: 'Expense category deleted successfully.',
     });
     vi.mocked(apiClient.fetchExpenseTypes).mockResolvedValue({
-      data: [{ id: 20, expense_category_id: 10, name: 'Dairy' }],
-      meta: { count: 1 },
+      data: [
+        { id: 20, company_id: 1, expense_category_id: 10, name: 'Dairy' },
+        { id: 22, company_id: 1, expense_category_id: 12, name: 'Listrik' },
+        {
+          id: 23,
+          company_id: 2,
+          expense_category_id: 13,
+          name: 'Tipe Perusahaan 2',
+        },
+      ],
+      meta: { count: 3 },
     });
     vi.mocked(apiClient.createExpenseType).mockResolvedValue({
-      data: { id: 21, expense_category_id: 10, name: 'Kemasan' },
+      data: {
+        id: 21,
+        company_id: 1,
+        expense_category_id: 10,
+        name: 'Kemasan',
+      },
     });
     vi.mocked(apiClient.updateExpenseType).mockResolvedValue({
-      data: { id: 21, expense_category_id: 10, name: 'Kemasan Botol' },
+      data: {
+        id: 21,
+        company_id: 1,
+        expense_category_id: 10,
+        name: 'Kemasan Botol',
+      },
     });
     vi.mocked(apiClient.deleteExpenseType).mockResolvedValue({
       message: 'Expense type deleted successfully.',
@@ -559,7 +583,13 @@ describe('App ERP Main Menu integration', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Bahan Baku')).toBeInTheDocument();
+      expect(screen.getByText('Kategori Perusahaan 2')).toBeInTheDocument();
     });
+
+    const kategoriCompanySelect = screen.getByLabelText(
+      'Pilih Perusahaan'
+    ) as HTMLSelectElement;
+    expect(kategoriCompanySelect.value).toBe('1');
 
     // CRUD on Tab 1: Kategori
     fireEvent.change(screen.getByLabelText('Nama Kategori'), {
@@ -569,6 +599,7 @@ describe('App ERP Main Menu integration', () => {
     fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
     await waitFor(() => {
       expect(apiClient.createExpenseCategory).toHaveBeenCalledWith({
+        company_id: 1,
         name: 'Utilitas',
       });
       expect(screen.getByText('Utilitas')).toBeInTheDocument();
@@ -582,6 +613,7 @@ describe('App ERP Main Menu integration', () => {
     fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
     await waitFor(() => {
       expect(apiClient.updateExpenseCategory).toHaveBeenCalledWith(11, {
+        company_id: 1,
         name: 'Utilitas Pabrik',
       });
       expect(screen.getByText('Utilitas Pabrik')).toBeInTheDocument();
@@ -598,8 +630,27 @@ describe('App ERP Main Menu integration', () => {
     fireEvent.click(tabTipe);
     expect(tabTipe).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText('Dairy')).toBeInTheDocument();
+    expect(screen.getByText('Tipe Perusahaan 2')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Pilih Kategori'), {
+    const tipeCompanySelect = screen.getByLabelText(
+      'Pilih Perusahaan'
+    ) as HTMLSelectElement;
+    const tipeCategorySelect = screen.getByLabelText(
+      'Pilih Kategori'
+    ) as HTMLSelectElement;
+    expect(tipeCompanySelect.value).toBe('1');
+    expect(
+      Array.from(tipeCategorySelect.options).map((opt) => opt.textContent)
+    ).not.toContain('Kategori Perusahaan 2');
+
+    // Switching company resets category and filters categories to company 2
+    fireEvent.change(tipeCompanySelect, { target: { value: '2' } });
+    expect(
+      Array.from(tipeCategorySelect.options).map((opt) => opt.textContent)
+    ).toContain('Kategori Perusahaan 2');
+    fireEvent.change(tipeCompanySelect, { target: { value: '1' } });
+
+    fireEvent.change(tipeCategorySelect, {
       target: { value: '10' },
     });
     fireEvent.change(screen.getByLabelText('Nama Tipe'), {
@@ -609,6 +660,7 @@ describe('App ERP Main Menu integration', () => {
     fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
     await waitFor(() => {
       expect(apiClient.createExpenseType).toHaveBeenCalledWith({
+        company_id: 1,
         expense_category_id: 10,
         name: 'Kemasan',
       });
@@ -623,6 +675,7 @@ describe('App ERP Main Menu integration', () => {
     fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
     await waitFor(() => {
       expect(apiClient.updateExpenseType).toHaveBeenCalledWith(21, {
+        company_id: 1,
         expense_category_id: 10,
         name: 'Kemasan Botol',
       });
@@ -636,14 +689,61 @@ describe('App ERP Main Menu integration', () => {
       expect(screen.queryByText('Kemasan Botol')).not.toBeInTheDocument();
     });
 
-    // CRUD on Tab 3: Item (scoped to active company_id = 1)
+    // CRUD on Tab 3: Item
     fireEvent.click(tabItem);
     expect(tabItem).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText('Susu Segar')).toBeInTheDocument();
-    // Item from company_id = 2 is not shown when company 1 is active
-    expect(screen.queryByText('Krim Kental')).not.toBeInTheDocument();
+    expect(screen.getByText('Krim Kental')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Pilih Tipe'), {
+    const itemCompanySelect = screen.getByLabelText(
+      'Pilih Perusahaan'
+    ) as HTMLSelectElement;
+    const itemCategorySelect = screen.getByLabelText(
+      'Pilih Kategori'
+    ) as HTMLSelectElement;
+    const itemTypeSelect = screen.getByLabelText(
+      'Pilih Tipe'
+    ) as HTMLSelectElement;
+    expect(itemCompanySelect.value).toBe('1');
+    expect(itemTypeSelect).toBeDisabled();
+
+    // Switching company updates category options and clears category & type
+    fireEvent.change(itemCompanySelect, { target: { value: '2' } });
+    expect(
+      Array.from(itemCategorySelect.options).map((opt) => opt.textContent)
+    ).toContain('Kategori Perusahaan 2');
+    fireEvent.change(itemCompanySelect, { target: { value: '1' } });
+    expect(itemCategorySelect.value).toBe('');
+    expect(itemTypeSelect.value).toBe('');
+
+    fireEvent.change(itemCategorySelect, {
+      target: { value: '10' },
+    });
+    expect(itemTypeSelect).not.toBeDisabled();
+    const typeOptionLabels = Array.from(itemTypeSelect.options).map(
+      (opt) => opt.textContent
+    );
+    expect(typeOptionLabels).toContain('Dairy');
+    expect(typeOptionLabels).not.toContain('Listrik');
+
+    fireEvent.change(itemTypeSelect, {
+      target: { value: '20' },
+    });
+    expect(itemTypeSelect.value).toBe('20');
+
+    // Switching parent category clears selected tipe and updates filtered options
+    fireEvent.change(itemCategorySelect, {
+      target: { value: '12' },
+    });
+    expect(itemTypeSelect.value).toBe('');
+    expect(
+      Array.from(itemTypeSelect.options).map((opt) => opt.textContent)
+    ).toContain('Listrik');
+
+    fireEvent.change(itemCategorySelect, {
+      target: { value: '10' },
+    });
+    fireEvent.change(itemTypeSelect, {
       target: { value: '20' },
     });
     fireEvent.change(screen.getByLabelText('Nama Item'), {
@@ -690,6 +790,230 @@ describe('App ERP Main Menu integration', () => {
     await waitFor(() => {
       expect(apiClient.deleteExpenseItem).toHaveBeenCalledWith(32);
       expect(screen.queryByText('Keju Cheddar')).not.toBeInTheDocument();
+    });
+  });
+
+  it('opens View Operasional modal with current month date range and expense amounts grouped by category and type', async () => {
+    const now = new Date();
+    const currentMonthIso = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      15,
+      10,
+      0,
+      0
+    ).toISOString();
+    const previousMonthIso = new Date(
+      now.getFullYear(),
+      now.getMonth() - 1,
+      15,
+      10,
+      0,
+      0
+    ).toISOString();
+
+    vi.mocked(apiClient.fetchErpModules).mockResolvedValue({
+      data: [
+        DEFAULT_CFO_MODULE,
+        DEFAULT_CHO_MODULE,
+        DEFAULT_CPO_MODULE,
+        DEFAULT_CDO_MODULE,
+        DEFAULT_CMO_MODULE,
+      ],
+      meta: { count: 5 },
+    });
+    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
+      data: [
+        { id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1 },
+        { id: 2, name: 'PT. Pangan Nusantara', series: 1 },
+      ],
+      meta: { count: 2 },
+    });
+    vi.mocked(apiClient.fetchExpenseCategories).mockResolvedValue({
+      data: [
+        { id: 10, company_id: 1, name: 'Bahan Baku' },
+        { id: 11, company_id: 1, name: 'Utilitas' },
+        { id: 12, company_id: 2, name: 'Operasional Cabang 2' },
+      ],
+      meta: { count: 3 },
+    });
+    vi.mocked(apiClient.fetchExpenseTypes).mockResolvedValue({
+      data: [
+        { id: 20, company_id: 1, expense_category_id: 10, name: 'Dairy' },
+        { id: 21, company_id: 1, expense_category_id: 10, name: 'Kemasan' },
+        { id: 22, company_id: 1, expense_category_id: 11, name: 'Listrik' },
+        { id: 23, company_id: 2, expense_category_id: 12, name: 'Sewa' },
+      ],
+      meta: { count: 4 },
+    });
+    vi.mocked(apiClient.fetchExpenseItems).mockResolvedValue({
+      data: [
+        {
+          id: 30,
+          expense_category_id: 10,
+          expense_type_id: 20,
+          company_id: 1,
+          name: 'Susu Segar',
+          amount: 1500000,
+          created_at: currentMonthIso,
+        },
+        {
+          id: 31,
+          expense_category_id: 10,
+          expense_type_id: 20,
+          company_id: 1,
+          name: 'Mentega',
+          amount: 500000,
+          created_at: currentMonthIso,
+        },
+        {
+          id: 32,
+          expense_category_id: 10,
+          expense_type_id: 21,
+          company_id: 1,
+          name: 'Botol Kaca',
+          amount: 300000,
+          created_at: currentMonthIso,
+        },
+        {
+          id: 33,
+          expense_category_id: 12,
+          expense_type_id: 23,
+          company_id: 2,
+          name: 'Sewa Gudang',
+          amount: 9000000,
+          created_at: currentMonthIso,
+        },
+        {
+          id: 34,
+          expense_category_id: 11,
+          expense_type_id: 22,
+          company_id: 1,
+          name: 'Listrik Bulan Lalu',
+          amount: 750000,
+          created_at: previousMonthIso,
+        },
+      ],
+      meta: { count: 5 },
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(1);
+    });
+
+    fireEvent.click(screen.getByTestId('company-tab-1'));
+    fireEvent.click(screen.getByTestId('module-card-CFO'));
+    fireEvent.click(
+      screen.getByTestId('horizontal-menu-card-INPUT_OPERASIONAL')
+    );
+    fireEvent.click(
+      screen.getByTestId('horizontal-menu-card-VIEW_OPERASIONAL')
+    );
+
+    const modal = await screen.findByTestId('view-operasional-modal');
+    expect(modal).toBeInTheDocument();
+
+    expect(
+      screen.getByTestId('view-operasional-date-range')
+    ).toHaveTextContent(formatCurrentMonthDateRange(now));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('view-operasional-category-amount-10')
+      ).toHaveTextContent('2.3');
+      expect(
+        screen.getByTestId('view-operasional-type-amount-20')
+      ).toHaveTextContent('2');
+      expect(
+        screen.getByTestId('view-operasional-type-amount-21')
+      ).toHaveTextContent('0.3');
+      expect(
+        screen.getByTestId('view-operasional-category-amount-11')
+      ).toHaveTextContent('0');
+      expect(
+        screen.getByTestId('view-operasional-type-amount-22')
+      ).toHaveTextContent('0');
+      expect(
+        screen.queryByTestId('view-operasional-category-12')
+      ).not.toBeInTheDocument();
+    });
+
+    // Clicking category amount opens ExpenseItem detail per item for that category
+    fireEvent.click(
+      screen.getByTestId('view-operasional-category-amount-10')
+    );
+    const detailModal = await screen.findByTestId(
+      'view-operasional-detail-modal'
+    );
+    expect(detailModal).toBeInTheDocument();
+    expect(screen.getByText('Susu Segar')).toBeInTheDocument();
+    expect(screen.getByText('Mentega')).toBeInTheDocument();
+    expect(screen.getByText('Botol Kaca')).toBeInTheDocument();
+    expect(screen.queryByText('Sewa Gudang')).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId('view-operasional-detail-summary-value')
+    ).toHaveTextContent('Rp 2.300.000 (2.3)');
+
+    // Close detail modal and click type amount to drill down to a specific type
+    const closeButtons = screen.getAllByRole('button', {
+      name: 'Tutup Modal',
+    });
+    fireEvent.click(closeButtons[closeButtons.length - 1]);
+    expect(
+      screen.queryByTestId('view-operasional-detail-modal')
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('view-operasional-type-amount-20'));
+    expect(
+      await screen.findByTestId('view-operasional-detail-modal')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Susu Segar')).toBeInTheDocument();
+    expect(screen.getByText('Mentega')).toBeInTheDocument();
+    expect(screen.queryByText('Botol Kaca')).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId('view-operasional-detail-summary-value')
+    ).toHaveTextContent('Rp 2.000.000 (2)');
+
+    const closeButtonsAfterType = screen.getAllByRole('button', {
+      name: 'Tutup Modal',
+    });
+    fireEvent.click(
+      closeButtonsAfterType[closeButtonsAfterType.length - 1]
+    );
+    expect(
+      screen.queryByTestId('view-operasional-detail-modal')
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tutup Modal' }));
+    expect(
+      screen.queryByTestId('view-operasional-modal')
+    ).not.toBeInTheDocument();
+
+    // Switching active company on header secondary tab loads that company's View Operasional data
+    fireEvent.click(screen.getByTestId('company-tab-2'));
+    fireEvent.click(screen.getByTestId('module-card-CFO'));
+    fireEvent.click(
+      screen.getByTestId('horizontal-menu-card-INPUT_OPERASIONAL')
+    );
+    fireEvent.click(
+      screen.getByTestId('horizontal-menu-card-VIEW_OPERASIONAL')
+    );
+
+    expect(
+      await screen.findByTestId('view-operasional-modal')
+    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId('view-operasional-category-10')
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByTestId('view-operasional-category-amount-12')
+      ).toHaveTextContent('9');
+      expect(
+        screen.getByTestId('view-operasional-type-amount-23')
+      ).toHaveTextContent('9');
     });
   });
 });

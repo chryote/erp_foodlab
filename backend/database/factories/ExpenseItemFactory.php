@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\CapitalCompany;
 use App\Models\Company;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseItem;
@@ -10,7 +9,7 @@ use App\Models\ExpenseType;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<CapitalCompany>
+ * @extends Factory<ExpenseItem>
  */
 class ExpenseItemFactory extends Factory
 {
@@ -21,7 +20,8 @@ class ExpenseItemFactory extends Factory
         return [
             'expense_category_id' => ExpenseCategory::factory(),
             'expense_type_id' => ExpenseType::factory(),
-            'name' => $this->faker->name(),
+            'company_id' => Company::factory(),
+            'name' => $this->faker->words(2, true),
             'amount' => $this->faker->randomFloat(2, 1000000, 1000000000),
         ];
     }

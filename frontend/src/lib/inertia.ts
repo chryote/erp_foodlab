@@ -380,20 +380,20 @@ export function useMasterOperasionalCrudResource(
   initialTypes?: ExpenseType[],
   initialItems?: ExpenseItem[]
 ) {
-  const [categories, setCategories] = useState<ExpenseCategory[]>(
+  const [allCategories, setAllCategories] = useState<ExpenseCategory[]>(
     initialCategories ?? []
   );
-  const [types, setTypes] = useState<ExpenseType[]>(initialTypes ?? []);
+  const [allTypes, setAllTypes] = useState<ExpenseType[]>(initialTypes ?? []);
   const [allItems, setAllItems] = useState<ExpenseItem[]>(initialItems ?? []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (initialCategories) setCategories(initialCategories);
+    if (initialCategories) setAllCategories(initialCategories);
   }, [initialCategories]);
 
   useEffect(() => {
-    if (initialTypes) setTypes(initialTypes);
+    if (initialTypes) setAllTypes(initialTypes);
   }, [initialTypes]);
 
   useEffect(() => {
@@ -416,8 +416,8 @@ export function useMasterOperasionalCrudResource(
         fetchExpenseTypes(),
         fetchExpenseItems(),
       ]);
-      setCategories(catRes?.data ?? []);
-      setTypes(typeRes?.data ?? []);
+      setAllCategories(catRes?.data ?? []);
+      setAllTypes(typeRes?.data ?? []);
       setAllItems(itemRes?.data ?? []);
     } catch (err) {
       setError(
@@ -436,6 +436,22 @@ export function useMasterOperasionalCrudResource(
     }
   }, [isOpen, loadData]);
 
+  const categories = useMemo<ExpenseCategory[]>(() => {
+    if (!company) {
+      return allCategories;
+    }
+    return allCategories.filter(
+      (category) => Number(category.company_id) === company.id
+    );
+  }, [allCategories, company]);
+
+  const types = useMemo<ExpenseType[]>(() => {
+    if (!company) {
+      return allTypes;
+    }
+    return allTypes.filter((type) => Number(type.company_id) === company.id);
+  }, [allTypes, company]);
+
   const items = useMemo<ExpenseItem[]>(() => {
     if (!company) {
       return allItems;
@@ -443,57 +459,65 @@ export function useMasterOperasionalCrudResource(
     return allItems.filter((item) => Number(item.company_id) === company.id);
   }, [allItems, company]);
 
-  const createCategory = useCallback(async (name: string) => {
-    if (isInertiaActive()) {
-      router.post(
-        '/cfo/expense-categories',
-        { name },
-        { preserveScroll: true }
-      );
-      return null;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await createExpenseCategory({ name });
-      setCategories((prev) => [res.data, ...prev]);
-      return res.data;
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Gagal menambahkan kategori.'
-      );
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const createCategory = useCallback(
+    async (name: string, companyId?: number) => {
+      const resolvedCompanyId = companyId ?? company?.id;
+      if (!resolvedCompanyId) return null;
+      const payload = { company_id: resolvedCompanyId, name };
+      if (isInertiaActive()) {
+        router.post('/cfo/expense-categories', payload, {
+          preserveScroll: true,
+        });
+        return null;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await createExpenseCategory(payload);
+        setAllCategories((prev) => [res.data, ...prev]);
+        return res.data;
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : 'Gagal menambahkan kategori.'
+        );
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [company]
+  );
 
-  const updateCategory = useCallback(async (id: number, name: string) => {
-    if (isInertiaActive()) {
-      router.put(
-        `/cfo/expense-categories/${id}`,
-        { name },
-        { preserveScroll: true }
-      );
-      return null;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await updateExpenseCategory(id, { name });
-      setCategories((prev) =>
-        prev.map((item) => (item.id === id ? res.data : item))
-      );
-      return res.data;
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Gagal memperbarui kategori.'
-      );
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const updateCategory = useCallback(
+    async (id: number, name: string, companyId?: number) => {
+      const resolvedCompanyId = companyId ?? company?.id;
+      if (!resolvedCompanyId) return null;
+      const payload = { company_id: resolvedCompanyId, name };
+      if (isInertiaActive()) {
+        router.put(`/cfo/expense-categories/${id}`, payload, {
+          preserveScroll: true,
+        });
+        return null;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await updateExpenseCategory(id, payload);
+        setAllCategories((prev) =>
+          prev.map((item) => (item.id === id ? res.data : item))
+        );
+        return res.data;
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : 'Gagal memperbarui kategori.'
+        );
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [company]
+  );
 
   const removeCategory = useCallback(async (id: number) => {
     if (isInertiaActive()) {
@@ -504,8 +528,8 @@ export function useMasterOperasionalCrudResource(
     setError(null);
     try {
       await deleteExpenseCategory(id);
-      setCategories((prev) => prev.filter((item) => item.id !== id));
-      setTypes((prev) =>
+      setAllCategories((prev) => prev.filter((item) => item.id !== id));
+      setAllTypes((prev) =>
         prev.filter((item) => Number(item.expense_category_id) !== id)
       );
       setAllItems((prev) =>
@@ -523,23 +547,23 @@ export function useMasterOperasionalCrudResource(
   }, []);
 
   const createType = useCallback(
-    async (expenseCategoryId: number, name: string) => {
+    async (expenseCategoryId: number, name: string, companyId?: number) => {
+      const resolvedCompanyId = companyId ?? company?.id;
+      if (!resolvedCompanyId) return null;
+      const payload = {
+        company_id: resolvedCompanyId,
+        expense_category_id: expenseCategoryId,
+        name,
+      };
       if (isInertiaActive()) {
-        router.post(
-          '/cfo/expense-types',
-          { expense_category_id: expenseCategoryId, name },
-          { preserveScroll: true }
-        );
+        router.post('/cfo/expense-types', payload, { preserveScroll: true });
         return null;
       }
       setLoading(true);
       setError(null);
       try {
-        const res = await createExpenseType({
-          expense_category_id: expenseCategoryId,
-          name,
-        });
-        setTypes((prev) => [res.data, ...prev]);
+        const res = await createExpenseType(payload);
+        setAllTypes((prev) => [res.data, ...prev]);
         return res.data;
       } catch (err) {
         setError(
@@ -550,27 +574,34 @@ export function useMasterOperasionalCrudResource(
         setLoading(false);
       }
     },
-    []
+    [company]
   );
 
   const updateType = useCallback(
-    async (id: number, expenseCategoryId: number, name: string) => {
+    async (
+      id: number,
+      expenseCategoryId: number,
+      name: string,
+      companyId?: number
+    ) => {
+      const resolvedCompanyId = companyId ?? company?.id;
+      if (!resolvedCompanyId) return null;
+      const payload = {
+        company_id: resolvedCompanyId,
+        expense_category_id: expenseCategoryId,
+        name,
+      };
       if (isInertiaActive()) {
-        router.put(
-          `/cfo/expense-types/${id}`,
-          { expense_category_id: expenseCategoryId, name },
-          { preserveScroll: true }
-        );
+        router.put(`/cfo/expense-types/${id}`, payload, {
+          preserveScroll: true,
+        });
         return null;
       }
       setLoading(true);
       setError(null);
       try {
-        const res = await updateExpenseType(id, {
-          expense_category_id: expenseCategoryId,
-          name,
-        });
-        setTypes((prev) =>
+        const res = await updateExpenseType(id, payload);
+        setAllTypes((prev) =>
           prev.map((item) => (item.id === id ? res.data : item))
         );
         return res.data;
@@ -583,7 +614,7 @@ export function useMasterOperasionalCrudResource(
         setLoading(false);
       }
     },
-    []
+    [company]
   );
 
   const removeType = useCallback(async (id: number) => {
@@ -595,7 +626,7 @@ export function useMasterOperasionalCrudResource(
     setError(null);
     try {
       await deleteExpenseType(id);
-      setTypes((prev) => prev.filter((item) => item.id !== id));
+      setAllTypes((prev) => prev.filter((item) => item.id !== id));
       setAllItems((prev) =>
         prev.filter((item) => Number(item.expense_type_id) !== id)
       );
@@ -609,15 +640,24 @@ export function useMasterOperasionalCrudResource(
   }, []);
 
   const createItem = useCallback(
-    async (expenseTypeId: number, name: string, amount: number) => {
-      if (!company) return null;
-      const matchedType = types.find((t) => t.id === expenseTypeId);
+    async (
+      expenseTypeId: number,
+      name: string,
+      amount: number,
+      expenseCategoryId?: number,
+      companyId?: number
+    ) => {
+      const resolvedCompanyId = companyId ?? company?.id;
+      if (!resolvedCompanyId) return null;
+      const matchedType = allTypes.find((t) => t.id === expenseTypeId);
+      const resolvedCategoryId =
+        expenseCategoryId ?? matchedType?.expense_category_id;
       const payload = {
-        ...(matchedType?.expense_category_id
-          ? { expense_category_id: matchedType.expense_category_id }
+        ...(resolvedCategoryId
+          ? { expense_category_id: resolvedCategoryId }
           : {}),
         expense_type_id: expenseTypeId,
-        company_id: company.id,
+        company_id: resolvedCompanyId,
         name,
         amount,
       };
@@ -640,19 +680,29 @@ export function useMasterOperasionalCrudResource(
         setLoading(false);
       }
     },
-    [company, types]
+    [company, allTypes]
   );
 
   const updateItem = useCallback(
-    async (id: number, expenseTypeId: number, name: string, amount: number) => {
-      if (!company) return null;
-      const matchedType = types.find((t) => t.id === expenseTypeId);
+    async (
+      id: number,
+      expenseTypeId: number,
+      name: string,
+      amount: number,
+      expenseCategoryId?: number,
+      companyId?: number
+    ) => {
+      const resolvedCompanyId = companyId ?? company?.id;
+      if (!resolvedCompanyId) return null;
+      const matchedType = allTypes.find((t) => t.id === expenseTypeId);
+      const resolvedCategoryId =
+        expenseCategoryId ?? matchedType?.expense_category_id;
       const payload = {
-        ...(matchedType?.expense_category_id
-          ? { expense_category_id: matchedType.expense_category_id }
+        ...(resolvedCategoryId
+          ? { expense_category_id: resolvedCategoryId }
           : {}),
         expense_type_id: expenseTypeId,
-        company_id: company.id,
+        company_id: resolvedCompanyId,
         name,
         amount,
       };
@@ -679,7 +729,7 @@ export function useMasterOperasionalCrudResource(
         setLoading(false);
       }
     },
-    [company, types]
+    [company, allTypes]
   );
 
   const removeItem = useCallback(async (id: number) => {
@@ -702,6 +752,9 @@ export function useMasterOperasionalCrudResource(
   }, []);
 
   return {
+    allCategories,
+    allTypes,
+    allItems,
     categories,
     types,
     items,
