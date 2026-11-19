@@ -1,0 +1,35 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('expense_types', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('expense_category_id')->constrained('expense_categories')->cascadeOnDelete();
+            $table->string('name', 150)->index();
+            $table->timestamps();
+            $table->softDeletes();
+
+            $table->index('expense_category_id');
+            $table->index('created_at');
+            $table->index('updated_at');
+            $table->index('deleted_at');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('expense_types');
+    }
+};
