@@ -1,16 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type {
-  Company,
-  ExpenseCategory,
-  ExpenseItem,
-  ExpenseType,
-} from '@/api/client';
+import type { Company, ExpenseCategory, ExpenseType } from '@/api/client';
 import { type CrudFieldConfig, CrudModal } from '@/components/ui';
-import { useMasterOperasionalCrudResource } from '@/lib/inertia';
+import { useMasterOperasionalCrudResource } from '@/lib/cfoResources';
 import { cn } from '@/lib/utils';
-import { formatCapitalIdr } from './CapitalCompanyCrudModal';
 
-export type MasterOperasionalTabKey = 'kategori' | 'tipe' | 'item';
+export type MasterOperasionalTabKey = 'kategori' | 'tipe';
 
 export const MASTER_OPERASIONAL_TABS: Array<{
   key: MasterOperasionalTabKey;
@@ -18,37 +12,24 @@ export const MASTER_OPERASIONAL_TABS: Array<{
 }> = [
   { key: 'kategori', label: 'Kategori' },
   { key: 'tipe', label: 'Tipe' },
-  { key: 'item', label: 'Item' },
 ];
 
 export interface MasterOperasionalCrudModalProps {
   isOpen: boolean;
   company: Company | null;
   companies?: Company[];
-  initialExpenseCategories?: ExpenseCategory[];
-  initialExpenseTypes?: ExpenseType[];
-  initialExpenseItems?: ExpenseItem[];
   onClose: () => void;
 }
 
 export const MasterOperasionalCrudModal: React.FC<
   MasterOperasionalCrudModalProps
-> = ({
-  isOpen,
-  company,
-  companies,
-  initialExpenseCategories,
-  initialExpenseTypes,
-  initialExpenseItems,
-  onClose,
-}) => {
+> = ({ isOpen, company, companies, onClose }) => {
   const [activeTab, setActiveTab] =
     useState<MasterOperasionalTabKey>('kategori');
 
   const {
     allCategories,
     allTypes,
-    allItems,
     loading,
     error,
     createCategory,
@@ -57,16 +38,7 @@ export const MasterOperasionalCrudModal: React.FC<
     createType,
     updateType,
     removeType,
-    createItem,
-    updateItem,
-    removeItem,
-  } = useMasterOperasionalCrudResource(
-    isOpen,
-    company,
-    initialExpenseCategories,
-    initialExpenseTypes,
-    initialExpenseItems
-  );
+  } = useMasterOperasionalCrudResource(isOpen, company);
 
   useEffect(() => {
     if (!isOpen) {
@@ -165,102 +137,6 @@ export const MasterOperasionalCrudModal: React.FC<
     [allCategories, companyOptions, defaultCompanyId, renderCompanyName]
   );
 
-  const itemFields = useMemo<CrudFieldConfig<ExpenseItem>[]>(
-    () => [
-      {
-        key: 'company_id',
-        label: 'Pilih Perusahaan',
-        type: 'select',
-        placeholder: 'Pilih perusahaan...',
-        defaultValue: defaultCompanyId,
-        options: companyOptions,
-        resetFieldsOnChange: ['expense_category_id', 'expense_type_id'],
-        renderValue: (row) => renderCompanyName(row.company_id, row.company),
-      },
-      {
-        key: 'expense_category_id',
-        label: 'Pilih Kategori',
-        type: 'select',
-        placeholder: 'Pilih kategori...',
-        disabled: (values) => !values.company_id,
-        options: (values) => {
-          const companyId = parseInt(values.company_id ?? '', 10);
-          if (!Number.isFinite(companyId)) {
-            return [];
-          }
-          return allCategories
-            .filter((cat) => Number(cat.company_id) === companyId)
-            .map((cat) => ({
-              value: String(cat.id),
-              label: cat.name,
-            }));
-        },
-        resetFieldsOnChange: ['expense_type_id'],
-        renderValue: (row) => {
-          const matchedType = allTypes.find(
-            (t) => t.id === Number(row.expense_type_id)
-          );
-          const catId = Number(
-            row.expense_category_id || matchedType?.expense_category_id
-          );
-          return (
-            allCategories.find((c) => c.id === catId)?.name ??
-            row.expense_category?.name ??
-            String(catId || '')
-          );
-        },
-      },
-      {
-        key: 'expense_type_id',
-        label: 'Pilih Tipe',
-        type: 'select',
-        placeholder: 'Pilih tipe...',
-        disabled: (values) => !values.expense_category_id,
-        options: (values) => {
-          const categoryId = parseInt(values.expense_category_id ?? '', 10);
-          if (!Number.isFinite(categoryId)) {
-            return [];
-          }
-          const companyId = parseInt(values.company_id ?? '', 10);
-          return allTypes
-            .filter(
-              (t) =>
-                Number(t.expense_category_id) === categoryId &&
-                (!Number.isFinite(companyId) ||
-                  Number(t.company_id) === companyId)
-            )
-            .map((t) => ({
-              value: String(t.id),
-              label: t.name,
-            }));
-        },
-        renderValue: (row) =>
-          allTypes.find((t) => t.id === Number(row.expense_type_id))?.name ??
-          row.expense_type?.name ??
-          String(row.expense_type_id),
-      },
-      {
-        key: 'name',
-        label: 'Nama Item',
-        placeholder: 'Contoh: Susu Segar',
-      },
-      {
-        key: 'amount',
-        label: 'Nominal',
-        type: 'decimal',
-        placeholder: 'Contoh: 1.500.000',
-        renderValue: (row) => formatCapitalIdr(Number(row.amount)),
-      },
-    ],
-    [
-      allCategories,
-      allTypes,
-      companyOptions,
-      defaultCompanyId,
-      renderCompanyName,
-    ]
-  );
-
   const tabsBar = (
     <div
       role="tablist"
@@ -293,7 +169,7 @@ export const MasterOperasionalCrudModal: React.FC<
   );
 
   const modalTitle = 'Master Operasional';
-  const modalSubtitle = 'Kelola kategori, tipe, dan item operasional perusahaan';
+  const modalSubtitle = 'Kelola kategori dan tipe operasional perusahaan';
 
   if (activeTab === 'tipe') {
     return (
@@ -329,61 +205,6 @@ export const MasterOperasionalCrudModal: React.FC<
         }}
         onDelete={async (id) => {
           await removeType(id);
-        }}
-      />
-    );
-  }
-
-  if (activeTab === 'item') {
-    return (
-      <CrudModal
-        resetKey={`item-${company?.id ?? 0}`}
-        isOpen={isOpen}
-        title={modalTitle}
-        subtitle={modalSubtitle}
-        testId="master-operasional-crud-modal"
-        tabs={tabsBar}
-        fields={itemFields}
-        emptyMessage="Belum ada data item operasional."
-        pageSize={5}
-        items={allItems}
-        loading={loading}
-        error={error}
-        onClose={onClose}
-        onCreate={async (values) => {
-          const companyId = parseInt(values.company_id ?? '', 10);
-          const categoryId = parseInt(values.expense_category_id ?? '', 10);
-          const typeId = parseInt(values.expense_type_id ?? '', 10);
-          const name = (values.name ?? '').trim();
-          const amount = parseFloat(values.amount ?? '');
-          if (
-            Number.isFinite(companyId) &&
-            Number.isFinite(categoryId) &&
-            Number.isFinite(typeId) &&
-            name &&
-            Number.isFinite(amount)
-          ) {
-            await createItem(typeId, name, amount, categoryId, companyId);
-          }
-        }}
-        onUpdate={async (id, values) => {
-          const companyId = parseInt(values.company_id ?? '', 10);
-          const categoryId = parseInt(values.expense_category_id ?? '', 10);
-          const typeId = parseInt(values.expense_type_id ?? '', 10);
-          const name = (values.name ?? '').trim();
-          const amount = parseFloat(values.amount ?? '');
-          if (
-            Number.isFinite(companyId) &&
-            Number.isFinite(categoryId) &&
-            Number.isFinite(typeId) &&
-            name &&
-            Number.isFinite(amount)
-          ) {
-            await updateItem(id, typeId, name, amount, categoryId, companyId);
-          }
-        }}
-        onDelete={async (id) => {
-          await removeItem(id);
         }}
       />
     );

@@ -14,6 +14,7 @@ export const CFO_INPUT_MODAL_ITEMS: HorizontalMenuItem[] = [
 export const CFO_INPUT_OPERASIONAL_ITEMS: HorizontalMenuItem[] = [
   { code: 'MASTER_OPERASIONAL', title: 'Master Operasional' },
   { code: 'VIEW_OPERASIONAL', title: 'View Operasional' },
+  { code: 'ITEM_OPERASIONAL', title: 'Item Operasional' },
 ];
 
 export const CFO_MENU_ITEMS: HorizontalMenuItem[] = [

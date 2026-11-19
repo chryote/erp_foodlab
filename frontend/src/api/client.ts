@@ -155,6 +155,10 @@ export interface ExpenseItem {
   company_id: number;
   name: string;
   amount: number;
+  purchased_on?: string | null;
+  closing_date?: string | null;
+  employee_id?: number | null;
+  detail?: string | null;
   expense_category?: ExpenseCategory | null;
   expense_type?: ExpenseType | null;
   company?: Company | null;
@@ -441,13 +445,21 @@ export async function fetchExpenseItems(): Promise<ExpenseItemsListResponse> {
   );
 }
 
-export async function createExpenseItem(payload: {
+export interface ExpenseItemPayload {
   expense_category_id?: number;
   expense_type_id: number;
   company_id: number;
   name: string;
   amount: number;
-}): Promise<{ data: ExpenseItem }> {
+  purchased_on: string;
+  closing_date?: string | null;
+  employee_id?: number | null;
+  detail?: string | null;
+}
+
+export async function createExpenseItem(
+  payload: ExpenseItemPayload
+): Promise<{ data: ExpenseItem }> {
   return requestJson<{ data: ExpenseItem }>(
     '/v1/modules/cfo/expense-items',
     {
@@ -461,13 +473,7 @@ export async function createExpenseItem(payload: {
 
 export async function updateExpenseItem(
   id: number,
-  payload: {
-    expense_category_id?: number;
-    expense_type_id: number;
-    company_id: number;
-    name: string;
-    amount: number;
-  }
+  payload: ExpenseItemPayload
 ): Promise<{ data: ExpenseItem }> {
   return requestJson<{ data: ExpenseItem }>(
     `/v1/modules/cfo/expense-items/${id}`,

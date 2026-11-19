@@ -76,6 +76,7 @@ class ExpenseItemService
             $term = '%' . trim($search) . '%';
             $query->where(function ($q) use ($term) {
                 $q->where('name', 'like', $term)
+                    ->orWhere('detail', 'like', $term)
                     ->orWhereHas('expenseCategory', function ($expenseCategoryQuery) use ($term) {
                         $expenseCategoryQuery->where('name', 'like', $term);
                     })

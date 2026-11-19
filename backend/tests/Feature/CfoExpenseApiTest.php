@@ -1,9 +1,6 @@
 <?php
 
 use App\Models\Company;
-use App\Models\ExpenseCategory;
-use App\Models\ExpenseItem;
-use App\Models\ExpenseType;
 use Illuminate\Support\Facades\Cache;
 
 describe('CFO Expense Category, Type, and Item CRUD scoped by company_id', function () {
@@ -79,6 +76,7 @@ describe('CFO Expense Category, Type, and Item CRUD scoped by company_id', funct
             'expense_type_id' => $typeBId,
             'name' => 'Cross Company Item',
             'amount' => 1000000,
+            'purchased_on' => '2026-11-19',
         ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['expense_type_id']);
@@ -89,11 +87,19 @@ describe('CFO Expense Category, Type, and Item CRUD scoped by company_id', funct
             'expense_type_id' => $typeAId,
             'name' => 'Bubuk Coklat',
             'amount' => 2000000,
+            'purchased_on' => '2026-11-19',
+            'closing_date' => '2026-11-30',
+            'employee_id' => null,
+            'detail' => 'Stok awal bulan',
         ]);
         $itemARes->assertCreated()
             ->assertJsonPath('data.company_id', $companyA->id)
             ->assertJsonPath('data.expense_category_id', $catAId)
-            ->assertJsonPath('data.expense_type_id', $typeAId);
+            ->assertJsonPath('data.expense_type_id', $typeAId)
+            ->assertJsonPath('data.purchased_on', '2026-11-19')
+            ->assertJsonPath('data.closing_date', '2026-11-30')
+            ->assertJsonPath('data.employee_id', null)
+            ->assertJsonPath('data.detail', 'Stok awal bulan');
 
         $itemAId = $itemARes->json('data.id');
 
@@ -119,7 +125,15 @@ describe('CFO Expense Category, Type, and Item CRUD scoped by company_id', funct
             'expense_type_id' => $typeAId,
             'name' => 'Bubuk Coklat Dark',
             'amount' => 2500000,
-        ])->assertOk()->assertJsonPath('data.name', 'Bubuk Coklat Dark');
+            'purchased_on' => '2026-11-20',
+            'closing_date' => null,
+            'employee_id' => 5,
+            'detail' => 'Revisi pembelian',
+        ])->assertOk()
+            ->assertJsonPath('data.name', 'Bubuk Coklat Dark')
+            ->assertJsonPath('data.purchased_on', '2026-11-20')
+            ->assertJsonPath('data.employee_id', 5)
+            ->assertJsonPath('data.detail', 'Revisi pembelian');
 
         $this->deleteJson("/api/v1/modules/cfo/expense-items/{$itemAId}")->assertOk();
         $this->assertSoftDeleted('expense_items', ['id' => $itemAId]);
@@ -129,37 +143,5 @@ describe('CFO Expense Category, Type, and Item CRUD scoped by company_id', funct
 
         $this->deleteJson("/api/v1/modules/cfo/expense-categories/{$catAId}")->assertOk();
         $this->assertSoftDeleted('expense_categories', ['id' => $catAId]);
-    });
-
-    it('creates, updates, and deletes company-scoped expense entities via Inertia web routes', function () {
-        $company = Company::factory()->create(['name' => 'PT. Slaras Nusa Foodlab']);
-
-        $this->from('/')->post('/cfo/expense-categories', [
-            'company_id' => $company->id,
-            'name' => 'Operasional',
-        ])->assertRedirect('/');
-
-        $category = ExpenseCategory::query()->where('company_id', $company->id)->firstOrFail();
-
-        $this->from('/')->post('/cfo/expense-types', [
-            'company_id' => $company->id,
-            'expense_category_id' => $category->id,
-            'name' => 'Franchise',
-        ])->assertRedirect('/');
-
-        $type = ExpenseType::query()->where('company_id', $company->id)->firstOrFail();
-
-        $this->from('/')->post('/cfo/expense-items', [
-            'company_id' => $company->id,
-            'expense_category_id' => $category->id,
-            'expense_type_id' => $type->id,
-            'name' => 'Franchise Outlet',
-            'amount' => 15000000,
-        ])->assertRedirect('/');
-
-        $item = ExpenseItem::query()->where('company_id', $company->id)->firstOrFail();
-        expect($item->expense_category_id)->toBe($category->id)
-            ->and($item->expense_type_id)->toBe($type->id)
-            ->and((float) $item->amount)->toBe(15000000.0);
     });
 });

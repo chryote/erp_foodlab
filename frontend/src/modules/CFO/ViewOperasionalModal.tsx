@@ -11,7 +11,7 @@ import {
   Modal,
   SummaryBanner,
 } from '@/components/ui';
-import { useMasterOperasionalCrudResource } from '@/lib/inertia';
+import { useMasterOperasionalCrudResource } from '@/lib/cfoResources';
 import { formatCapitalIdr } from './CapitalCompanyCrudModal';
 
 export function formatOperasionalNumber(amount: number): string {
@@ -38,11 +38,18 @@ export function formatCurrentMonthDateRange(
 }
 
 function isInMonth(
-  dateValue: string | undefined,
+  dateValue: string | null | undefined,
   referenceDate: Date
 ): boolean {
   if (!dateValue) {
     return true;
+  }
+  const ymdMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateValue.trim());
+  if (ymdMatch && !dateValue.includes('T')) {
+    return (
+      Number(ymdMatch[1]) === referenceDate.getFullYear() &&
+      Number(ymdMatch[2]) - 1 === referenceDate.getMonth()
+    );
   }
   const parsed = new Date(dateValue);
   if (Number.isNaN(parsed.getTime())) {
@@ -73,9 +80,6 @@ type SelectedOperasionalDetail =
 export interface ViewOperasionalModalProps {
   isOpen: boolean;
   company: Company | null;
-  initialExpenseCategories?: ExpenseCategory[];
-  initialExpenseTypes?: ExpenseType[];
-  initialExpenseItems?: ExpenseItem[];
   referenceDate?: Date;
   onClose: () => void;
 }
@@ -83,20 +87,11 @@ export interface ViewOperasionalModalProps {
 export const ViewOperasionalModal: React.FC<ViewOperasionalModalProps> = ({
   isOpen,
   company,
-  initialExpenseCategories,
-  initialExpenseTypes,
-  initialExpenseItems,
   referenceDate,
   onClose,
 }) => {
   const { categories, types, items, loading, error } =
-    useMasterOperasionalCrudResource(
-      isOpen,
-      company,
-      initialExpenseCategories,
-      initialExpenseTypes,
-      initialExpenseItems
-    );
+    useMasterOperasionalCrudResource(isOpen, company);
 
   const [selectedDetail, setSelectedDetail] =
     useState<SelectedOperasionalDetail | null>(null);
@@ -122,7 +117,10 @@ export const ViewOperasionalModal: React.FC<ViewOperasionalModalProps> = ({
   );
 
   const currentMonthItems = useMemo(
-    () => items.filter((item) => isInMonth(item.created_at, effectiveDate)),
+    () =>
+      items.filter((item) =>
+        isInMonth(item.purchased_on || item.created_at, effectiveDate)
+      ),
     [items, effectiveDate]
   );
 
@@ -193,6 +191,11 @@ export const ViewOperasionalModal: React.FC<ViewOperasionalModalProps> = ({
   const detailFields = useMemo<CrudFieldConfig<ExpenseItem>[]>(
     () => [
       {
+        key: 'purchased_on',
+        label: 'Tanggal Transaksi',
+        renderValue: (row) => row.purchased_on ?? '-',
+      },
+      {
         key: 'expense_type_id',
         label: 'Tipe',
         renderValue: (row) =>
@@ -203,6 +206,11 @@ export const ViewOperasionalModal: React.FC<ViewOperasionalModalProps> = ({
       {
         key: 'name',
         label: 'Nama Item',
+      },
+      {
+        key: 'detail',
+        label: 'Keterangan',
+        renderValue: (row) => (row.detail ? row.detail : '-'),
       },
       {
         key: 'amount',

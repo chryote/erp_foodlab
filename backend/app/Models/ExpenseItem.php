@@ -19,6 +19,10 @@ class ExpenseItem extends Model
         'company_id',
         'name',
         'amount',
+        'purchased_on',
+        'closing_date',
+        'employee_id',
+        'detail',
     ];
 
     protected $casts = [
@@ -26,6 +30,9 @@ class ExpenseItem extends Model
         'expense_type_id' => 'integer',
         'company_id' => 'integer',
         'amount' => 'float',
+        'purchased_on' => 'date:Y-m-d',
+        'closing_date' => 'date:Y-m-d',
+        'employee_id' => 'integer',
     ];
 
     public function expenseCategory(): BelongsTo
