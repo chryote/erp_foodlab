@@ -97,6 +97,34 @@ export const TextInput: React.FC<TextInputProps> = ({
   );
 };
 
+export interface TextareaInputProps
+  extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  label?: string;
+}
+
+export const TextareaInput: React.FC<TextareaInputProps> = ({
+  label,
+  id,
+  className,
+  rows = 2,
+  ...rest
+}) => {
+  return (
+    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+      {label && <ShadcnLabel htmlFor={id}>{label}</ShadcnLabel>}
+      <textarea
+        id={id}
+        rows={rows}
+        className={cn(
+          'flex min-h-[60px] w-full resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60',
+          className
+        )}
+        {...rest}
+      />
+    </div>
+  );
+};
+
 export interface DecimalInputProps
   extends Omit<
     React.InputHTMLAttributes<HTMLInputElement>,
@@ -347,8 +375,11 @@ export interface CrudFieldConfig<T> {
   label: string;
   placeholder?: string;
   defaultValue?: string;
-  type?: 'text' | 'number' | 'decimal' | 'select' | 'date';
+  type?: 'text' | 'number' | 'decimal' | 'select' | 'date' | 'textarea';
+  rows?: number;
+  pickerOnly?: boolean;
   optional?: boolean;
+  hideInTable?: boolean;
   step?: string | number;
   min?: string | number;
   options?:
@@ -619,7 +650,9 @@ export function CrudModal<T extends CrudEntity>({
         <code>{(safeCurrentPage - 1) * pageSize + index + 1}</code>
       ),
     },
-    ...resolvedFields.map((field) => ({
+    ...resolvedFields
+      .filter((field) => !field.hideInTable)
+      .map((field) => ({
       key: field.key,
       header: field.label,
       render: (row: T) => {
@@ -736,7 +769,7 @@ export function CrudModal<T extends CrudEntity>({
             data-testid={`${testId}-form`}
             className={
               isMultiRowForm
-                ? 'grid grid-cols-1 items-end gap-3 border-b border-border pb-4 sm:grid-cols-2 md:grid-cols-4'
+                ? 'grid grid-cols-1 items-start gap-3 border-b border-border pb-4 sm:grid-cols-2 md:grid-cols-4'
                 : 'flex flex-wrap items-end gap-2.5 border-b border-border pb-4'
             }
           >
@@ -775,6 +808,21 @@ export function CrudModal<T extends CrudEntity>({
                   />
                 );
               }
+              if (field.type === 'textarea') {
+                return (
+                  <TextareaInput
+                    key={field.key}
+                    id={`${testId}-${field.key}-input`}
+                    label={field.label}
+                    placeholder={field.placeholder}
+                    rows={field.rows ?? 2}
+                    value={formValues[field.key] ?? ''}
+                    onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                  />
+                );
+              }
+              const isPickerOnlyDate =
+                field.type === 'date' && field.pickerOnly;
               return (
                 <TextInput
                   key={field.key}
@@ -784,7 +832,43 @@ export function CrudModal<T extends CrudEntity>({
                   min={field.min}
                   label={field.label}
                   placeholder={field.placeholder}
+                  className={
+                    isPickerOnlyDate
+                      ? 'cursor-pointer select-none caret-transparent'
+                      : undefined
+                  }
                   value={formValues[field.key] ?? ''}
+                  onKeyDown={
+                    isPickerOnlyDate
+                      ? (e) => {
+                          if (e.key !== 'Tab' && e.key !== 'Escape') {
+                            e.preventDefault();
+                          }
+                        }
+                      : undefined
+                  }
+                  onPaste={
+                    isPickerOnlyDate ? (e) => e.preventDefault() : undefined
+                  }
+                  onDrop={
+                    isPickerOnlyDate ? (e) => e.preventDefault() : undefined
+                  }
+                  onClick={
+                    isPickerOnlyDate
+                      ? (e) => {
+                          const input = e.currentTarget as HTMLInputElement & {
+                            showPicker?: () => void;
+                          };
+                          if (typeof input.showPicker === 'function') {
+                            try {
+                              input.showPicker();
+                            } catch {
+                              // Ignore if browser restricts programmatic picker opening
+                            }
+                          }
+                        }
+                      : undefined
+                  }
                   onChange={(e) => handleFieldChange(field.key, e.target.value)}
                 />
               );
@@ -792,7 +876,7 @@ export function CrudModal<T extends CrudEntity>({
             <div
               className={
                 isMultiRowForm
-                  ? 'flex items-center justify-end gap-2 md:justify-start'
+                  ? 'flex items-center justify-end gap-2 sm:pt-[20px] md:justify-start'
                   : 'flex items-center gap-2'
               }
             >

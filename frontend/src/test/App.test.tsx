@@ -771,7 +771,10 @@ describe('App ERP Main Menu integration', () => {
     expect(itemModal).toHaveClass('max-w-5xl');
     expect(
       screen.getByTestId('expense-item-crud-modal-form')
-    ).toHaveClass('grid', 'md:grid-cols-4');
+    ).toHaveClass('grid', 'items-start', 'md:grid-cols-4');
+    expect(
+      screen.queryByRole('columnheader', { name: 'Pilih Perusahaan' })
+    ).not.toBeInTheDocument();
     expect(screen.getByText('Susu Segar')).toBeInTheDocument();
     expect(screen.getByText('Krim Kental')).toBeInTheDocument();
     expect(screen.getByText('Stok susu pagi')).toBeInTheDocument();
@@ -790,6 +793,8 @@ describe('App ERP Main Menu integration', () => {
     ) as HTMLInputElement;
     expect(itemCompanySelect.value).toBe('1');
     expect(itemDateInput.type).toBe('date');
+    expect(fireEvent.keyDown(itemDateInput, { key: '1' })).toBe(false);
+    expect(fireEvent.keyDown(itemDateInput, { key: 'Tab' })).toBe(true);
     expect(itemTypeSelect).toBeDisabled();
 
     // Switching company updates category options and clears category & type
@@ -840,7 +845,9 @@ describe('App ERP Main Menu integration', () => {
     fireEvent.change(screen.getByLabelText('Nominal'), {
       target: { value: '3250000' },
     });
-    fireEvent.change(screen.getByLabelText('Keterangan'), {
+    const detailInput = screen.getByLabelText('Keterangan');
+    expect(detailInput.tagName).toBe('TEXTAREA');
+    fireEvent.change(detailInput, {
       target: { value: 'Pembelian bahan pizza' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));

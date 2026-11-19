@@ -63,6 +63,7 @@ export const ExpenseItemCrudModal: React.FC<ExpenseItemCrudModalProps> = ({
         type: 'select',
         placeholder: 'Pilih perusahaan...',
         defaultValue: defaultCompanyId,
+        hideInTable: true,
         options: companyOptions,
         resetFieldsOnChange: ['expense_category_id', 'expense_type_id'],
         renderValue: (row) =>
@@ -137,6 +138,7 @@ export const ExpenseItemCrudModal: React.FC<ExpenseItemCrudModalProps> = ({
         key: 'purchased_on',
         label: 'Tanggal Transaksi',
         type: 'date',
+        pickerOnly: true,
         defaultValue: todayDate,
         renderValue: (row) => row.purchased_on ?? '-',
       },
@@ -155,6 +157,8 @@ export const ExpenseItemCrudModal: React.FC<ExpenseItemCrudModalProps> = ({
       {
         key: 'detail',
         label: 'Keterangan',
+        type: 'textarea',
+        rows: 2,
         placeholder: 'Contoh: Pembelian bahan baku mingguan',
         optional: true,
         renderValue: (row) => (row.detail ? row.detail : '-'),
