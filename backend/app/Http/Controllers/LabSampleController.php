@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreLabSampleRequest;
 use App\Http\Resources\LabSampleResource;
 use App\Models\LabSample;
 use App\Services\LabSampleService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 class LabSampleController extends Controller
 {
@@ -27,21 +27,9 @@ class LabSampleController extends Controller
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreLabSampleRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'batch_code' => ['required', 'string', 'max:64', 'unique:lab_samples,batch_code'],
-            'product_name' => ['required', 'string', 'max:150'],
-            'category' => ['required', 'string', 'max:80'],
-            'ph_level' => ['required', 'numeric', 'between:0,14'],
-            'moisture_percent' => ['required', 'numeric', 'between:0,100'],
-            'status' => ['sometimes', 'string', 'in:pending,approved,rejected'],
-        ]);
-
-        $sample = $this->labSampleService->createSample([
-            ...$validated,
-            'status' => $validated['status'] ?? 'pending',
-        ]);
+        $sample = $this->labSampleService->createSample($request->validated());
 
         return (new LabSampleResource($sample))
             ->additional([

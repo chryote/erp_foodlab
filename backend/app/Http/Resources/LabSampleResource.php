@@ -22,9 +22,10 @@ class LabSampleResource extends JsonResource
             'category' => $this->category,
             'ph_level' => (float) $this->ph_level,
             'moisture_percent' => (float) $this->moisture_percent,
-            'status' => $this->status,
+            'status' => $this->status instanceof \BackedEnum ? $this->status->value : $this->status,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
+            'deleted_at' => $this->deleted_at?->toISOString(),
         ];
     }
 }

@@ -1,24 +1,32 @@
 # Agentic Development Rules (Low-Token Architecture)
 
-This repository uses **Laravel 11 REST API + React 18 (`@tanstack/react-query`) + Tailwind CSS v4 + `shadcn/ui`**. Follow these rules to keep context reads (input tokens) and generated code (output tokens) minimal:
+Laravel 11 REST API (`/api/v1/*`) + React 18 (`@tanstack/react-query`) + Tailwind CSS v4 + `shadcn/ui`.
 
-## 1. Do Not Read or Regenerate Locked `shadcn/ui` Primitives
-- Raw `shadcn/ui` primitives live in `frontend/src/components/ui/shadcn/*` (`ShadcnButton`, `ShadcnBadge`, `ShadcnCard`, `Dialog`, `ShadcnInput`, `ShadcnLabel`, `ShadcnTable`).
-- **Never read or rewrite files in `frontend/src/components/ui/shadcn/`** unless explicitly asked to modify a base primitive.
-- To add a new `shadcn/ui` primitive, run `npx shadcn@latest add <component>` inside `frontend/`.
+## Backend Rules (Laravel ERP)
+1. **Flat 4-File Entity Pattern (No Repositories/DTOs/CQRS):**
+   - Per entity: `Model` (`app/Models/`), `FormRequest` (`app/Modules/<MOD>/Requests/` or `app/Http/Requests/`), `JsonResource` (`app/Http/Resources/`), `Service` (`app/Modules/<MOD>/Services/`), plus a thin `Controller`.
+   - Extract an `Action` class only for complex multi-step workflows (e.g., `ApprovePurchaseOrderAction`).
+   - **Golden Module reference:** `ExpenseItem` (`ExpenseItem.php`, `SaveExpenseItemRequest.php`, `ExpenseItemResource.php`, `ExpenseItemService.php`, `ExpenseItemController.php`, `ExpenseItemTest.php`).
+2. **One Schema Source:**
+   - Read `backend/database/schema/mysql-schema.sql` when present instead of scanning `backend/database/migrations/`.
+   - Run `make schema-dump` (`docker compose exec app php artisan schema:dump`) after migration changes.
+3. **PHP Enums for Every Status:**
+   - Store backed string enums in `backend/app/Enums/` (e.g., `LabSampleStatus`), cast on the Eloquent Model, and validate with `Rule::enum(...)` in `FormRequest`. Never use raw status strings or magic integers.
+4. **Standardized Filtering & Auto API Docs:**
+   - Use `spatie/laravel-query-builder` (`allowedFilters`, `allowedSorts`, `allowedIncludes`) in `Service::list()`.
+   - `dedoc/scramble` auto-generates OpenAPI docs at `/docs/api` and `/docs/api.json` from `FormRequest` + `JsonResource`.
+5. **3 Non-Negotiable ERP Safety Rules:**
+   - Wrap all multi-table or state-changing writes in `DB::transaction(...)`.
+   - Use `->lockForUpdate()` inside transactions when modifying inventory quantities, stock, or account balances.
+   - Never hard-delete financial/operational records: always use `SoftDeletes` and/or a void/cancelled enum status.
+6. **Feature Tests Over Manual Testing:**
+   - Write one Pest Feature Test per module/entity covering `GET` (filters/sorts/includes), `POST`, `PUT`, `DELETE` (`assertSoftDeleted`), validation `422`, and `JsonResource` structure.
+   - Verify with `php artisan test --filter=<Name>Test` (or `make test-filter FILTER=<Name>Test`).
+7. **Spec-Driven Workflow:**
+   - Implement new features from a concise 15-line spec (see `docs/SPEC_TEMPLATE.md`) in a fresh chat.
 
-## 2. Prefer Declarative ERP Composite Components Over Raw JSX
-- Import high-level reusable ERP components from `@/components/ui`:
-  - `CrudModal`, `ConfirmDialog`, `CrudFieldConfig`, `CrudComputedColumnConfig`, `CrudRowActionConfig`, `SummaryBanner`
-  - `DataTable`, `Pagination`, `TableFilterBar`
-  - `PageHeader`, `Card`, `CardHeader`, `Badge`, `Button`
-  - `ModuleLauncherCard`, `HorizontalMenu`, `CascadingHorizontalMenu`
-- Define new ERP CRUD screens using a declarative `CrudFieldConfig<T>[]` array + `<CrudModal />` (~30–50 lines) instead of hand-writing `<Dialog>`, `<Form>`, and `<Table>` JSX.
-
-## 3. Use REST API Client (`@/api/client`) & TanStack Query Hooks (`@/lib/cfoResources`)
-- Laravel REST API routes (`backend/routes/api.php` -> `backend/app/Modules/*/routes.php`) serve `/api/v1/*` JSON endpoints.
-- On the frontend (`frontend/src/App.tsx` + `frontend/src/lib/cfoResources.ts`), use `@tanstack/react-query` (`useQuery`, `useMutation`, `queryClient.invalidateQueries`) backed by `@/api/client` rather than writing manual `useState` / `useEffect` / `try-catch` fetch boilerplate in feature modals.
-
-## 4. Mandatory Confirmation Dialog for All User-Triggered CRUD Actions
-- All CRUD actions clicked by the user (Create / `Tambah`, Update / `Perbarui`, Delete / `Hapus`) **must** display a confirmation dialog (`ConfirmDialog`) and wait for explicit user confirmation before executing the mutation.
-- `<CrudModal />` enforces this confirmation dialog automatically for `onCreate`, `onUpdate`, and `onDelete` actions. Any custom CRUD mutation outside `<CrudModal />` must wrap its trigger with `<ConfirmDialog />` from `@/components/ui`.
+## Frontend Rules (React + shadcn/ui)
+1. **Locked `shadcn/ui` Primitives:** Never read or rewrite `frontend/src/components/ui/shadcn/*` unless explicitly asked. Add primitives via `npx shadcn@latest add <component>` inside `frontend/`.
+2. **Declarative ERP Composites (`@/components/ui`):** Prefer `CrudModal`, `ConfirmDialog`, `CrudFieldConfig`, `DataTable`, `Pagination`, `TableFilterBar`, `PageHeader`, `Card`, `Badge`, `Button`, `ModuleLauncherCard`, `HorizontalMenu`, `CascadingHorizontalMenu` (~30–50 lines per CRUD screen).
+3. **API & Queries:** Use `@/api/client` + `@tanstack/react-query` hooks (`@/lib/cfoResources`) rather than manual `useState`/`useEffect` fetch boilerplate.
+4. **Mandatory Confirmation:** All user-triggered CRUD actions (`Tambah`, `Perbarui`, `Hapus`) must confirm via `<ConfirmDialog />` (built into `<CrudModal />`) before mutating.

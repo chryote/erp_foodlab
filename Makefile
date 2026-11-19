@@ -1,4 +1,4 @@
-.PHONY: help setup up down restart ps logs test test-backend test-frontend k6-smoke k6-load k6-stress migrate seed
+.PHONY: help setup up down restart ps logs test test-backend test-filter test-frontend k6-smoke k6-load k6-stress migrate schema-dump seed
 
 help: ## Show available Make targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -28,6 +28,9 @@ logs: ## Follow container logs
 migrate: ## Run Laravel database migrations
 	docker compose exec app php artisan migrate
 
+schema-dump: ## Dump MySQL schema into database/schema/mysql-schema.sql
+	docker compose exec app php artisan schema:dump
+
 seed: ## Seed Laravel database with sample FoodLab data
 	docker compose exec app php artisan db:seed
 
@@ -35,6 +38,9 @@ test: test-backend test-frontend ## Run both Backend (Pest) and Frontend (Vitest
 
 test-backend: ## Run Laravel Pest PHP unit & feature tests
 	docker compose exec app ./vendor/bin/pest
+
+test-filter: ## Run filtered Pest tests (usage: make test-filter FILTER=ExpenseItemTest)
+	docker compose exec app php artisan test --filter=$(FILTER)
 
 test-frontend: ## Run React Vitest unit tests
 	docker compose exec frontend npm run test:run

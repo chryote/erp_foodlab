@@ -5,10 +5,11 @@ namespace App\Modules\CFO\Controllers;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ExpenseItemResource;
 use App\Models\ExpenseItem;
+use App\Modules\CFO\Requests\SaveExpenseItemRequest;
 use App\Modules\CFO\Services\ExpenseItemService;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class ExpenseItemController extends Controller
 {
@@ -18,92 +19,38 @@ class ExpenseItemController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $search = $request->query('search');
-        $expenseCategoryId = $request->query('expense_category_id');
-        $expenseTypeId = $request->query('expense_type_id');
-        $companyId = $request->query('company_id');
-        $perPage = $request->query('per_page');
-        $page = $request->query('page');
+        $result = $this->expenseItemService->list($request);
 
-        if ($search !== null || $perPage !== null || $page !== null) {
-            $paginator = $this->expenseItemService->paginateExpenseItems(
-                is_string($search) ? $search : null,
-                max(1, (int) ($perPage ?? 10)),
-                max(1, (int) ($page ?? 1)),
-                $expenseCategoryId !== null ? (int) $expenseCategoryId : null,
-                $expenseTypeId !== null ? (int) $expenseTypeId : null,
-                $companyId !== null ? (int) $companyId : null
-            );
-
+        if ($result instanceof LengthAwarePaginator) {
             return response()->json([
-                'data' => ExpenseItemResource::collection($paginator->items()),
+                'data' => ExpenseItemResource::collection($result->items()),
                 'meta' => [
-                    'count' => count($paginator->items()),
-                    'total' => $paginator->total(),
-                    'page' => $paginator->currentPage(),
-                    'per_page' => $paginator->perPage(),
-                    'last_page' => $paginator->lastPage(),
+                    'count' => count($result->items()),
+                    'total' => $result->total(),
+                    'page' => $result->currentPage(),
+                    'per_page' => $result->perPage(),
+                    'last_page' => $result->lastPage(),
                     'cache_key' => ExpenseItemService::CACHE_KEY_LIST,
                 ],
             ]);
         }
 
-        $expenseItems = $this->expenseItemService->listFilteredExpenseItems(
-            $expenseCategoryId !== null ? (int) $expenseCategoryId : null,
-            $expenseTypeId !== null ? (int) $expenseTypeId : null,
-            $companyId !== null ? (int) $companyId : null
-        );
-
         return response()->json([
-            'data' => ExpenseItemResource::collection($expenseItems),
+            'data' => ExpenseItemResource::collection($result),
             'meta' => [
-                'count' => $expenseItems->count(),
-                'total' => $expenseItems->count(),
+                'count' => $result->count(),
+                'total' => $result->count(),
                 'page' => 1,
-                'per_page' => max(1, $expenseItems->count()),
+                'per_page' => max(1, $result->count()),
                 'last_page' => 1,
                 'cache_key' => ExpenseItemService::CACHE_KEY_LIST,
             ],
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(SaveExpenseItemRequest $request): JsonResponse
     {
-        $companyId = (int) $request->input('company_id');
-
-        $validated = $request->validate([
-            'company_id' => [
-                'required',
-                'integer',
-                Rule::exists('companies', 'id')->whereNull('deleted_at'),
-            ],
-            'expense_category_id' => [
-                'sometimes',
-                'nullable',
-                'integer',
-                Rule::exists('expense_categories', 'id')
-                    ->whereNull('deleted_at')
-                    ->where('company_id', $companyId),
-            ],
-            'expense_type_id' => [
-                'required',
-                'integer',
-                Rule::exists('expense_types', 'id')
-                    ->whereNull('deleted_at')
-                    ->where('company_id', $companyId),
-            ],
-            'name' => ['required', 'string', 'max:150'],
-            'amount' => ['required', 'numeric', 'min:0'],
-            'purchased_on' => ['required', 'date_format:Y-m-d'],
-            'closing_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
-            'employee_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
-            'detail' => ['sometimes', 'nullable', 'string', 'max:500'],
-        ]);
-
-        $validated['name'] = (string) $validated['name'];
-        $validated['amount'] = (float) $validated['amount'];
-
-        $expenseItem = $this->expenseItemService->createExpenseItem($validated);
+        $expenseItem = $this->expenseItemService->createExpenseItem($request->payload());
 
         return (new ExpenseItemResource($expenseItem))
             ->response()
@@ -117,43 +64,9 @@ class ExpenseItemController extends Controller
         ))->response();
     }
 
-    public function update(Request $request, ExpenseItem $expenseItem): JsonResponse
+    public function update(SaveExpenseItemRequest $request, ExpenseItem $expenseItem): JsonResponse
     {
-        $companyId = (int) $request->input('company_id');
-
-        $validated = $request->validate([
-            'company_id' => [
-                'required',
-                'integer',
-                Rule::exists('companies', 'id')->whereNull('deleted_at'),
-            ],
-            'expense_category_id' => [
-                'sometimes',
-                'nullable',
-                'integer',
-                Rule::exists('expense_categories', 'id')
-                    ->whereNull('deleted_at')
-                    ->where('company_id', $companyId),
-            ],
-            'expense_type_id' => [
-                'required',
-                'integer',
-                Rule::exists('expense_types', 'id')
-                    ->whereNull('deleted_at')
-                    ->where('company_id', $companyId),
-            ],
-            'name' => ['required', 'string', 'max:150'],
-            'amount' => ['required', 'numeric', 'min:0'],
-            'purchased_on' => ['required', 'date_format:Y-m-d'],
-            'closing_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
-            'employee_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
-            'detail' => ['sometimes', 'nullable', 'string', 'max:500'],
-        ]);
-
-        $validated['name'] = (string) $validated['name'];
-        $validated['amount'] = (float) $validated['amount'];
-
-        $updated = $this->expenseItemService->updateExpenseItem($expenseItem, $validated);
+        $updated = $this->expenseItemService->updateExpenseItem($expenseItem, $request->payload());
 
         return (new ExpenseItemResource($updated))->response();
     }

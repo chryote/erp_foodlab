@@ -6,6 +6,7 @@ use App\Models\Company;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class CompanyService
 {
@@ -56,8 +57,11 @@ class CompanyService
 
     public function deleteCompany(Company $company): void
     {
-        $company->capitalCompanies()->delete();
-        $company->delete();
+        DB::transaction(function () use ($company): void {
+            $company->capitalCompanies()->delete();
+            $company->delete();
+        });
+
         Cache::forget(self::CACHE_KEY_LIST);
         Cache::forget(CapitalCompanyService::CACHE_KEY_LIST);
     }

@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Enums\LabSampleStatus;
 use App\Models\LabSample;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class LabSampleService
@@ -56,7 +58,13 @@ class LabSampleService
      */
     public function createSample(array $attributes): LabSample
     {
-        $sample = LabSample::query()->create($attributes);
+        $sample = DB::transaction(function () use ($attributes) {
+            return LabSample::query()->create([
+                ...$attributes,
+                'status' => $attributes['status'] ?? LabSampleStatus::PENDING->value,
+            ]);
+        });
+
         Cache::forget(self::CACHE_KEY_LIST);
 
         return $sample;
