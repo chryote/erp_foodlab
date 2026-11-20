@@ -1,6 +1,37 @@
 import React from 'react';
 import type { ErpModuleOverview } from '../../api/client';
-import { ModuleLauncherCard } from '../../components/ui';
+import {
+  CascadingHorizontalMenu,
+  type HorizontalMenuItem,
+  ModuleLauncherCard,
+} from '../../components/ui';
+
+export const CFO_INPUT_MODAL_ITEMS: HorizontalMenuItem[] = [
+  { code: 'PERUSAHAAN', title: 'Master Modal' },
+  { code: 'DAFTAR_KAPITAL_PERUSAHAAN', title: 'View Modal' },
+];
+
+export const CFO_INPUT_OPERASIONAL_ITEMS: HorizontalMenuItem[] = [
+  { code: 'MASTER_OPERASIONAL', title: 'Master Operasional' },
+  { code: 'ITEM_OPERASIONAL', title: 'Item Operasional' },
+  { code: 'VIEW_OPERASIONAL', title: 'View Operasional' },
+];
+
+export const CFO_MENU_ITEMS: HorizontalMenuItem[] = [
+  {
+    code: 'INPUT_MODAL',
+    title: 'Input Modal',
+    children: CFO_INPUT_MODAL_ITEMS,
+  },
+  {
+    code: 'INPUT_OPERASIONAL',
+    title: 'Input Operasional',
+    children: CFO_INPUT_OPERASIONAL_ITEMS,
+  },
+  { code: 'INPUT_ASET', title: 'Input Aset' },
+  { code: 'LABA_RUGI', title: 'Laba Rugi' },
+  { code: 'NERACA', title: 'Neraca' },
+];
 
 export const DEFAULT_CFO_MODULE: ErpModuleOverview = {
   code: 'CFO',
@@ -23,24 +54,6 @@ export const DEFAULT_CFO_MODULE: ErpModuleOverview = {
   ],
 };
 
-const CfoIcon = (
-  <svg
-    viewBox="0 0 24 24"
-    width="40"
-    height="40"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.8"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <rect x="2" y="5" width="20" height="14" rx="2" />
-    <line x1="2" y1="10" x2="22" y2="10" />
-    <path d="M7 15h.01" />
-    <path d="M11 15h2" />
-  </svg>
-);
-
 interface CfoModuleCardProps {
   data?: ErpModuleOverview;
   isSelected?: boolean;
@@ -56,10 +69,36 @@ export const CfoModuleCard: React.FC<CfoModuleCardProps> = ({
     <ModuleLauncherCard
       code={data.code}
       title={data.title}
-      icon={CfoIcon}
       accent="cfo"
       isSelected={isSelected}
       onClick={() => onSelect?.(data)}
+    />
+  );
+};
+
+interface CfoHorizontalMenuProps {
+  selectedCode?: string | null;
+  selectedChildCode?: string | null;
+  onSelect?: (item: HorizontalMenuItem) => void;
+  onSelectChild?: (item: HorizontalMenuItem) => void;
+}
+
+export const CfoHorizontalMenu: React.FC<CfoHorizontalMenuProps> = ({
+  selectedCode,
+  selectedChildCode,
+  onSelect,
+  onSelectChild,
+}) => {
+  return (
+    <CascadingHorizontalMenu
+      items={CFO_MENU_ITEMS}
+      accent="cfo"
+      selectedCode={selectedCode}
+      selectedChildCode={selectedChildCode}
+      ariaLabel="CFO Submenu"
+      testId="cfo-horizontal-menu"
+      onSelect={onSelect}
+      onSelectChild={onSelectChild}
     />
   );
 };

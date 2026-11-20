@@ -1,4 +1,5 @@
 import React from 'react';
+import { ShadcnButton } from './shadcn/button';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
 
@@ -8,20 +9,27 @@ export interface ButtonProps
   children: React.ReactNode;
 }
 
+const VARIANT_MAP = {
+  primary: 'default',
+  secondary: 'secondary',
+  ghost: 'ghost',
+} as const;
+
 export const Button: React.FC<ButtonProps> = ({
   variant = 'secondary',
   type = 'button',
-  className = '',
+  className,
   children,
   ...rest
 }) => {
   return (
-    <button
+    <ShadcnButton
       type={type}
-      className={`ui-btn ui-btn-${variant} ${className}`.trim()}
+      variant={VARIANT_MAP[variant]}
+      className={className}
       {...rest}
     >
       {children}
-    </button>
+    </ShadcnButton>
   );
 };

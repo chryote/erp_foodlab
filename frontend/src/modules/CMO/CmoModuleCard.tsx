@@ -23,22 +23,6 @@ export const DEFAULT_CMO_MODULE: ErpModuleOverview = {
   ],
 };
 
-const CmoIcon = (
-  <svg
-    viewBox="0 0 24 24"
-    width="40"
-    height="40"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.8"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
-    <polyline points="16 7 22 7 22 13" />
-  </svg>
-);
-
 interface CmoModuleCardProps {
   data?: ErpModuleOverview;
   isSelected?: boolean;
@@ -54,7 +38,6 @@ export const CmoModuleCard: React.FC<CmoModuleCardProps> = ({
     <ModuleLauncherCard
       code={data.code}
       title={data.title}
-      icon={CmoIcon}
       accent="cmo"
       isSelected={isSelected}
       onClick={() => onSelect?.(data)}

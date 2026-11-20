@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Enums\LabSampleStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class LabSample extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'batch_code',
@@ -23,6 +25,7 @@ class LabSample extends Model
         return [
             'ph_level' => 'float',
             'moisture_percent' => 'float',
+            'status' => LabSampleStatus::class,
         ];
     }
 }

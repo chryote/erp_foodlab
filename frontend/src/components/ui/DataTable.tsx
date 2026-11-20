@@ -1,9 +1,17 @@
 import React from 'react';
+import {
+  ShadcnTable,
+  ShadcnTableBody,
+  ShadcnTableCell,
+  ShadcnTableHead,
+  ShadcnTableHeader,
+  ShadcnTableRow,
+} from './shadcn/table';
 
 export interface DataTableColumn<T> {
   key: string;
   header: string;
-  render: (row: T) => React.ReactNode;
+  render: (row: T, index: number) => React.ReactNode;
 }
 
 export interface DataTableProps<T> {
@@ -23,32 +31,35 @@ export function DataTable<T>({
 }: DataTableProps<T>): React.ReactElement {
   if (data.length === 0) {
     return (
-      <p className="ui-empty-state" data-testid={emptyTestId}>
+      <p
+        className="py-8 text-center text-sm text-muted-foreground"
+        data-testid={emptyTestId}
+      >
         {emptyMessage}
       </p>
     );
   }
 
   return (
-    <div className="ui-table-wrapper">
-      <table className="ui-table">
-        <thead>
-          <tr>
-            {columns.map((col) => (
-              <th key={col.key}>{col.header}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((row) => (
-            <tr key={rowKey(row)}>
-              {columns.map((col) => (
-                <td key={col.key}>{col.render(row)}</td>
-              ))}
-            </tr>
+    <ShadcnTable>
+      <ShadcnTableHeader>
+        <ShadcnTableRow>
+          {columns.map((col) => (
+            <ShadcnTableHead key={col.key}>{col.header}</ShadcnTableHead>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </ShadcnTableRow>
+      </ShadcnTableHeader>
+      <ShadcnTableBody>
+        {data.map((row, index) => (
+          <ShadcnTableRow key={rowKey(row)}>
+            {columns.map((col) => (
+              <ShadcnTableCell key={col.key}>
+                {col.render(row, index)}
+              </ShadcnTableCell>
+            ))}
+          </ShadcnTableRow>
+        ))}
+      </ShadcnTableBody>
+    </ShadcnTable>
   );
 }

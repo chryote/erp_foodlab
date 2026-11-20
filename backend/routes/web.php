@@ -3,9 +3,5 @@
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return response()->json([
-        'service' => config('app.name'),
-        'status' => 'running',
-        'documentation' => '/api/health',
-    ]);
-});
+    return view('app');
+})->name('erp.dashboard');

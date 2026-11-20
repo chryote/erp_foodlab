@@ -1,4 +1,11 @@
 import React from 'react';
+import { cn } from '@/lib/utils';
+import {
+  ShadcnCard,
+  ShadcnCardDescription,
+  ShadcnCardHeader,
+  ShadcnCardTitle,
+} from './shadcn/card';
 
 export interface CardProps extends React.HTMLAttributes<HTMLElement> {
   as?: 'section' | 'div' | 'article';
@@ -7,17 +14,23 @@ export interface CardProps extends React.HTMLAttributes<HTMLElement> {
 }
 
 export const Card: React.FC<CardProps> = ({
-  as: Component = 'section',
+  as = 'section',
   variant = 'default',
-  className = '',
+  className,
   children,
   ...rest
 }) => {
-  const variantClass = variant === 'highlighted' ? 'ui-card-highlighted' : '';
   return (
-    <Component className={`ui-card ${variantClass} ${className}`.trim()} {...rest}>
+    <ShadcnCard
+      as={as}
+      className={cn(
+        variant === 'highlighted' && 'border-primary/60 shadow-lg',
+        className
+      )}
+      {...rest}
+    >
       {children}
-    </Component>
+    </ShadcnCard>
   );
 };
 
@@ -35,13 +48,17 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
   actions,
 }) => {
   return (
-    <div className="ui-card-header">
+    <ShadcnCardHeader>
       <div>
-        {eyebrow && <span className="ui-eyebrow">{eyebrow}</span>}
-        <h2 className="ui-card-title">{title}</h2>
-        {subtitle && <p className="ui-subtitle">{subtitle}</p>}
+        {eyebrow && (
+          <span className="block text-[11px] font-bold uppercase tracking-widest text-primary mb-1">
+            {eyebrow}
+          </span>
+        )}
+        <ShadcnCardTitle>{title}</ShadcnCardTitle>
+        {subtitle && <ShadcnCardDescription>{subtitle}</ShadcnCardDescription>}
       </div>
-      {actions && <div className="ui-card-actions">{actions}</div>}
-    </div>
+      {actions && <div className="flex items-center gap-3">{actions}</div>}
+    </ShadcnCardHeader>
   );
 };

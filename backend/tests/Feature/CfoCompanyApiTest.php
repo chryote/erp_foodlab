@@ -1,0 +1,93 @@
+<?php
+
+use App\Models\Company;
+use App\Modules\CFO\Services\CompanyService;
+use Illuminate\Support\Facades\Cache;
+
+describe('CFO Company CRUD API (/api/v1/modules/cfo/companies)', function () {
+    beforeEach(function () {
+        Cache::flush();
+    });
+
+    it('lists companies and caches results', function () {
+        Company::factory()->count(2)->create();
+
+        expect(Cache::has(CompanyService::CACHE_KEY_LIST))->toBeFalse();
+
+        $response = $this->getJson('/api/v1/modules/cfo/companies');
+
+        $response->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('meta.cache_key', CompanyService::CACHE_KEY_LIST);
+
+        expect(Cache::has(CompanyService::CACHE_KEY_LIST))->toBeTrue();
+    });
+
+    it('filters and paginates companies by name', function () {
+        Company::factory()->create([
+            'name' => 'PT. Slaras Nusa Foodlab',
+        ]);
+        Company::factory()->create([
+            'name' => 'PT. Agro Pangan Sejahtera',
+        ]);
+        Company::factory()->create([
+            'name' => 'PT. Dairy Nusantara',
+        ]);
+
+        $filtered = $this->getJson('/api/v1/modules/cfo/companies?search=Agro');
+        $filtered->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.name', 'PT. Agro Pangan Sejahtera');
+
+        $paginated = $this->getJson('/api/v1/modules/cfo/companies?page=1&per_page=2');
+        $paginated->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('meta.total', 3)
+            ->assertJsonPath('meta.per_page', 2)
+            ->assertJsonPath('meta.last_page', 2);
+    });
+
+    it('creates, updates, and soft-deletes a company', function () {
+        $createRes = $this->postJson('/api/v1/modules/cfo/companies', [
+            'name' => 'PT. Slaras Nusa Foodlab',
+            'series' => 2,
+        ]);
+
+        $createRes->assertCreated()
+            ->assertJsonPath('data.name', 'PT. Slaras Nusa Foodlab')
+            ->assertJsonPath('data.series', 2);
+
+        $companyId = $createRes->json('data.id');
+        $this->assertDatabaseHas('companies', [
+            'id' => $companyId,
+            'name' => 'PT. Slaras Nusa Foodlab',
+            'series' => 2,
+        ]);
+
+        $updateRes = $this->putJson("/api/v1/modules/cfo/companies/{$companyId}", [
+            'name' => 'PT. Slaras Nusa Foodlab Internasional',
+            'series' => 3,
+        ]);
+
+        $updateRes->assertOk()
+            ->assertJsonPath('data.name', 'PT. Slaras Nusa Foodlab Internasional')
+            ->assertJsonPath('data.series', 3);
+
+        $deleteRes = $this->deleteJson("/api/v1/modules/cfo/companies/{$companyId}");
+        $deleteRes->assertOk();
+
+        $this->assertSoftDeleted('companies', ['id' => $companyId]);
+
+        $listRes = $this->getJson('/api/v1/modules/cfo/companies');
+        $listRes->assertOk()->assertJsonCount(0, 'data');
+    });
+
+    it('validates company name and series when creating or updating', function () {
+        $this->postJson('/api/v1/modules/cfo/companies', [
+            'name' => '',
+            'series' => 0,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['name', 'series']);
+    });
+});

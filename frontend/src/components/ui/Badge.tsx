@@ -1,4 +1,5 @@
 import React from 'react';
+import { ShadcnBadge } from './shadcn/badge';
 
 export type BadgeVariant = 'ok' | 'err' | 'warn' | 'info' | 'neutral';
 
@@ -7,18 +8,27 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   children: React.ReactNode;
 }
 
+const VARIANT_MAP = {
+  ok: 'success',
+  err: 'destructive',
+  warn: 'warning',
+  info: 'info',
+  neutral: 'secondary',
+} as const;
+
 export const Badge: React.FC<BadgeProps> = ({
   variant = 'neutral',
-  className = '',
+  className,
   children,
   ...rest
 }) => {
   return (
-    <span
-      className={`ui-badge ui-badge-${variant} ${className}`.trim()}
+    <ShadcnBadge
+      variant={VARIANT_MAP[variant]}
+      className={className}
       {...rest}
     >
       {children}
-    </span>
+    </ShadcnBadge>
   );
 };

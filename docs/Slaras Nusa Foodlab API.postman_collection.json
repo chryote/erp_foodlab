@@ -1,0 +1,1317 @@
+{
+  "info": {
+    "_postman_id": "2fb8d4d2-57b8-4a67-b511-4b634eed80dd",
+    "name": "Slaras Nusa Foodlab API",
+    "description": "# Slaras Nusa Foodlab API\n\nlorem ipsum dolor sit amet\n\nLink:  \n[https://documenter.getpostman.com/view/25327324/2sBYHbsw9R](https://documenter.getpostman.com/view/25327324/2sBYHbsw9R)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "25327324"
+  },
+  "item": [
+    {
+      "name": "CFO",
+      "item": [
+        {
+          "name": "Pemegang Saham",
+          "item": [
+            {
+              "name": "Capital companies list",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/api/v1/modules/cfo/capital-companies",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "modules",
+                    "cfo",
+                    "capital-companies"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "Capital companies list",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseURL}}/api/v1/modules/cfo/capital-companies",
+                      "host": [
+                        "{{baseURL}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "modules",
+                        "cfo",
+                        "capital-companies"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Server",
+                      "value": "nginx/1.27.5"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, private"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Thu, 19 Nov 2026 07:43:42 GMT"
+                    },
+                    {
+                      "key": "Access-Control-Allow-Origin",
+                      "value": "*"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"data\": [\n        {\n            \"id\": 3,\n            \"company_id\": 3,\n            \"stakeholder_name\": \"alex\",\n            \"capital\": 123500,\n            \"created_at\": \"2026-11-19T07:40:40.000000Z\",\n            \"updated_at\": \"2026-11-19T07:40:40.000000Z\",\n            \"deleted_at\": null,\n            \"company\": {\n                \"id\": 3,\n                \"name\": \"company test\",\n                \"series\": 1,\n                \"created_at\": \"2026-11-19T07:40:30.000000Z\",\n                \"updated_at\": \"2026-11-19T07:40:30.000000Z\",\n                \"deleted_at\": null\n            }\n        }\n    ],\n    \"meta\": {\n        \"count\": 1,\n        \"total\": 1,\n        \"total_capital\": 123500,\n        \"page\": 1,\n        \"per_page\": 1,\n        \"last_page\": 1,\n        \"cache_key\": \"erp_foodlab:cfo:capital_companies:list\"\n    }\n}"
+                }
+              ]
+            },
+            {
+              "name": "Create company shareholder",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "company_id",
+                      "value": "3",
+                      "type": "text",
+                      "uuid": "bedb0523-e316-4b3b-8871-a28806d56b6b"
+                    },
+                    {
+                      "key": "stakeholder_name",
+                      "value": "bambang2",
+                      "type": "text",
+                      "uuid": "cd3c9513-257b-4714-a217-a1e73985cd5e"
+                    },
+                    {
+                      "key": "capital",
+                      "value": "123000",
+                      "type": "text",
+                      "uuid": "fb1c08b4-34b5-4bc5-b012-1f3aff808ac7"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseURL}}/api/v1/modules/cfo/capital-companies",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "modules",
+                    "cfo",
+                    "capital-companies"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "Create company shareholder",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [],
+                    "body": {
+                      "mode": "formdata",
+                      "formdata": [
+                        {
+                          "key": "company_id",
+                          "value": "3",
+                          "type": "text",
+                          "uuid": "bedb0523-e316-4b3b-8871-a28806d56b6b"
+                        },
+                        {
+                          "key": "stakeholder_name",
+                          "value": "bambang2",
+                          "type": "text",
+                          "uuid": "cd3c9513-257b-4714-a217-a1e73985cd5e"
+                        },
+                        {
+                          "key": "capital",
+                          "value": "123000",
+                          "type": "text",
+                          "uuid": "fb1c08b4-34b5-4bc5-b012-1f3aff808ac7"
+                        }
+                      ]
+                    },
+                    "url": {
+                      "raw": "{{baseURL}}/api/v1/modules/cfo/capital-companies",
+                      "host": [
+                        "{{baseURL}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "modules",
+                        "cfo",
+                        "capital-companies"
+                      ]
+                    }
+                  },
+                  "status": "Created",
+                  "code": 201,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Server",
+                      "value": "nginx/1.27.5"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, private"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Thu, 19 Nov 2026 07:59:27 GMT"
+                    },
+                    {
+                      "key": "Access-Control-Allow-Origin",
+                      "value": "*"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"data\": {\n        \"company_id\": 3,\n        \"stakeholder_name\": \"bambang2\",\n        \"capital\": 123000,\n        \"updated_at\": \"2026-11-19T07:59:27.000000Z\",\n        \"created_at\": \"2026-11-19T07:59:27.000000Z\",\n        \"id\": 5,\n        \"company\": {\n            \"id\": 3,\n            \"name\": \"company test\",\n            \"series\": 1,\n            \"created_at\": \"2026-11-19T07:40:30.000000Z\",\n            \"updated_at\": \"2026-11-19T07:40:30.000000Z\",\n            \"deleted_at\": null\n        }\n    }\n}"
+                }
+              ]
+            },
+            {
+              "name": "Create company shareholder",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/api/v1/modules/cfo/capital-companies/:capitalCompanyID",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "modules",
+                    "cfo",
+                    "capital-companies",
+                    ":capitalCompanyID"
+                  ],
+                  "variable": [
+                    {
+                      "key": "capitalCompanyID",
+                      "value": "4"
+                    }
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "Successfully get specific data of capital companies",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseURL}}/api/v1/modules/cfo/capital-companies/:capitalCompanyID",
+                      "host": [
+                        "{{baseURL}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "modules",
+                        "cfo",
+                        "capital-companies",
+                        ":capitalCompanyID"
+                      ],
+                      "variable": [
+                        {
+                          "key": "capitalCompanyID",
+                          "value": "4"
+                        }
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "",
+                  "header": [
+                    {
+                      "key": "Server",
+                      "value": "nginx/1.27.5"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, private"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Thu, 19 Nov 2026 09:24:26 GMT"
+                    },
+                    {
+                      "key": "Access-Control-Allow-Origin",
+                      "value": "*"
+                    }
+                  ],
+                  "cookie": [
+                    {
+                      "expires": "Invalid Date",
+                      "domain": "",
+                      "path": ""
+                    }
+                  ],
+                  "body": "{\n    \"data\": {\n        \"id\": 4,\n        \"company_id\": 3,\n        \"stakeholder_name\": \"bambang\",\n        \"capital\": 123000,\n        \"created_at\": \"2026-11-19T07:55:51.000000Z\",\n        \"updated_at\": \"2026-11-19T07:55:51.000000Z\",\n        \"deleted_at\": null,\n        \"company\": {\n            \"id\": 3,\n            \"name\": \"company test\",\n            \"series\": 1,\n            \"created_at\": \"2026-11-19T07:40:30.000000Z\",\n            \"updated_at\": \"2026-11-19T07:40:30.000000Z\",\n            \"deleted_at\": null\n        }\n    }\n}"
+                }
+              ]
+            },
+            {
+              "name": "Edit company shareholder",
+              "request": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "stakeholder_name",
+                      "value": "new bambang",
+                      "type": "text",
+                      "uuid": "9686e940-e197-4161-9429-0257dce682c0"
+                    },
+                    {
+                      "key": "capital",
+                      "value": "456000",
+                      "type": "text",
+                      "uuid": "a6ea2e61-6832-4df2-890a-28cf0f241353"
+                    },
+                    {
+                      "key": "company_id",
+                      "value": "3",
+                      "type": "text",
+                      "uuid": "bbc18f59-aecd-4b3d-ac56-1b06aa2ddfd4"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseURL}}/api/v1/modules/cfo/capital-companies/:capitalCompanyID",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "modules",
+                    "cfo",
+                    "capital-companies",
+                    ":capitalCompanyID"
+                  ],
+                  "variable": [
+                    {
+                      "key": "capitalCompanyID",
+                      "value": "4"
+                    }
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "Successfully edit specific data of capital companies",
+                  "originalRequest": {
+                    "method": "PUT",
+                    "header": [],
+                    "body": {
+                      "mode": "formdata",
+                      "formdata": [
+                        {
+                          "key": "stakeholder_name",
+                          "value": "new bambang",
+                          "type": "text",
+                          "uuid": "9686e940-e197-4161-9429-0257dce682c0"
+                        },
+                        {
+                          "key": "capital",
+                          "value": "456000",
+                          "type": "text",
+                          "uuid": "a6ea2e61-6832-4df2-890a-28cf0f241353"
+                        },
+                        {
+                          "key": "company_id",
+                          "value": "3",
+                          "type": "text",
+                          "uuid": "bbc18f59-aecd-4b3d-ac56-1b06aa2ddfd4"
+                        }
+                      ]
+                    },
+                    "url": {
+                      "raw": "{{baseURL}}/api/v1/modules/cfo/capital-companies/:capitalCompanyID",
+                      "host": [
+                        "{{baseURL}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "modules",
+                        "cfo",
+                        "capital-companies",
+                        ":capitalCompanyID"
+                      ],
+                      "variable": [
+                        {
+                          "key": "capitalCompanyID",
+                          "value": "4"
+                        }
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "",
+                  "header": [
+                    {
+                      "key": "Server",
+                      "value": "nginx/1.27.5"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, private"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Thu, 19 Nov 2026 09:28:58 GMT"
+                    },
+                    {
+                      "key": "Access-Control-Allow-Origin",
+                      "value": "*"
+                    }
+                  ],
+                  "cookie": [
+                    {
+                      "expires": "Invalid Date",
+                      "domain": "",
+                      "path": ""
+                    }
+                  ],
+                  "body": "{\n    \"data\": {\n        \"id\": 4,\n        \"company_id\": 3,\n        \"stakeholder_name\": \"new bambang\",\n        \"capital\": 456000,\n        \"created_at\": \"2026-11-19T07:55:51.000000Z\",\n        \"updated_at\": \"2026-11-19T09:28:58.000000Z\",\n        \"deleted_at\": null,\n        \"company\": {\n            \"id\": 3,\n            \"name\": \"company test\",\n            \"series\": 1,\n            \"created_at\": \"2026-11-19T07:40:30.000000Z\",\n            \"updated_at\": \"2026-11-19T07:40:30.000000Z\",\n            \"deleted_at\": null\n        }\n    }\n}"
+                }
+              ]
+            },
+            {
+              "name": "Patch data company shareholder",
+              "request": {
+                "method": "PATCH",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "stakeholder_name",
+                      "value": "new bambang",
+                      "type": "text",
+                      "uuid": "9686e940-e197-4161-9429-0257dce682c0"
+                    },
+                    {
+                      "key": "capital",
+                      "value": "456000",
+                      "type": "text",
+                      "uuid": "a6ea2e61-6832-4df2-890a-28cf0f241353"
+                    },
+                    {
+                      "key": "company_id",
+                      "value": "3",
+                      "type": "text",
+                      "uuid": "bbc18f59-aecd-4b3d-ac56-1b06aa2ddfd4"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseURL}}/api/v1/modules/cfo/capital-companies/:capitalCompanyID",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "modules",
+                    "cfo",
+                    "capital-companies",
+                    ":capitalCompanyID"
+                  ],
+                  "variable": [
+                    {
+                      "key": "capitalCompanyID",
+                      "value": "4"
+                    }
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "Successfully patch specific data of company shareholder",
+                  "originalRequest": {
+                    "method": "PATCH",
+                    "header": [],
+                    "body": {
+                      "mode": "formdata",
+                      "formdata": [
+                        {
+                          "key": "stakeholder_name",
+                          "value": "new bambang",
+                          "type": "text",
+                          "uuid": "9686e940-e197-4161-9429-0257dce682c0"
+                        },
+                        {
+                          "key": "capital",
+                          "value": "456000",
+                          "type": "text",
+                          "uuid": "a6ea2e61-6832-4df2-890a-28cf0f241353"
+                        },
+                        {
+                          "key": "company_id",
+                          "value": "3",
+                          "type": "text",
+                          "uuid": "bbc18f59-aecd-4b3d-ac56-1b06aa2ddfd4"
+                        }
+                      ]
+                    },
+                    "url": {
+                      "raw": "{{baseURL}}/api/v1/modules/cfo/capital-companies/:capitalCompanyID",
+                      "host": [
+                        "{{baseURL}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "modules",
+                        "cfo",
+                        "capital-companies",
+                        ":capitalCompanyID"
+                      ],
+                      "variable": [
+                        {
+                          "key": "capitalCompanyID",
+                          "value": "4"
+                        }
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "",
+                  "header": [
+                    {
+                      "key": "Server",
+                      "value": "nginx/1.27.5"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, private"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Thu, 19 Nov 2026 09:47:26 GMT"
+                    },
+                    {
+                      "key": "Access-Control-Allow-Origin",
+                      "value": "*"
+                    }
+                  ],
+                  "cookie": [
+                    {
+                      "expires": "Invalid Date",
+                      "domain": "",
+                      "path": ""
+                    }
+                  ],
+                  "body": "{\n    \"data\": {\n        \"id\": 4,\n        \"company_id\": 3,\n        \"stakeholder_name\": \"new bambang\",\n        \"capital\": 456000,\n        \"created_at\": \"2026-11-19T07:55:51.000000Z\",\n        \"updated_at\": \"2026-11-19T09:28:58.000000Z\",\n        \"deleted_at\": null,\n        \"company\": {\n            \"id\": 3,\n            \"name\": \"company test\",\n            \"series\": 1,\n            \"created_at\": \"2026-11-19T07:40:30.000000Z\",\n            \"updated_at\": \"2026-11-19T07:40:30.000000Z\",\n            \"deleted_at\": null\n        }\n    }\n}"
+                }
+              ]
+            },
+            {
+              "name": "Delete company shareholder",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/api/v1/modules/cfo/capital-companies/:capitalCompanyID",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "modules",
+                    "cfo",
+                    "capital-companies",
+                    ":capitalCompanyID"
+                  ],
+                  "variable": [
+                    {
+                      "key": "capitalCompanyID",
+                      "value": "4"
+                    }
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "Successfully delete company shareholder",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseURL}}/api/v1/modules/cfo/capital-companies/:capitalCompanyID",
+                      "host": [
+                        "{{baseURL}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "modules",
+                        "cfo",
+                        "capital-companies",
+                        ":capitalCompanyID"
+                      ],
+                      "variable": [
+                        {
+                          "key": "capitalCompanyID",
+                          "value": "4"
+                        }
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "",
+                  "header": [
+                    {
+                      "key": "Server",
+                      "value": "nginx/1.27.5"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, private"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Thu, 19 Nov 2026 09:51:47 GMT"
+                    },
+                    {
+                      "key": "Access-Control-Allow-Origin",
+                      "value": "*"
+                    }
+                  ],
+                  "cookie": [
+                    {
+                      "expires": "Invalid Date",
+                      "domain": "",
+                      "path": ""
+                    }
+                  ],
+                  "body": "{\n    \"message\": \"Capital company deleted successfully.\"\n}"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "All Data",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/api/v1/modules/cfo",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "modules",
+                "cfo"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Successfully get data",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/api/v1/modules/cfo",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "modules",
+                    "cfo"
+                  ]
+                }
+              },
+              "code": 200,
+              "_postman_previewlanguage": "",
+              "header": [],
+              "cookie": [
+                {
+                  "expires": "Invalid Date",
+                  "domain": "",
+                  "path": ""
+                }
+              ],
+              "body": "{\r\n    \"data\": {\r\n        \"code\": \"CFO\",\r\n        \"title\": \"CFO (Keuangan)\",\r\n        \"subtitle\": \"Manajemen Keuangan, Arus Kas, Buku Besar & Anggaran\",\r\n        \"status\": \"active\",\r\n        \"primary_kpi\": {\r\n            \"label\": \"Kas & Setara Kas Bulan Ini\",\r\n            \"value\": \"Rp 1.450.000.000\",\r\n            \"trend\": \"+12.4%\"\r\n        },\r\n        \"highlights\": [\r\n            {\r\n                \"label\": \"Piutang Usaha (AR)\",\r\n                \"value\": \"Rp 320.500.000\"\r\n            },\r\n            {\r\n                \"label\": \"Utang Dagang (AP)\",\r\n                \"value\": \"Rp 185.000.000\"\r\n            },\r\n            {\r\n                \"label\": \"Margin Laba Bersih\",\r\n                \"value\": \"21.8%\"\r\n            }\r\n        ],\r\n        \"recent_items\": [\r\n            {\r\n                \"id\": \"INV-CFO-001\",\r\n                \"name\": \"Jurnal Penutupan Bulanan FoodLab\",\r\n                \"status\": \"Verified\"\r\n            },\r\n            {\r\n                \"id\": \"INV-CFO-002\",\r\n                \"name\": \"Pembayaran Bahan Baku Dairy\",\r\n                \"status\": \"Paid\"\r\n            },\r\n            {\r\n                \"id\": \"INV-CFO-003\",\r\n                \"name\": \"Audit Pajak PPN Kuartal IV\",\r\n                \"status\": \"In Review\"\r\n            }\r\n        ]\r\n    }\r\n}"
+            }
+          ]
+        },
+        {
+          "name": "Companies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/api/v1/modules/cfo/companies",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "modules",
+                "cfo",
+                "companies"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Successfully get data",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/api/v1/modules/cfo/companies",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "modules",
+                    "cfo",
+                    "companies"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Server",
+                  "value": "nginx/1.27.5"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, private"
+                },
+                {
+                  "key": "Date",
+                  "value": "Thu, 19 Nov 2026 07:03:53 GMT"
+                },
+                {
+                  "key": "Access-Control-Allow-Origin",
+                  "value": "*"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"data\": [\n        {\n            \"id\": 2,\n            \"name\": \"test 123\",\n            \"series\": 1,\n            \"created_at\": \"2026-11-19T07:03:49.000000Z\",\n            \"updated_at\": \"2026-11-19T07:03:49.000000Z\",\n            \"deleted_at\": null\n        }\n    ],\n    \"meta\": {\n        \"count\": 1,\n        \"total\": 1,\n        \"page\": 1,\n        \"per_page\": 1,\n        \"last_page\": 1,\n        \"cache_key\": \"erp_foodlab:cfo:companies:list\"\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create Companies",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "test 123",
+                  "type": "text",
+                  "uuid": "f1a06450-6b58-41fa-a2ad-0d9e332a7729"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseURL}}/api/v1/modules/cfo/companies",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "modules",
+                "cfo",
+                "companies"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Create Companies",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "name",
+                      "value": "test 123",
+                      "type": "text",
+                      "uuid": "f1a06450-6b58-41fa-a2ad-0d9e332a7729"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseURL}}/api/v1/modules/cfo/companies",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "modules",
+                    "cfo",
+                    "companies"
+                  ]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Server",
+                  "value": "nginx/1.27.5"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, private"
+                },
+                {
+                  "key": "Date",
+                  "value": "Thu, 19 Nov 2026 07:03:49 GMT"
+                },
+                {
+                  "key": "Access-Control-Allow-Origin",
+                  "value": "*"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"data\": {\n        \"name\": \"test 123\",\n        \"series\": 1,\n        \"updated_at\": \"2026-11-19T07:03:49.000000Z\",\n        \"created_at\": \"2026-11-19T07:03:49.000000Z\",\n        \"id\": 2\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Edit Data",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "test change data",
+                  "type": "text",
+                  "uuid": "05ec83a3-e32d-429e-83f8-b0f1279e0d7c"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseURL}}/api/v1/modules/cfo/companies/:companiesID",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "modules",
+                "cfo",
+                "companies",
+                ":companiesID"
+              ],
+              "variable": [
+                {
+                  "key": "companiesID",
+                  "value": "2"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Successfully edit data",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "name",
+                      "value": "test change data",
+                      "type": "text",
+                      "uuid": "05ec83a3-e32d-429e-83f8-b0f1279e0d7c"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseURL}}/api/v1/modules/cfo/companies/:companiesID",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "modules",
+                    "cfo",
+                    "companies",
+                    ":companiesID"
+                  ],
+                  "variable": [
+                    {
+                      "key": "companiesID",
+                      "value": "2"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Server",
+                  "value": "nginx/1.27.5"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, private"
+                },
+                {
+                  "key": "Date",
+                  "value": "Thu, 19 Nov 2026 07:14:17 GMT"
+                },
+                {
+                  "key": "Access-Control-Allow-Origin",
+                  "value": "*"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"data\": {\n        \"id\": 2,\n        \"name\": \"test change data\",\n        \"series\": 1,\n        \"created_at\": \"2026-11-19T07:03:49.000000Z\",\n        \"updated_at\": \"2026-11-19T07:14:17.000000Z\",\n        \"deleted_at\": null\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Patch Data",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "test patch data",
+                  "type": "text",
+                  "uuid": "05ec83a3-e32d-429e-83f8-b0f1279e0d7c"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseURL}}/api/v1/modules/cfo/companies/:companiesID",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "modules",
+                "cfo",
+                "companies",
+                ":companiesID"
+              ],
+              "variable": [
+                {
+                  "key": "companiesID",
+                  "value": "2"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Successfully patch data",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "name",
+                      "value": "test patch data",
+                      "type": "text",
+                      "uuid": "05ec83a3-e32d-429e-83f8-b0f1279e0d7c"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseURL}}/api/v1/modules/cfo/companies/:companiesID",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "modules",
+                    "cfo",
+                    "companies",
+                    ":companiesID"
+                  ],
+                  "variable": [
+                    {
+                      "key": "companiesID",
+                      "value": "2"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Server",
+                  "value": "nginx/1.27.5"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, private"
+                },
+                {
+                  "key": "Date",
+                  "value": "Thu, 19 Nov 2026 07:17:07 GMT"
+                },
+                {
+                  "key": "Access-Control-Allow-Origin",
+                  "value": "*"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"data\": {\n        \"id\": 2,\n        \"name\": \"test patch data\",\n        \"series\": 1,\n        \"created_at\": \"2026-11-19T07:03:49.000000Z\",\n        \"updated_at\": \"2026-11-19T07:17:07.000000Z\",\n        \"deleted_at\": null\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Delete data",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/api/v1/modules/cfo/companies/:companiesID",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "modules",
+                "cfo",
+                "companies",
+                ":companiesID"
+              ],
+              "variable": [
+                {
+                  "key": "companiesID",
+                  "value": "2"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Successfully delete specific data",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/api/v1/modules/cfo/companies/:companiesID",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "modules",
+                    "cfo",
+                    "companies",
+                    ":companiesID"
+                  ],
+                  "variable": [
+                    {
+                      "key": "companiesID",
+                      "value": "2"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Server",
+                  "value": "nginx/1.27.5"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, private"
+                },
+                {
+                  "key": "Date",
+                  "value": "Thu, 19 Nov 2026 07:18:42 GMT"
+                },
+                {
+                  "key": "Access-Control-Allow-Origin",
+                  "value": "*"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"message\": \"Company deleted successfully.\"\n}"
+            }
+          ]
+        }
+      ],
+      "description": "# CFO (Keuangan)\nManajemen Keuangan, Arus Kas, Buku Besar & Anggaran"
+    },
+    {
+      "name": "Status",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseURL}}/api/health",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "api",
+            "health"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "Status",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/api/health",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "Server",
+              "value": "nginx/1.27.5"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "key": "Transfer-Encoding",
+              "value": "chunked"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, private"
+            },
+            {
+              "key": "Date",
+              "value": "Thu, 19 Nov 2026 06:50:15 GMT"
+            },
+            {
+              "key": "Access-Control-Allow-Origin",
+              "value": "*"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"status\": \"ok\",\n    \"service\": \"ERP FoodLab API\",\n    \"checks\": {\n        \"database\": \"ok\",\n        \"cache_redis\": \"ok\"\n    },\n    \"timestamp\": \"2026-11-19T06:50:15+00:00\"\n}"
+        }
+      ]
+    }
+  ]
+}

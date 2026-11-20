@@ -1,0 +1,68 @@
+<?php
+
+namespace App\Modules\CFO\Services;
+
+use App\Models\Company;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+
+class CompanyService
+{
+    public const CACHE_KEY_LIST = 'erp_foodlab:cfo:companies:list';
+
+    public function listCompanies(): Collection
+    {
+        return Cache::remember(self::CACHE_KEY_LIST, 60, function () {
+            return Company::query()
+                ->orderByDesc('id')
+                ->get();
+        });
+    }
+
+    public function paginateCompanies(?string $search = null, int $perPage = 10, int $page = 1): LengthAwarePaginator
+    {
+        $query = Company::query()->orderByDesc('id');
+
+        if ($search !== null && trim($search) !== '') {
+            $term = '%' . trim($search) . '%';
+            $query->where('name', 'like', $term);
+        }
+
+        return $query->paginate($perPage, ['*'], 'page', $page);
+    }
+
+    public function createCompany(array $attributes): Company
+    {
+        $attributes['series'] = isset($attributes['series']) ? (int) $attributes['series'] : 1;
+        $company = Company::query()->create($attributes);
+        Cache::forget(self::CACHE_KEY_LIST);
+        Cache::forget(CapitalCompanyService::CACHE_KEY_LIST);
+
+        return $company;
+    }
+
+    public function updateCompany(Company $company, array $attributes): Company
+    {
+        if (isset($attributes['series'])) {
+            $attributes['series'] = (int) $attributes['series'];
+        }
+        $company->update($attributes);
+        Cache::forget(self::CACHE_KEY_LIST);
+        Cache::forget(CapitalCompanyService::CACHE_KEY_LIST);
+
+        return $company->refresh();
+    }
+
+    public function deleteCompany(Company $company): void
+    {
+        DB::transaction(function () use ($company): void {
+            $company->capitalCompanies()->delete();
+            $company->delete();
+        });
+
+        Cache::forget(self::CACHE_KEY_LIST);
+        Cache::forget(CapitalCompanyService::CACHE_KEY_LIST);
+    }
+}
