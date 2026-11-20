@@ -7,7 +7,7 @@ import {
   setAuthToken,
 } from '@/lib/authStorage';
 import { createAppQueryClient } from '@/lib/cfoResources';
-import { Route, Routes, Navigate, useNavigate } from 'react-router-dom';
+import { Route, Routes, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import DashboardFlowSimulator from './Pages/DashboardFlowSimulator';
 import Dashboard from './Pages/Dashboard';
 import PageNotFound from './Pages/PageNotFound';
@@ -16,6 +16,17 @@ import { LoginPage } from './Pages/LoginPage';
 export interface AppProps {
   queryClient?: QueryClient;
 }
+
+const AuthenticatedLoginRedirect: React.FC = () => {
+  const location = useLocation();
+  const state = location.state as { from?: string } | null;
+  const target =
+    state?.from && state.from.startsWith('/') && state.from !== '/login'
+      ? state.from
+      : '/dashboard';
+
+  return <Navigate to={target} replace />;
+};
 
 export const App: React.FC<AppProps> = ({ queryClient: providedClient }) => {
   const [defaultClient] = useState(() => createAppQueryClient());
@@ -55,33 +66,42 @@ export const App: React.FC<AppProps> = ({ queryClient: providedClient }) => {
 
   if (!token) {
     return (
-      <>
       <QueryClientProvider client={client}>
         <Routes>
-          <Route path="/" element={<LoginPage onAuthenticated={handleAuthenticated} />} />
+          <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginPage onAuthenticated={handleAuthenticated} />} />
-          <Route path="/dashboard-flow-simulator" element={<Navigate to="/" replace />} />
+          <Route
+            path="/dashboard"
+            element={<Navigate to="/login" state={{ from: '/dashboard' }} replace />}
+          />
+          <Route
+            path="/dashboard-flow-simulator"
+            element={
+              <Navigate to="/login" state={{ from: '/dashboard-flow-simulator' }} replace />
+            }
+          />
           <Route path="/404" element={<PageNotFound />} />
-          <Route path="*" element={<Navigate to="/404" />} />
+          <Route path="*" element={<Navigate to="/404" replace />} />
         </Routes>
       </QueryClientProvider>
-    </>
-    )
+    );
   }
 
   return (
-    <>
-      <QueryClientProvider client={client}>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/login" element={<Navigate to="/" replace />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/dashboard-flow-simulator" element={<DashboardFlowSimulator onLogout={handleLogout} />} />
-          <Route path="/404" element={<PageNotFound />} />
-          <Route path="*" element={<Navigate to="/404" />} />
-        </Routes>
-      </QueryClientProvider>
-    </>
+    <QueryClientProvider client={client}>
+      <Routes>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/login" element={<AuthenticatedLoginRedirect />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route
+          path="/dashboard-flow-simulator"
+          element={<DashboardFlowSimulator onLogout={handleLogout} />}
+        />
+        <Route path="/404" element={<PageNotFound />} />
+        <Route path="*" element={<Navigate to="/404" replace />} />
+      </Routes>
+    </QueryClientProvider>
+
   );
 };
 

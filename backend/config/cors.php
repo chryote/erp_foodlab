@@ -8,11 +8,16 @@ $allowedOrigins = array_values(array_filter(array_map(
     ))
 )));
 
+$allowedOriginPatterns = array_values(array_filter(array_map(
+    'trim',
+    explode(',', (string) env('CORS_ALLOWED_ORIGIN_PATTERNS', ''))
+)));
+
 return [
     'paths' => ['api/*', 'sanctum/csrf-cookie'],
     'allowed_methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     'allowed_origins' => $allowedOrigins,
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => $allowedOriginPatterns,
     'allowed_headers' => [
         'Accept',
         'Authorization',

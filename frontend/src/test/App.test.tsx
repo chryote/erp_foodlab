@@ -1201,4 +1201,43 @@ describe('App ERP Main Menu integration', () => {
       ).toHaveTextContent('9');
     });
   });
+
+  it('redirects unauthenticated visitors on /dashboard-flow-simulator to /login and returns them after login', async () => {
+    window.localStorage.clear();
+    vi.mocked(apiClient.login).mockResolvedValue({
+      data: {
+        user: {
+          id: 1,
+          name: 'ERP Administrator',
+          email: 'admin@foodlab.test',
+        },
+        token: 'lan-token-123',
+        token_type: 'Bearer',
+      },
+    });
+    vi.mocked(apiClient.fetchErpModules).mockResolvedValue({
+      data: [DEFAULT_CFO_MODULE],
+      meta: { count: 1 },
+    });
+    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
+      data: [{ id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1 }],
+      meta: { count: 1 },
+    });
+
+    renderApp();
+
+    expect(await screen.findByTestId('login-form')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Email'), {
+      target: { value: 'admin@foodlab.test' },
+    });
+    fireEvent.change(screen.getByLabelText('Kata Sandi'), {
+      target: { value: 'password' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Masuk' }));
+
+    expect(
+      await screen.findByText('PT. Slaras Nusa Foodlab')
+    ).toBeInTheDocument();
+  });
 });
