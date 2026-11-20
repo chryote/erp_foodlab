@@ -7,7 +7,7 @@ import {
   setAuthToken,
 } from '@/lib/authStorage';
 import { createAppQueryClient } from '@/lib/cfoResources';
-import { Route, Routes, Navigate } from 'react-router-dom';
+import { Route, Routes, Navigate, useNavigate } from 'react-router-dom';
 import DashboardFlowSimulator from './Pages/DashboardFlowSimulator';
 import Dashboard from './Pages/Dashboard';
 import PageNotFound from './Pages/PageNotFound';
@@ -20,6 +20,7 @@ export interface AppProps {
 export const App: React.FC<AppProps> = ({ queryClient: providedClient }) => {
   const [defaultClient] = useState(() => createAppQueryClient());
   const client = providedClient ?? defaultClient;
+  const navigate = useNavigate();
   const [token, setToken] = useState<string | null>(() => getAuthToken());
 
   useEffect(() => {
@@ -34,8 +35,9 @@ export const App: React.FC<AppProps> = ({ queryClient: providedClient }) => {
       setAuthToken(nextToken);
       client.clear();
       setToken(nextToken);
+      navigate('/', { replace: true });
     },
-    [client]
+    [client, navigate]
   );
 
   const handleLogout = useCallback(async () => {
@@ -48,15 +50,17 @@ export const App: React.FC<AppProps> = ({ queryClient: providedClient }) => {
     clearAuthToken();
     client.clear();
     setToken(null);
-  }, [client]);
+    navigate('/', { replace: true });
+  }, [client, navigate]);
 
   if (!token) {
     return (
       <>
       <QueryClientProvider client={client}>
         <Routes>
-          <Route path="/" element={<Navigate to="/login" />} />
+          <Route path="/" element={<LoginPage onAuthenticated={handleAuthenticated} />} />
           <Route path="/login" element={<LoginPage onAuthenticated={handleAuthenticated} />} />
+          <Route path="/dashboard-flow-simulator" element={<Navigate to="/" replace />} />
           <Route path="/404" element={<PageNotFound />} />
           <Route path="*" element={<Navigate to="/404" />} />
         </Routes>
@@ -69,7 +73,8 @@ export const App: React.FC<AppProps> = ({ queryClient: providedClient }) => {
     <>
       <QueryClientProvider client={client}>
         <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" />} />
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/login" element={<Navigate to="/" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/dashboard-flow-simulator" element={<DashboardFlowSimulator onLogout={handleLogout} />} />
           <Route path="/404" element={<PageNotFound />} />

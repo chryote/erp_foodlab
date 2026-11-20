@@ -1,5 +1,6 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import App from '../App';
 import * as apiClient from '../api/client';
 import { DEFAULT_CFO_MODULE } from '../modules/CFO/CfoModuleCard';
@@ -11,6 +12,18 @@ import { formatCurrentMonthDateRange } from '../modules/CFO/ViewOperasionalModal
 
 vi.mock('../api/client');
 
+const CurrentPath = () => {
+  const { pathname } = useLocation();
+  return <output data-testid="current-path">{pathname}</output>;
+};
+
+const renderApp = (initialPath = '/dashboard-flow-simulator') =>
+  render(
+    <MemoryRouter initialEntries={[initialPath]}>
+      <App />
+    </MemoryRouter>
+  );
+
 describe('App ERP Main Menu integration', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -19,6 +32,62 @@ describe('App ERP Main Menu integration', () => {
 
   afterEach(() => {
     window.localStorage.clear();
+  });
+
+  it('returns to the root login page after logout', async () => {
+    vi.mocked(apiClient.fetchErpModules).mockResolvedValue({
+      data: [],
+      meta: { count: 0 },
+    });
+    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
+      data: [],
+      meta: { count: 0 },
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/dashboard-flow-simulator']}>
+        <CurrentPath />
+        <App />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Keluar' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('current-path')).toHaveTextContent('/');
+    });
+    expect(await screen.findByLabelText('Email')).toBeInTheDocument();
+  });
+
+  it('redirects to the root dashboard after successful login', async () => {
+    window.localStorage.clear();
+    vi.mocked(apiClient.login).mockResolvedValue({
+      data: {
+        user: { id: 1, name: 'ERP Administrator', email: 'admin@foodlab.test' },
+        token: 'token-123',
+        token_type: 'Bearer',
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <CurrentPath />
+        <App />
+      </MemoryRouter>
+    );
+
+    fireEvent.change(screen.getByLabelText('Email'), {
+      target: { value: 'admin@foodlab.test' },
+    });
+    fireEvent.change(screen.getByLabelText('Kata Sandi'), {
+      target: { value: 'password' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Masuk' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('current-path')).toHaveTextContent('/');
+    });
+    expect(screen.getByText('Dashboard')).toBeInTheDocument();
   });
 
   it('renders PT. Slaras Nusa Foodlab header and all 5 ERP module cards (CFO, CHO, CPO, CDO, CMO)', async () => {
@@ -95,7 +164,7 @@ describe('App ERP Main Menu integration', () => {
       }
     );
 
-    render(<App />);
+    renderApp();
 
     expect(screen.getByText('PT. Slaras Nusa Foodlab')).toBeInTheDocument();
     // Main ModuleCards are hidden by default until a secondary company tab is clicked
@@ -332,7 +401,7 @@ describe('App ERP Main Menu integration', () => {
       meta: { count: 3 },
     });
 
-    render(<App />);
+    renderApp();
 
     await waitFor(() => {
       expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(1);
@@ -427,7 +496,7 @@ describe('App ERP Main Menu integration', () => {
       meta: { count: 2 },
     });
 
-    render(<App />);
+    renderApp();
 
     expect(screen.getByText('PT. Slaras Nusa Foodlab')).toBeInTheDocument();
     await waitFor(() => {
@@ -625,7 +694,7 @@ describe('App ERP Main Menu integration', () => {
       return { message: 'Expense item deleted successfully.' };
     });
 
-    render(<App />);
+    renderApp();
 
     await waitFor(() => {
       expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(1);
@@ -1012,7 +1081,7 @@ describe('App ERP Main Menu integration', () => {
       meta: { count: 5 },
     });
 
-    render(<App />);
+    renderApp();
 
     await waitFor(() => {
       expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(1);
