@@ -2,50 +2,30 @@
 
 namespace App\Modules\CFO\Controllers;
 
+use App\Http\Controllers\Concerns\RespondsWithApiList;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ExpenseItemResource;
 use App\Models\ExpenseItem;
 use App\Modules\CFO\Requests\SaveExpenseItemRequest;
 use App\Modules\CFO\Services\ExpenseItemService;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ExpenseItemController extends Controller
 {
+    use RespondsWithApiList;
+
     public function __construct(
         protected ExpenseItemService $expenseItemService,
     ) {}
 
     public function index(Request $request): JsonResponse
     {
-        $result = $this->expenseItemService->list($request);
-
-        if ($result instanceof LengthAwarePaginator) {
-            return response()->json([
-                'data' => ExpenseItemResource::collection($result->items()),
-                'meta' => [
-                    'count' => count($result->items()),
-                    'total' => $result->total(),
-                    'page' => $result->currentPage(),
-                    'per_page' => $result->perPage(),
-                    'last_page' => $result->lastPage(),
-                    'cache_key' => ExpenseItemService::CACHE_KEY_LIST,
-                ],
-            ]);
-        }
-
-        return response()->json([
-            'data' => ExpenseItemResource::collection($result),
-            'meta' => [
-                'count' => $result->count(),
-                'total' => $result->count(),
-                'page' => 1,
-                'per_page' => max(1, $result->count()),
-                'last_page' => 1,
-                'cache_key' => ExpenseItemService::CACHE_KEY_LIST,
-            ],
-        ]);
+        return $this->respondWithList(
+            ExpenseItemResource::class,
+            $this->expenseItemService->list($request),
+            ['cache_key' => ExpenseItemService::CACHE_KEY_LIST]
+        );
     }
 
     public function store(SaveExpenseItemRequest $request): JsonResponse

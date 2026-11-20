@@ -3,72 +3,49 @@
 namespace App\Modules\CFO\Services;
 
 use App\Models\CapitalCompany;
+use App\Support\IndexQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\QueryBuilder;
 
 class CapitalCompanyService
 {
     public const CACHE_KEY_LIST = 'erp_foodlab:cfo:capital_companies:list';
 
-    public function listCapitalCompanies(): Collection
+    /**
+     * @return LengthAwarePaginator|Collection<int, CapitalCompany>
+     */
+    public function list(Request $request): LengthAwarePaginator|Collection
     {
-        return Cache::remember(self::CACHE_KEY_LIST, 60, function () {
-            return CapitalCompany::query()
-                ->with('company')
-                ->orderByDesc('id')
-                ->get();
-        });
-    }
+        $query = IndexQuery::withDefaultRelations($this->query($request), $request, ['company']);
 
-    public function listCapitalCompaniesByCompany(int $companyId): Collection
-    {
-        return $this->listCapitalCompanies()
-            ->where('company_id', $companyId)
-            ->values();
-    }
-
-    public function getTotalCapital(): float
-    {
-        return (float) $this->listCapitalCompanies()->sum('capital');
-    }
-
-    public function getTotalCapitalForCompany(int $companyId): float
-    {
-        return (float) $this->listCapitalCompaniesByCompany($companyId)->sum('capital');
-    }
-
-    public function paginateCapitalCompanies(
-        ?string $search = null,
-        int $perPage = 10,
-        int $page = 1,
-        ?int $companyId = null
-    ): LengthAwarePaginator {
-        $query = CapitalCompany::query()
-            ->with('company')
-            ->orderByDesc('id');
-
-        if ($companyId !== null) {
-            $query->where('company_id', $companyId);
+        if (IndexQuery::isPaginated($request)) {
+            return IndexQuery::paginate($query, $request);
         }
 
-        if ($search !== null && trim($search) !== '') {
-            $term = '%' . trim($search) . '%';
-            $query->where(function ($q) use ($term) {
-                $q->where('stakeholder_name', 'like', $term)
-                    ->orWhere('capital', 'like', $term)
-                    ->orWhereHas('company', function ($companyQuery) use ($term) {
-                        $companyQuery->where('name', 'like', $term);
-                    });
-            });
+        if (IndexQuery::isCacheable($request)) {
+            return Cache::remember(self::CACHE_KEY_LIST, 60, fn () => $query->get());
         }
 
-        return $query->paginate($perPage, ['*'], 'page', $page);
+        return $query->get();
+    }
+
+    public function totalCapital(Request $request): float
+    {
+        return (float) $this->query($request)->sum('capital');
     }
 
     public function createCapitalCompany(array $attributes): CapitalCompany
     {
-        $capitalCompany = CapitalCompany::query()->create($attributes);
+        $capitalCompany = DB::transaction(
+            fn (): CapitalCompany => CapitalCompany::query()->create($attributes)
+        );
+
         Cache::forget(self::CACHE_KEY_LIST);
 
         return $capitalCompany->load('company');
@@ -76,15 +53,49 @@ class CapitalCompanyService
 
     public function updateCapitalCompany(CapitalCompany $capitalCompany, array $attributes): CapitalCompany
     {
-        $capitalCompany->update($attributes);
+        $updated = DB::transaction(function () use ($capitalCompany, $attributes): CapitalCompany {
+            $locked = CapitalCompany::query()->lockForUpdate()->findOrFail($capitalCompany->getKey());
+            $locked->update($attributes);
+
+            return $locked;
+        });
+
         Cache::forget(self::CACHE_KEY_LIST);
 
-        return $capitalCompany->refresh()->load('company');
+        return $updated->refresh()->load('company');
     }
 
     public function deleteCapitalCompany(CapitalCompany $capitalCompany): void
     {
-        $capitalCompany->delete();
+        DB::transaction(function () use ($capitalCompany): void {
+            $locked = CapitalCompany::query()->lockForUpdate()->findOrFail($capitalCompany->getKey());
+            $locked->delete();
+        });
+
         Cache::forget(self::CACHE_KEY_LIST);
+    }
+
+    private function query(Request $request): QueryBuilder
+    {
+        return IndexQuery::make(CapitalCompany::class, $request)
+            ->allowedFilters([
+                AllowedFilter::exact('company_id'),
+                AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
+                    $term = '%'.trim((string) $value).'%';
+
+                    $query->where(function (Builder $searchQuery) use ($term): void {
+                        $searchQuery
+                            ->where('stakeholder_name', 'like', $term)
+                            ->orWhere('capital', 'like', $term)
+                            ->orWhereHas(
+                                'company',
+                                fn (Builder $companyQuery) => $companyQuery->where('name', 'like', $term)
+                            );
+                    });
+                }),
+            ])
+            ->allowedSorts(['id', 'stakeholder_name', 'capital', 'created_at', 'updated_at'])
+            ->allowedIncludes(['company'])
+            ->defaultSort('-id');
     }
 }

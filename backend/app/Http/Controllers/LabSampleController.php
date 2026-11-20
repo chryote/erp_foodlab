@@ -2,29 +2,29 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\RespondsWithApiList;
 use App\Http\Requests\StoreLabSampleRequest;
 use App\Http\Resources\LabSampleResource;
 use App\Models\LabSample;
 use App\Services\LabSampleService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class LabSampleController extends Controller
 {
+    use RespondsWithApiList;
+
     public function __construct(
         protected LabSampleService $labSampleService
     ) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $samples = $this->labSampleService->listRecentSamples();
-
-        return response()->json([
-            'data' => LabSampleResource::collection($samples),
-            'meta' => [
-                'count' => $samples->count(),
-                'cache_key' => LabSampleService::CACHE_KEY_LIST,
-            ],
-        ]);
+        return $this->respondWithList(
+            LabSampleResource::class,
+            $this->labSampleService->list($request),
+            ['cache_key' => LabSampleService::CACHE_KEY_LIST]
+        );
     }
 
     public function store(StoreLabSampleRequest $request): JsonResponse

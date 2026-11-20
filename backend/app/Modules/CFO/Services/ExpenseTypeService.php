@@ -2,104 +2,114 @@
 
 namespace App\Modules\CFO\Services;
 
-use App\Models\ExpenseCategory;
 use App\Models\ExpenseType;
+use App\Support\IndexQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\QueryBuilder;
 
 class ExpenseTypeService
 {
     public const CACHE_KEY_LIST = 'erp_foodlab:cfo:expense_types:list';
 
-    public function listExpenseTypes(): Collection
+    /**
+     * @return LengthAwarePaginator|Collection<int, ExpenseType>
+     */
+    public function list(Request $request): LengthAwarePaginator|Collection
     {
-        return Cache::remember(self::CACHE_KEY_LIST, 60, function () {
-            return ExpenseType::query()
-                ->with(['expenseCategory', 'company'])
-                ->orderByDesc('id')
-                ->get();
-        });
-    }
+        $query = IndexQuery::withDefaultRelations(
+            $this->query($request),
+            $request,
+            ['expenseCategory', 'company']
+        );
 
-    public function listFilteredExpenseTypes(
-        ?int $expenseCategoryId = null,
-        ?int $companyId = null
-    ): Collection {
-        return $this->listExpenseTypes()
-            ->when($expenseCategoryId !== null, fn (Collection $types) => $types->where('expense_category_id', $expenseCategoryId))
-            ->when($companyId !== null, fn (Collection $types) => $types->where('company_id', $companyId))
-            ->values();
-    }
-
-    public function listExpenseTypeByExpenseCategory(int $expenseCategoryId, ?int $companyId = null): Collection
-    {
-        return $this->listFilteredExpenseTypes($expenseCategoryId, $companyId);
-    }
-
-    public function paginateExpenseTypes(
-        ?string $search = null,
-        int $perPage = 10,
-        int $page = 1,
-        ?int $expenseCategoryId = null,
-        ?int $companyId = null
-    ): LengthAwarePaginator {
-        $query = ExpenseType::query()
-            ->with(['expenseCategory', 'company'])
-            ->orderByDesc('id');
-
-        if ($expenseCategoryId !== null) {
-            $query->where('expense_category_id', $expenseCategoryId);
+        if (IndexQuery::isPaginated($request)) {
+            return IndexQuery::paginate($query, $request);
         }
 
-        if ($companyId !== null) {
-            $query->where('company_id', $companyId);
+        if (IndexQuery::isCacheable($request)) {
+            return Cache::remember(self::CACHE_KEY_LIST, 60, fn () => $query->get());
         }
 
-        if ($search !== null && trim($search) !== '') {
-            $term = '%' . trim($search) . '%';
-            $query->where(function ($q) use ($term) {
-                $q->where('name', 'like', $term)
-                    ->orWhereHas('expenseCategory', function ($expenseCategoryQuery) use ($term) {
-                        $expenseCategoryQuery->where('name', 'like', $term);
-                    });
-            });
-        }
-
-        return $query->paginate($perPage, ['*'], 'page', $page);
+        return $query->get();
     }
 
     public function createExpenseType(array $attributes): ExpenseType
     {
-        if (empty($attributes['company_id']) && ! empty($attributes['expense_category_id'])) {
-            $category = ExpenseCategory::query()->findOrFail($attributes['expense_category_id']);
-            $attributes['company_id'] = $category->company_id;
-        }
+        $expenseType = DB::transaction(
+            fn (): ExpenseType => ExpenseType::query()->create($attributes)
+        );
 
-        $expenseType = ExpenseType::query()->create($attributes);
-        Cache::forget(self::CACHE_KEY_LIST);
-        Cache::forget(ExpenseItemService::CACHE_KEY_LIST);
+        $this->forgetCaches();
 
         return $expenseType->load(['expenseCategory', 'company']);
     }
 
     public function updateExpenseType(ExpenseType $expenseType, array $attributes): ExpenseType
     {
-        if (empty($attributes['company_id']) && ! empty($attributes['expense_category_id'])) {
-            $category = ExpenseCategory::query()->findOrFail($attributes['expense_category_id']);
-            $attributes['company_id'] = $category->company_id;
-        }
+        $updated = DB::transaction(function () use ($expenseType, $attributes): ExpenseType {
+            $locked = ExpenseType::query()->lockForUpdate()->findOrFail($expenseType->getKey());
+            $locked->update($attributes);
 
-        $expenseType->update($attributes);
-        Cache::forget(self::CACHE_KEY_LIST);
-        Cache::forget(ExpenseItemService::CACHE_KEY_LIST);
+            return $locked;
+        });
 
-        return $expenseType->refresh()->load(['expenseCategory', 'company']);
+        $this->forgetCaches();
+
+        return $updated->refresh()->load(['expenseCategory', 'company']);
     }
 
     public function deleteExpenseType(ExpenseType $expenseType): void
     {
-        $expenseType->delete();
+        DB::transaction(function () use ($expenseType): void {
+            $locked = ExpenseType::query()->lockForUpdate()->findOrFail($expenseType->getKey());
+
+            if ($locked->expenseItems()->exists()) {
+                throw ValidationException::withMessages([
+                    'expense_type' => [
+                        'This expense type is still referenced by expense items.',
+                    ],
+                ]);
+            }
+
+            $locked->delete();
+        });
+
+        $this->forgetCaches();
+    }
+
+    private function query(Request $request): QueryBuilder
+    {
+        return IndexQuery::make(ExpenseType::class, $request)
+            ->allowedFilters([
+                AllowedFilter::exact('company_id'),
+                AllowedFilter::exact('expense_category_id'),
+                AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
+                    $term = '%'.trim((string) $value).'%';
+
+                    $query->where(function (Builder $searchQuery) use ($term): void {
+                        $searchQuery
+                            ->where('name', 'like', $term)
+                            ->orWhereHas(
+                                'expenseCategory',
+                                fn (Builder $categoryQuery) => $categoryQuery->where('name', 'like', $term)
+                            );
+                    });
+                }),
+            ])
+            ->allowedSorts(['id', 'name', 'created_at', 'updated_at'])
+            ->allowedIncludes(['expenseCategory', 'company'])
+            ->defaultSort('-id');
+    }
+
+    private function forgetCaches(): void
+    {
         Cache::forget(self::CACHE_KEY_LIST);
         Cache::forget(ExpenseItemService::CACHE_KEY_LIST);
     }

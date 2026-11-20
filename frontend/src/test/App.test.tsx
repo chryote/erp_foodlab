@@ -1,5 +1,5 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import App from '../App';
 import * as apiClient from '../api/client';
 import { DEFAULT_CFO_MODULE } from '../modules/CFO/CfoModuleCard';
@@ -14,6 +14,11 @@ vi.mock('../api/client');
 describe('App ERP Main Menu integration', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    window.localStorage.setItem('erp_foodlab.auth_token', 'test-token');
+  });
+
+  afterEach(() => {
+    window.localStorage.clear();
   });
 
   it('renders PT. Slaras Nusa Foodlab header and all 5 ERP module cards (CFO, CHO, CPO, CDO, CMO)', async () => {

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Schema;
 describe('General System Integrity, Schema, Storage & API Contract Guardrails', function () {
     beforeEach(function () {
         Artisan::call('migrate:fresh');
+        actingAsErpUser();
     });
 
     it('ensures storage, logs, and bootstrap/cache directories exist and are writable', function () {
@@ -48,11 +49,11 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
         expect($modelFiles)->not->toBeEmpty();
 
         foreach ($modelFiles as $file) {
-            $className = 'App\\Models\\' . $file->getFilenameWithoutExtension();
+            $className = 'App\\Models\\'.$file->getFilenameWithoutExtension();
             expect(class_exists($className))->toBeTrue("Model class {$className} should exist");
 
             $reflection = new ReflectionClass($className);
-            if ($reflection->isAbstract() || !$reflection->isSubclassOf(Model::class)) {
+            if ($reflection->isAbstract() || ! $reflection->isSubclassOf(Model::class)) {
                 continue;
             }
 
@@ -90,13 +91,13 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
 
                 return str_starts_with($uri, 'api/')
                     && in_array('GET', $methods, true)
-                    && !str_contains($uri, '{');
+                    && ! str_contains($uri, '{');
             });
 
         expect($routes)->not->toBeEmpty();
 
         foreach ($routes as $route) {
-            $uri = '/' . ltrim($route->uri(), '/');
+            $uri = '/'.ltrim($route->uri(), '/');
             $response = $this->withHeaders([
                 'Origin' => 'http://localhost:5173',
                 'Accept' => 'application/json',

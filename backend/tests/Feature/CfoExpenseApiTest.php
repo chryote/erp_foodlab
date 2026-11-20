@@ -1,11 +1,15 @@
 <?php
 
 use App\Models\Company;
+use App\Models\ExpenseCategory;
+use App\Models\ExpenseItem;
+use App\Models\ExpenseType;
 use Illuminate\Support\Facades\Cache;
 
 describe('CFO Expense Category, Type, and Item CRUD scoped by company_id', function () {
     beforeEach(function () {
         Cache::flush();
+        actingAsErpUser();
     });
 
     it('creates, filters, updates, and soft-deletes expense categories, types, and items per company_id via API', function () {
@@ -155,5 +159,55 @@ describe('CFO Expense Category, Type, and Item CRUD scoped by company_id', funct
 
         $this->deleteJson("/api/v1/modules/cfo/expense-categories/{$catAId}")->assertOk();
         $this->assertSoftDeleted('expense_categories', ['id' => $catAId]);
+    });
+
+    it('supports QueryBuilder sorting and includes for expense types', function () {
+        $company = Company::factory()->create();
+        $category = ExpenseCategory::factory()->create([
+            'company_id' => $company->id,
+            'name' => 'Reagen',
+        ]);
+        ExpenseType::factory()->create([
+            'company_id' => $company->id,
+            'expense_category_id' => $category->id,
+            'name' => 'Zeta',
+        ]);
+        ExpenseType::factory()->create([
+            'company_id' => $company->id,
+            'expense_category_id' => $category->id,
+            'name' => 'Alpha',
+        ]);
+
+        $this->getJson('/api/v1/modules/cfo/expense-types?sort=name&include=expenseCategory,company')
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.name', 'Alpha')
+            ->assertJsonPath('data.0.expense_category.name', 'Reagen')
+            ->assertJsonPath('data.0.company.id', $company->id);
+    });
+
+    it('refuses to soft-delete a category or type that is still referenced by items', function () {
+        $company = Company::factory()->create();
+        $category = ExpenseCategory::factory()->create(['company_id' => $company->id]);
+        $type = ExpenseType::factory()->create([
+            'company_id' => $company->id,
+            'expense_category_id' => $category->id,
+        ]);
+        ExpenseItem::factory()->create([
+            'company_id' => $company->id,
+            'expense_category_id' => $category->id,
+            'expense_type_id' => $type->id,
+        ]);
+
+        $this->deleteJson("/api/v1/modules/cfo/expense-types/{$type->id}")
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['expense_type']);
+
+        $this->deleteJson("/api/v1/modules/cfo/expense-categories/{$category->id}")
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['expense_category']);
+
+        $this->assertNotSoftDeleted('expense_types', ['id' => $type->id]);
+        $this->assertNotSoftDeleted('expense_categories', ['id' => $category->id]);
     });
 });

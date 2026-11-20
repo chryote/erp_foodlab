@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Cache;
 describe('ERP Modules API (/api/v1/modules)', function () {
     beforeEach(function () {
         Cache::flush();
+        actingAsErpUser();
     });
 
     it('returns all 5 ERP modules on the main menu endpoint', function () {
