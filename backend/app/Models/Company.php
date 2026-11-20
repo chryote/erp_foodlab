@@ -65,6 +65,11 @@ class Company extends Model
         return $this->hasMany(PayrollGrade::class);
     }
 
+    public function taxStatuses(): HasMany
+    {
+        return $this->hasMany(TaxStatus::class);
+    }
+
     public function employees(): HasMany
     {
         return $this->hasMany(Employee::class);

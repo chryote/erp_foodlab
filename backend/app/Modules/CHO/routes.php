@@ -4,6 +4,7 @@ use App\Modules\CHO\Controllers\ChoController;
 use App\Modules\CHO\Controllers\EmployeePositionController;
 use App\Modules\CHO\Controllers\EmploymentStatusController;
 use App\Modules\CHO\Controllers\PayrollGradeController;
+use App\Modules\CHO\Controllers\TaxStatusController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('cho')->group(function () {
@@ -29,4 +30,11 @@ Route::prefix('cho')->group(function () {
     Route::put('/payroll-grades/{payrollGrade}', [PayrollGradeController::class, 'update'])->name('api.modules.cho.payroll-grades.update');
     Route::patch('/payroll-grades/{payrollGrade}', [PayrollGradeController::class, 'update'])->name('api.modules.cho.payroll-grades.patch');
     Route::delete('/payroll-grades/{payrollGrade}', [PayrollGradeController::class, 'destroy'])->name('api.modules.cho.payroll-grades.destroy');
+
+    Route::get('/tax-statuses', [TaxStatusController::class, 'index'])->name('api.modules.cho.tax-statuses.index');
+    Route::post('/tax-statuses', [TaxStatusController::class, 'store'])->name('api.modules.cho.tax-statuses.store');
+    Route::get('/tax-statuses/{taxStatus}', [TaxStatusController::class, 'show'])->name('api.modules.cho.tax-statuses.show');
+    Route::put('/tax-statuses/{taxStatus}', [TaxStatusController::class, 'update'])->name('api.modules.cho.tax-statuses.update');
+    Route::patch('/tax-statuses/{taxStatus}', [TaxStatusController::class, 'update'])->name('api.modules.cho.tax-statuses.patch');
+    Route::delete('/tax-statuses/{taxStatus}', [TaxStatusController::class, 'destroy'])->name('api.modules.cho.tax-statuses.destroy');
 });
