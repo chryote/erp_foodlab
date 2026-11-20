@@ -429,6 +429,7 @@ export interface CrudModalProps<T extends CrudEntity> {
   inputLabel?: string;
   inputPlaceholder?: string;
   fields?: CrudFieldConfig<T>[];
+  formLayout?: 'auto' | 'single-row';
   computedColumns?: CrudComputedColumnConfig<T>[];
   rowActions?: CrudRowActionConfig<T>[];
   summary?: React.ReactNode;
@@ -457,6 +458,7 @@ export function CrudModal<T extends CrudEntity>({
   inputLabel = 'Nama',
   inputPlaceholder = 'Masukkan nama...',
   fields,
+  formLayout = 'auto',
   computedColumns = [],
   rowActions = [],
   summary,
@@ -740,7 +742,104 @@ export function CrudModal<T extends CrudEntity>({
       : []),
   ];
 
-  const isMultiRowForm = resolvedFields.length > 4;
+  const isSingleRowForm = formLayout === 'single-row';
+  const isMultiRowForm = !isSingleRowForm && resolvedFields.length > 4;
+
+  const renderFieldControl = (field: CrudFieldConfig<T>) => {
+    const isFieldDisabled =
+      typeof field.disabled === 'function'
+        ? field.disabled(formValues)
+        : field.disabled;
+    if (field.type === 'select') {
+      const resolvedOptions =
+        typeof field.options === 'function'
+          ? field.options(formValues)
+          : (field.options ?? []);
+      return (
+        <SelectInput
+          key={field.key}
+          id={`${testId}-${field.key}-input`}
+          label={field.label}
+          placeholder={field.placeholder}
+          options={resolvedOptions}
+          disabled={isFieldDisabled}
+          value={formValues[field.key] ?? ''}
+          onChange={(e) => handleFieldChange(field.key, e.target.value)}
+        />
+      );
+    }
+    if (field.type === 'decimal') {
+      return (
+        <DecimalInput
+          key={field.key}
+          id={`${testId}-${field.key}-input`}
+          label={field.label}
+          placeholder={field.placeholder}
+          value={formValues[field.key] ?? ''}
+          onChange={(rawVal) => handleFieldChange(field.key, rawVal)}
+        />
+      );
+    }
+    if (field.type === 'textarea') {
+      return (
+        <TextareaInput
+          key={field.key}
+          id={`${testId}-${field.key}-input`}
+          label={field.label}
+          placeholder={field.placeholder}
+          rows={field.rows ?? 2}
+          value={formValues[field.key] ?? ''}
+          onChange={(e) => handleFieldChange(field.key, e.target.value)}
+        />
+      );
+    }
+    const isPickerOnlyDate = field.type === 'date' && field.pickerOnly;
+    return (
+      <TextInput
+        key={field.key}
+        id={`${testId}-${field.key}-input`}
+        type={field.type ?? 'text'}
+        step={field.step}
+        min={field.min}
+        label={field.label}
+        placeholder={field.placeholder}
+        className={
+          isPickerOnlyDate
+            ? 'cursor-pointer select-none caret-transparent'
+            : undefined
+        }
+        value={formValues[field.key] ?? ''}
+        onKeyDown={
+          isPickerOnlyDate
+            ? (e) => {
+                if (e.key !== 'Tab' && e.key !== 'Escape') {
+                  e.preventDefault();
+                }
+              }
+            : undefined
+        }
+        onPaste={isPickerOnlyDate ? (e) => e.preventDefault() : undefined}
+        onDrop={isPickerOnlyDate ? (e) => e.preventDefault() : undefined}
+        onClick={
+          isPickerOnlyDate
+            ? (e) => {
+                const input = e.currentTarget as HTMLInputElement & {
+                  showPicker?: () => void;
+                };
+                if (typeof input.showPicker === 'function') {
+                  try {
+                    input.showPicker();
+                  } catch {
+                    // Ignore if browser restricts programmatic picker opening
+                  }
+                }
+              }
+            : undefined
+        }
+        onChange={(e) => handleFieldChange(field.key, e.target.value)}
+      />
+    );
+  };
 
   return (
     <>
@@ -749,7 +848,13 @@ export function CrudModal<T extends CrudEntity>({
         title={title}
         subtitle={subtitle}
         testId={testId}
-        maxWidthClass={isMultiRowForm ? 'max-w-5xl' : 'max-w-3xl'}
+        maxWidthClass={
+          isSingleRowForm
+            ? 'max-w-7xl'
+            : isMultiRowForm
+              ? 'max-w-5xl'
+              : 'max-w-3xl'
+        }
         onClose={onClose}
       >
         {tabs}
@@ -768,116 +873,34 @@ export function CrudModal<T extends CrudEntity>({
             onSubmit={handleSubmit}
             data-testid={`${testId}-form`}
             className={
-              isMultiRowForm
-                ? 'grid grid-cols-1 items-start gap-3 border-b border-border pb-4 sm:grid-cols-2 md:grid-cols-4'
-                : 'flex flex-wrap items-end gap-2.5 border-b border-border pb-4'
+              isSingleRowForm
+                ? 'flex flex-wrap items-end gap-2.5 border-b border-border pb-4'
+                : isMultiRowForm
+                  ? 'grid grid-cols-1 items-start gap-3 border-b border-border pb-4 sm:grid-cols-2 md:grid-cols-4'
+                  : 'flex flex-wrap items-end gap-2.5 border-b border-border pb-4'
             }
           >
             {resolvedFields.map((field) => {
-              const isFieldDisabled =
-                typeof field.disabled === 'function'
-                  ? field.disabled(formValues)
-                  : field.disabled;
-              if (field.type === 'select') {
-                const resolvedOptions =
-                  typeof field.options === 'function'
-                    ? field.options(formValues)
-                    : (field.options ?? []);
-                return (
-                  <SelectInput
-                    key={field.key}
-                    id={`${testId}-${field.key}-input`}
-                    label={field.label}
-                    placeholder={field.placeholder}
-                    options={resolvedOptions}
-                    disabled={isFieldDisabled}
-                    value={formValues[field.key] ?? ''}
-                    onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                  />
-                );
+              const control = renderFieldControl(field);
+              if (!isSingleRowForm) {
+                return control;
               }
-              if (field.type === 'decimal') {
-                return (
-                  <DecimalInput
-                    key={field.key}
-                    id={`${testId}-${field.key}-input`}
-                    label={field.label}
-                    placeholder={field.placeholder}
-                    value={formValues[field.key] ?? ''}
-                    onChange={(rawVal) => handleFieldChange(field.key, rawVal)}
-                  />
-                );
-              }
-              if (field.type === 'textarea') {
-                return (
-                  <TextareaInput
-                    key={field.key}
-                    id={`${testId}-${field.key}-input`}
-                    label={field.label}
-                    placeholder={field.placeholder}
-                    rows={field.rows ?? 2}
-                    value={formValues[field.key] ?? ''}
-                    onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                  />
-                );
-              }
-              const isPickerOnlyDate =
-                field.type === 'date' && field.pickerOnly;
               return (
-                <TextInput
+                <div
                   key={field.key}
-                  id={`${testId}-${field.key}-input`}
-                  type={field.type ?? 'text'}
-                  step={field.step}
-                  min={field.min}
-                  label={field.label}
-                  placeholder={field.placeholder}
-                  className={
-                    isPickerOnlyDate
-                      ? 'cursor-pointer select-none caret-transparent'
-                      : undefined
-                  }
-                  value={formValues[field.key] ?? ''}
-                  onKeyDown={
-                    isPickerOnlyDate
-                      ? (e) => {
-                          if (e.key !== 'Tab' && e.key !== 'Escape') {
-                            e.preventDefault();
-                          }
-                        }
-                      : undefined
-                  }
-                  onPaste={
-                    isPickerOnlyDate ? (e) => e.preventDefault() : undefined
-                  }
-                  onDrop={
-                    isPickerOnlyDate ? (e) => e.preventDefault() : undefined
-                  }
-                  onClick={
-                    isPickerOnlyDate
-                      ? (e) => {
-                          const input = e.currentTarget as HTMLInputElement & {
-                            showPicker?: () => void;
-                          };
-                          if (typeof input.showPicker === 'function') {
-                            try {
-                              input.showPicker();
-                            } catch {
-                              // Ignore if browser restricts programmatic picker opening
-                            }
-                          }
-                        }
-                      : undefined
-                  }
-                  onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                />
+                  className="flex min-w-[140px] flex-1 flex-col"
+                >
+                  {control}
+                </div>
               );
             })}
             <div
               className={
-                isMultiRowForm
-                  ? 'flex items-center justify-end gap-2 sm:pt-[20px] md:justify-start'
-                  : 'flex items-center gap-2'
+                isSingleRowForm
+                  ? 'flex shrink-0 items-center gap-2'
+                  : isMultiRowForm
+                    ? 'flex items-center justify-end gap-2 sm:pt-[20px] md:justify-start'
+                    : 'flex items-center gap-2'
               }
             >
               <Button type="submit" variant="primary" disabled={loading}>

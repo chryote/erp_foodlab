@@ -146,6 +146,17 @@ describe('CFO CompanyAsset (Input Aset)', () => {
     const masterModal = await screen.findByTestId('company-asset-crud-modal');
     expect(masterModal).toBeInTheDocument();
 
+    // Master Aset keeps every CRUD input (and the submit button) on one row.
+    expect(masterModal).toHaveClass('max-w-7xl');
+    const masterAssetForm = screen.getByTestId(
+      'company-asset-crud-modal-form'
+    );
+    expect(masterAssetForm).toHaveClass('flex', 'flex-wrap', 'items-end');
+    expect(masterAssetForm).not.toHaveClass('grid');
+    expect(
+      masterAssetForm.querySelectorAll(':scope > div.flex-1')
+    ).toHaveLength(5);
+
     await waitFor(() => {
       expect(apiClient.fetchCompanyAssets).toHaveBeenCalled();
       expect(screen.getByText('Sentrifus Laboratorium')).toBeInTheDocument();

@@ -149,6 +149,7 @@ export const CompanyAssetCrudModal: React.FC<CompanyAssetCrudModalProps> = ({
       subtitle="Kelola data aset perusahaan pada modul CFO"
       testId="company-asset-crud-modal"
       fields={fields}
+      formLayout="single-row"
       computedColumns={computedColumns}
       summary={
         <SummaryBanner
