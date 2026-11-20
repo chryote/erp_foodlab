@@ -17,6 +17,7 @@ class Employee extends Model
         'company_id',
         'employee_position_id',
         'employment_status_id',
+        'payroll_grade_id',
         'name',
         'email',
         'phone',
@@ -26,6 +27,7 @@ class Employee extends Model
         'company_id' => 'integer',
         'employee_position_id' => 'integer',
         'employment_status_id' => 'integer',
+        'payroll_grade_id' => 'integer',
     ];
 
     public function company(): BelongsTo
@@ -41,5 +43,10 @@ class Employee extends Model
     public function employmentStatus(): BelongsTo
     {
         return $this->belongsTo(EmploymentStatus::class);
+    }
+
+    public function payrollGrade(): BelongsTo
+    {
+        return $this->belongsTo(PayrollGrade::class);
     }
 }

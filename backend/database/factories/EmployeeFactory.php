@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\Employee;
 use App\Models\EmployeePosition;
 use App\Models\EmploymentStatus;
+use App\Models\PayrollGrade;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -21,6 +22,7 @@ class EmployeeFactory extends Factory
             'company_id' => Company::factory(),
             'employee_position_id' => EmployeePosition::factory(),
             'employment_status_id' => EmploymentStatus::factory(),
+            'payroll_grade_id' => PayrollGrade::factory(),
             'name' => $this->faker->name(),
             'email' => $this->faker->unique()->safeEmail(),
             'phone' => $this->faker->numerify('08##########'),
