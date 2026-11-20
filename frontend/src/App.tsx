@@ -7,7 +7,10 @@ import {
   setAuthToken,
 } from '@/lib/authStorage';
 import { createAppQueryClient } from '@/lib/cfoResources';
+import { Route, Routes, Navigate } from 'react-router-dom';
+import DashboardFlowSimulator from './Pages/DashboardFlowSimulator';
 import Dashboard from './Pages/Dashboard';
+import PageNotFound from './Pages/PageNotFound';
 import { LoginPage } from './Pages/LoginPage';
 
 export interface AppProps {
@@ -48,13 +51,32 @@ export const App: React.FC<AppProps> = ({ queryClient: providedClient }) => {
   }, [client]);
 
   if (!token) {
-    return <LoginPage onAuthenticated={handleAuthenticated} />;
+    return (
+      <>
+      <QueryClientProvider client={client}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/login" />} />
+          <Route path="/login" element={<LoginPage onAuthenticated={handleAuthenticated} />} />
+          <Route path="/404" element={<PageNotFound />} />
+          <Route path="*" element={<Navigate to="/404" />} />
+        </Routes>
+      </QueryClientProvider>
+    </>
+    )
   }
 
   return (
-    <QueryClientProvider client={client}>
-      <Dashboard onLogout={handleLogout} />
-    </QueryClientProvider>
+    <>
+      <QueryClientProvider client={client}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/dashboard-flow-simulator" element={<DashboardFlowSimulator onLogout={handleLogout} />} />
+          <Route path="/404" element={<PageNotFound />} />
+          <Route path="*" element={<Navigate to="/404" />} />
+        </Routes>
+      </QueryClientProvider>
+    </>
   );
 };
 
