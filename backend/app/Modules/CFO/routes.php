@@ -2,6 +2,7 @@
 
 use App\Modules\CFO\Controllers\CapitalCompanyController;
 use App\Modules\CFO\Controllers\CfoController;
+use App\Modules\CFO\Controllers\CompanyAssetController;
 use App\Modules\CFO\Controllers\CompanyController;
 use App\Modules\CFO\Controllers\ExpenseCategoryController;
 use App\Modules\CFO\Controllers\ExpenseItemController;
@@ -24,6 +25,13 @@ Route::prefix('cfo')->group(function () {
     Route::put('/capital-companies/{capitalCompany}', [CapitalCompanyController::class, 'update'])->name('api.modules.cfo.capital-companies.update');
     Route::patch('/capital-companies/{capitalCompany}', [CapitalCompanyController::class, 'update'])->name('api.modules.cfo.capital-companies.patch');
     Route::delete('/capital-companies/{capitalCompany}', [CapitalCompanyController::class, 'destroy'])->name('api.modules.cfo.capital-companies.destroy');
+
+    Route::get('/company-assets', [CompanyAssetController::class, 'index'])->name('api.modules.cfo.company-assets.index');
+    Route::post('/company-assets', [CompanyAssetController::class, 'store'])->name('api.modules.cfo.company-assets.store');
+    Route::get('/company-assets/{companyAsset}', [CompanyAssetController::class, 'show'])->name('api.modules.cfo.company-assets.show');
+    Route::put('/company-assets/{companyAsset}', [CompanyAssetController::class, 'update'])->name('api.modules.cfo.company-assets.update');
+    Route::patch('/company-assets/{companyAsset}', [CompanyAssetController::class, 'update'])->name('api.modules.cfo.company-assets.patch');
+    Route::delete('/company-assets/{companyAsset}', [CompanyAssetController::class, 'destroy'])->name('api.modules.cfo.company-assets.destroy');
 
     Route::get('/expense-categories', [ExpenseCategoryController::class, 'index'])->name('api.modules.cfo.expense-categories.index');
     Route::post('/expense-categories', [ExpenseCategoryController::class, 'store'])->name('api.modules.cfo.expense-categories.store');

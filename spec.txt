@@ -1,0 +1,15 @@
+## Feature: CFO / CompanyAsset (Aset Perusahaan)
+- **Table:** `company_assets` — `id`, `company_id` (FK companies, compound index `(company_id, asset_date)`), `asset_date` (date), `name` (varchar 150, index), `amount` (unsigned int, default 1), `price_per_unit` (double), `total_price` (double, derived), timestamps, `softDeletes`
+- **Enum:** none — no status in scope; do not invent one
+- **Relations:** `belongsTo(Company)`; add `Company::companyAssets(): HasMany`
+- **Endpoints (`/api/v1/modules/cfo/company-assets`):** `index`, `store`, `show`, `update` (PUT + PATCH), `destroy` (soft delete, `{message}` response)
+- **QueryBuilder (`Service::list`):** filters=[`company_id` exact, `search` on `name`], sorts=[`id`, `asset_date`, `name`, `amount`, `price_per_unit`, `total_price`, `created_at`], includes=[`company`], defaultSort `-asset_date`, `-id`, cache list + forget on writes
+- **Safety / Business Rules:**
+  - `DB::transaction()` on create/update/delete; `lockForUpdate()` on update/delete
+  - `total_price = amount * price_per_unit` computed in Service; never trusted from the client
+  - `company_id` must exist and not be soft-deleted; `asset_date` = `date_format:Y-m-d`; `amount` >= 1; `name` <= 150; prices >= 0
+  - Single-table writes -> no Action class
+- **Pest Test (`tests/Feature/CompanyAssetTest.php`):** `actingAsErpUser()` + `Cache::flush()`; CRUD, filter/sort/include, 422 (deleted company, bad date, empty name, amount 0, negative price), `assertSoftDeleted`, JsonResource keys
+- **Then:** `make migrate` -> `make schema-dump` -> `make test-filter FILTER=CompanyAssetTest`
+
+
