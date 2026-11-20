@@ -17,6 +17,11 @@ export const CFO_INPUT_OPERASIONAL_ITEMS: HorizontalMenuItem[] = [
   { code: 'VIEW_OPERASIONAL', title: 'View Operasional' },
 ];
 
+export const CFO_INPUT_ASET_ITEMS: HorizontalMenuItem[] = [
+  { code: 'MASTER_ASET', title: 'Master Aset' },
+  { code: 'VIEW_ASET', title: 'View Aset' },
+];
+
 export const CFO_MENU_ITEMS: HorizontalMenuItem[] = [
   {
     code: 'INPUT_MODAL',
@@ -28,7 +33,11 @@ export const CFO_MENU_ITEMS: HorizontalMenuItem[] = [
     title: 'Input Operasional',
     children: CFO_INPUT_OPERASIONAL_ITEMS,
   },
-  { code: 'INPUT_ASET', title: 'Input Aset' },
+  {
+    code: 'INPUT_ASET',
+    title: 'Input Aset',
+    children: CFO_INPUT_ASET_ITEMS,
+  },
   { code: 'LABA_RUGI', title: 'Laba Rugi' },
   { code: 'NERACA', title: 'Neraca' },
 ];

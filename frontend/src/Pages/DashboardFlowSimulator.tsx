@@ -11,9 +11,11 @@ import {
   CfoHorizontalMenu,
   CfoModuleCard,
 } from '@/modules/CFO/CfoModuleCard';
+import { CompanyAssetCrudModal } from '@/modules/CFO/CompanyAssetCrudModal';
 import { CompanyCrudModal } from '@/modules/CFO/CompanyCrudModal';
 import { ExpenseItemCrudModal } from '@/modules/CFO/ExpenseItemCrudModal';
 import { MasterOperasionalCrudModal } from '@/modules/CFO/MasterOperasionalCrudModal';
+import { ViewCompanyAssetModal } from '@/modules/CFO/ViewCompanyAssetModal';
 import { ViewOperasionalModal } from '@/modules/CFO/ViewOperasionalModal';
 import { ChoModuleCard } from '@/modules/CHO/ChoModuleCard';
 import { CmoModuleCard } from '@/modules/CMO/CmoModuleCard';
@@ -190,6 +192,19 @@ export const DashboardFlowSimulator: React.FC<DashboardProps> = ({ onLogout }) =
               isOpen={selectedChildSubMenu?.code === 'ITEM_OPERASIONAL'}
               company={selectedCompany}
               companies={companyResource.companies}
+              onClose={() => setSelectedChildSubMenu(null)}
+            />
+
+            <CompanyAssetCrudModal
+              isOpen={selectedChildSubMenu?.code === 'MASTER_ASET'}
+              company={selectedCompany}
+              companies={companyResource.companies}
+              onClose={() => setSelectedChildSubMenu(null)}
+            />
+
+            <ViewCompanyAssetModal
+              isOpen={selectedChildSubMenu?.code === 'VIEW_ASET'}
+              company={selectedCompany}
               onClose={() => setSelectedChildSubMenu(null)}
             />
           </>

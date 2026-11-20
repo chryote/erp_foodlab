@@ -1,4 +1,5 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import App from '../App';
 import * as apiClient from '../api/client';
@@ -10,6 +11,14 @@ import { DEFAULT_CMO_MODULE } from '../modules/CMO/CmoModuleCard';
 import { formatCurrentMonthDateRange } from '../modules/CFO/ViewOperasionalModal';
 
 vi.mock('../api/client');
+
+function renderApp() {
+  return render(
+    <MemoryRouter initialEntries={['/dashboard-flow-simulator']}>
+      <App />
+    </MemoryRouter>
+  );
+}
 
 describe('App ERP Main Menu integration', () => {
   beforeEach(() => {
@@ -95,7 +104,7 @@ describe('App ERP Main Menu integration', () => {
       }
     );
 
-    render(<App />);
+    renderApp();
 
     expect(screen.getByText('PT. Slaras Nusa Foodlab')).toBeInTheDocument();
     // Main ModuleCards are hidden by default until a secondary company tab is clicked
@@ -332,7 +341,7 @@ describe('App ERP Main Menu integration', () => {
       meta: { count: 3 },
     });
 
-    render(<App />);
+    renderApp();
 
     await waitFor(() => {
       expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(1);
@@ -427,7 +436,7 @@ describe('App ERP Main Menu integration', () => {
       meta: { count: 2 },
     });
 
-    render(<App />);
+    renderApp();
 
     expect(screen.getByText('PT. Slaras Nusa Foodlab')).toBeInTheDocument();
     await waitFor(() => {
@@ -625,7 +634,7 @@ describe('App ERP Main Menu integration', () => {
       return { message: 'Expense item deleted successfully.' };
     });
 
-    render(<App />);
+    renderApp();
 
     await waitFor(() => {
       expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(1);
@@ -1012,7 +1021,7 @@ describe('App ERP Main Menu integration', () => {
       meta: { count: 5 },
     });
 
-    render(<App />);
+    renderApp();
 
     await waitFor(() => {
       expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(1);
