@@ -113,81 +113,86 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   };
 
   return (
-    <header className="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-border pb-5">
-      <div className="w-full flex-1">
-        {eyebrow && (
-          <span className="mb-2 block text-[11px] font-bold uppercase tracking-widest text-primary">
-            {eyebrow}
-          </span>
-        )}
-
-        <div data-testid="header-tiered-tabs" className="flex flex-col">
-          {/* Primary Tabs: Seri 1, Seri 2, Seri 3, ... */}
-          <div
-            role="tablist"
-            aria-label="Series Tabs"
-            data-testid="header-series-tabs"
-            className="flex flex-wrap items-end gap-1 pl-1"
-          >
-            {seriesList.map((series) => {
-              const isSelected = series === activeSeries;
-              return (
-                <button
-                  key={series}
-                  type="button"
-                  role="tab"
-                  aria-selected={isSelected}
-                  data-testid={`series-tab-${series}`}
-                  onClick={() => handleSeriesClick(series)}
-                  className={cn(
-                    'cursor-pointer rounded-t-lg border px-4 py-1.5 text-xs transition-colors',
-                    isSelected
-                      ? 'relative z-10 -mb-px border-border border-b-card bg-card font-bold text-primary shadow-2xs'
-                      : 'border-transparent bg-slate-200/60 font-medium text-muted-foreground hover:bg-slate-200 hover:text-foreground'
-                  )}
-                >
-                  {`Seri ${series}`}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Secondary Tabs: All companies in the selected series */}
-          <div
-            role="tablist"
-            aria-label="Company Tabs"
-            data-testid="header-company-tabs"
-            className="flex flex-wrap items-end gap-1 rounded-b-xl rounded-tr-xl border border-border bg-card px-3 pt-2.5 pb-2 shadow-sm"
-          >
-            {companiesInActiveSeries.map((company) => {
-              const isSelected = activeCompany?.id === company.id;
-              return (
-                <button
-                  key={company.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={isSelected}
-                  data-testid={`company-tab-${company.id}`}
-                  onClick={() => handleCompanyClick(company)}
-                  className={cn(
-                    'cursor-pointer rounded-md border px-4 py-1.5 text-left transition-colors',
-                    isSelected
-                      ? 'border-primary/40 bg-primary/15 text-base font-bold tracking-tight text-foreground shadow-2xs'
-                      : 'border-border/80 bg-muted/60 text-sm font-medium text-foreground/80 hover:border-primary/40 hover:bg-primary/5 hover:text-foreground'
-                  )}
-                >
-                  {company.name}
-                </button>
-              );
-            })}
-          </div>
+    <header className="mb-7 border-b border-border pb-5">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          {eyebrow && (
+            <span className="block text-[11px] font-bold uppercase tracking-widest text-primary">
+              {eyebrow}
+            </span>
+          )}
         </div>
 
-        {subtitle && (
-          <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p>
+        {actions && (
+          <div className="flex shrink-0 items-center gap-3">{actions}</div>
         )}
       </div>
-      {actions && <div className="flex items-center gap-3">{actions}</div>}
+
+      <div data-testid="header-tiered-tabs" className="mt-3 flex flex-col">
+        {/* Primary Tabs: Seri 1, Seri 2, Seri 3, ... */}
+        <div
+          role="tablist"
+          aria-label="Series Tabs"
+          data-testid="header-series-tabs"
+          className="flex flex-wrap items-end gap-1 pl-1"
+        >
+          {seriesList.map((series) => {
+            const isSelected = series === activeSeries;
+            return (
+              <button
+                key={series}
+                type="button"
+                role="tab"
+                aria-selected={isSelected}
+                data-testid={`series-tab-${series}`}
+                onClick={() => handleSeriesClick(series)}
+                className={cn(
+                  'cursor-pointer rounded-t-lg border px-4 py-1.5 text-xs transition-colors',
+                  isSelected
+                    ? 'relative z-10 -mb-px border-border border-b-card bg-card font-bold text-primary shadow-2xs'
+                    : 'border-transparent bg-slate-200/60 font-medium text-muted-foreground hover:bg-slate-200 hover:text-foreground'
+                )}
+              >
+                {`Seri ${series}`}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Secondary Tabs: All companies in the selected series */}
+        <div
+          role="tablist"
+          aria-label="Company Tabs"
+          data-testid="header-company-tabs"
+          className="flex flex-wrap items-end gap-1 rounded-b-xl rounded-tr-xl border border-border bg-card px-3 pt-2.5 pb-2 shadow-sm"
+        >
+          {companiesInActiveSeries.map((company) => {
+            const isSelected = activeCompany?.id === company.id;
+            return (
+              <button
+                key={company.id}
+                type="button"
+                role="tab"
+                aria-selected={isSelected}
+                data-testid={`company-tab-${company.id}`}
+                onClick={() => handleCompanyClick(company)}
+                className={cn(
+                  'cursor-pointer rounded-md border px-4 py-1.5 text-left transition-colors',
+                  isSelected
+                    ? 'border-primary/40 bg-primary/15 text-base font-bold tracking-tight text-foreground shadow-2xs'
+                    : 'border-border/80 bg-muted/60 text-sm font-medium text-foreground/80 hover:border-primary/40 hover:bg-primary/5 hover:text-foreground'
+                )}
+              >
+                {company.name}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {subtitle && (
+        <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p>
+      )}
     </header>
   );
 };

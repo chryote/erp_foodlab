@@ -1,12 +1,17 @@
 <?php
 
+use App\Models\CapitalCompany;
 use App\Models\Company;
+use App\Models\ExpenseCategory;
+use App\Models\ExpenseItem;
+use App\Models\ExpenseType;
 use App\Modules\CFO\Services\CompanyService;
 use Illuminate\Support\Facades\Cache;
 
 describe('CFO Company CRUD API (/api/v1/modules/cfo/companies)', function () {
     beforeEach(function () {
         Cache::flush();
+        actingAsErpUser();
     });
 
     it('lists companies and caches results', function () {
@@ -89,5 +94,49 @@ describe('CFO Company CRUD API (/api/v1/modules/cfo/companies)', function () {
         ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['name', 'series']);
+    });
+
+    it('supports QueryBuilder filters, sorts, and includes', function () {
+        $company = Company::factory()->create([
+            'name' => 'PT. Beta',
+            'series' => 2,
+        ]);
+        Company::factory()->create([
+            'name' => 'PT. Alpha',
+            'series' => 1,
+        ]);
+        CapitalCompany::factory()->create([
+            'company_id' => $company->id,
+            'stakeholder_name' => 'Rian',
+        ]);
+
+        $this->getJson('/api/v1/modules/cfo/companies?filter[series]=2&sort=name&include=capitalCompanies')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.name', 'PT. Beta')
+            ->assertJsonPath('data.0.capital_companies.0.stakeholder_name', 'Rian');
+    });
+
+    it('soft-deletes dependent financial records when a company is deleted', function () {
+        $company = Company::factory()->create();
+        $capital = CapitalCompany::factory()->create(['company_id' => $company->id]);
+        $category = ExpenseCategory::factory()->create(['company_id' => $company->id]);
+        $type = ExpenseType::factory()->create([
+            'company_id' => $company->id,
+            'expense_category_id' => $category->id,
+        ]);
+        $item = ExpenseItem::factory()->create([
+            'company_id' => $company->id,
+            'expense_category_id' => $category->id,
+            'expense_type_id' => $type->id,
+        ]);
+
+        $this->deleteJson("/api/v1/modules/cfo/companies/{$company->id}")->assertOk();
+
+        $this->assertSoftDeleted('companies', ['id' => $company->id]);
+        $this->assertSoftDeleted('capital_companies', ['id' => $capital->id]);
+        $this->assertSoftDeleted('expense_categories', ['id' => $category->id]);
+        $this->assertSoftDeleted('expense_types', ['id' => $type->id]);
+        $this->assertSoftDeleted('expense_items', ['id' => $item->id]);
     });
 });

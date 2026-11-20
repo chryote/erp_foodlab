@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Cache;
 describe('CFO CapitalCompany CRUD API (/api/v1/modules/cfo/capital-companies)', function () {
     beforeEach(function () {
         Cache::flush();
+        actingAsErpUser();
     });
 
     it('lists capital companies with company relation and caches results', function () {
@@ -73,6 +74,11 @@ describe('CFO CapitalCompany CRUD API (/api/v1/modules/cfo/capital-companies)', 
             ->assertJsonPath('meta.total', 3)
             ->assertJsonPath('meta.per_page', 2)
             ->assertJsonPath('meta.last_page', 2);
+
+        $this->getJson('/api/v1/modules/cfo/capital-companies?sort=capital&include=company')
+            ->assertOk()
+            ->assertJsonPath('data.0.stakeholder_name', 'Rian')
+            ->assertJsonPath('data.0.company.name', 'PT. Slaras Nusa Foodlab');
     });
 
     it('creates, updates, shows, and soft-deletes a capital company with stakeholder_name and float capital', function () {

@@ -1,0 +1,39 @@
+<?php
+
+namespace App\Modules\CFO\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class SaveCompanyRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function rules(): array
+    {
+        return [
+            'name' => ['required', 'string', 'max:150'],
+            'series' => ['sometimes', 'required', 'integer', 'min:1'],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function payload(): array
+    {
+        $validated = $this->validated();
+        $validated['name'] = (string) $validated['name'];
+
+        if (array_key_exists('series', $validated)) {
+            $validated['series'] = (int) $validated['series'];
+        }
+
+        return $validated;
+    }
+}

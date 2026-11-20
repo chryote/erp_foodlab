@@ -4,10 +4,16 @@ namespace App\Services;
 
 use App\Enums\LabSampleStatus;
 use App\Models\LabSample;
-use Illuminate\Support\Collection;
+use App\Support\IndexQuery;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\QueryBuilder;
 
 class LabSampleService
 {
@@ -39,18 +45,25 @@ class LabSampleService
     }
 
     /**
-     * Retrieve recent lab samples using Redis/Cache-aside pattern.
+     * List or paginate test samples using Spatie QueryBuilder.
+     *
+     * @return LengthAwarePaginator|Collection<int, LabSample>
      */
-    public function listRecentSamples(int $limit = 50): Collection
+    public function list(Request $request): LengthAwarePaginator|Collection
     {
-        $ttl = (int) config('prometheus.sample_list_cache_ttl', 60);
+        $query = $this->query($request);
 
-        return Cache::remember(self::CACHE_KEY_LIST, $ttl, function () use ($limit) {
-            return LabSample::query()
-                ->latest('id')
-                ->limit($limit)
-                ->get();
-        });
+        if (IndexQuery::isPaginated($request)) {
+            return IndexQuery::paginate($query, $request);
+        }
+
+        if (IndexQuery::isCacheable($request)) {
+            $ttl = (int) config('prometheus.sample_list_cache_ttl', 60);
+
+            return Cache::remember(self::CACHE_KEY_LIST, $ttl, fn () => $query->get());
+        }
+
+        return $query->get();
     }
 
     /**
@@ -68,5 +81,25 @@ class LabSampleService
         Cache::forget(self::CACHE_KEY_LIST);
 
         return $sample;
+    }
+
+    private function query(Request $request): QueryBuilder
+    {
+        return IndexQuery::make(LabSample::class, $request)
+            ->allowedFilters([
+                AllowedFilter::exact('status'),
+                AllowedFilter::exact('category'),
+                AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
+                    $term = '%'.trim((string) $value).'%';
+
+                    $query->where(function (Builder $searchQuery) use ($term): void {
+                        $searchQuery
+                            ->where('batch_code', 'like', $term)
+                            ->orWhere('product_name', 'like', $term);
+                    });
+                }),
+            ])
+            ->allowedSorts(['id', 'batch_code', 'product_name', 'category', 'status', 'created_at'])
+            ->defaultSort('-id');
     }
 }

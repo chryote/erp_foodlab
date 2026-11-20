@@ -1,3 +1,5 @@
+import { clearAuthToken, getAuthToken } from '@/lib/authStorage';
+
 export interface HealthResponse {
   status: 'ok' | 'degraded';
   service: string;
@@ -6,6 +8,23 @@ export interface HealthResponse {
     cache_redis: 'ok' | 'error';
   };
   timestamp: string;
+}
+
+export interface AuthUser {
+  id: number;
+  name: string;
+  email: string;
+  email_verified_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface LoginResponse {
+  data: {
+    user: AuthUser;
+    token: string;
+    token_type: string;
+  };
 }
 
 export interface LabSample {
@@ -189,10 +208,12 @@ async function requestJson<T>(
 ): Promise<T> {
   let response: Response;
   try {
+    const token = getAuthToken();
     response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers: {
         Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(options.headers ?? {}),
       },
     });
@@ -201,6 +222,13 @@ async function requestJson<T>(
     throw new Error(
       `Tidak dapat terhubung ke server API (${API_BASE_URL}${endpoint}): ${detail}`
     );
+  }
+
+  if (response.status === 401) {
+    clearAuthToken();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('erp:unauthorized'));
+    }
   }
 
   if (!response.ok) {
@@ -494,4 +522,32 @@ export async function deleteExpenseItem(
     { method: 'DELETE' },
     'Failed to delete expense item'
   );
+}
+
+export async function login(payload: {
+  email: string;
+  password: string;
+  device_name?: string;
+}): Promise<LoginResponse> {
+  return requestJson<LoginResponse>(
+    '/v1/auth/login',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Login gagal'
+  );
+}
+
+export async function logout(): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    '/v1/auth/logout',
+    { method: 'POST' },
+    'Logout gagal'
+  );
+}
+
+export async function fetchCurrentUser(): Promise<{ data: AuthUser }> {
+  return requestJson<{ data: AuthUser }>('/v1/auth/me', {}, 'Gagal memuat sesi');
 }

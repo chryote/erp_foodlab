@@ -2,86 +2,38 @@
 
 namespace App\Modules\CFO\Controllers;
 
+use App\Http\Controllers\Concerns\RespondsWithApiList;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\CapitalCompanyResource;
 use App\Models\CapitalCompany;
+use App\Modules\CFO\Requests\SaveCapitalCompanyRequest;
 use App\Modules\CFO\Services\CapitalCompanyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class CapitalCompanyController extends Controller
 {
+    use RespondsWithApiList;
+
     public function __construct(
         protected CapitalCompanyService $capitalCompanyService
     ) {}
 
     public function index(Request $request): JsonResponse
     {
-        $search = $request->query('search');
-        $companyId = $request->query('company_id');
-        $perPage = $request->query('per_page');
-        $page = $request->query('page');
-
-        if ($search !== null || $perPage !== null || $page !== null) {
-            $paginator = $this->capitalCompanyService->paginateCapitalCompanies(
-                is_string($search) ? $search : null,
-                max(1, (int) ($perPage ?? 10)),
-                max(1, (int) ($page ?? 1)),
-                $companyId !== null ? (int) $companyId : null
-            );
-            $totalCapital = $companyId !== null
-                ? $this->capitalCompanyService->getTotalCapitalForCompany((int) $companyId)
-                : $this->capitalCompanyService->getTotalCapital();
-
-            return response()->json([
-                'data' => CapitalCompanyResource::collection($paginator->items()),
-                'meta' => [
-                    'count' => count($paginator->items()),
-                    'total' => $paginator->total(),
-                    'total_capital' => $totalCapital,
-                    'page' => $paginator->currentPage(),
-                    'per_page' => $paginator->perPage(),
-                    'last_page' => $paginator->lastPage(),
-                    'cache_key' => CapitalCompanyService::CACHE_KEY_LIST,
-                ],
-            ]);
-        }
-
-        $capitalCompanies = $companyId !== null
-            ? $this->capitalCompanyService->listCapitalCompaniesByCompany((int) $companyId)
-            : $this->capitalCompanyService->listCapitalCompanies();
-        $totalCapital = (float) $capitalCompanies->sum('capital');
-
-        return response()->json([
-            'data' => CapitalCompanyResource::collection($capitalCompanies),
-            'meta' => [
-                'count' => $capitalCompanies->count(),
-                'total' => $capitalCompanies->count(),
-                'total_capital' => $totalCapital,
-                'page' => 1,
-                'per_page' => max(1, $capitalCompanies->count()),
-                'last_page' => 1,
+        return $this->respondWithList(
+            CapitalCompanyResource::class,
+            $this->capitalCompanyService->list($request),
+            [
+                'total_capital' => $this->capitalCompanyService->totalCapital($request),
                 'cache_key' => CapitalCompanyService::CACHE_KEY_LIST,
-            ],
-        ]);
+            ]
+        );
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(SaveCapitalCompanyRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'company_id' => [
-                'required',
-                'integer',
-                Rule::exists('companies', 'id')->whereNull('deleted_at'),
-            ],
-            'stakeholder_name' => ['required', 'string', 'max:150'],
-            'capital' => ['required', 'numeric', 'min:0'],
-        ]);
-
-        $validated['capital'] = (float) $validated['capital'];
-
-        $capitalCompany = $this->capitalCompanyService->createCapitalCompany($validated);
+        $capitalCompany = $this->capitalCompanyService->createCapitalCompany($request->payload());
 
         return (new CapitalCompanyResource($capitalCompany))
             ->response()
@@ -93,21 +45,9 @@ class CapitalCompanyController extends Controller
         return (new CapitalCompanyResource($capitalCompany->load('company')))->response();
     }
 
-    public function update(Request $request, CapitalCompany $capitalCompany): JsonResponse
+    public function update(SaveCapitalCompanyRequest $request, CapitalCompany $capitalCompany): JsonResponse
     {
-        $validated = $request->validate([
-            'company_id' => [
-                'required',
-                'integer',
-                Rule::exists('companies', 'id')->whereNull('deleted_at'),
-            ],
-            'stakeholder_name' => ['required', 'string', 'max:150'],
-            'capital' => ['required', 'numeric', 'min:0'],
-        ]);
-
-        $validated['capital'] = (float) $validated['capital'];
-
-        $updated = $this->capitalCompanyService->updateCapitalCompany($capitalCompany, $validated);
+        $updated = $this->capitalCompanyService->updateCapitalCompany($capitalCompany, $request->payload());
 
         return (new CapitalCompanyResource($updated))->response();
     }

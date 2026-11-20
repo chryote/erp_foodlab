@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Cache;
 describe('LabSample API (/api/v1/samples)', function () {
     beforeEach(function () {
         Cache::flush();
+        actingAsErpUser();
     });
 
     it('lists lab samples and caches results in Redis/Cache store', function () {
