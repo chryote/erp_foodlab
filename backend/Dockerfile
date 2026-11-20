@@ -32,8 +32,9 @@ COPY --from=composer:2.8 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-COPY composer.json ./
-RUN composer install --no-interaction --prefer-dist --no-scripts --no-autoloader
+COPY composer.json composer.lock* ./
+RUN composer install --no-interaction --prefer-dist --no-scripts --no-autoloader \
+    && cat composer.json composer.lock 2>/dev/null | sha256sum | awk '{print $1}' > /var/www/html/vendor/.composer.deps.sha256
 
 COPY . .
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
