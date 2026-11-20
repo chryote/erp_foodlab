@@ -2,6 +2,9 @@
 
 namespace Database\Factories;
 
+use App\Enums\Agama;
+use App\Enums\GolonganDarah;
+use App\Enums\JenisKelamin;
 use App\Models\Company;
 use App\Models\Employee;
 use App\Models\EmployeePosition;
@@ -28,6 +31,24 @@ class EmployeeFactory extends Factory
             'name' => $this->faker->name(),
             'email' => $this->faker->unique()->safeEmail(),
             'phone' => $this->faker->numerify('08##########'),
+            'photo_url' => null,
+            'nik_ktp' => $this->faker->unique()->numerify('################'),
+            'nickname' => $this->faker->firstName(),
+            'birth_place' => $this->faker->city(),
+            'birth_date' => $this->faker->date('Y-m-d', '-20 years'),
+            'gender' => $this->faker->randomElement(JenisKelamin::values()),
+            'religion' => $this->faker->randomElement(Agama::values()),
+            'blood_type' => $this->faker->randomElement(GolonganDarah::values()),
+            'mother_name' => $this->faker->name('female'),
+            'ktp_address' => $this->faker->address(),
+            'domicile_address' => $this->faker->address(),
+            'whatsapp_number' => $this->faker->numerify('08##########'),
+            'emergency_phone_number' => $this->faker->numerify('08##########'),
+            'instagram' => '@'.$this->faker->userName(),
+            'tiktok' => '@'.$this->faker->userName(),
+            'bpjs_ketenagakerjaan' => $this->faker->numerify('###########'),
+            'bpjs_kesehatan' => $this->faker->numerify('#############'),
+            'npwp_number' => $this->faker->numerify('################'),
         ];
     }
 }
