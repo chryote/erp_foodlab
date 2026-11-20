@@ -11,6 +11,8 @@ enum JenisDokumen: string
 {
     use HasEnumHelpers;
 
+    public const DEFAULT_MAX_SIZE_KB = 10240;
+
     private const FORMAT_PDF_AND_IMAGE = ['.pdf', '.jpg', '.jpeg', '.png'];
 
     private const FORMAT_IMAGE_ONLY = ['.jpg', '.jpeg', '.png'];
@@ -110,6 +112,97 @@ enum JenisDokumen: string
         $normalized = strtolower(ltrim(trim($formatOrExtension), '.'));
 
         return $normalized !== '' && in_array($normalized, $this->allowedExtensions(), true);
+    }
+
+    /**
+     * Maximum allowed file size in kilobytes for this document type.
+     */
+    public function maxSizeKb(): int
+    {
+        return self::DEFAULT_MAX_SIZE_KB;
+    }
+
+    /**
+     * Storage subdirectory path for this document type.
+     */
+    public function storageDirectory(?string $baseDirectory = null): string
+    {
+        $prefix = $baseDirectory !== null && trim($baseDirectory, '/') !== ''
+            ? trim($baseDirectory, '/').'/'
+            : '';
+
+        return "{$prefix}documents/{$this->value}";
+    }
+
+    /**
+     * Laravel file validation rules tailored to this document type.
+     *
+     * @return list<string>
+     */
+    public function validationRules(bool $required = true, ?int $maxSizeKb = null): array
+    {
+        return [
+            $required ? 'required' : 'nullable',
+            'file',
+            $this->mimesRule(),
+            'max:'.($maxSizeKb ?? $this->maxSizeKb()),
+        ];
+    }
+
+    /**
+     * All unique allowed formats across every document type.
+     *
+     * @return list<string>
+     */
+    public static function allAllowedFormats(): array
+    {
+        $formats = [];
+
+        foreach (self::cases() as $case) {
+            foreach ($case->allowedFormats() as $format) {
+                if (! in_array($format, $formats, true)) {
+                    $formats[] = $format;
+                }
+            }
+        }
+
+        return $formats;
+    }
+
+    /**
+     * All unique allowed extensions (without leading dots) across every document type.
+     *
+     * @return list<string>
+     */
+    public static function allAllowedExtensions(): array
+    {
+        return array_map(
+            static fn (string $format): string => ltrim($format, '.'),
+            self::allAllowedFormats(),
+        );
+    }
+
+    /**
+     * Combined Laravel mimes rule across all document types.
+     */
+    public static function allMimesRule(): string
+    {
+        return 'mimes:'.implode(',', self::allAllowedExtensions());
+    }
+
+    /**
+     * Default Laravel file validation rules across all document types.
+     *
+     * @return list<string>
+     */
+    public static function defaultValidationRules(bool $required = true, ?int $maxSizeKb = null): array
+    {
+        return [
+            $required ? 'required' : 'nullable',
+            'file',
+            self::allMimesRule(),
+            'max:'.($maxSizeKb ?? self::DEFAULT_MAX_SIZE_KB),
+        ];
     }
 
     /**

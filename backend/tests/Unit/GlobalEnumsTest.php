@@ -92,6 +92,15 @@ describe('Global Backend Enums', function () {
             ->and(JenisDokumen::PAS_FOTO->isAllowedFormat('.pdf'))->toBeFalse()
             ->and(JenisDokumen::CV->allowedFormats())->toBe(['.pdf', '.doc', '.docx'])
             ->and(JenisDokumen::KONTRAK_KERJA->allowedFormats())->toBe(['.pdf'])
+            ->and(JenisDokumen::allAllowedFormats())->toBe(['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx'])
+            ->and(JenisDokumen::allAllowedExtensions())->toBe(['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'])
+            ->and(JenisDokumen::allMimesRule())->toBe('mimes:pdf,jpg,jpeg,png,doc,docx')
+            ->and(JenisDokumen::KTP->maxSizeKb())->toBe(10240)
+            ->and(JenisDokumen::KTP->storageDirectory())->toBe('documents/ktp')
+            ->and(JenisDokumen::KTP->storageDirectory('users/7'))->toBe('users/7/documents/ktp')
+            ->and(JenisDokumen::PAS_FOTO->validationRules())->toBe(['required', 'file', 'mimes:jpg,jpeg,png', 'max:10240'])
+            ->and(JenisDokumen::PAS_FOTO->validationRules(required: false, maxSizeKb: 2048))->toBe(['nullable', 'file', 'mimes:jpg,jpeg,png', 'max:2048'])
+            ->and(JenisDokumen::defaultValidationRules())->toBe(['required', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:10240'])
             ->and(JenisDokumen::options())->toHaveCount(11);
     });
 
