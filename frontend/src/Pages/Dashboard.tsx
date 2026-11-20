@@ -1,15 +1,22 @@
 import React, { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   ArrowUpRight,
   Building2,
   CalendarDays,
   CircleDollarSign,
   ClipboardList,
+  LogOut,
   Plus,
   ReceiptText,
   Users,
 } from 'lucide-react';
-import type { Company, ExpenseItem } from '@/api/client';
+import {
+  fetchCurrentUser,
+  type AuthUser,
+  type Company,
+  type ExpenseItem,
+} from '@/api/client';
 import { Button, Card, CardHeader, PageHeader } from '@/components/ui';
 import {
   useCapitalOverviewResource,
@@ -26,6 +33,10 @@ import {
 } from '@/modules/CFO/ViewOperasionalModal';
 
 type DashboardModal = 'capital' | 'expense' | 'operations' | null;
+
+export interface DashboardProps {
+  onLogout?: () => void | Promise<void>;
+}
 
 interface MetricCardProps {
   label: string;
@@ -123,11 +134,30 @@ function getItemCategoryId(
   );
 }
 
-export const Dashboard: React.FC = () => {
+function getUserInitials(name: string): string {
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0] ?? '')
+      .join('')
+      .toLocaleUpperCase() || 'U'
+  );
+}
+
+export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(
     null
   );
   const [activeModal, setActiveModal] = useState<DashboardModal>(null);
+  const currentUserQuery = useQuery<AuthUser>({
+    queryKey: ['auth', 'current-user'],
+    queryFn: async () => {
+      const response = await fetchCurrentUser();
+      return response.data;
+    },
+  });
   const {
     capitalCompanies,
     companies,
@@ -256,7 +286,14 @@ export const Dashboard: React.FC = () => {
     setSelectedCompanyId(company.id);
   };
 
-  const error = capitalError ?? operationsError;
+  const userError = currentUserQuery.error
+    ? currentUserQuery.error instanceof Error
+      ? currentUserQuery.error.message
+      : 'Gagal memuat data pengguna.'
+    : null;
+  const errors = [userError, capitalError, operationsError].filter(
+    (message): message is string => Boolean(message)
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -275,21 +312,62 @@ export const Dashboard: React.FC = () => {
           onSelectSeries={handleSelectSeries}
           onSelectCompany={handleSelectCompany}
           actions={
-            <span className="hidden items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground sm:inline-flex">
-              <CalendarDays aria-hidden="true" className="size-4" />
-              {dateRange}
-            </span>
+            <>
+              {currentUserQuery.data ? (
+                <div
+                  aria-label={`Pengguna aktif: ${currentUserQuery.data.name}, ${currentUserQuery.data.email}`}
+                  className="flex items-center gap-2 rounded-full border border-border bg-card py-1 pl-1 pr-3"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-semibold text-primary"
+                  >
+                    {getUserInitials(currentUserQuery.data.name)}
+                  </span>
+                  <span className="hidden min-w-0 sm:block">
+                    <span className="block max-w-40 truncate text-xs font-semibold text-foreground">
+                      {currentUserQuery.data.name}
+                    </span>
+                    <span className="block max-w-40 truncate text-[11px] text-muted-foreground">
+                      {currentUserQuery.data.email}
+                    </span>
+                  </span>
+                </div>
+              ) : currentUserQuery.isLoading ? (
+                <span
+                  role="status"
+                  className="hidden text-xs text-muted-foreground sm:inline"
+                >
+                  Memuat pengguna...
+                </span>
+              ) : null}
+              <span className="hidden items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground xl:inline-flex">
+                <CalendarDays aria-hidden="true" className="size-4" />
+                {dateRange}
+              </span>
+              {onLogout && (
+                <Button
+                  variant="secondary"
+                  aria-label="Keluar"
+                  onClick={onLogout}
+                >
+                  <LogOut aria-hidden="true" className="size-4 sm:mr-1.5" />
+                  <span className="hidden sm:inline">Keluar</span>
+                </Button>
+              )}
+            </>
           }
         />
 
-        {error && (
+        {errors.map((message) => (
           <div
+            key={message}
             role="alert"
-            className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            className="mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
           >
-            {error}
+            {message}
           </div>
-        )}
+        ))}
 
         {!capitalLoading && companies.length === 0 && (
           <div className="mb-6 rounded-xl border border-dashed border-border bg-card px-5 py-6 text-sm text-muted-foreground">

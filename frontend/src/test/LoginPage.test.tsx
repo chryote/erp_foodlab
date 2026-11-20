@@ -35,12 +35,43 @@ describe('LoginPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Masuk' }));
 
     await waitFor(() => {
-      expect(onAuthenticated).toHaveBeenCalledWith('token-123');
+      expect(onAuthenticated).toHaveBeenCalledWith('token-123', false);
     });
     expect(apiClient.login).toHaveBeenCalledWith({
       email: 'admin@foodlab.test',
       password: 'password',
       device_name: 'erp-web',
+    });
+  });
+
+  it('passes development mode when the login option is checked', async () => {
+    vi.mocked(apiClient.login).mockResolvedValue({
+      data: {
+        user: {
+          id: 1,
+          name: 'ERP Administrator',
+          email: 'admin@foodlab.test',
+        },
+        token: 'token-123',
+        token_type: 'Bearer',
+      },
+    });
+    const onAuthenticated = vi.fn();
+
+    render(<LoginPage onAuthenticated={onAuthenticated} />);
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: /Mode pengembangan/ })
+    );
+    fireEvent.change(screen.getByLabelText('Email'), {
+      target: { value: 'admin@foodlab.test' },
+    });
+    fireEvent.change(screen.getByLabelText('Kata Sandi'), {
+      target: { value: 'password' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Masuk' }));
+
+    await waitFor(() => {
+      expect(onAuthenticated).toHaveBeenCalledWith('token-123', true);
     });
   });
 

@@ -85,9 +85,60 @@ describe('App ERP Main Menu integration', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Masuk' }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('current-path')).toHaveTextContent('/');
+      expect(screen.getByTestId('current-path')).toHaveTextContent(/^\/$/);
     });
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
+  });
+
+  it('opens the flow simulator after login when development mode is enabled', async () => {
+    window.localStorage.clear();
+    vi.mocked(apiClient.login).mockResolvedValue({
+      data: {
+        user: { id: 1, name: 'ERP Administrator', email: 'admin@foodlab.test' },
+        token: 'token-123',
+        token_type: 'Bearer',
+      },
+    });
+    vi.mocked(apiClient.fetchErpModules).mockResolvedValue({
+      data: [],
+      meta: { count: 0 },
+    });
+    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
+      data: [],
+      meta: { count: 0 },
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <CurrentPath />
+        <App />
+      </MemoryRouter>
+    );
+
+    fireEvent.change(screen.getByLabelText('Email'), {
+      target: { value: 'admin@foodlab.test' },
+    });
+    fireEvent.change(screen.getByLabelText('Kata Sandi'), {
+      target: { value: 'password' },
+    });
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: /Mode pengembangan/ })
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Masuk' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('current-path')).toHaveTextContent(
+        /^\/dashboard-flow-simulator$/
+      );
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Keluar' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('current-path')).toHaveTextContent(/^\/$/);
+    });
+    expect(window.localStorage.getItem('erp_foodlab.development_mode')).toBe(
+      null
+    );
+    expect(await screen.findByLabelText('Email')).toBeInTheDocument();
   });
 
   it('renders PT. Slaras Nusa Foodlab header and all 5 ERP module cards (CFO, CHO, CPO, CDO, CMO)', async () => {

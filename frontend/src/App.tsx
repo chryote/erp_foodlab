@@ -3,7 +3,9 @@ import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { logout as logoutRequest } from '@/api/client';
 import {
   clearAuthToken,
+  getDevelopmentMode,
   getAuthToken,
+  setDevelopmentMode as persistDevelopmentMode,
   setAuthToken,
 } from '@/lib/authStorage';
 import { createAppQueryClient } from '@/lib/cfoResources';
@@ -22,20 +24,29 @@ export const App: React.FC<AppProps> = ({ queryClient: providedClient }) => {
   const client = providedClient ?? defaultClient;
   const navigate = useNavigate();
   const [token, setToken] = useState<string | null>(() => getAuthToken());
+  const [developmentMode, setDevelopmentMode] = useState(getDevelopmentMode);
 
   useEffect(() => {
-    const handleUnauthorized = () => setToken(null);
+    const handleUnauthorized = () => {
+      setToken(null);
+      setDevelopmentMode(false);
+    };
     window.addEventListener('erp:unauthorized', handleUnauthorized);
 
     return () => window.removeEventListener('erp:unauthorized', handleUnauthorized);
   }, []);
 
   const handleAuthenticated = useCallback(
-    (nextToken: string) => {
+    (nextToken: string, useDevelopmentMode: boolean) => {
       setAuthToken(nextToken);
+      persistDevelopmentMode(useDevelopmentMode);
       client.clear();
       setToken(nextToken);
-      navigate('/', { replace: true });
+      setDevelopmentMode(useDevelopmentMode);
+      navigate(
+        useDevelopmentMode ? '/dashboard-flow-simulator' : '/',
+        { replace: true }
+      );
     },
     [client, navigate]
   );
@@ -50,6 +61,7 @@ export const App: React.FC<AppProps> = ({ queryClient: providedClient }) => {
     clearAuthToken();
     client.clear();
     setToken(null);
+    setDevelopmentMode(false);
     navigate('/', { replace: true });
   }, [client, navigate]);
 
@@ -73,9 +85,27 @@ export const App: React.FC<AppProps> = ({ queryClient: providedClient }) => {
     <>
       <QueryClientProvider client={client}>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
+          <Route
+            path="/"
+            element={
+              developmentMode ? (
+                <Navigate to="/dashboard-flow-simulator" replace />
+              ) : (
+                <Dashboard onLogout={handleLogout} />
+              )
+            }
+          />
           <Route path="/login" element={<Navigate to="/" replace />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route
+            path="/dashboard"
+            element={
+              developmentMode ? (
+                <Navigate to="/dashboard-flow-simulator" replace />
+              ) : (
+                <Dashboard onLogout={handleLogout} />
+              )
+            }
+          />
           <Route path="/dashboard-flow-simulator" element={<DashboardFlowSimulator onLogout={handleLogout} />} />
           <Route path="/404" element={<PageNotFound />} />
           <Route path="*" element={<Navigate to="/404" />} />
