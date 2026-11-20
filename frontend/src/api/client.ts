@@ -224,8 +224,21 @@ export interface CompanyAssetsListResponse {
   };
 }
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+function resolveApiBaseUrl(): string {
+  const configured = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/+$/, '');
+  }
+  if (import.meta.env.DEV) {
+    return '/api';
+  }
+  if (typeof window !== 'undefined' && window.location?.hostname) {
+    return `${window.location.protocol}//${window.location.hostname}:8000/api`;
+  }
+  return 'http://localhost:8000/api';
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 async function requestJson<T>(
   endpoint: string,
