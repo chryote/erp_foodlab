@@ -1,5 +1,4 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import App from '../App';
@@ -35,7 +34,7 @@ describe('App ERP Main Menu integration', () => {
     window.localStorage.clear();
   });
 
-  it('returns to the root login page after logout', async () => {
+  it('redirects to the login page after logout', async () => {
     vi.mocked(apiClient.fetchErpModules).mockResolvedValue({
       data: [],
       meta: { count: 0 },
@@ -55,7 +54,7 @@ describe('App ERP Main Menu integration', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Keluar' }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('current-path')).toHaveTextContent('/');
+      expect(screen.getByTestId('current-path')).toHaveTextContent('/login');
     });
     expect(await screen.findByLabelText('Email')).toBeInTheDocument();
   });
@@ -134,7 +133,7 @@ describe('App ERP Main Menu integration', () => {
     });
     fireEvent.click(await screen.findByRole('button', { name: 'Keluar' }));
     await waitFor(() => {
-      expect(screen.getByTestId('current-path')).toHaveTextContent(/^\/$/);
+      expect(screen.getByTestId('current-path')).toHaveTextContent(/^\/login$/);
     });
     expect(window.localStorage.getItem('erp_foodlab.development_mode')).toBe(
       null
