@@ -5,21 +5,17 @@ if [ ! -f /var/www/html/.env ] && [ -f /var/www/html/.env.example ]; then
     cp /var/www/html/.env.example /var/www/html/.env
 fi
 
-LOCK_HASH=""
-if [ -f /var/www/html/composer.lock ]; then
-    LOCK_HASH="$(sha256sum /var/www/html/composer.lock | awk '{print $1}')"
-fi
+DEPS_HASH="$(cat /var/www/html/composer.json /var/www/html/composer.lock 2>/dev/null | sha256sum | awk '{print $1}')"
 CURRENT_HASH=""
-if [ -f /var/www/html/vendor/.composer.lock.sha256 ]; then
-    CURRENT_HASH="$(cat /var/www/html/vendor/.composer.lock.sha256)"
+if [ -f /var/www/html/vendor/.composer.deps.sha256 ]; then
+    CURRENT_HASH="$(cat /var/www/html/vendor/.composer.deps.sha256)"
 fi
 
-if [ ! -f /var/www/html/vendor/autoload.php ] || [ "$LOCK_HASH" != "$CURRENT_HASH" ]; then
+if [ ! -f /var/www/html/vendor/autoload.php ] || [ "$DEPS_HASH" != "$CURRENT_HASH" ]; then
     echo "Syncing Composer dependencies into /var/www/html/vendor..."
     composer install --no-interaction --prefer-dist
-    if [ -n "$LOCK_HASH" ]; then
-        printf '%s' "$LOCK_HASH" > /var/www/html/vendor/.composer.lock.sha256
-    fi
+    DEPS_HASH="$(cat /var/www/html/composer.json /var/www/html/composer.lock 2>/dev/null | sha256sum | awk '{print $1}')"
+    printf '%s' "$DEPS_HASH" > /var/www/html/vendor/.composer.deps.sha256
 fi
 
 mkdir -p /var/www/html/storage/logs /var/www/html/storage/framework/cache /var/www/html/storage/framework/sessions /var/www/html/storage/framework/views /var/www/html/bootstrap/cache

@@ -1,17 +1,22 @@
 # Stage 1: Development
 FROM node:22-alpine AS development
 WORKDIR /app
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json* ./
+RUN if [ -f package-lock.json ]; then npm ci || npm install; else npm install; fi \
+    && cat package.json package-lock.json 2>/dev/null | sha256sum | awk '{print $1}' > /app/node_modules/.deps.sha256
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
+    && chmod +x /usr/local/bin/docker-entrypoint.sh
 COPY . .
 EXPOSE 5173
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
 # Stage 2: Build
 FROM node:22-alpine AS build
 WORKDIR /app
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json* ./
+RUN if [ -f package-lock.json ]; then npm ci || npm install; else npm install; fi
 COPY . .
 RUN npm run build
 

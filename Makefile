@@ -12,7 +12,7 @@ setup: ## Copy environment files and start all containers
 	docker compose exec app php artisan migrate --seed
 
 up: ## Start all Docker services in detached mode
-	docker compose up -d --build
+	docker compose up -d --build -V
 
 down: ## Stop and remove Docker containers
 	docker compose down

@@ -198,6 +198,32 @@ export interface ExpenseItemsListResponse {
   };
 }
 
+export interface CompanyAsset {
+  id: number;
+  company_id: number;
+  asset_date: string;
+  name: string;
+  amount: number;
+  price_per_unit: number;
+  total_price: number;
+  company?: Company | null;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface CompanyAssetsListResponse {
+  data: CompanyAsset[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
@@ -521,6 +547,61 @@ export async function deleteExpenseItem(
     `/v1/modules/cfo/expense-items/${id}`,
     { method: 'DELETE' },
     'Failed to delete expense item'
+  );
+}
+
+export async function fetchCompanyAssets(): Promise<CompanyAssetsListResponse> {
+  return requestJson<CompanyAssetsListResponse>(
+    '/v1/modules/cfo/company-assets',
+    {},
+    'Failed to fetch company assets'
+  );
+}
+
+export interface CompanyAssetPayload {
+  company_id: number;
+  asset_date: string;
+  name: string;
+  amount: number;
+  price_per_unit: number;
+}
+
+export async function createCompanyAsset(
+  payload: CompanyAssetPayload
+): Promise<{ data: CompanyAsset }> {
+  return requestJson<{ data: CompanyAsset }>(
+    '/v1/modules/cfo/company-assets',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create company asset'
+  );
+}
+
+export async function updateCompanyAsset(
+  id: number,
+  payload: CompanyAssetPayload
+): Promise<{ data: CompanyAsset }> {
+  return requestJson<{ data: CompanyAsset }>(
+    `/v1/modules/cfo/company-assets/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update company asset'
+  );
+}
+
+export async function deleteCompanyAsset(
+  id: number
+): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/cfo/company-assets/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete company asset'
   );
 }
 

@@ -8,6 +8,8 @@ import {
 import {
   type CapitalCompany,
   type Company,
+  type CompanyAsset,
+  type CompanyAssetPayload,
   type ErpModuleCode,
   type ErpModuleOverview,
   type ExpenseCategory,
@@ -15,22 +17,26 @@ import {
   type ExpenseType,
   createCapitalCompany,
   createCompany,
+  createCompanyAsset,
   createExpenseCategory,
   createExpenseItem,
   createExpenseType,
   deleteCapitalCompany,
   deleteCompany,
+  deleteCompanyAsset,
   deleteExpenseCategory,
   deleteExpenseItem,
   deleteExpenseType,
   fetchCapitalCompanies,
   fetchCompanies,
+  fetchCompanyAssets,
   fetchErpModules,
   fetchExpenseCategories,
   fetchExpenseItems,
   fetchExpenseTypes,
   updateCapitalCompany,
   updateCompany,
+  updateCompanyAsset,
   updateExpenseCategory,
   updateExpenseItem,
   updateExpenseType,
@@ -43,6 +49,7 @@ export const cfoQueryKeys = {
   expenseCategories: ['cfo', 'expense-categories'] as const,
   expenseTypes: ['cfo', 'expense-types'] as const,
   expenseItems: ['cfo', 'expense-items'] as const,
+  companyAssets: ['cfo', 'company-assets'] as const,
 };
 
 export function createAppQueryClient(): QueryClient {
@@ -141,6 +148,9 @@ export function useCompanyCrudResource(enabled = true) {
       void queryClient.invalidateQueries({
         queryKey: cfoQueryKeys.expenseItems,
       });
+      void queryClient.invalidateQueries({
+        queryKey: cfoQueryKeys.companyAssets,
+      });
     },
   });
 
@@ -165,6 +175,9 @@ export function useCompanyCrudResource(enabled = true) {
       });
       void queryClient.invalidateQueries({
         queryKey: cfoQueryKeys.expenseItems,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: cfoQueryKeys.companyAssets,
       });
     },
   });
@@ -931,5 +944,170 @@ export function useMasterOperasionalCrudResource(
     createItem,
     updateItem,
     removeItem,
+  };
+}
+
+export interface CompanyAssetMutationInput {
+  companyId?: number;
+  assetDate: string;
+  name: string;
+  amount: number;
+  pricePerUnit: number;
+}
+
+export function useCompanyAssetCrudResource(
+  enabled: boolean,
+  company: Company | null
+) {
+  const queryClient = useQueryClient();
+  const [mutationError, setMutationError] = useState<string | null>(null);
+
+  const assetsQuery = useQuery<CompanyAsset[]>({
+    queryKey: cfoQueryKeys.companyAssets,
+    queryFn: async () => {
+      const res = await fetchCompanyAssets();
+      return res?.data ?? [];
+    },
+    enabled,
+  });
+
+  const allAssets = assetsQuery.data ?? [];
+
+  const assets = useMemo<CompanyAsset[]>(() => {
+    if (!company) {
+      return allAssets;
+    }
+    return allAssets.filter(
+      (asset) => Number(asset.company_id) === company.id
+    );
+  }, [allAssets, company]);
+
+  const createMutation = useMutation({
+    mutationFn: async (payload: CompanyAssetPayload) => {
+      const res = await createCompanyAsset(payload);
+      return res.data;
+    },
+    onSuccess: (created) => {
+      queryClient.setQueryData<CompanyAsset[]>(
+        cfoQueryKeys.companyAssets,
+        (prev = []) => [created, ...prev]
+      );
+      void queryClient.invalidateQueries({
+        queryKey: cfoQueryKeys.companyAssets,
+      });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (input: {
+      id: number;
+      payload: CompanyAssetPayload;
+    }) => {
+      const res = await updateCompanyAsset(input.id, input.payload);
+      return res.data;
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData<CompanyAsset[]>(
+        cfoQueryKeys.companyAssets,
+        (prev = []) =>
+          prev.map((item) => (item.id === updated.id ? updated : item))
+      );
+      void queryClient.invalidateQueries({
+        queryKey: cfoQueryKeys.companyAssets,
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await deleteCompanyAsset(id);
+      return id;
+    },
+    onSuccess: (deletedId) => {
+      queryClient.setQueryData<CompanyAsset[]>(
+        cfoQueryKeys.companyAssets,
+        (prev = []) => prev.filter((item) => item.id !== deletedId)
+      );
+      void queryClient.invalidateQueries({
+        queryKey: cfoQueryKeys.companyAssets,
+      });
+    },
+  });
+
+  const buildPayload = useCallback(
+    (input: CompanyAssetMutationInput): CompanyAssetPayload | null => {
+      const resolvedCompanyId = input.companyId ?? company?.id;
+      if (!resolvedCompanyId) {
+        return null;
+      }
+      return {
+        company_id: resolvedCompanyId,
+        asset_date: input.assetDate,
+        name: input.name,
+        amount: input.amount,
+        price_per_unit: input.pricePerUnit,
+      };
+    },
+    [company]
+  );
+
+  const createAsset = useCallback(
+    async (input: CompanyAssetMutationInput) => {
+      const payload = buildPayload(input);
+      if (!payload) return null;
+      setMutationError(null);
+      try {
+        return await createMutation.mutateAsync(payload);
+      } catch (err) {
+        setMutationError(getErrorMessage(err, 'Gagal menambahkan aset.'));
+        return null;
+      }
+    },
+    [buildPayload, createMutation]
+  );
+
+  const updateAsset = useCallback(
+    async (id: number, input: CompanyAssetMutationInput) => {
+      const payload = buildPayload(input);
+      if (!payload) return null;
+      setMutationError(null);
+      try {
+        return await updateMutation.mutateAsync({ id, payload });
+      } catch (err) {
+        setMutationError(getErrorMessage(err, 'Gagal memperbarui aset.'));
+        return null;
+      }
+    },
+    [buildPayload, updateMutation]
+  );
+
+  const removeAsset = useCallback(
+    async (id: number) => {
+      setMutationError(null);
+      try {
+        await deleteMutation.mutateAsync(id);
+        return true;
+      } catch (err) {
+        setMutationError(getErrorMessage(err, 'Gagal menghapus aset.'));
+        return false;
+      }
+    },
+    [deleteMutation]
+  );
+
+  return {
+    allAssets,
+    assets,
+    loading:
+      assetsQuery.isLoading ||
+      createMutation.isPending ||
+      updateMutation.isPending ||
+      deleteMutation.isPending,
+    error:
+      mutationError ??
+      getErrorMessage(assetsQuery.error, 'Gagal memuat data aset perusahaan.'),
+    createAsset,
+    updateAsset,
+    removeAsset,
   };
 }

@@ -63,6 +63,32 @@ CREATE TABLE `companies` (
   KEY `companies_series_index` (`series`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `company_assets`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `company_assets` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `company_id` bigint unsigned NOT NULL,
+  `asset_date` date NOT NULL,
+  `name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `amount` int unsigned NOT NULL DEFAULT '1',
+  `price_per_unit` double NOT NULL DEFAULT '0',
+  `total_price` double NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `company_assets_company_id_asset_date_index` (`company_id`,`asset_date`),
+  KEY `company_assets_asset_date_index` (`asset_date`),
+  KEY `company_assets_amount_index` (`amount`),
+  KEY `company_assets_total_price_index` (`total_price`),
+  KEY `company_assets_created_at_index` (`created_at`),
+  KEY `company_assets_updated_at_index` (`updated_at`),
+  KEY `company_assets_deleted_at_index` (`deleted_at`),
+  KEY `company_assets_name_index` (`name`),
+  CONSTRAINT `company_assets_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `expense_categories`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -225,3 +251,4 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (15,'2026_11_19_080
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (16,'2026_11_19_090000_add_details_and_dates_to_expense_items_table',8);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (17,'2026_11_19_100000_add_soft_deletes_to_lab_samples_table',9);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (18,'2026_11_20_000001_create_personal_access_tokens_table',10);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (19,'2026_11_20_100000_create_company_assets_table',11);
