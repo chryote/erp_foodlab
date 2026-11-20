@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import type { Company, ErpModuleOverview } from '@/api/client';
-import { type HorizontalMenuItem, PageHeader } from '@/components/ui';
+import { type HorizontalMenuItem, Button, PageHeader } from '@/components/ui';
 import {
   useCompanyCrudResource,
   useErpModulesQuery,
@@ -20,7 +20,11 @@ import { CmoModuleCard } from '@/modules/CMO/CmoModuleCard';
 import { CpoModuleCard } from '@/modules/CPO/CpoModuleCard';
 import '@/App.css';
 
-export const Dashboard: React.FC = () => {
+export interface DashboardProps {
+  onLogout?: () => void;
+}
+
+export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const { modulesMap } = useErpModulesQuery();
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [selectedModule, setSelectedModule] =
@@ -103,6 +107,13 @@ export const Dashboard: React.FC = () => {
         selectedCompanyId={selectedCompany?.id ?? null}
         onSelectSeries={handleSelectSeries}
         onSelectCompany={handleSelectCompany}
+        actions={
+          onLogout ? (
+            <Button variant="secondary" onClick={onLogout}>
+              Keluar
+            </Button>
+          ) : undefined
+        }
       />
 
       <main className="grid grid-cols-1 gap-6">

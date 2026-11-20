@@ -29,5 +29,19 @@ class Company extends Model
     {
         return $this->hasMany(CapitalCompany::class);
     }
-}
 
+    public function expenseCategories(): HasMany
+    {
+        return $this->hasMany(ExpenseCategory::class);
+    }
+
+    public function expenseTypes(): HasMany
+    {
+        return $this->hasMany(ExpenseType::class);
+    }
+
+    public function expenseItems(): HasMany
+    {
+        return $this->hasMany(ExpenseItem::class);
+    }
+}

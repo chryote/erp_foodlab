@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Cache;
 describe('ExpenseItem Golden Module & Spec-Driven Backend Standards', function () {
     beforeEach(function () {
         Cache::flush();
+        actingAsErpUser();
     });
 
     it('supports full CRUD, QueryBuilder filtering/sorting/includes, validation, and soft-deletes', function () {

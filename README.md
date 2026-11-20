@@ -35,6 +35,8 @@ Never commit production secrets, `.env` files, or private API keys to version co
 - Generate a strong `APP_KEY` via `php artisan key:generate`.
 - Configure non-default passwords for `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD`, `REDIS_PASSWORD`, and `GRAFANA_ADMIN_PASSWORD`.
 - Restrict public network access to `/api/metrics`, Prometheus (`:9090`), and Redis (`:6379`) behind an internal VPC or ingress firewall.
+- Change or disable the local-only `admin@foodlab.test` demo account before exposing the API, and set `CORS_ALLOWED_ORIGINS` to the exact frontend origins (defaults to `http://localhost:5173,http://127.0.0.1:5173`).
+- All authenticated users currently share full ERP access. Add per-company/role policies before multi-tenant production use.
 
 ## Background
 
@@ -48,7 +50,7 @@ erp_foodlab/
 ├── backend/                          # Laravel 11 REST API (PHP 8.4), MySQL, Redis, Prometheus, Pest PHP
 │   ├── app/
 │   │   ├── Http/
-│   │   │   ├── Controllers/          # ErpMenuController, HealthController, LabSampleController, MetricsController
+│   │   │   ├── Controllers/          # AuthController, ErpMenuController, HealthController, LabSampleController, MetricsController
 │   │   │   └── Middleware/           # RecordPrometheusMetrics
 │   │   ├── Models/                   # Company, CapitalCompany, ExpenseCategory, ExpenseType, ExpenseItem, LabSample, User
 │   │   ├── Modules/                  # Dedicated Backend Folders per Executive Module
@@ -64,9 +66,11 @@ erp_foodlab/
 │   ├── components.json               # Official shadcn/ui CLI configuration
 │   └── src/
 │       ├── Pages/
-│       │   └── Dashboard.tsx         # ERP Main Dashboard Page
+│       │   ├── Dashboard.tsx         # ERP Main Dashboard Page
+│       │   └── LoginPage.tsx         # Sanctum login gate
 │       ├── api/                      # Typed REST API client (client.ts)
 │       ├── lib/
+│       │   ├── authStorage.ts        # Bearer token persistence helpers
 │       │   ├── cfoResources.ts       # TanStack Query hooks & cache invalidation
 │       │   └── utils.ts              # Tailwind + clsx cn() class merger
 │       ├── components/
@@ -79,7 +83,7 @@ erp_foodlab/
 │       │   ├── CPO/                  # CpoModuleCard.tsx — CPO (Persediaan Barang Dagang)
 │       │   ├── CDO/                  # CdoModuleCard.tsx — CDO (Pemasaran)
 │       │   └── CMO/                  # CmoModuleCard.tsx — CMO (Penjualan)
-│       └── test/                     # Vitest + React Testing Library suites (5 suites, 18 tests)
+│       └── test/                     # Vitest + React Testing Library suites (6 files, 25 tests)
 ├── benchmarks/k6/                    # Grafana k6 smoke, load, and stress benchmark scripts
 ├── docker/                           # Nginx, PHP-FPM 8.4, MySQL 8.0 init, and Redis 7.4 configs
 ├── monitoring/                       # Prometheus scrape/alert rules & provisioned Grafana dashboards
@@ -142,6 +146,8 @@ docker compose exec app php artisan key:generate
 docker compose exec app php artisan migrate --seed
 ```
 
+The seeder creates a local-development administrator: **`admin@foodlab.test` / `password`**. Change or remove this account outside local development.
+
 4. *(Whenever you add new Composer or npm packages)* Rebuild and refresh the anonymous volumes so the running containers pick up the new dependencies:
 
 ```powershell
@@ -155,7 +161,8 @@ docker compose up -d --build -V app frontend
 | **React ERP Dev Server** | `http://localhost:5173` | Vite HMR Development Server (`usePolling: true`) |
 | **Laravel SPA Shell** | `http://localhost:8000` | Root SPA HTML shell (`backend/resources/views/app.blade.php`) |
 | **Laravel Health Check** | `http://localhost:8000/api/health` | REST API & Infrastructure Health Check |
-| **ERP Modules API** | `http://localhost:8000/api/v1/modules` | Aggregated CFO, CHO, CPO, CDO, CMO JSON |
+| **ERP Modules API** | `http://localhost:8000/api/v1/modules` | Authenticated CFO, CHO, CPO, CDO, CMO JSON |
+| **Sanctum Login** | `http://localhost:8000/api/v1/auth/login` | `POST` email + password; returns a Bearer token |
 | **Prometheus Metrics** | `http://localhost:8000/api/metrics` | OpenMetrics / Prometheus `0.0.4` text format |
 | **Prometheus UI** | `http://localhost:9090` | Targets, PromQL & Alert Rules |
 | **Grafana UI** | `http://localhost:3000` | Default login: `admin` / `admin` |
@@ -166,7 +173,7 @@ docker compose up -d --build -V app frontend
 
 ### Running Unit & Feature Tests
 
-**Backend (Pest PHP — 9 suites, 31 tests, 244 assertions)**:
+**Backend (Pest PHP — 45 tests, 462 assertions)**:
 
 Backend tests run in an isolated in-memory SQLite (`:memory:`) and `array` cache environment configured in `backend/tests/TestCase.php`, ensuring your seeded MySQL database is never wiped during test runs:
 
@@ -178,7 +185,7 @@ docker compose exec app ./vendor/bin/pest
 cd backend && ./vendor/bin/pest
 ```
 
-**Frontend (Vitest + React Testing Library — 5 suites, 18 tests)**:
+**Frontend (Vitest + React Testing Library — 6 files, 25 tests)**:
 
 ```powershell
 # Inside Docker
@@ -213,12 +220,17 @@ docker compose --profile benchmark run --rm k6 run /scripts/stress.test.js
 
 ### REST API Endpoints (`backend/routes/api.php`)
 
+All `/api/v1/*` routes require a Sanctum Bearer token (`Authorization: Bearer <token>`), except `POST /api/v1/auth/login`. `GET /api/health` and `GET /api/metrics` remain public for probes and Prometheus scraping.
+
+- `POST /api/v1/auth/login` — Exchanges `email` + `password` for a Bearer token.
+- `GET /api/v1/auth/me` — Returns the authenticated user.
+- `POST /api/v1/auth/logout` — Revokes the current access token.
 - `GET /api/v1/modules` — Returns the ERP Main Menu overview across all 5 executive modules (`CFO`, `CHO`, `CPO`, `CDO`, `CMO`), cached in Redis.
-- `GET|POST /api/v1/modules/cfo/companies` & `GET|PUT|PATCH|DELETE /api/v1/modules/cfo/companies/{company}` — CFO Company CRUD JSON API.
-- `GET|POST /api/v1/modules/cfo/capital-companies` & `GET|PUT|PATCH|DELETE /api/v1/modules/cfo/capital-companies/{capitalCompany}` — CFO Stakeholder & Capital CRUD JSON API.
+- `GET|POST /api/v1/modules/cfo/companies` & `GET|PUT|PATCH|DELETE /api/v1/modules/cfo/companies/{company}` — CFO Company CRUD JSON API (`?filter[search]=`, `?filter[series]=`, `?sort=`, `?include=capitalCompanies`, `?per_page=`).
+- `GET|POST /api/v1/modules/cfo/capital-companies` & `GET|PUT|PATCH|DELETE /api/v1/modules/cfo/capital-companies/{capitalCompany}` — CFO Stakeholder & Capital CRUD JSON API (`?filter[search]=`, `?filter[company_id]=`, `?sort=`, `?include=company`).
 - `GET|POST /api/v1/modules/cfo/expense-categories` & `GET|PUT|PATCH|DELETE /api/v1/modules/cfo/expense-categories/{expenseCategory}` — CFO Expense Category CRUD JSON API.
 - `GET|POST /api/v1/modules/cfo/expense-types` & `GET|PUT|PATCH|DELETE /api/v1/modules/cfo/expense-types/{expenseType}` — CFO Expense Type CRUD JSON API.
-- `GET|POST /api/v1/modules/cfo/expense-items` & `GET|PUT|PATCH|DELETE /api/v1/modules/cfo/expense-items/{expenseItem}` — CFO Expense Item CRUD JSON API.
+- `GET|POST /api/v1/modules/cfo/expense-items` & `GET|PUT|PATCH|DELETE /api/v1/modules/cfo/expense-items/{expenseItem}` — CFO Expense Item CRUD JSON API (Spatie QueryBuilder filters, sorts, and includes).
 - `GET /api/health` — Verifies connectivity to MySQL 8.0 and Redis 7.4.
 - `GET|POST /api/v1/samples` — Lists and creates FoodLab quality control samples.
 - `GET /api/metrics` — Exposes application counters and histograms in Prometheus `0.0.4` text format.
