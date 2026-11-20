@@ -13,5 +13,7 @@ Copy this into a fresh chat when building a new module or entity:
   - `DB::transaction()` on multi-table writes
   - `lockForUpdate()` on stock / balance updates (if applicable)
   - Optional Action (`Approve<Entity>Action`) if multi-step side effects exist
+- **Seeder (`database/seeders/DatabaseSeeder.php`):** idempotent sample data (`updateOrCreate` / `withTrashed()` on unique keys inside `DB::transaction()`, end with `Cache::flush()`); assert table populated in `SystemIntegrityTest`
 - **Pest Test (`tests/Feature/<Entity>Test.php`):** CRUD, filters, 422 validation, soft delete
+- **Verify:** `php artisan migrate:fresh --seed` (and repeat `db:seed`), `make schema-dump`, `make test-filter FILTER=<Entity>Test`
 ```

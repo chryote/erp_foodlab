@@ -9,10 +9,13 @@ RUN apk add --no-cache \
     libpng-dev \
     libxml2-dev \
     libzip-dev \
+    mariadb-client \
+    mariadb-connector-c \
     oniguruma-dev \
     unzip \
     zip \
-    $PHPIZE_DEPS
+    $PHPIZE_DEPS \
+    && printf '[client]\nssl=0\n' > /etc/my.cnf
 
 # Install PHP extensions including Redis & MySQL
 RUN docker-php-ext-install \
