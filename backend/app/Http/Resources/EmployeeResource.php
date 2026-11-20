@@ -20,6 +20,7 @@ class EmployeeResource extends JsonResource
             'id' => (int) $this->id,
             'company_id' => (int) $this->company_id,
             'employee_position_id' => $this->employee_position_id !== null ? (int) $this->employee_position_id : null,
+            'employment_status_id' => $this->employment_status_id !== null ? (int) $this->employment_status_id : null,
             'name' => $this->name,
             'email' => $this->email,
             'phone' => $this->phone,
@@ -27,6 +28,10 @@ class EmployeeResource extends JsonResource
             'employee_position' => $this->whenLoaded(
                 'employeePosition',
                 fn ($position) => new EmployeePositionResource($position)
+            ),
+            'employment_status' => $this->whenLoaded(
+                'employmentStatus',
+                fn ($status) => new EmploymentStatusResource($status)
             ),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

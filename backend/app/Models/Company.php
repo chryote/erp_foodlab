@@ -55,6 +55,11 @@ class Company extends Model
         return $this->hasMany(EmployeePosition::class);
     }
 
+    public function employmentStatuses(): HasMany
+    {
+        return $this->hasMany(EmploymentStatus::class);
+    }
+
     public function employees(): HasMany
     {
         return $this->hasMany(Employee::class);

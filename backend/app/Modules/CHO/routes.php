@@ -2,6 +2,7 @@
 
 use App\Modules\CHO\Controllers\ChoController;
 use App\Modules\CHO\Controllers\EmployeePositionController;
+use App\Modules\CHO\Controllers\EmploymentStatusController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('cho')->group(function () {
@@ -13,4 +14,11 @@ Route::prefix('cho')->group(function () {
     Route::put('/employee-positions/{employeePosition}', [EmployeePositionController::class, 'update'])->name('api.modules.cho.employee-positions.update');
     Route::patch('/employee-positions/{employeePosition}', [EmployeePositionController::class, 'update'])->name('api.modules.cho.employee-positions.patch');
     Route::delete('/employee-positions/{employeePosition}', [EmployeePositionController::class, 'destroy'])->name('api.modules.cho.employee-positions.destroy');
+
+    Route::get('/employment-statuses', [EmploymentStatusController::class, 'index'])->name('api.modules.cho.employment-statuses.index');
+    Route::post('/employment-statuses', [EmploymentStatusController::class, 'store'])->name('api.modules.cho.employment-statuses.store');
+    Route::get('/employment-statuses/{employmentStatus}', [EmploymentStatusController::class, 'show'])->name('api.modules.cho.employment-statuses.show');
+    Route::put('/employment-statuses/{employmentStatus}', [EmploymentStatusController::class, 'update'])->name('api.modules.cho.employment-statuses.update');
+    Route::patch('/employment-statuses/{employmentStatus}', [EmploymentStatusController::class, 'update'])->name('api.modules.cho.employment-statuses.patch');
+    Route::delete('/employment-statuses/{employmentStatus}', [EmploymentStatusController::class, 'destroy'])->name('api.modules.cho.employment-statuses.destroy');
 });

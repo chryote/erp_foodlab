@@ -118,6 +118,7 @@ CREATE TABLE `employees` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `company_id` bigint unsigned NOT NULL,
   `employee_position_id` bigint unsigned DEFAULT NULL,
+  `employment_status_id` bigint unsigned DEFAULT NULL,
   `name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
   `email` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `phone` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -131,8 +132,32 @@ CREATE TABLE `employees` (
   KEY `employees_updated_at_index` (`updated_at`),
   KEY `employees_deleted_at_index` (`deleted_at`),
   KEY `employees_name_index` (`name`),
+  KEY `employees_employment_status_id_index` (`employment_status_id`),
   CONSTRAINT `employees_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT,
-  CONSTRAINT `employees_employee_position_id_foreign` FOREIGN KEY (`employee_position_id`) REFERENCES `employee_positions` (`id`) ON DELETE RESTRICT
+  CONSTRAINT `employees_employee_position_id_foreign` FOREIGN KEY (`employee_position_id`) REFERENCES `employee_positions` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `employees_employment_status_id_foreign` FOREIGN KEY (`employment_status_id`) REFERENCES `employment_statuses` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `employment_statuses`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `employment_statuses` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `company_id` bigint unsigned NOT NULL,
+  `code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `employment_statuses_code_unique` (`code`),
+  KEY `employment_statuses_company_id_index` (`company_id`),
+  KEY `employment_statuses_created_at_index` (`created_at`),
+  KEY `employment_statuses_updated_at_index` (`updated_at`),
+  KEY `employment_statuses_deleted_at_index` (`deleted_at`),
+  KEY `employment_statuses_name_index` (`name`),
+  CONSTRAINT `employment_statuses_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `expense_categories`;
@@ -238,7 +263,7 @@ CREATE TABLE `migrations` (
   `migration` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `batch` int NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=24 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `personal_access_tokens`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -291,7 +316,7 @@ CREATE TABLE `users` (
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 /*!40000 ALTER TABLE `migrations` DISABLE KEYS */;
-INSERT INTO `migrations` VALUES (5,'0001_01_01_000000_create_users_table',1),(6,'0001_01_01_000001_create_cache_table',1),(7,'2026_01_01_000002_create_lab_samples_table',1),(8,'2026_01_01_000003_create_companies_table',1),(9,'2026_01_01_000004_create_capital_companies_table',2),(10,'2026_01_01_000005_move_stakeholder_name_to_capital_companies_table',3),(11,'2026_01_01_000006_add_series_to_companies_table',4),(12,'2026_11_19_022819_create_expense_categories_table',5),(13,'2026_11_19_044225_create_expense_types_table',5),(14,'2026_11_19_051751_create_expense_items_table',6),(15,'2026_11_19_080000_add_company_id_to_expense_categories_and_types_tables',7),(16,'2026_11_19_090000_add_details_and_dates_to_expense_items_table',8),(17,'2026_11_19_100000_add_soft_deletes_to_lab_samples_table',9),(18,'2026_11_20_000001_create_personal_access_tokens_table',10),(19,'2026_11_20_100000_create_company_assets_table',11),(20,'2026_11_20_110000_create_employee_positions_table',12),(21,'2026_11_20_120000_create_employees_table',12);
+INSERT INTO `migrations` VALUES (5,'0001_01_01_000000_create_users_table',1),(6,'0001_01_01_000001_create_cache_table',1),(7,'2026_01_01_000002_create_lab_samples_table',1),(8,'2026_01_01_000003_create_companies_table',1),(9,'2026_01_01_000004_create_capital_companies_table',2),(10,'2026_01_01_000005_move_stakeholder_name_to_capital_companies_table',3),(11,'2026_01_01_000006_add_series_to_companies_table',4),(12,'2026_11_19_022819_create_expense_categories_table',5),(13,'2026_11_19_044225_create_expense_types_table',5),(14,'2026_11_19_051751_create_expense_items_table',6),(15,'2026_11_19_080000_add_company_id_to_expense_categories_and_types_tables',7),(16,'2026_11_19_090000_add_details_and_dates_to_expense_items_table',8),(17,'2026_11_19_100000_add_soft_deletes_to_lab_samples_table',9),(18,'2026_11_20_000001_create_personal_access_tokens_table',10),(19,'2026_11_20_100000_create_company_assets_table',11),(20,'2026_11_20_110000_create_employee_positions_table',12),(21,'2026_11_20_120000_create_employees_table',12),(22,'2026_11_20_130000_create_employment_statuses_table',13),(23,'2026_11_20_140000_add_employment_status_id_to_employees_table',13);
 /*!40000 ALTER TABLE `migrations` ENABLE KEYS */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 

@@ -16,6 +16,7 @@ class Employee extends Model
     protected $fillable = [
         'company_id',
         'employee_position_id',
+        'employment_status_id',
         'name',
         'email',
         'phone',
@@ -24,6 +25,7 @@ class Employee extends Model
     protected $casts = [
         'company_id' => 'integer',
         'employee_position_id' => 'integer',
+        'employment_status_id' => 'integer',
     ];
 
     public function company(): BelongsTo
@@ -34,5 +36,10 @@ class Employee extends Model
     public function employeePosition(): BelongsTo
     {
         return $this->belongsTo(EmployeePosition::class);
+    }
+
+    public function employmentStatus(): BelongsTo
+    {
+        return $this->belongsTo(EmploymentStatus::class);
     }
 }
