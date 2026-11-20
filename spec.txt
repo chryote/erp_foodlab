@@ -1,15 +1,26 @@
-## Feature: CFO / CompanyAsset (Aset Perusahaan)
-- **Table:** `company_assets` — `id`, `company_id` (FK companies, compound index `(company_id, asset_date)`), `asset_date` (date), `name` (varchar 150, index), `amount` (unsigned int, default 1), `price_per_unit` (double), `total_price` (double, derived), timestamps, `softDeletes`
-- **Enum:** none — no status in scope; do not invent one
-- **Relations:** `belongsTo(Company)`; add `Company::companyAssets(): HasMany`
-- **Endpoints (`/api/v1/modules/cfo/company-assets`):** `index`, `store`, `show`, `update` (PUT + PATCH), `destroy` (soft delete, `{message}` response)
-- **QueryBuilder (`Service::list`):** filters=[`company_id` exact, `search` on `name`], sorts=[`id`, `asset_date`, `name`, `amount`, `price_per_unit`, `total_price`, `created_at`], includes=[`company`], defaultSort `-asset_date`, `-id`, cache list + forget on writes
-- **Safety / Business Rules:**
-  - `DB::transaction()` on create/update/delete; `lockForUpdate()` on update/delete
-  - `total_price = amount * price_per_unit` computed in Service; never trusted from the client
-  - `company_id` must exist and not be soft-deleted; `asset_date` = `date_format:Y-m-d`; `amount` >= 1; `name` <= 150; prices >= 0
-  - Single-table writes -> no Action class
-- **Pest Test (`tests/Feature/CompanyAssetTest.php`):** `actingAsErpUser()` + `Cache::flush()`; CRUD, filter/sort/include, 422 (deleted company, bad date, empty name, amount 0, negative price), `assertSoftDeleted`, JsonResource keys
-- **Then:** `make migrate` -> `make schema-dump` -> `make test-filter FILTER=CompanyAssetTest`
+## Feature: CHO / Employee
+
+* **Table:**
+* `employees` (alter existing table) — keep existing `id`, `company_id` (FK `companies`, index), `employee_position_id` (FK `employee_positions`, nullable, index), `employment_status_id` (FK `employment_statuses`, nullable, index), `payroll_grade_id` (FK `payroll_grades`, nullable, index), `name` (varchar 150, index), `email` (varchar 150, nullable), `phone` (varchar 50, nullable), timestamps, `softDeletes`; **add columns (nullable for backward compatibility with existing rows):** `photo_url` (varchar 255, nullable), `nik_ktp` (varchar 16, nullable, unique), `nickname` (varchar 100, nullable), `birth_place` (varchar 100, nullable), `birth_date` (date, nullable), `gender` (varchar 30, nullable, index — backed by `JenisKelamin`), `religion` (varchar 30, nullable, index — backed by `Agama`), `blood_type` (varchar 10, nullable — backed by `GolonganDarah`), `mother_name` (varchar 150, nullable), `ktp_address` (text, nullable), `domicile_address` (text, nullable), `whatsapp_number` (varchar 30, nullable), `emergency_phone_number` (varchar 30, nullable), `instagram` (varchar 100, nullable), `tiktok` (varchar 100, nullable), `bpjs_ketenagakerjaan` (varchar 50, nullable), `bpjs_kesehatan` (varchar 50, nullable), `npwp_number` (varchar 30, nullable), `tax_status_id` (FK `tax_statuses`, nullable, index)
 
 
+* `employee_documents` (new table) — `id`, `employee_id` (FK `employees`, cascade on delete), `document_type` (varchar 50 — backed by `JenisDokumen Enum`), `file_url` (varchar 255), compound unique `(employee_id, document_type, deleted_at)`, timestamps, `softDeletes`
+
+* **Enum:** use existing `App\Enums\JenisKelamin` (`gender`), `App\Enums\Agama` (`religion`), `App\Enums\GolonganDarah` (`blood_type`), and `App\Enums\JenisDokumen` (`employee_documents.document_type`); cast on Eloquent models
+
+
+* **Relations:** `belongsTo(Company)`, `belongsTo(EmployeePosition)`, `belongsTo(EmploymentStatus)`, `belongsTo(PayrollGrade)`, `belongsTo(TaxStatus)`, `hasMany(EmployeeDocument)`; add `Company::employees(): HasMany`
+* **Endpoints (`/api/v1/modules/cho/employees`):** `index`, `store`, `show`, `update` (PUT + PATCH), `destroy` (soft delete, `{message}` response)
+* **QueryBuilder (`Service::list`):** filters=[`company_id` exact, `employee_position_id` exact, `employment_status_id` exact, `payroll_grade_id` exact, `tax_status_id` exact, `gender` exact, `religion` exact, `blood_type` exact, `search` on `name`, `nickname`, `nik_ktp`, `email`, `phone`], sorts=[`id`, `name`, `nik_ktp`, `birth_date`, `created_at`], includes=[`company`, `employeePosition`, `employmentStatus`, `payrollGrade`, `taxStatus`, `documents`], defaultSort `name`, `-id`, cache list + forget on writes
+* **Safety / Business Rules:**
+* `DB::transaction()` on create/update/delete; `lockForUpdate()` on update/delete
+* Multi-table write (`employees` + `employee_documents` sync) -> use Action classes (`CreateEmployeeAction`, `UpdateEmployeeAction`)
+* `company_id` is required, must exist and not be soft-deleted; optional master FKs (`employee_position_id`, `employment_status_id`, `payroll_grade_id`, `tax_status_id`) when provided must exist and not be soft-deleted
+* Validate enum columns with `Rule::enum(...)` (`JenisKelamin`, `Agama`, `GolonganDarah`, `JenisDokumen`)
+
+
+* `name` required <= 150; `nik_ktp` (when provided) = 16 digits, unique; `email` (when provided) = valid email, <= 150; `phone` <= 50; `birth_date` (when provided) = `date_format:Y-m-d` and `before:today`; `documents.*.document_type` must be distinct within the same payload
+
+
+* **Pest Test (`tests/Feature/EmployeeTest.php`):** `actingAsErpUser()` + `Cache::flush()`; CRUD with `company_id`, existing fields (`name`, `email`, `phone`), new profile fields + enum values, and nested `documents`; filter/sort/include; 422 (deleted `company_id`, soft-deleted master FK, invalid enum value, duplicate `nik_ktp`, bad `birth_date`, duplicate `document_type` in payload); `assertSoftDeleted`; JsonResource keys
+* **Then:** `make migrate` -> `make schema-dump` -> `make test-filter FILTER=EmployeeTest`
