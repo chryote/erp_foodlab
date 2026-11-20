@@ -3,12 +3,13 @@ import { login } from '@/api/client';
 import { Button, Card, CardHeader, TextInput } from '@/components/ui';
 
 export interface LoginPageProps {
-  onAuthenticated: (token: string) => void;
+  onAuthenticated: (token: string, developmentMode: boolean) => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticated }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [developmentMode, setDevelopmentMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -23,7 +24,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticated }) => {
         password,
         device_name: 'erp-web',
       });
-      onAuthenticated(response.data.token);
+      onAuthenticated(response.data.token, developmentMode);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal masuk.');
     } finally {
@@ -75,6 +76,27 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticated }) => {
             onChange={(event) => setPassword(event.target.value)}
             required
           />
+
+          <label
+            htmlFor="login-development-mode"
+            className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-muted/40 p-3"
+          >
+            <input
+              id="login-development-mode"
+              type="checkbox"
+              checked={developmentMode}
+              onChange={(event) => setDevelopmentMode(event.target.checked)}
+              className="mt-1 size-4 accent-primary"
+            />
+            <span>
+              <span className="block text-sm font-medium text-foreground">
+                Mode pengembangan
+              </span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                Buka simulator alur sistem setelah login.
+              </span>
+            </span>
+          </label>
 
           <Button type="submit" variant="primary" disabled={submitting}>
             {submitting ? 'Memproses...' : 'Masuk'}
