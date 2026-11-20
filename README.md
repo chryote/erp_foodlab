@@ -109,7 +109,7 @@ To keep AI agent token usage minimal during development (see [`AGENTS.md`](AGENT
    - Standard Radix + Tailwind `shadcn/ui` primitives (`ShadcnButton`, `ShadcnBadge`, `ShadcnCard`, `Dialog`, `ShadcnInput`, `ShadcnLabel`, `ShadcnTable`).
    - Add new primitives via `npx shadcn@latest add <component>` inside `frontend/`.
 2. **Declarative ERP Composite Layer (`frontend/src/components/ui/`)**:
-   - `CrudModal<T>` + `CrudFieldConfig<T>[]`: Schema-driven CRUD dialog supporting `text`, `number`, `decimal` (Indonesian dot-thousand / comma-decimal auto-formatter), and `select` fields, computed columns (`CrudComputedColumnConfig<T>`), custom row action buttons (`CrudRowActionConfig<T>`), read-only master-detail mode (`readOnly`), and client/server pagination.
+   - `CrudModal<T>` + `CrudFieldConfig<T>[]`: Schema-driven CRUD dialog supporting `text`, `number`, `decimal` (Indonesian dot-thousand / comma-decimal auto-formatter), and `select` fields, computed columns (`CrudComputedColumnConfig<T>`), custom row action buttons (`CrudRowActionConfig<T>`), read-only master-detail mode (`readOnly`), client/server pagination, and `formLayout="single-row"` to place every input plus the submit button on one row.
    - `SummaryBanner`: Highlighted KPI/capital summary bar inside modals and dashboards.
    - `CascadingHorizontalMenu` & `HorizontalMenu`: Multi-level horizontal submenu navigation.
    - `ModuleLauncherCard`, `PageHeader`, `Card`, `CardHeader`, `DataTable`, `Pagination`, `TableFilterBar`, `Badge`, `Button`.
