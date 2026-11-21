@@ -79,6 +79,36 @@ CREATE TABLE `company_assets` (
   CONSTRAINT `company_assets_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `employee_attendances`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `employee_attendances` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `company_id` bigint unsigned NOT NULL,
+  `employee_id` bigint unsigned NOT NULL,
+  `employee_shift_id` bigint unsigned DEFAULT NULL,
+  `attendance_date` date NOT NULL,
+  `clock_in_at` timestamp NULL DEFAULT NULL,
+  `clock_out_at` timestamp NULL DEFAULT NULL,
+  `late_minutes` smallint unsigned NOT NULL DEFAULT '0',
+  `overtime_minutes` smallint unsigned NOT NULL DEFAULT '0',
+  `status` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'present',
+  `notes` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) STORED,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `employee_attendances_company_emp_date_active_unique` (`company_id`,`employee_id`,`attendance_date`,`active_flag`),
+  KEY `employee_attendances_employee_shift_id_foreign` (`employee_shift_id`),
+  KEY `employee_attendances_company_deleted_idx` (`company_id`,`deleted_at`),
+  KEY `employee_attendances_company_date_idx` (`company_id`,`attendance_date`),
+  KEY `employee_attendances_emp_date_idx` (`employee_id`,`attendance_date`),
+  CONSTRAINT `employee_attendances_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `employee_attendances_employee_id_foreign` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `employee_attendances_employee_shift_id_foreign` FOREIGN KEY (`employee_shift_id`) REFERENCES `employee_shifts` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `employee_documents`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -123,15 +153,15 @@ DROP TABLE IF EXISTS `employee_shifts`;
 CREATE TABLE `employee_shifts` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `company_id` bigint unsigned NOT NULL,
-  `code` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `code` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `start_time` time NOT NULL,
   `end_time` time NOT NULL,
   `break_minutes` smallint unsigned NOT NULL DEFAULT '0',
   `grace_period_minutes` smallint unsigned NOT NULL DEFAULT '0',
   `is_overnight` tinyint(1) NOT NULL DEFAULT '0',
-  `status` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
-  `description` text COLLATE utf8mb4_unicode_ci,
+  `status` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
@@ -433,5 +463,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (31,'2026_11_21_000
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (32,'2026_11_21_000003_make_code_nullable_on_tax_statuses_table',19);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (34,'2026_11_21_120000_database_wide_cleanup',20);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (35,'2026_11_21_130000_create_employee_shifts_table',21);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (36,'2026_11_21_140000_create_employee_attendances_table',22);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;

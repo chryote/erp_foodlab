@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Enums\Agama;
+use App\Enums\AttendanceStatusEnum;
 use App\Enums\GolonganDarah;
 use App\Enums\JenisDokumen;
 use App\Enums\JenisKelamin;
@@ -11,6 +12,7 @@ use App\Models\CapitalCompany;
 use App\Models\Company;
 use App\Models\CompanyAsset;
 use App\Models\Employee;
+use App\Models\EmployeeAttendance;
 use App\Models\EmployeeDocument;
 use App\Models\EmployeePosition;
 use App\Models\EmployeeShift;
@@ -41,6 +43,7 @@ class DatabaseSeeder extends Seeder
             $this->seedCfoAssets($company);
             $this->seedChoModule($company);
             $this->seedEmployeeShifts();
+            $this->seedEmployeeAttendances();
         });
 
         Cache::flush();
@@ -434,6 +437,85 @@ class DatabaseSeeder extends Seeder
                 $shift->company_id = $company->id;
                 $shift->deleted_at = null;
                 $shift->save();
+            }
+        }
+    }
+
+    private function seedEmployeeAttendances(): void
+    {
+        $employees = Employee::query()->orderBy('id')->get();
+
+        foreach ($employees as $index => $employee) {
+            $morningShift = EmployeeShift::query()
+                ->where('company_id', $employee->company_id)
+                ->where('code', 'SHIFT-PAGI')
+                ->first();
+
+            $afternoonShift = EmployeeShift::query()
+                ->where('company_id', $employee->company_id)
+                ->where('code', 'SHIFT-SIANG')
+                ->first();
+
+            $samples = $index % 2 === 0
+                ? [
+                    [
+                        'employee_shift_id' => $morningShift?->id,
+                        'attendance_date' => '2026-11-20',
+                        'clock_in_at' => '2026-11-20 06:55:00',
+                        'clock_out_at' => '2026-11-20 15:30:00',
+                        'late_minutes' => 0,
+                        'overtime_minutes' => 30,
+                        'status' => AttendanceStatusEnum::PRESENT,
+                        'notes' => 'Hadir tepat waktu dengan lembur analisis sampel',
+                    ],
+                    [
+                        'employee_shift_id' => $morningShift?->id,
+                        'attendance_date' => '2026-11-21',
+                        'clock_in_at' => '2026-11-21 07:05:00',
+                        'clock_out_at' => '2026-11-21 15:00:00',
+                        'late_minutes' => 0,
+                        'overtime_minutes' => 0,
+                        'status' => AttendanceStatusEnum::PRESENT,
+                        'notes' => 'Hadir dalam masa toleransi shift pagi',
+                    ],
+                ]
+                : [
+                    [
+                        'employee_shift_id' => $morningShift?->id,
+                        'attendance_date' => '2026-11-20',
+                        'clock_in_at' => '2026-11-20 07:25:00',
+                        'clock_out_at' => '2026-11-20 15:00:00',
+                        'late_minutes' => 10,
+                        'overtime_minutes' => 0,
+                        'status' => AttendanceStatusEnum::LATE,
+                        'notes' => 'Terlambat 10 menit melewati masa toleransi',
+                    ],
+                    [
+                        'employee_shift_id' => $afternoonShift?->id,
+                        'attendance_date' => '2026-11-21',
+                        'clock_in_at' => null,
+                        'clock_out_at' => null,
+                        'late_minutes' => 0,
+                        'overtime_minutes' => 0,
+                        'status' => AttendanceStatusEnum::LEAVE,
+                        'notes' => 'Cuti tahunan disetujui',
+                    ],
+                ];
+
+            foreach ($samples as $payload) {
+                $attendance = EmployeeAttendance::query()
+                    ->withTrashed()
+                    ->where('company_id', $employee->company_id)
+                    ->where('employee_id', $employee->id)
+                    ->whereDate('attendance_date', $payload['attendance_date'])
+                    ->orderByRaw('deleted_at IS NOT NULL')
+                    ->first() ?? new EmployeeAttendance();
+
+                $attendance->fill($payload);
+                $attendance->company_id = $employee->company_id;
+                $attendance->employee_id = $employee->id;
+                $attendance->deleted_at = null;
+                $attendance->save();
             }
         }
     }
