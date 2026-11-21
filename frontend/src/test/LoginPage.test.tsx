@@ -8,6 +8,32 @@ vi.mock('../api/client');
 describe('LoginPage', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    window.localStorage.clear();
+    document.documentElement.removeAttribute('data-theme');
+  });
+
+  it('uses the active theme background and lets the user toggle themes', () => {
+    const { container } = render(
+      <LoginPage onAuthenticated={vi.fn()} />
+    );
+
+    expect(container.firstElementChild).toHaveClass('bg-background');
+
+    const toggle = screen.getByTestId('theme-toggle');
+    fireEvent.click(toggle);
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+    expect(window.localStorage.getItem('erp_foodlab.theme')).toBe('dark');
+    expect(toggle.querySelector('[aria-hidden="true"] > span')).toHaveClass(
+      'left-0.5',
+      'translate-x-3'
+    );
+
+    fireEvent.click(toggle);
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light');
+    expect(toggle.querySelector('[aria-hidden="true"] > span')).toHaveClass(
+      'left-0.5',
+      'translate-x-0'
+    );
   });
 
   it('submits credentials and hands the issued token to the app', async () => {
