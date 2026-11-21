@@ -106,10 +106,10 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   data-testid={`dashboard-series-tab-${series}`}
                   onClick={() => onSelectSeries?.(series)}
                   className={cn(
-                    'relative shrink-0 px-3 text-xs font-semibold transition-colors hover:text-primary sm:px-4',
+                    'relative shrink-0 px-3 text-xs font-semibold transition-colors sm:px-4',
                     isSelected
-                      ? 'text-primary after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-primary'
-                      : 'text-muted-foreground'
+                      ? 'after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-primary'
+                      : ''
                   )}
                 >
                   {`Seri ${series}`}
@@ -156,7 +156,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           <nav
             role="tablist"
             aria-label="Companies"
-            className="flex min-w-0 items-center gap-1 overflow-x-auto"
+            className="flex min-w-0 items-stretch gap-1 self-stretch overflow-x-auto"
           >
             {companiesInActiveSeries.map((company) => {
               const isSelected = selectedCompanyId === company.id;
@@ -169,10 +169,10 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   data-testid={`dashboard-company-tab-${company.id}`}
                   onClick={() => onSelectCompany?.(company)}
                   className={cn(
-                    'shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
+                    'relative flex shrink-0 items-center px-3 text-xs font-semibold transition-colors sm:px-4',
                     isSelected
-                      ? 'bg-muted text-foreground'
-                      : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+                      ? 'after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-primary'
+                      : ''
                   )}
                 >
                   {company.name}
@@ -182,11 +182,6 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           </nav>
 
           <div className="flex shrink-0 items-center gap-2">
-            {dateRange && (
-              <span className="hidden whitespace-nowrap text-xs text-muted-foreground md:block">
-                {dateRange}
-              </span>
-            )}
             <ThemeToggle showLabel />
           </div>
         </div>
