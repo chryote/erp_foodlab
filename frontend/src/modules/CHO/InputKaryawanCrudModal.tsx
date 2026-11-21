@@ -193,7 +193,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
   const [pendingAction, setPendingAction] =
     useState<PendingEmployeeAction | null>(null);
 
-  const pageSize = 5;
+  const pageSize = 10;
 
   const createDefaultDocRow = (
     rowId: number,
@@ -666,476 +666,561 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
         title="Input Karyawan"
         subtitle="Kelola data karyawan, enum agama & golongan darah, serta unggah dokumen"
         testId="input-karyawan-crud-modal"
-        maxWidthClass="max-w-6xl"
+        maxWidthClass="max-w-[95vw]"
+        dialogClassName="h-[92vh] max-h-[92vh]"
+        bodyClassName="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden"
         onClose={onClose}
       >
         {error && (
           <div
             role="alert"
-            className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700"
+            className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700"
           >
             {error}
           </div>
         )}
 
-        <form
-          onSubmit={handleSubmit}
-          data-testid="input-karyawan-crud-modal-form"
-          className="flex flex-col gap-4 border-b border-border pb-4"
+        <div
+          data-testid="input-karyawan-crud-modal-split-layout"
+          className="grid min-h-0 flex-1 grid-cols-1 gap-6 lg:grid-cols-[440px_minmax(0,1fr)] xl:grid-cols-[480px_minmax(0,1fr)]"
         >
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
-            <SelectInput
-              id="employee-company-input"
-              label="Pilih Perusahaan"
-              placeholder="Pilih perusahaan..."
-              options={companyOptions}
-              value={form.company_id}
-              onChange={(e) => handleFieldChange('company_id', e.target.value)}
-            />
-            <TextInput
-              id="employee-name-input"
-              label="Nama Lengkap"
-              placeholder="Contoh: Nadia Putri Pratiwi"
-              required
-              value={form.name}
-              onChange={(e) => handleFieldChange('name', e.target.value)}
-            />
-            <TextInput
-              id="employee-nickname-input"
-              label="Nama Panggilan"
-              placeholder="Contoh: Nadia"
-              value={form.nickname}
-              onChange={(e) => handleFieldChange('nickname', e.target.value)}
-            />
-            <TextInput
-              id="employee-nik-ktp-input"
-              label="NIK KTP (16 Digit)"
-              placeholder="Contoh: 3273011504960001"
-              maxLength={16}
-              value={form.nik_ktp}
-              onChange={(e) => handleFieldChange('nik_ktp', e.target.value)}
-            />
+          <div
+            data-testid="input-karyawan-crud-modal-form-panel"
+            className="flex min-h-0 flex-col rounded-xl border border-border bg-muted/25 p-4 lg:overflow-y-auto"
+          >
+            <form
+              onSubmit={handleSubmit}
+              data-testid="input-karyawan-crud-modal-form"
+              className="flex flex-col gap-4"
+            >
+              <div className="border-b border-border pb-2.5">
+                <h3 className="text-sm font-semibold text-foreground">
+                  {editingEmployee ? 'Edit Data Karyawan' : 'Tambah Data Karyawan'}
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  {editingEmployee
+                    ? 'Perbarui data karyawan yang dipilih lalu simpan perubahan.'
+                    : 'Lengkapi formulir di bawah ini untuk menambahkan karyawan baru.'}
+                </p>
+              </div>
 
-            <SelectInput
-              id="employee-position-input"
-              label="Jabatan"
-              placeholder="Pilih jabatan..."
-              options={positionOptions}
-              disabled={!form.company_id}
-              value={form.employee_position_id}
-              onChange={(e) =>
-                handleFieldChange('employee_position_id', e.target.value)
-              }
-            />
-            <SelectInput
-              id="employee-status-input"
-              label="Status Karyawan"
-              placeholder="Pilih status..."
-              options={statusOptions}
-              disabled={!form.company_id}
-              value={form.employment_status_id}
-              onChange={(e) =>
-                handleFieldChange('employment_status_id', e.target.value)
-              }
-            />
-            <SelectInput
-              id="employee-grade-input"
-              label="Payroll Grade"
-              placeholder="Pilih payroll grade..."
-              options={gradeOptions}
-              disabled={!form.company_id}
-              value={form.payroll_grade_id}
-              onChange={(e) =>
-                handleFieldChange('payroll_grade_id', e.target.value)
-              }
-            />
-            <SelectInput
-              id="employee-tax-status-input"
-              label="Status Pajak"
-              placeholder="Pilih status pajak..."
-              options={taxStatusOptions}
-              disabled={!form.company_id}
-              value={form.tax_status_id}
-              onChange={(e) =>
-                handleFieldChange('tax_status_id', e.target.value)
-              }
-            />
+              <div className="grid grid-cols-1 gap-3">
+                <SelectInput
+                  id="employee-company-input"
+                  label="Pilih Perusahaan"
+                  labelPlacement="left"
+                  placeholder="Pilih perusahaan..."
+                  options={companyOptions}
+                  value={form.company_id}
+                  onChange={(e) =>
+                    handleFieldChange('company_id', e.target.value)
+                  }
+                />
+                <TextInput
+                  id="employee-name-input"
+                  label="Nama Lengkap"
+                  labelPlacement="left"
+                  placeholder="Contoh: Nadia Putri Pratiwi"
+                  required
+                  value={form.name}
+                  onChange={(e) => handleFieldChange('name', e.target.value)}
+                />
+                <TextInput
+                  id="employee-nickname-input"
+                  label="Nama Panggilan"
+                  labelPlacement="left"
+                  placeholder="Contoh: Nadia"
+                  value={form.nickname}
+                  onChange={(e) =>
+                    handleFieldChange('nickname', e.target.value)
+                  }
+                />
+                <TextInput
+                  id="employee-nik-ktp-input"
+                  label="NIK KTP (16 Digit)"
+                  labelPlacement="left"
+                  placeholder="Contoh: 3273011504960001"
+                  maxLength={16}
+                  value={form.nik_ktp}
+                  onChange={(e) => handleFieldChange('nik_ktp', e.target.value)}
+                />
 
-            <SelectInput
-              id="employee-gender-input"
-              label="Jenis Kelamin"
-              placeholder="Pilih jenis kelamin..."
-              options={enums.jenis_kelamin.map((opt) => ({
-                value: opt.value,
-                label: opt.nama,
-              }))}
-              value={form.gender}
-              onChange={(e) => handleFieldChange('gender', e.target.value)}
-            />
-            <SelectInput
-              id="employee-religion-input"
-              label="Agama"
-              placeholder="Pilih agama..."
-              options={enums.agama.map((opt) => ({
-                value: opt.value,
-                label: opt.nama,
-              }))}
-              value={form.religion}
-              onChange={(e) => handleFieldChange('religion', e.target.value)}
-            />
-            <SelectInput
-              id="employee-blood-type-input"
-              label="Golongan Darah"
-              placeholder="Pilih golongan darah..."
-              options={enums.golongan_darah.map((opt) => ({
-                value: opt.value,
-                label: opt.nama,
-              }))}
-              value={form.blood_type}
-              onChange={(e) => handleFieldChange('blood_type', e.target.value)}
-            />
-            <TextInput
-              id="employee-mother-name-input"
-              label="Nama Ibu Kandung"
-              placeholder="Contoh: Siti Aminah"
-              value={form.mother_name}
-              onChange={(e) => handleFieldChange('mother_name', e.target.value)}
-            />
+                <SelectInput
+                  id="employee-position-input"
+                  label="Jabatan"
+                  labelPlacement="left"
+                  placeholder="Pilih jabatan..."
+                  options={positionOptions}
+                  disabled={!form.company_id}
+                  value={form.employee_position_id}
+                  onChange={(e) =>
+                    handleFieldChange('employee_position_id', e.target.value)
+                  }
+                />
+                <SelectInput
+                  id="employee-status-input"
+                  label="Status Karyawan"
+                  labelPlacement="left"
+                  placeholder="Pilih status..."
+                  options={statusOptions}
+                  disabled={!form.company_id}
+                  value={form.employment_status_id}
+                  onChange={(e) =>
+                    handleFieldChange('employment_status_id', e.target.value)
+                  }
+                />
+                <SelectInput
+                  id="employee-grade-input"
+                  label="Payroll Grade"
+                  labelPlacement="left"
+                  placeholder="Pilih payroll grade..."
+                  options={gradeOptions}
+                  disabled={!form.company_id}
+                  value={form.payroll_grade_id}
+                  onChange={(e) =>
+                    handleFieldChange('payroll_grade_id', e.target.value)
+                  }
+                />
+                <SelectInput
+                  id="employee-tax-status-input"
+                  label="Status Pajak"
+                  labelPlacement="left"
+                  placeholder="Pilih status pajak..."
+                  options={taxStatusOptions}
+                  disabled={!form.company_id}
+                  value={form.tax_status_id}
+                  onChange={(e) =>
+                    handleFieldChange('tax_status_id', e.target.value)
+                  }
+                />
 
-            <TextInput
-              id="employee-birth-place-input"
-              label="Tempat Lahir"
-              placeholder="Contoh: Bandung"
-              value={form.birth_place}
-              onChange={(e) => handleFieldChange('birth_place', e.target.value)}
-            />
-            <TextInput
-              id="employee-birth-date-input"
-              label="Tanggal Lahir"
-              type="date"
-              value={form.birth_date}
-              onChange={(e) => handleFieldChange('birth_date', e.target.value)}
-            />
-            <TextInput
-              id="employee-email-input"
-              label="Email"
-              type="email"
-              placeholder="Contoh: nadia@foodlab.test"
-              value={form.email}
-              onChange={(e) => handleFieldChange('email', e.target.value)}
-            />
-            <TextInput
-              id="employee-phone-input"
-              label="No. Telepon"
-              placeholder="Contoh: 081234567801"
-              value={form.phone}
-              onChange={(e) => handleFieldChange('phone', e.target.value)}
-            />
+                <SelectInput
+                  id="employee-gender-input"
+                  label="Jenis Kelamin"
+                  labelPlacement="left"
+                  placeholder="Pilih jenis kelamin..."
+                  options={enums.jenis_kelamin.map((opt) => ({
+                    value: opt.value,
+                    label: opt.nama,
+                  }))}
+                  value={form.gender}
+                  onChange={(e) => handleFieldChange('gender', e.target.value)}
+                />
+                <SelectInput
+                  id="employee-religion-input"
+                  label="Agama"
+                  labelPlacement="left"
+                  placeholder="Pilih agama..."
+                  options={enums.agama.map((opt) => ({
+                    value: opt.value,
+                    label: opt.nama,
+                  }))}
+                  value={form.religion}
+                  onChange={(e) =>
+                    handleFieldChange('religion', e.target.value)
+                  }
+                />
+                <SelectInput
+                  id="employee-blood-type-input"
+                  label="Golongan Darah"
+                  labelPlacement="left"
+                  placeholder="Pilih golongan darah..."
+                  options={enums.golongan_darah.map((opt) => ({
+                    value: opt.value,
+                    label: opt.nama,
+                  }))}
+                  value={form.blood_type}
+                  onChange={(e) =>
+                    handleFieldChange('blood_type', e.target.value)
+                  }
+                />
+                <TextInput
+                  id="employee-mother-name-input"
+                  label="Nama Ibu Kandung"
+                  labelPlacement="left"
+                  placeholder="Contoh: Siti Aminah"
+                  value={form.mother_name}
+                  onChange={(e) =>
+                    handleFieldChange('mother_name', e.target.value)
+                  }
+                />
 
-            <TextInput
-              id="employee-whatsapp-input"
-              label="No. WhatsApp"
-              placeholder="Contoh: 081234567801"
-              value={form.whatsapp_number}
-              onChange={(e) =>
-                handleFieldChange('whatsapp_number', e.target.value)
-              }
-            />
-            <TextInput
-              id="employee-emergency-phone-input"
-              label="No. Telepon Darurat"
-              placeholder="Contoh: 081234567899"
-              value={form.emergency_phone_number}
-              onChange={(e) =>
-                handleFieldChange('emergency_phone_number', e.target.value)
-              }
-            />
-            <TextInput
-              id="employee-instagram-input"
-              label="Instagram"
-              placeholder="Contoh: @nadia.lab"
-              value={form.instagram}
-              onChange={(e) => handleFieldChange('instagram', e.target.value)}
-            />
-            <TextInput
-              id="employee-tiktok-input"
-              label="TikTok"
-              placeholder="Contoh: @nadia.tiktok"
-              value={form.tiktok}
-              onChange={(e) => handleFieldChange('tiktok', e.target.value)}
-            />
+                <TextInput
+                  id="employee-birth-place-input"
+                  label="Tempat Lahir"
+                  labelPlacement="left"
+                  placeholder="Contoh: Bandung"
+                  value={form.birth_place}
+                  onChange={(e) =>
+                    handleFieldChange('birth_place', e.target.value)
+                  }
+                />
+                <TextInput
+                  id="employee-birth-date-input"
+                  label="Tanggal Lahir"
+                  labelPlacement="left"
+                  type="date"
+                  value={form.birth_date}
+                  onChange={(e) =>
+                    handleFieldChange('birth_date', e.target.value)
+                  }
+                />
+                <TextInput
+                  id="employee-email-input"
+                  label="Email"
+                  labelPlacement="left"
+                  type="email"
+                  placeholder="Contoh: nadia@foodlab.test"
+                  value={form.email}
+                  onChange={(e) => handleFieldChange('email', e.target.value)}
+                />
+                <TextInput
+                  id="employee-phone-input"
+                  label="No. Telepon"
+                  labelPlacement="left"
+                  placeholder="Contoh: 081234567801"
+                  value={form.phone}
+                  onChange={(e) => handleFieldChange('phone', e.target.value)}
+                />
 
-            <TextInput
-              id="employee-bpjs-tk-input"
-              label="BPJS Ketenagakerjaan"
-              placeholder="Nomor BPJS TK"
-              value={form.bpjs_ketenagakerjaan}
-              onChange={(e) =>
-                handleFieldChange('bpjs_ketenagakerjaan', e.target.value)
-              }
-            />
-            <TextInput
-              id="employee-bpjs-kes-input"
-              label="BPJS Kesehatan"
-              placeholder="Nomor BPJS Kesehatan"
-              value={form.bpjs_kesehatan}
-              onChange={(e) =>
-                handleFieldChange('bpjs_kesehatan', e.target.value)
-              }
-            />
-            <TextInput
-              id="employee-npwp-input"
-              label="Nomor NPWP"
-              placeholder="Contoh: 9123456789012000"
-              value={form.npwp_number}
-              onChange={(e) => handleFieldChange('npwp_number', e.target.value)}
-            />
-            <div className="flex flex-col gap-1.5">
-              <TextInput
-                id="employee-photo-url-input"
-                label="URL Foto Karyawan"
-                placeholder="Unggah pas foto atau isi URL"
-                value={form.photo_url}
-                onChange={(e) => handleFieldChange('photo_url', e.target.value)}
-              />
-              <div className="flex items-center justify-between gap-2">
-                <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-primary hover:underline">
-                  <input
-                    type="file"
-                    accept=".jpg,.jpeg,.png"
-                    aria-label="Unggah Pas Foto"
-                    data-testid="employee-photo-file-input"
-                    className="hidden"
-                    disabled={uploadingDocument}
-                    onChange={(e) => void handlePhotoFileChange(e)}
+                <TextInput
+                  id="employee-whatsapp-input"
+                  label="No. WhatsApp"
+                  labelPlacement="left"
+                  placeholder="Contoh: 081234567801"
+                  value={form.whatsapp_number}
+                  onChange={(e) =>
+                    handleFieldChange('whatsapp_number', e.target.value)
+                  }
+                />
+                <TextInput
+                  id="employee-emergency-phone-input"
+                  label="No. Telepon Darurat"
+                  labelPlacement="left"
+                  placeholder="Contoh: 081234567899"
+                  value={form.emergency_phone_number}
+                  onChange={(e) =>
+                    handleFieldChange('emergency_phone_number', e.target.value)
+                  }
+                />
+                <TextInput
+                  id="employee-instagram-input"
+                  label="Instagram"
+                  labelPlacement="left"
+                  placeholder="Contoh: @nadia.lab"
+                  value={form.instagram}
+                  onChange={(e) =>
+                    handleFieldChange('instagram', e.target.value)
+                  }
+                />
+                <TextInput
+                  id="employee-tiktok-input"
+                  label="TikTok"
+                  labelPlacement="left"
+                  placeholder="Contoh: @nadia.tiktok"
+                  value={form.tiktok}
+                  onChange={(e) => handleFieldChange('tiktok', e.target.value)}
+                />
+
+                <TextInput
+                  id="employee-bpjs-tk-input"
+                  label="BPJS Ketenagakerjaan"
+                  labelPlacement="left"
+                  placeholder="Nomor BPJS TK"
+                  value={form.bpjs_ketenagakerjaan}
+                  onChange={(e) =>
+                    handleFieldChange('bpjs_ketenagakerjaan', e.target.value)
+                  }
+                />
+                <TextInput
+                  id="employee-bpjs-kes-input"
+                  label="BPJS Kesehatan"
+                  labelPlacement="left"
+                  placeholder="Nomor BPJS Kesehatan"
+                  value={form.bpjs_kesehatan}
+                  onChange={(e) =>
+                    handleFieldChange('bpjs_kesehatan', e.target.value)
+                  }
+                />
+                <TextInput
+                  id="employee-npwp-input"
+                  label="Nomor NPWP"
+                  labelPlacement="left"
+                  placeholder="Contoh: 9123456789012000"
+                  value={form.npwp_number}
+                  onChange={(e) =>
+                    handleFieldChange('npwp_number', e.target.value)
+                  }
+                />
+                <div className="flex flex-col gap-1.5">
+                  <TextInput
+                    id="employee-photo-url-input"
+                    label="URL Foto Karyawan"
+                    labelPlacement="left"
+                    placeholder="Unggah pas foto atau isi URL"
+                    value={form.photo_url}
+                    onChange={(e) =>
+                      handleFieldChange('photo_url', e.target.value)
+                    }
                   />
-                  <span>
-                    {uploadingDocument
-                      ? 'Mengunggah foto...'
-                      : 'Unggah Pas Foto (.jpg/.png)'}
-                  </span>
-                </label>
-                {form.photo_url.trim() !== '' && (
-                  <a
-                    href={resolveDocumentUrl(form.photo_url)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs font-medium text-primary hover:underline"
+                  <div className="flex items-center justify-between gap-2 sm:pl-[152px]">
+                    <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-primary hover:underline">
+                      <input
+                        type="file"
+                        accept=".jpg,.jpeg,.png"
+                        aria-label="Unggah Pas Foto"
+                        data-testid="employee-photo-file-input"
+                        className="hidden"
+                        disabled={uploadingDocument}
+                        onChange={(e) => void handlePhotoFileChange(e)}
+                      />
+                      <span>
+                        {uploadingDocument
+                          ? 'Mengunggah foto...'
+                          : 'Unggah Pas Foto (.jpg/.png)'}
+                      </span>
+                    </label>
+                    {form.photo_url.trim() !== '' && (
+                      <a
+                        href={resolveDocumentUrl(form.photo_url)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs font-medium text-primary hover:underline"
+                      >
+                        Lihat
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                <TextareaInput
+                  id="employee-ktp-address-input"
+                  label="Alamat KTP"
+                  labelPlacement="left"
+                  rows={2}
+                  placeholder="Alamat sesuai KTP"
+                  value={form.ktp_address}
+                  onChange={(e) =>
+                    handleFieldChange('ktp_address', e.target.value)
+                  }
+                />
+                <TextareaInput
+                  id="employee-domicile-address-input"
+                  label="Alamat Domisili"
+                  labelPlacement="left"
+                  rows={2}
+                  placeholder="Alamat tempat tinggal saat ini"
+                  value={form.domicile_address}
+                  onChange={(e) =>
+                    handleFieldChange('domicile_address', e.target.value)
+                  }
+                />
+              </div>
+
+              <div
+                className="rounded-xl border border-border bg-card/70 p-3.5"
+                data-testid="employee-documents-section"
+              >
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                      Dokumen Karyawan (EmployeeDocument)
+                    </h4>
+                    <p className="text-xs text-muted-foreground">
+                      Unggah berkas melalui DocumentService atau masukkan URL.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="neutral">
+                      {filledDocuments.length} dokumen terlampir
+                    </Badge>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      data-testid="add-employee-document-btn"
+                      disabled={
+                        documentRows.length >= enums.jenis_dokumen.length
+                      }
+                      onClick={handleAddDocumentRow}
+                    >
+                      + Tambah Dokumen
+                    </Button>
+                  </div>
+                </div>
+
+                {documentRows.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-border bg-card px-3 py-3 text-center text-xs text-muted-foreground">
+                    Belum ada baris dokumen. Klik &ldquo;+ Tambah Dokumen&rdquo;
+                    untuk menambahkan dokumen.
+                  </p>
+                ) : (
+                  <div
+                    className="flex flex-col gap-2.5"
+                    data-testid="employee-documents-list"
                   >
-                    Lihat
-                  </a>
+                    {documentRows.map((docRow, index) => {
+                      const rowDocMeta = docTypeMetaByValue.get(
+                        docRow.document_type
+                      );
+                      const usedByOtherRows = new Set(
+                        documentRows
+                          .filter((r) => r.rowId !== docRow.rowId)
+                          .map((r) => r.document_type)
+                      );
+                      const rowOptions = enums.jenis_dokumen
+                        .filter(
+                          (opt) =>
+                            opt.value === docRow.document_type ||
+                            !usedByOtherRows.has(opt.value)
+                        )
+                        .map((opt) => ({
+                          value: opt.value,
+                          label: opt.nama,
+                        }));
+                      const isRowUploading =
+                        uploadingDocument && uploadingRowId === docRow.rowId;
+
+                      return (
+                        <div
+                          key={docRow.rowId}
+                          data-testid={`employee-document-row-${index}`}
+                          className="flex flex-col gap-2.5 rounded-lg border border-border bg-card p-3"
+                        >
+                          <SelectInput
+                            id={`employee-document-type-input-${docRow.rowId}`}
+                            label="Jenis Dokumen"
+                            labelPlacement="left"
+                            options={rowOptions}
+                            value={docRow.document_type}
+                            onChange={(e) =>
+                              handleUpdateDocumentRow(docRow.rowId, {
+                                document_type: e.target.value,
+                              })
+                            }
+                          />
+                          <TextInput
+                            id={`employee-document-url-input-${docRow.rowId}`}
+                            label="URL Dokumen"
+                            labelPlacement="left"
+                            placeholder="https://... atau unggah berkas"
+                            value={docRow.file_url}
+                            onChange={(e) =>
+                              handleUpdateDocumentRow(docRow.rowId, {
+                                file_url: e.target.value,
+                              })
+                            }
+                          />
+                          <div className="grid grid-cols-1 items-center gap-1.5 sm:grid-cols-[140px_minmax(0,1fr)] sm:gap-3">
+                            <span className="text-xs font-medium leading-snug text-foreground">
+                              Unggah Berkas (
+                              {rowDocMeta?.allowed_formats.join(', ') ??
+                                '.pdf, .jpg, .png'}
+                              )
+                            </span>
+                            <label className="flex h-9 cursor-pointer items-center justify-center rounded-lg border border-dashed border-primary/50 bg-background px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/5">
+                              <input
+                                type="file"
+                                accept={
+                                  rowDocMeta?.allowed_formats.join(',') ??
+                                  '.pdf,.jpg,.jpeg,.png,.doc,.docx'
+                                }
+                                aria-label={`Unggah Berkas Dokumen ${rowDocMeta?.nama ?? index + 1}`}
+                                data-testid={
+                                  index === 0
+                                    ? 'employee-document-file-input'
+                                    : `employee-document-file-input-${index}`
+                                }
+                                className="hidden"
+                                disabled={uploadingDocument}
+                                onChange={(e) =>
+                                  void handleDocumentFileChange(
+                                    docRow.rowId,
+                                    docRow.document_type,
+                                    e
+                                  )
+                                }
+                              />
+                              {isRowUploading
+                                ? 'Mengunggah...'
+                                : 'Pilih & Unggah File'}
+                            </label>
+                          </div>
+                          <div className="flex items-center justify-end gap-1.5">
+                            {docRow.file_url.trim() !== '' && (
+                              <a
+                                href={resolveDocumentUrl(docRow.file_url)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex h-8 items-center rounded-lg border border-border px-2.5 text-xs font-medium text-primary hover:bg-muted"
+                              >
+                                Lihat
+                              </a>
+                            )}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              data-testid={`remove-employee-document-row-${index}`}
+                              onClick={() =>
+                                handleRemoveDocumentRow(docRow.rowId)
+                              }
+                            >
+                              Hapus
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <TextareaInput
-              id="employee-ktp-address-input"
-              label="Alamat KTP"
-              rows={2}
-              placeholder="Alamat sesuai KTP"
-              value={form.ktp_address}
-              onChange={(e) => handleFieldChange('ktp_address', e.target.value)}
-            />
-            <TextareaInput
-              id="employee-domicile-address-input"
-              label="Alamat Domisili"
-              rows={2}
-              placeholder="Alamat tempat tinggal saat ini"
-              value={form.domicile_address}
-              onChange={(e) =>
-                handleFieldChange('domicile_address', e.target.value)
-              }
-            />
+              <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                <Button type="submit" variant="primary" disabled={loading}>
+                  {editingEmployee ? 'Perbarui' : 'Tambah'}
+                </Button>
+                {editingEmployee && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleCancelEdit}
+                  >
+                    Batal
+                  </Button>
+                )}
+              </div>
+            </form>
           </div>
 
           <div
-            className="rounded-xl border border-border bg-muted/30 p-3.5"
-            data-testid="employee-documents-section"
+            data-testid="input-karyawan-crud-modal-table-panel"
+            className="flex min-h-0 min-w-0 flex-col justify-between gap-4 rounded-xl border border-border bg-card p-4"
           >
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                  Dokumen Karyawan (EmployeeDocument)
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Daftar Karyawan
                 </h3>
-                <p className="text-xs text-muted-foreground">
-                  Unggah berkas melalui DocumentService atau masukkan URL, lalu
-                  klik Tambah Dokumen untuk menambah baris dokumen.
-                </p>
+                <Badge variant="neutral">{allEmployees.length} karyawan</Badge>
               </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="neutral">
-                  {filledDocuments.length} dokumen terlampir
-                </Badge>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  data-testid="add-employee-document-btn"
-                  disabled={documentRows.length >= enums.jenis_dokumen.length}
-                  onClick={handleAddDocumentRow}
-                >
-                  + Tambah Dokumen
-                </Button>
-              </div>
+              <DataTable
+                columns={columns}
+                data={paginatedEmployees}
+                rowKey={(row) => row.id}
+                emptyMessage="Belum ada data karyawan."
+              />
             </div>
 
-            {documentRows.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-border bg-card px-3 py-3 text-center text-xs text-muted-foreground">
-                Belum ada baris dokumen. Klik &ldquo;+ Tambah Dokumen&rdquo;
-                untuk menambahkan dokumen.
-              </p>
-            ) : (
-              <div
-                className="flex flex-col gap-2.5"
-                data-testid="employee-documents-list"
-              >
-                {documentRows.map((docRow, index) => {
-                  const rowDocMeta = docTypeMetaByValue.get(
-                    docRow.document_type
-                  );
-                  const usedByOtherRows = new Set(
-                    documentRows
-                      .filter((r) => r.rowId !== docRow.rowId)
-                      .map((r) => r.document_type)
-                  );
-                  const rowOptions = enums.jenis_dokumen
-                    .filter(
-                      (opt) =>
-                        opt.value === docRow.document_type ||
-                        !usedByOtherRows.has(opt.value)
-                    )
-                    .map((opt) => ({
-                      value: opt.value,
-                      label: opt.nama,
-                    }));
-                  const isRowUploading =
-                    uploadingDocument && uploadingRowId === docRow.rowId;
-
-                  return (
-                    <div
-                      key={docRow.rowId}
-                      data-testid={`employee-document-row-${index}`}
-                      className="grid grid-cols-1 items-end gap-2.5 rounded-lg border border-border bg-card p-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)_auto]"
-                    >
-                      <SelectInput
-                        id={`employee-document-type-input-${docRow.rowId}`}
-                        label="Jenis Dokumen"
-                        options={rowOptions}
-                        value={docRow.document_type}
-                        onChange={(e) =>
-                          handleUpdateDocumentRow(docRow.rowId, {
-                            document_type: e.target.value,
-                          })
-                        }
-                      />
-                      <TextInput
-                        id={`employee-document-url-input-${docRow.rowId}`}
-                        label="URL Dokumen"
-                        placeholder="https://... atau unggah berkas"
-                        value={docRow.file_url}
-                        onChange={(e) =>
-                          handleUpdateDocumentRow(docRow.rowId, {
-                            file_url: e.target.value,
-                          })
-                        }
-                      />
-                      <div className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-foreground">
-                          Unggah Berkas (
-                          {rowDocMeta?.allowed_formats.join(', ') ??
-                            '.pdf, .jpg, .png'}
-                          )
-                        </span>
-                        <label className="flex h-9 cursor-pointer items-center justify-center rounded-lg border border-dashed border-primary/50 bg-background px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/5">
-                          <input
-                            type="file"
-                            accept={
-                              rowDocMeta?.allowed_formats.join(',') ??
-                              '.pdf,.jpg,.jpeg,.png,.doc,.docx'
-                            }
-                            aria-label={`Unggah Berkas Dokumen ${rowDocMeta?.nama ?? index + 1}`}
-                            data-testid={
-                              index === 0
-                                ? 'employee-document-file-input'
-                                : `employee-document-file-input-${index}`
-                            }
-                            className="hidden"
-                            disabled={uploadingDocument}
-                            onChange={(e) =>
-                              void handleDocumentFileChange(
-                                docRow.rowId,
-                                docRow.document_type,
-                                e
-                              )
-                            }
-                          />
-                          {isRowUploading
-                            ? 'Mengunggah...'
-                            : 'Pilih & Unggah File'}
-                        </label>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        {docRow.file_url.trim() !== '' && (
-                          <a
-                            href={resolveDocumentUrl(docRow.file_url)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex h-9 items-center rounded-lg border border-border px-2.5 text-xs font-medium text-primary hover:bg-muted"
-                          >
-                            Lihat
-                          </a>
-                        )}
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          data-testid={`remove-employee-document-row-${index}`}
-                          onClick={() => handleRemoveDocumentRow(docRow.rowId)}
-                        >
-                          Hapus
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <div className="shrink-0 border-t border-border pt-3">
+              <Pagination
+                currentPage={safeCurrentPage}
+                totalPages={totalPages}
+                totalItems={allEmployees.length}
+                testId="input-karyawan-pagination"
+                onPageChange={setCurrentPage}
+              />
+            </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            <Button type="submit" variant="primary" disabled={loading}>
-              {editingEmployee ? 'Perbarui' : 'Tambah'}
-            </Button>
-            {editingEmployee && (
-              <Button type="button" variant="ghost" onClick={handleCancelEdit}>
-                Batal
-              </Button>
-            )}
-          </div>
-        </form>
-
-        <div className="flex shrink-0 flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Daftar Karyawan
-            </h3>
-            <Badge variant="neutral">{allEmployees.length} karyawan</Badge>
-          </div>
-          <DataTable
-            columns={columns}
-            data={paginatedEmployees}
-            rowKey={(row) => row.id}
-            emptyMessage="Belum ada data karyawan."
-          />
         </div>
-
-        <Pagination
-          currentPage={safeCurrentPage}
-          totalPages={totalPages}
-          totalItems={allEmployees.length}
-          testId="input-karyawan-pagination"
-          onPageChange={setCurrentPage}
-        />
       </Modal>
 
       <ConfirmDialog

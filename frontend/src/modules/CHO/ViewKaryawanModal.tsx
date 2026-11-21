@@ -148,6 +148,8 @@ export const ViewKaryawanModal: React.FC<ViewKaryawanModalProps> = ({
             : 'Daftar karyawan perusahaan aktif pada modul CHO (SDM)'
         }
         testId="view-karyawan-modal"
+        layout="split"
+        modalSize="expanded"
         fields={fields}
         computedColumns={computedColumns}
         rowActions={[
@@ -167,7 +169,7 @@ export const ViewKaryawanModal: React.FC<ViewKaryawanModalProps> = ({
           />
         }
         emptyMessage="Belum ada data karyawan pada perusahaan ini."
-        pageSize={5}
+        pageSize={10}
         items={employees}
         loading={loading}
         error={error}
@@ -184,7 +186,7 @@ export const ViewKaryawanModal: React.FC<ViewKaryawanModalProps> = ({
             : undefined
         }
         testId="view-karyawan-detail-modal"
-        maxWidthClass="max-w-3xl"
+        maxWidthClass="max-w-4xl"
         onClose={() => setSelectedEmployee(null)}
       >
         {selectedEmployee && (
@@ -207,102 +209,57 @@ export const ViewKaryawanModal: React.FC<ViewKaryawanModalProps> = ({
               </div>
             )}
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <span className="block text-xs text-muted-foreground">
-                  NIK KTP
-                </span>
-                <span className="font-medium">
-                  {selectedEmployee.nik_ktp ?? '-'}
-                </span>
-              </div>
-              <div>
-                <span className="block text-xs text-muted-foreground">
-                  Nama Panggilan
-                </span>
-                <span className="font-medium">
-                  {selectedEmployee.nickname ?? '-'}
-                </span>
-              </div>
-              <div>
-                <span className="block text-xs text-muted-foreground">
-                  Tempat, Tanggal Lahir
-                </span>
-                <span className="font-medium">
-                  {[
-                    selectedEmployee.birth_place,
-                    selectedEmployee.birth_date,
-                  ]
+            <div className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-muted/25 p-4">
+              {[
+                ['NIK KTP', selectedEmployee.nik_ktp ?? '-'],
+                ['Nama Panggilan', selectedEmployee.nickname ?? '-'],
+                [
+                  'Tempat, Tanggal Lahir',
+                  [selectedEmployee.birth_place, selectedEmployee.birth_date]
                     .filter(Boolean)
-                    .join(', ') || '-'}
-                </span>
-              </div>
-              <div>
-                <span className="block text-xs text-muted-foreground">
-                  Jenis Kelamin
-                </span>
-                <span className="font-medium">
-                  {selectedEmployee.gender
+                    .join(', ') || '-',
+                ],
+                [
+                  'Jenis Kelamin',
+                  selectedEmployee.gender
                     ? (genderLabelByValue.get(selectedEmployee.gender) ??
                       selectedEmployee.gender)
-                    : '-'}
-                </span>
-              </div>
-              <div>
-                <span className="block text-xs text-muted-foreground">
-                  Agama
-                </span>
-                <span className="font-medium">
-                  {selectedEmployee.religion
+                    : '-',
+                ],
+                [
+                  'Agama',
+                  selectedEmployee.religion
                     ? (religionLabelByValue.get(selectedEmployee.religion) ??
                       selectedEmployee.religion)
-                    : '-'}
-                </span>
-              </div>
-              <div>
-                <span className="block text-xs text-muted-foreground">
-                  Golongan Darah
-                </span>
-                <span className="font-medium">
-                  {selectedEmployee.blood_type
+                    : '-',
+                ],
+                [
+                  'Golongan Darah',
+                  selectedEmployee.blood_type
                     ? (bloodTypeLabelByValue.get(selectedEmployee.blood_type) ??
                       selectedEmployee.blood_type)
-                    : '-'}
-                </span>
-              </div>
-              <div>
-                <span className="block text-xs text-muted-foreground">
-                  BPJS Ketenagakerjaan / Kesehatan
-                </span>
-                <span className="font-medium">
-                  {selectedEmployee.bpjs_ketenagakerjaan ?? '-'} /{' '}
-                  {selectedEmployee.bpjs_kesehatan ?? '-'}
-                </span>
-              </div>
-              <div>
-                <span className="block text-xs text-muted-foreground">
-                  NPWP
-                </span>
-                <span className="font-medium">
-                  {selectedEmployee.npwp_number ?? '-'}
-                </span>
-              </div>
-              <div>
-                <span className="block text-xs text-muted-foreground">
-                  Alamat KTP
-                </span>
-                <span className="font-medium">
-                  {selectedEmployee.ktp_address ?? '-'}
-                </span>
-              </div>
-              <div>
-                <span className="block text-xs text-muted-foreground">
-                  Alamat Domisili
-                </span>
-                <span className="font-medium">
-                  {selectedEmployee.domicile_address ?? '-'}
-                </span>
-              </div>
+                    : '-',
+                ],
+                [
+                  'BPJS Ketenagakerjaan / Kesehatan',
+                  `${selectedEmployee.bpjs_ketenagakerjaan ?? '-'} / ${selectedEmployee.bpjs_kesehatan ?? '-'}`,
+                ],
+                ['NPWP', selectedEmployee.npwp_number ?? '-'],
+                ['Alamat KTP', selectedEmployee.ktp_address ?? '-'],
+                ['Alamat Domisili', selectedEmployee.domicile_address ?? '-'],
+              ].map(([detailLabel, detailValue]) => (
+                <div
+                  key={detailLabel}
+                  className="grid grid-cols-1 items-baseline gap-1 border-b border-border/60 pb-2 last:border-b-0 last:pb-0 sm:grid-cols-[200px_minmax(0,1fr)] sm:gap-3"
+                >
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {detailLabel}
+                  </span>
+                  <span className="font-medium text-foreground">
+                    {detailValue}
+                  </span>
+                </div>
+              ))}
             </div>
 
             <div className="rounded-xl border border-border bg-muted/30 p-3">

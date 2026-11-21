@@ -499,6 +499,24 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
     const inputKaryawanModal = await screen.findByTestId(
       'input-karyawan-crud-modal'
     );
+    expect(inputKaryawanModal).toHaveClass(
+      'max-w-[95vw]',
+      'h-[92vh]',
+      'max-h-[92vh]'
+    );
+    expect(
+      screen.getByTestId('input-karyawan-crud-modal-split-layout')
+    ).toContainElement(
+      screen.getByTestId('input-karyawan-crud-modal-form-panel')
+    );
+    expect(
+      screen.getByTestId('input-karyawan-crud-modal-split-layout')
+    ).toContainElement(
+      screen.getByTestId('input-karyawan-crud-modal-table-panel')
+    );
+    expect(screen.getByTestId('employee-name-input-field')).toHaveClass(
+      'sm:grid-cols-[140px_minmax(0,1fr)]'
+    );
     expect(
       await within(inputKaryawanModal).findByText('Nadia Putri')
     ).toBeInTheDocument();
@@ -614,6 +632,10 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
     // 6. View Karyawan Modal: lists Karyawan on active clicked Company
     fireEvent.click(screen.getByTestId('horizontal-menu-card-VIEW_KARYAWAN'));
     const viewModal = await screen.findByTestId('view-karyawan-modal');
+    expect(viewModal).toHaveClass('max-w-[95vw]', 'h-[92vh]', 'max-h-[92vh]');
+    expect(
+      screen.getByTestId('view-karyawan-modal-table-panel')
+    ).toBeInTheDocument();
     await waitFor(() => {
       expect(apiClient.fetchActiveCompanyEmployees).toHaveBeenCalled();
       expect(within(viewModal).getByText('Nadia Putri')).toBeInTheDocument();
