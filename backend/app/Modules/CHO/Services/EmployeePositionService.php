@@ -2,6 +2,7 @@
 
 namespace App\Modules\CHO\Services;
 
+use App\Models\Company;
 use App\Models\EmployeePosition;
 use App\Support\IndexQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -30,6 +31,8 @@ class EmployeePositionService
     {
         $query = IndexQuery::withDefaultRelations($this->query($request), $request, self::RELATIONS);
 
+        IndexQuery::applyActiveCompanyFilter($query->getEloquentBuilder(), $request);
+
         if (IndexQuery::isPaginated($request)) {
             return IndexQuery::paginate($query, $request);
         }
@@ -46,9 +49,14 @@ class EmployeePositionService
      */
     public function createEmployeePosition(array $attributes): EmployeePosition
     {
-        $employeePosition = DB::transaction(
-            fn (): EmployeePosition => EmployeePosition::query()->create($attributes)
-        );
+        $employeePosition = DB::transaction(function () use ($attributes): EmployeePosition {
+            $this->assertWriteConstraints(
+                (int) $attributes['company_id'],
+                $attributes['code'] ?? null
+            );
+
+            return EmployeePosition::query()->create($attributes);
+        });
 
         Cache::forget(self::CACHE_KEY_LIST);
 
@@ -62,6 +70,19 @@ class EmployeePositionService
     {
         $updated = DB::transaction(function () use ($employeePosition, $attributes): EmployeePosition {
             $locked = EmployeePosition::query()->lockForUpdate()->findOrFail($employeePosition->getKey());
+
+            $targetCompanyId = (int) ($attributes['company_id'] ?? $locked->company_id);
+            if ($targetCompanyId !== (int) $locked->company_id && $locked->employees()->exists()) {
+                throw ValidationException::withMessages([
+                    'company_id' => [
+                        'Cannot change company for an employee position that is still referenced by active employees.',
+                    ],
+                ]);
+            }
+
+            $targetCode = array_key_exists('code', $attributes) ? $attributes['code'] : $locked->code;
+            $this->assertWriteConstraints($targetCompanyId, $targetCode, $locked);
+
             $locked->update($attributes);
 
             return $locked;
@@ -98,17 +119,50 @@ class EmployeePositionService
             ->allowedFilters([
                 AllowedFilter::exact('company_id'),
                 AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
-                    $term = '%'.trim((string) $value).'%';
+                    $escaped = IndexQuery::escapeLike($value);
+                    if ($escaped === null) {
+                        return;
+                    }
 
-                    $query->where(function (Builder $searchQuery) use ($term): void {
-                        $searchQuery
-                            ->where('code', 'like', $term)
-                            ->orWhere('name', 'like', $term);
+                    $query->where(function (Builder $searchQuery) use ($escaped): void {
+                        IndexQuery::whereLike($searchQuery, 'code', $escaped);
+                        IndexQuery::orWhereLike($searchQuery, 'name', $escaped);
                     });
                 }),
             ])
             ->allowedSorts(['id', 'code', 'name', 'created_at'])
             ->allowedIncludes(['employees', 'company'])
             ->defaultSort('name', 'id');
+    }
+
+    private function assertWriteConstraints(int $companyId, mixed $code, ?EmployeePosition $existing = null): void
+    {
+        $companyExists = Company::query()
+            ->whereNull('deleted_at')
+            ->sharedLock()
+            ->whereKey($companyId)
+            ->exists();
+
+        if (! $companyExists) {
+            throw ValidationException::withMessages([
+                'company_id' => ['The selected company is invalid or has been deleted.'],
+            ]);
+        }
+
+        if ($code !== null && $code !== '') {
+            $duplicate = EmployeePosition::query()
+                ->whereNull('deleted_at')
+                ->where('company_id', $companyId)
+                ->where('code', (string) $code)
+                ->when($existing !== null, fn (Builder $query) => $query->whereKeyNot($existing->getKey()))
+                ->sharedLock()
+                ->exists();
+
+            if ($duplicate) {
+                throw ValidationException::withMessages([
+                    'code' => ['The code has already been taken.'],
+                ]);
+            }
+        }
     }
 }

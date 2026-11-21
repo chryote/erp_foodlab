@@ -38,6 +38,7 @@ class EmployeePosition extends Model
 
             $position->employees()
                 ->withTrashed()
+                ->select(['id', 'name', 'employee_position_id', 'employee_attendance_code'])
                 ->each(function (Employee $employee) use ($position): void {
                     $employee->setRelation('employeePosition', $position);
                     $employee->syncAttendanceCode();

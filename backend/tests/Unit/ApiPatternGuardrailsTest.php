@@ -4,11 +4,19 @@ use App\Http\Controllers\Concerns\RespondsWithApiList;
 use App\Models\CapitalCompany;
 use App\Models\Company;
 use App\Models\CompanyAsset;
+use App\Models\Employee;
+use App\Models\EmployeeAttendance;
+use App\Models\EmployeeDocument;
+use App\Models\EmployeePosition;
+use App\Models\EmploymentStatus;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseItem;
 use App\Models\ExpenseType;
+use App\Models\PayrollGrade;
+use App\Models\TaxStatus;
 use App\Modules\CFO\Services\CompanyAssetService;
 use App\Modules\CFO\Services\CompanyService;
+use App\Modules\CHO\Services\EmployeeService;
 use App\Support\ActiveCompany;
 use App\Support\IndexQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -69,11 +77,15 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
         }
     });
 
-    it('bans known CFO speed and correctness anti-patterns in services, requests, and mysql schema', function () {
+    it('bans known CFO and CHO speed and correctness anti-patterns in services, requests, and mysql schema', function () {
         expect(IndexQuery::MAX_PER_PAGE)->toBeLessThanOrEqual(100);
 
-        $cfoServices = File::glob(app_path('Modules/CFO/Services/*Service.php'));
-        foreach ($cfoServices as $servicePath) {
+        $guardedServices = array_merge(
+            File::glob(app_path('Modules/CFO/Services/*Service.php')),
+            File::glob(app_path('Modules/CHO/Services/*Service.php'))
+        );
+
+        foreach ($guardedServices as $servicePath) {
             $contents = File::get($servicePath);
             if (! str_contains($contents, 'CACHE_KEY_LIST')) {
                 continue;
@@ -82,7 +94,7 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             expect($contents)
                 ->toContain('IndexQuery::applyActiveCompanyFilter(')
                 ->toContain('IndexQuery::escapeLike(')
-                ->not->toMatch('/->(?:or)?[wW]here\(\s*[\'"](?:capital|amount|price_per_unit|total_price)[\'"]\s*,\s*[\'"]like[\'"]/');
+                ->not->toMatch('/->(?:or)?[wW]here\(\s*[\'"](?:capital|amount|price_per_unit|total_price|grade|base_salary|position_allowance|total_gross|total_company_cost|net_employee_received)[\'"]\s*,\s*[\'"]like[\'"]/');
         }
 
         $companyService = File::get(app_path('Modules/CFO/Services/CompanyService.php'));
@@ -90,8 +102,18 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             ->toContain('companyAssets()->delete()')
             ->toContain('CompanyAssetService::CACHE_KEY_LIST');
 
-        foreach (['SaveCapitalCompanyRequest.php', 'SaveCompanyAssetRequest.php', 'SaveExpenseItemRequest.php'] as $requestFile) {
-            $requestCode = File::get(app_path('Modules/CFO/Requests/'.$requestFile));
+        foreach (['EmploymentStatusService.php', 'PayrollGradeService.php', 'TaxStatusService.php', 'EmployeePositionService.php'] as $choMasterService) {
+            $masterCode = File::get(app_path('Modules/CHO/Services/'.$choMasterService));
+            expect($masterCode)->toContain('EmployeeService::CACHE_KEY_LIST');
+        }
+
+        foreach ([
+            'Modules/CFO/Requests/SaveCapitalCompanyRequest.php',
+            'Modules/CFO/Requests/SaveCompanyAssetRequest.php',
+            'Modules/CFO/Requests/SaveExpenseItemRequest.php',
+            'Modules/CHO/Requests/SavePayrollGradeRequest.php',
+        ] as $requestPath) {
+            $requestCode = File::get(app_path($requestPath));
             expect($requestCode)
                 ->toContain("isMethod('PATCH')")
                 ->toContain('decimal:0,2')
@@ -99,7 +121,18 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
         }
 
         $schemaSql = File::get(database_path('schema/mysql-schema.sql'));
-        foreach (['capital_companies', 'company_assets', 'expense_categories', 'expense_types', 'expense_items'] as $table) {
+        foreach ([
+            'capital_companies',
+            'company_assets',
+            'expense_categories',
+            'expense_types',
+            'expense_items',
+            'employee_positions',
+            'employment_statuses',
+            'payroll_grades',
+            'tax_statuses',
+            'employees',
+        ] as $table) {
             preg_match("/CREATE TABLE `{$table}` \\((.*?)\\) ENGINE=/s", $schemaSql, $matches);
             expect($matches)->toHaveCount(2, "Table {$table} missing from mysql-schema.sql");
             $tableSql = $matches[1];
@@ -290,5 +323,153 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
         expect(Cache::has(CompanyService::CACHE_KEY_LIST))->toBeFalse();
         $this->getJson('/api/v1/modules/cfo/company-assets')->assertOk()->assertJsonCount(0, 'data');
         $this->getJson('/api/v1/active-company')->assertOk()->assertJsonPath('data', null);
+    });
+
+    it('enforces CHO speed and data correctness edge cases across all 5 CHO endpoints', function () {
+        $companyA = Company::factory()->create(['name' => 'PT. CHO Alpha']);
+        $companyB = Company::factory()->create(['name' => 'PT. CHO Beta']);
+
+        $positionA = EmployeePosition::factory()->create([
+            'company_id' => $companyA->id,
+            'code' => 'QA_100%',
+            'name' => 'Analis 100% Pangan',
+        ]);
+        $statusA = EmploymentStatus::factory()->create(['company_id' => $companyA->id, 'name' => 'Tetap']);
+        $gradeA = PayrollGrade::factory()->create([
+            'company_id' => $companyA->id,
+            'grade' => 2,
+            'sub_grade' => 'A',
+            'level_label' => 'Supervisor',
+        ]);
+        $taxA = TaxStatus::factory()->create(['company_id' => $companyA->id, 'code' => 'TK/0']);
+
+        $positionB = EmployeePosition::factory()->create(['company_id' => $companyB->id]);
+
+        $employees = Employee::factory()->count(5)->create([
+            'company_id' => $companyA->id,
+            'employee_position_id' => $positionA->id,
+            'employment_status_id' => $statusA->id,
+            'payroll_grade_id' => $gradeA->id,
+            'tax_status_id' => $taxA->id,
+        ]);
+
+        foreach ($employees as $employee) {
+            EmployeeDocument::factory()->create(['employee_id' => $employee->id]);
+        }
+
+        // 1. Pagination cap on CHO endpoints
+        $this->getJson('/api/v1/modules/cho/employees?page=1&per_page=99999')
+            ->assertOk()
+            ->assertJsonPath('meta.per_page', IndexQuery::MAX_PER_PAGE);
+
+        // 2. Cold-cache query count for /cho/employees (5 rows, 6 eager relations) has zero N+1
+        Cache::flush();
+        $this->postJson('/api/v1/active-company', ['company_id' => $companyB->id])->assertOk();
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->getJson('/api/v1/modules/cho/employees')->assertOk()->assertJsonCount(5, 'data');
+        $coldQueries = collect(DB::getQueryLog())
+            ->reject(fn ($q) => str_contains($q['query'], 'personal_access_tokens'));
+        DB::disableQueryLog();
+
+        // 1 employees + 6 eager loads (company, position, status, grade, tax, documents) = 7 queries
+        expect($coldQueries->count())->toBeLessThanOrEqual(8);
+
+        // Warm cache hits execute 0 SQL queries
+        $this->getJson('/api/v1/modules/cho/payroll-grades')->assertOk();
+        $this->getJson('/api/v1/modules/cho/employee-positions')->assertOk();
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->getJson('/api/v1/modules/cho/employees')->assertOk();
+        $this->getJson('/api/v1/modules/cho/payroll-grades')->assertOk();
+        $this->getJson('/api/v1/modules/cho/employee-positions')->assertOk();
+        $warmQueries = DB::getQueryLog();
+        DB::disableQueryLog();
+
+        expect($warmQueries)->toHaveCount(0);
+
+        // 3. Updating master data invalidates EmployeeService cache
+        expect(Cache::has(EmployeeService::CACHE_KEY_LIST))->toBeTrue();
+        $this->patchJson("/api/v1/modules/cho/payroll-grades/{$gradeA->id}", [
+            'level_label' => 'Supervisor Senior',
+        ])->assertOk();
+        expect(Cache::has(EmployeeService::CACHE_KEY_LIST))->toBeFalse();
+
+        // Warm again and test EmploymentStatus + TaxStatus invalidation
+        $this->getJson('/api/v1/modules/cho/employees')->assertOk();
+        $this->patchJson("/api/v1/modules/cho/employment-statuses/{$statusA->id}", ['name' => 'Pegawai Tetap'])->assertOk();
+        expect(Cache::has(EmployeeService::CACHE_KEY_LIST))->toBeFalse();
+
+        $this->getJson('/api/v1/modules/cho/employees')->assertOk();
+        $this->patchJson("/api/v1/modules/cho/tax-statuses/{$taxA->id}", ['name' => 'TK/0 Revisi'])->assertOk();
+        expect(Cache::has(EmployeeService::CACHE_KEY_LIST))->toBeFalse();
+
+        // 4. ?active_company=1 filters ALL 5 CHO endpoints
+        foreach ([
+            '/api/v1/modules/cho/employee-positions?active_company=1',
+            '/api/v1/modules/cho/employment-statuses?active_company=1',
+            '/api/v1/modules/cho/payroll-grades?active_company=1',
+            '/api/v1/modules/cho/tax-statuses?active_company=1',
+            '/api/v1/modules/cho/employees?active_company=1',
+        ] as $endpoint) {
+            $expectedCount = str_contains($endpoint, 'employee-positions') ? 1 : 0;
+            $this->getJson($endpoint, ['X-Active-Company-Id' => (string) $companyB->id])
+                ->assertOk()
+                ->assertJsonCount($expectedCount, 'data');
+        }
+
+        // 5. Reassigning company_id on master records or employees while referenced fails with 422
+        $this->patchJson("/api/v1/modules/cho/employee-positions/{$positionA->id}", ['company_id' => $companyB->id])
+            ->assertUnprocessable()->assertJsonValidationErrors(['company_id']);
+        $this->patchJson("/api/v1/modules/cho/employment-statuses/{$statusA->id}", ['company_id' => $companyB->id])
+            ->assertUnprocessable()->assertJsonValidationErrors(['company_id']);
+        $this->patchJson("/api/v1/modules/cho/payroll-grades/{$gradeA->id}", ['company_id' => $companyB->id])
+            ->assertUnprocessable()->assertJsonValidationErrors(['company_id']);
+        $this->patchJson("/api/v1/modules/cho/tax-statuses/{$taxA->id}", ['company_id' => $companyB->id])
+            ->assertUnprocessable()->assertJsonValidationErrors(['company_id']);
+
+        // PATCH changing Employee company_id without updating company-scoped FKs fails with 422
+        $targetEmployee = $employees->first();
+        $this->patchJson("/api/v1/modules/cho/employees/{$targetEmployee->id}", [
+            'company_id' => $companyB->id,
+            'employee_position_id' => $positionB->id,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['employment_status_id']);
+
+        // 6. Deleting an Employee referenced by active attendance fails with 422
+        $attendance = EmployeeAttendance::factory()->create([
+            'company_id' => $companyA->id,
+            'employee_id' => $targetEmployee->id,
+        ]);
+        $this->deleteJson("/api/v1/modules/cho/employees/{$targetEmployee->id}")
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['employee']);
+        $attendance->delete();
+
+        // 7. PayrollGrade numeric bounds & decimal:0,2 return 422 (not 500)
+        $this->postJson('/api/v1/modules/cho/payroll-grades', [
+            'company_id' => $companyA->id,
+            'grade' => 9,
+            'sub_grade' => 'Z',
+            'base_salary' => 5000000.123,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['base_salary']);
+
+        $this->postJson('/api/v1/modules/cho/payroll-grades', [
+            'company_id' => $companyA->id,
+            'grade' => 9,
+            'sub_grade' => 'Z',
+            'base_salary' => 9999999999999999.00,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['base_salary']);
+
+        // 8. LIKE wildcards & whitespace-only search on CHO
+        $this->getJson('/api/v1/modules/cho/employee-positions?filter[search]='.urlencode('100%'))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $positionA->id);
+
+        $this->getJson('/api/v1/modules/cho/employee-positions?filter[search]=%20%20%20')
+            ->assertOk()
+            ->assertJsonCount(2, 'data');
     });
 });

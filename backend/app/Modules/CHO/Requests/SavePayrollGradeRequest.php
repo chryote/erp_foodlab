@@ -9,6 +9,8 @@ use Illuminate\Validation\Validator;
 
 class SavePayrollGradeRequest extends FormRequest
 {
+    private const MAX_DECIMAL_18_2 = 9999999999999999.99;
+
     public function authorize(): bool
     {
         return true;
@@ -42,8 +44,8 @@ class SavePayrollGradeRequest extends FormRequest
             'grade' => [...$presence, 'integer', 'min:1', 'max:255'],
             'sub_grade' => [...$presence, 'string', 'max:10'],
             'level_label' => ['sometimes', 'nullable', 'string', 'max:150'],
-            'base_salary' => [...$presence, 'numeric', 'min:0'],
-            'position_allowance' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'base_salary' => [...$presence, 'numeric', 'min:0', 'max:9999999999999999.99', 'decimal:0,2'],
+            'position_allowance' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:9999999999999999.99', 'decimal:0,2'],
         ];
     }
 
@@ -54,12 +56,30 @@ class SavePayrollGradeRequest extends FormRequest
     {
         return [
             function (Validator $validator): void {
+                /** @var PayrollGrade|null $payrollGrade */
+                $payrollGrade = $this->route('payrollGrade');
+
+                if (! $validator->errors()->hasAny(['base_salary', 'position_allowance'])) {
+                    $baseSalary = $this->has('base_salary')
+                        ? (float) $this->input('base_salary')
+                        : (float) ($payrollGrade?->base_salary ?? 0);
+                    $positionAllowance = $this->has('position_allowance')
+                        ? (float) ($this->input('position_allowance') ?? 0)
+                        : (float) ($payrollGrade?->position_allowance ?? 0);
+
+                    $totalGross = $baseSalary + $positionAllowance;
+                    $totalCompanyCost = $totalGross + round($totalGross * 0.04) + round($totalGross * 0.0394);
+                    if ($totalCompanyCost > self::MAX_DECIMAL_18_2) {
+                        $validator->errors()->add(
+                            'base_salary',
+                            'The computed total company cost exceeds the maximum supported decimal(18,2) amount.'
+                        );
+                    }
+                }
+
                 if ($validator->errors()->hasAny(['company_id', 'grade', 'sub_grade'])) {
                     return;
                 }
-
-                /** @var PayrollGrade|null $payrollGrade */
-                $payrollGrade = $this->route('payrollGrade');
 
                 $companyId = $this->filled('company_id')
                     ? (int) $this->input('company_id')

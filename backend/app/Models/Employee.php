@@ -184,4 +184,9 @@ class Employee extends Model
     {
         return $this->hasMany(EmployeeShiftAssignment::class);
     }
+
+    public function expenseItems(): HasMany
+    {
+        return $this->hasMany(ExpenseItem::class);
+    }
 }

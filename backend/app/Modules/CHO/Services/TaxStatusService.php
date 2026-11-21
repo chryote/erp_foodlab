@@ -2,6 +2,7 @@
 
 namespace App\Modules\CHO\Services;
 
+use App\Models\Company;
 use App\Models\TaxStatus;
 use App\Support\IndexQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -30,6 +31,8 @@ class TaxStatusService
     {
         $query = IndexQuery::withDefaultRelations($this->query($request), $request, self::RELATIONS);
 
+        IndexQuery::applyActiveCompanyFilter($query->getEloquentBuilder(), $request);
+
         if (IndexQuery::isPaginated($request)) {
             return IndexQuery::paginate($query, $request);
         }
@@ -46,9 +49,14 @@ class TaxStatusService
      */
     public function createTaxStatus(array $attributes): TaxStatus
     {
-        $taxStatus = DB::transaction(
-            fn (): TaxStatus => TaxStatus::query()->create($attributes)
-        );
+        $taxStatus = DB::transaction(function () use ($attributes): TaxStatus {
+            $this->assertWriteConstraints(
+                (int) $attributes['company_id'],
+                $attributes['code'] ?? null
+            );
+
+            return TaxStatus::query()->create($attributes);
+        });
 
         Cache::forget(self::CACHE_KEY_LIST);
 
@@ -62,12 +70,26 @@ class TaxStatusService
     {
         $updated = DB::transaction(function () use ($taxStatus, $attributes): TaxStatus {
             $locked = TaxStatus::query()->lockForUpdate()->findOrFail($taxStatus->getKey());
+
+            $targetCompanyId = (int) ($attributes['company_id'] ?? $locked->company_id);
+            if ($targetCompanyId !== (int) $locked->company_id && $locked->employees()->exists()) {
+                throw ValidationException::withMessages([
+                    'company_id' => [
+                        'Cannot change company for a tax status that is still referenced by active employees.',
+                    ],
+                ]);
+            }
+
+            $targetCode = array_key_exists('code', $attributes) ? $attributes['code'] : $locked->code;
+            $this->assertWriteConstraints($targetCompanyId, $targetCode, $locked);
+
             $locked->update($attributes);
 
             return $locked;
         });
 
         Cache::forget(self::CACHE_KEY_LIST);
+        Cache::forget(EmployeeService::CACHE_KEY_LIST);
 
         return $updated->refresh()->load(self::RELATIONS);
     }
@@ -97,17 +119,50 @@ class TaxStatusService
             ->allowedFilters([
                 AllowedFilter::exact('company_id'),
                 AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
-                    $term = '%'.trim((string) $value).'%';
+                    $escaped = IndexQuery::escapeLike($value);
+                    if ($escaped === null) {
+                        return;
+                    }
 
-                    $query->where(function (Builder $searchQuery) use ($term): void {
-                        $searchQuery
-                            ->where('code', 'like', $term)
-                            ->orWhere('name', 'like', $term);
+                    $query->where(function (Builder $searchQuery) use ($escaped): void {
+                        IndexQuery::whereLike($searchQuery, 'code', $escaped);
+                        IndexQuery::orWhereLike($searchQuery, 'name', $escaped);
                     });
                 }),
             ])
             ->allowedSorts(['id', 'code', 'name', 'created_at'])
             ->allowedIncludes(['employees', 'company'])
             ->defaultSort('code', 'id');
+    }
+
+    private function assertWriteConstraints(int $companyId, mixed $code, ?TaxStatus $existing = null): void
+    {
+        $companyExists = Company::query()
+            ->whereNull('deleted_at')
+            ->sharedLock()
+            ->whereKey($companyId)
+            ->exists();
+
+        if (! $companyExists) {
+            throw ValidationException::withMessages([
+                'company_id' => ['The selected company is invalid or has been deleted.'],
+            ]);
+        }
+
+        if ($code !== null && $code !== '') {
+            $duplicate = TaxStatus::query()
+                ->whereNull('deleted_at')
+                ->where('company_id', $companyId)
+                ->where('code', (string) $code)
+                ->when($existing !== null, fn (Builder $query) => $query->whereKeyNot($existing->getKey()))
+                ->sharedLock()
+                ->exists();
+
+            if ($duplicate) {
+                throw ValidationException::withMessages([
+                    'code' => ['The code has already been taken.'],
+                ]);
+            }
+        }
     }
 }

@@ -13,6 +13,7 @@ class UpdateEmployeeAction
 {
     public function __construct(
         protected SyncEmployeeDocumentsAction $syncEmployeeDocuments,
+        protected AssertEmployeeContextAction $assertEmployeeContext,
     ) {}
 
     /**
@@ -25,6 +26,8 @@ class UpdateEmployeeAction
 
         return DB::transaction(function () use ($employee, $attributes, $hasDocuments, $documents): Employee {
             $locked = Employee::query()->lockForUpdate()->findOrFail($employee->getKey());
+
+            $this->assertEmployeeContext->execute($attributes, $locked);
 
             if ($attributes !== []) {
                 $locked->update($attributes);

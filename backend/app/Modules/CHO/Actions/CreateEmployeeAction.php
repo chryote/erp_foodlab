@@ -13,6 +13,7 @@ class CreateEmployeeAction
 {
     public function __construct(
         protected SyncEmployeeDocumentsAction $syncEmployeeDocuments,
+        protected AssertEmployeeContextAction $assertEmployeeContext,
     ) {}
 
     /**
@@ -23,6 +24,8 @@ class CreateEmployeeAction
         $documents = Arr::pull($attributes, 'documents');
 
         return DB::transaction(function () use ($attributes, $documents): Employee {
+            $this->assertEmployeeContext->execute($attributes);
+
             $employee = Employee::query()->create($attributes);
 
             if (is_array($documents) && $documents !== []) {
