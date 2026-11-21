@@ -96,6 +96,7 @@ interface FieldWrapperProps {
   label?: string;
   labelPlacement?: FieldLabelPlacement;
   alignTop?: boolean;
+  error?: string;
   children: React.ReactNode;
 }
 
@@ -104,6 +105,7 @@ const FieldWrapper: React.FC<FieldWrapperProps> = ({
   label,
   labelPlacement = 'top',
   alignTop = false,
+  error,
   children,
 }) => {
   if (labelPlacement === 'left') {
@@ -123,7 +125,14 @@ const FieldWrapper: React.FC<FieldWrapperProps> = ({
             {label}
           </ShadcnLabel>
         )}
-        <div className="min-w-0">{children}</div>
+        <div className="min-w-0">
+          {children}
+          {error && (
+            <p className="mt-1 text-xs text-red-600" role="status">
+              {error}
+            </p>
+          )}
+        </div>
       </div>
     );
   }
@@ -132,6 +141,11 @@ const FieldWrapper: React.FC<FieldWrapperProps> = ({
     <div className="flex min-w-0 flex-1 flex-col gap-1.5">
       {label && <ShadcnLabel htmlFor={id}>{label}</ShadcnLabel>}
       {children}
+      {error && (
+        <p className="text-xs text-red-600" role="status">
+          {error}
+        </p>
+      )}
     </div>
   );
 };
@@ -140,6 +154,7 @@ export interface TextInputProps
   extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   labelPlacement?: FieldLabelPlacement;
+  error?: string;
 }
 
 export const TextInput: React.FC<TextInputProps> = ({
@@ -147,11 +162,25 @@ export const TextInput: React.FC<TextInputProps> = ({
   labelPlacement = 'top',
   id,
   className,
+  error,
   ...rest
 }) => {
   return (
-    <FieldWrapper id={id} label={label} labelPlacement={labelPlacement}>
-      <ShadcnInput id={id} className={className} {...rest} />
+    <FieldWrapper
+      id={id}
+      label={label}
+      labelPlacement={labelPlacement}
+      error={error}
+    >
+      <ShadcnInput
+        id={id}
+        aria-invalid={error ? true : undefined}
+        className={cn(
+          error && 'border-red-500 focus-visible:ring-red-500',
+          className
+        )}
+        {...rest}
+      />
     </FieldWrapper>
   );
 };
@@ -160,6 +189,7 @@ export interface TextareaInputProps
   extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
   labelPlacement?: FieldLabelPlacement;
+  error?: string;
 }
 
 export const TextareaInput: React.FC<TextareaInputProps> = ({
@@ -168,6 +198,7 @@ export const TextareaInput: React.FC<TextareaInputProps> = ({
   id,
   className,
   rows = 2,
+  error,
   ...rest
 }) => {
   return (
@@ -176,12 +207,15 @@ export const TextareaInput: React.FC<TextareaInputProps> = ({
       label={label}
       labelPlacement={labelPlacement}
       alignTop={true}
+      error={error}
     >
       <textarea
         id={id}
         rows={rows}
+        aria-invalid={error ? true : undefined}
         className={cn(
           'flex min-h-[60px] w-full resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60',
+          error && 'border-red-500 focus-visible:ring-red-500',
           className
         )}
         {...rest}
@@ -290,6 +324,7 @@ export interface SelectInputProps
   labelPlacement?: FieldLabelPlacement;
   placeholder?: string;
   options: SelectOption[];
+  error?: string;
 }
 
 export const SelectInput: React.FC<SelectInputProps> = ({
@@ -299,14 +334,22 @@ export const SelectInput: React.FC<SelectInputProps> = ({
   placeholder = 'Pilih opsi...',
   options,
   className,
+  error,
   ...rest
 }) => {
   return (
-    <FieldWrapper id={id} label={label} labelPlacement={labelPlacement}>
+    <FieldWrapper
+      id={id}
+      label={label}
+      labelPlacement={labelPlacement}
+      error={error}
+    >
       <select
         id={id}
+        aria-invalid={error ? true : undefined}
         className={cn(
           'flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1.5 text-sm text-foreground shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60',
+          error && 'border-red-500 focus-visible:ring-red-500',
           className
         )}
         {...rest}
@@ -420,6 +463,78 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             onClick={() => void onConfirm()}
           >
             {confirmLabel}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export interface ValidationErrorDialogProps {
+  isOpen: boolean;
+  title?: string;
+  message?: string;
+  errors: string[];
+  closeLabel?: string;
+  testId?: string;
+  onClose: () => void;
+}
+
+export const ValidationErrorDialog: React.FC<ValidationErrorDialogProps> = ({
+  isOpen,
+  title = 'Validasi Gagal',
+  message = 'Mohon periksa kembali isian formulir Anda:',
+  errors,
+  closeLabel = 'Mengerti',
+  testId = 'validation-error-dialog',
+  onClose,
+}) => {
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/50 p-6 backdrop-blur-xs"
+      data-testid={`${testId}-backdrop`}
+      onClick={onClose}
+    >
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-label={title}
+        data-testid={testId}
+        className="flex max-h-[80vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-red-200 bg-card text-card-foreground shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-red-100 bg-red-50/80 px-6 py-4">
+          <h3 className="text-base font-bold tracking-tight text-red-800">
+            {title}
+          </h3>
+        </div>
+
+        <div className="flex flex-col gap-3 overflow-y-auto px-6 py-4 text-sm text-muted-foreground">
+          {message && <p className="font-medium text-foreground">{message}</p>}
+          {errors.length > 0 && (
+            <ul
+              data-testid={`${testId}-list`}
+              className="list-disc space-y-1.5 pl-5 text-xs text-red-700"
+            >
+              {errors.map((item, idx) => (
+                <li key={`${idx}-${item}`}>{item}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="flex justify-end border-t border-border px-6 py-3.5">
+          <Button
+            type="button"
+            variant="primary"
+            data-testid={`${testId}-close`}
+            onClick={onClose}
+          >
+            {closeLabel}
           </Button>
         </div>
       </div>

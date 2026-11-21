@@ -246,10 +246,26 @@ describe('Employee CHO module', function () {
             'payroll_grade_id' => $grade->id,
             'tax_status_id' => $taxStatus->id,
             'name' => 'Budi Santoso, S.Si.',
+            'email' => 'budi.santoso@foodlab.test',
+            'phone' => '081234567890',
+            'photo_url' => 'https://cdn.foodlab.test/photos/budi.jpg',
             'nik_ktp' => '3201010101900001',
+            'nickname' => 'Budi',
+            'birth_place' => 'Bandung',
+            'birth_date' => '1990-01-01',
             'gender' => JenisKelamin::LAKI_LAKI->value,
             'religion' => Agama::ISLAM->value,
             'blood_type' => GolonganDarah::AB->value,
+            'mother_name' => 'Siti Aminah',
+            'ktp_address' => 'Jl. Merdeka No. 1, Bandung',
+            'domicile_address' => 'Jl. Sudirman No. 10, Jakarta',
+            'whatsapp_number' => '081234567890',
+            'emergency_phone_number' => '081299998888',
+            'instagram' => '@budisantoso',
+            'tiktok' => '@buditiktok',
+            'bpjs_ketenagakerjaan' => '11223344556',
+            'bpjs_kesehatan' => '0001122334455',
+            'npwp_number' => '123456789012345',
             'documents' => [
                 [
                     'document_type' => JenisDokumen::KTP->value,
@@ -381,5 +397,190 @@ describe('Employee CHO module', function () {
             'nik_ktp' => $existing->nik_ktp,
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['nik_ktp']);
+    });
+
+    it('enforces strict required validation for all employee fields and minimum 1 document on create and update', function () {
+        $company = Company::factory()->create();
+        $otherCompany = Company::factory()->create();
+
+        $position = EmployeePosition::factory()->create(['company_id' => $company->id]);
+        $status = EmploymentStatus::factory()->create(['company_id' => $company->id]);
+        $grade = PayrollGrade::factory()->create(['company_id' => $company->id]);
+        $taxStatus = TaxStatus::factory()->create(['company_id' => $company->id]);
+
+        $otherPosition = EmployeePosition::factory()->create(['company_id' => $otherCompany->id]);
+
+        $allRequiredFields = [
+            'company_id',
+            'employee_position_id',
+            'employment_status_id',
+            'payroll_grade_id',
+            'tax_status_id',
+            'name',
+            'email',
+            'phone',
+            'photo_url',
+            'nik_ktp',
+            'nickname',
+            'birth_place',
+            'birth_date',
+            'gender',
+            'religion',
+            'blood_type',
+            'mother_name',
+            'ktp_address',
+            'domicile_address',
+            'whatsapp_number',
+            'emergency_phone_number',
+            'instagram',
+            'tiktok',
+            'bpjs_ketenagakerjaan',
+            'bpjs_kesehatan',
+            'npwp_number',
+            'documents',
+        ];
+
+        // Empty POST payload rejects all required fields and documents
+        $this->postJson('/api/v1/modules/cho/employees', [])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors($allRequiredFields);
+
+        // Whitespace-only values and empty documents array return 422
+        $this->postJson('/api/v1/modules/cho/employees', [
+            'company_id' => $company->id,
+            'employee_position_id' => $position->id,
+            'employment_status_id' => $status->id,
+            'payroll_grade_id' => $grade->id,
+            'tax_status_id' => $taxStatus->id,
+            'name' => '   ',
+            'email' => 'valid@foodlab.test',
+            'phone' => '   ',
+            'photo_url' => '   ',
+            'nik_ktp' => '3201010101900010',
+            'nickname' => '   ',
+            'birth_place' => '   ',
+            'birth_date' => '1995-05-05',
+            'gender' => JenisKelamin::PEREMPUAN->value,
+            'religion' => Agama::ISLAM->value,
+            'blood_type' => GolonganDarah::A->value,
+            'mother_name' => '   ',
+            'ktp_address' => '   ',
+            'domicile_address' => '   ',
+            'whatsapp_number' => '   ',
+            'emergency_phone_number' => '   ',
+            'instagram' => '   ',
+            'tiktok' => '   ',
+            'bpjs_ketenagakerjaan' => '   ',
+            'bpjs_kesehatan' => '   ',
+            'npwp_number' => '   ',
+            'documents' => [],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'name',
+                'phone',
+                'photo_url',
+                'nickname',
+                'birth_place',
+                'mother_name',
+                'ktp_address',
+                'domicile_address',
+                'whatsapp_number',
+                'emergency_phone_number',
+                'instagram',
+                'tiktok',
+                'bpjs_ketenagakerjaan',
+                'bpjs_kesehatan',
+                'npwp_number',
+                'documents',
+            ]);
+
+        // Document entry with whitespace-only file_url and cross-company position return 422
+        $this->postJson('/api/v1/modules/cho/employees', [
+            'company_id' => $company->id,
+            'employee_position_id' => $otherPosition->id,
+            'employment_status_id' => $status->id,
+            'payroll_grade_id' => $grade->id,
+            'tax_status_id' => $taxStatus->id,
+            'name' => 'Sari Indah',
+            'email' => 'sari@foodlab.test',
+            'phone' => '081234567891',
+            'photo_url' => 'https://cdn.foodlab.test/photos/sari.jpg',
+            'nik_ktp' => '3201010101900011',
+            'nickname' => 'Sari',
+            'birth_place' => 'Surabaya',
+            'birth_date' => '1995-05-05',
+            'gender' => JenisKelamin::PEREMPUAN->value,
+            'religion' => Agama::ISLAM->value,
+            'blood_type' => GolonganDarah::B->value,
+            'mother_name' => 'Aminah',
+            'ktp_address' => 'Jl. KTP No. 1',
+            'domicile_address' => 'Jl. Domisili No. 2',
+            'whatsapp_number' => '081234567891',
+            'emergency_phone_number' => '081234567892',
+            'instagram' => '@sari',
+            'tiktok' => '@saritiktok',
+            'bpjs_ketenagakerjaan' => '1122334455',
+            'bpjs_kesehatan' => '00011223344',
+            'npwp_number' => '123456789012345',
+            'documents' => [
+                [
+                    'document_type' => JenisDokumen::KTP->value,
+                    'file_url' => '   ',
+                ],
+            ],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'employee_position_id',
+                'documents.0.file_url',
+            ]);
+
+        // PUT with missing fields or empty documents returns 422
+        $employee = Employee::factory()->create([
+            'company_id' => $company->id,
+            'employee_position_id' => $position->id,
+            'employment_status_id' => $status->id,
+            'payroll_grade_id' => $grade->id,
+            'tax_status_id' => $taxStatus->id,
+        ]);
+
+        $this->putJson("/api/v1/modules/cho/employees/{$employee->id}", [
+            'company_id' => $company->id,
+            'name' => 'Updated Only Name',
+            'documents' => [],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'employee_position_id',
+                'employment_status_id',
+                'payroll_grade_id',
+                'tax_status_id',
+                'email',
+                'phone',
+                'photo_url',
+                'nik_ktp',
+                'nickname',
+                'birth_place',
+                'birth_date',
+                'gender',
+                'religion',
+                'blood_type',
+                'mother_name',
+                'ktp_address',
+                'domicile_address',
+                'whatsapp_number',
+                'emergency_phone_number',
+                'instagram',
+                'tiktok',
+                'bpjs_ketenagakerjaan',
+                'bpjs_kesehatan',
+                'npwp_number',
+                'documents',
+            ]);
+
+        // PATCH cannot clear required fields or documents to empty
+        $this->patchJson("/api/v1/modules/cho/employees/{$employee->id}", [
+            'nickname' => null,
+            'documents' => [],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['nickname', 'documents']);
     });
 });

@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  ApiRequestError,
   type ChoEnums,
   type Company,
   type Employee,
@@ -85,11 +86,70 @@ export const choQueryKeys = {
     ['cho', 'employees', 'active-company', companyId] as const,
 };
 
+export interface ApiErrorInfo {
+  id: number;
+  title: string;
+  message: string;
+  errors: string[];
+  fieldErrors?: Record<string, string[]>;
+}
+
 function getErrorMessage(err: unknown, fallback: string): string | null {
   if (!err) {
     return null;
   }
+  if (err instanceof ApiRequestError && err.errors) {
+    const flat = Object.values(err.errors).flat().filter(Boolean);
+    if (flat.length > 0) {
+      return flat.join(' ');
+    }
+  }
   return err instanceof Error ? err.message : fallback;
+}
+
+function extractApiErrorInfo(
+  err: unknown,
+  fallback: string,
+  id: number
+): ApiErrorInfo {
+  if (err instanceof ApiRequestError) {
+    const fieldErrors = err.errors;
+    const flat = fieldErrors
+      ? Array.from(new Set(Object.values(fieldErrors).flat().filter(Boolean)))
+      : [];
+    const isValidation = err.status === 422 || flat.length > 0;
+    return {
+      id,
+      title: isValidation ? 'Validasi Backend Gagal' : 'Permintaan API Gagal',
+      message: isValidation
+        ? 'Data ditolak oleh validasi server. Silakan periksa kembali kolom yang bermasalah:'
+        : err.message,
+      errors: flat.length > 0 ? flat : [err.message],
+      fieldErrors,
+    };
+  }
+
+  const message = err instanceof Error ? err.message : fallback;
+  const maybeRecord = err as { errors?: Record<string, string[]> } | null;
+  const fieldErrors =
+    maybeRecord && typeof maybeRecord === 'object' && maybeRecord.errors
+      ? maybeRecord.errors
+      : undefined;
+  const flat = fieldErrors
+    ? Array.from(new Set(Object.values(fieldErrors).flat().filter(Boolean)))
+    : [];
+  const isValidation =
+    flat.length > 0 || message.includes('422') || /validasi/i.test(message);
+
+  return {
+    id,
+    title: isValidation ? 'Validasi Backend Gagal' : 'Permintaan API Gagal',
+    message: isValidation
+      ? 'Data ditolak oleh validasi server. Silakan periksa kembali kolom yang bermasalah:'
+      : message,
+    errors: flat.length > 0 ? flat : [message],
+    fieldErrors,
+  };
 }
 
 export function useChoEnumsResource(enabled: boolean) {
@@ -586,6 +646,8 @@ export function useEmployeeCrudResource(
 ) {
   const queryClient = useQueryClient();
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const [errorInfo, setErrorInfo] = useState<ApiErrorInfo | null>(null);
+  const errorSeqRef = useRef(0);
   const [uploadingDocument, setUploadingDocument] = useState(false);
 
   const master = useMasterKaryawanCrudResource(enabled, company);
@@ -642,60 +704,70 @@ export function useEmployeeCrudResource(
     },
   });
 
+  const recordMutationError = useCallback((err: unknown, fallback: string) => {
+    errorSeqRef.current += 1;
+    setMutationError(getErrorMessage(err, fallback));
+    setErrorInfo(extractApiErrorInfo(err, fallback, errorSeqRef.current));
+  }, []);
+
   const saveEmployee = useCallback(
     async (payload: EmployeePayload): Promise<Employee | null> => {
       setMutationError(null);
+      setErrorInfo(null);
       try {
         return await createMutation.mutateAsync(payload);
       } catch (err) {
-        setMutationError(getErrorMessage(err, 'Gagal menambahkan karyawan.'));
+        recordMutationError(err, 'Gagal menambahkan karyawan.');
         return null;
       }
     },
-    [createMutation]
+    [createMutation, recordMutationError]
   );
 
   const editEmployee = useCallback(
     async (id: number, payload: EmployeePayload): Promise<Employee | null> => {
       setMutationError(null);
+      setErrorInfo(null);
       try {
         return await updateMutation.mutateAsync({ id, payload });
       } catch (err) {
-        setMutationError(getErrorMessage(err, 'Gagal memperbarui karyawan.'));
+        recordMutationError(err, 'Gagal memperbarui karyawan.');
         return null;
       }
     },
-    [updateMutation]
+    [updateMutation, recordMutationError]
   );
 
   const removeEmployee = useCallback(
     async (id: number): Promise<boolean> => {
       setMutationError(null);
+      setErrorInfo(null);
       try {
         await deleteMutation.mutateAsync(id);
         return true;
       } catch (err) {
-        setMutationError(getErrorMessage(err, 'Gagal menghapus karyawan.'));
+        recordMutationError(err, 'Gagal menghapus karyawan.');
         return false;
       }
     },
-    [deleteMutation]
+    [deleteMutation, recordMutationError]
   );
 
   const uploadDocument = useCallback(
     async (file: File, documentType?: string) => {
       setMutationError(null);
+      setErrorInfo(null);
       setUploadingDocument(true);
       try {
         return await uploadEmployeeDocument(file, documentType);
       } catch (err) {
-        setMutationError(getErrorMessage(err, 'Gagal mengunggah dokumen.'));
+        recordMutationError(err, 'Gagal mengunggah dokumen.');
         return null;
       } finally {
         setUploadingDocument(false);
       }
     },
-    []
+    [recordMutationError]
   );
 
   return {
@@ -718,7 +790,11 @@ export function useEmployeeCrudResource(
       mutationError ??
       getErrorMessage(employeesQuery.error, 'Gagal memuat data karyawan.') ??
       master.error,
-    clearError: () => setMutationError(null),
+    errorInfo,
+    clearError: () => {
+      setMutationError(null);
+      setErrorInfo(null);
+    },
     createEmployee: saveEmployee,
     updateEmployee: editEmployee,
     removeEmployee,

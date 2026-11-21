@@ -17,6 +17,7 @@ import {
   SelectInput,
   TextareaInput,
   TextInput,
+  ValidationErrorDialog,
 } from '@/components/ui';
 import { useEmployeeCrudResource } from '@/lib/choResources';
 
@@ -131,14 +132,183 @@ function employeeToFormState(employee: Employee): EmployeeFormState {
   };
 }
 
-function nullableTrimmed(value: string): string | null {
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
+type DocumentRow = EmployeeDocumentInput & { rowId: number };
+
+interface ValidationPopupState {
+  title: string;
+  message: string;
+  errors: string[];
 }
 
-function nullableInt(value: string): number | null {
-  const parsed = parseInt(value, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+interface EmployeeFormValidationResult {
+  valid: boolean;
+  errors: string[];
+  fieldErrors: Record<string, string>;
+}
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const NIK_PATTERN = /^\d{16}$/;
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function isValidPastDate(dateStr: string): boolean {
+  if (!DATE_PATTERN.test(dateStr)) {
+    return false;
+  }
+  const [yStr, mStr, dStr] = dateStr.split('-');
+  const year = Number(yStr);
+  const month = Number(mStr);
+  const day = Number(dStr);
+  const parsed = new Date(year, month - 1, day);
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    return false;
+  }
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return dateStr < today;
+}
+
+function validateEmployeeForm(
+  form: EmployeeFormState,
+  documentRows: DocumentRow[]
+): EmployeeFormValidationResult {
+  const errors: string[] = [];
+  const fieldErrors: Record<string, string> = {};
+
+  const recordError = (fieldKey: string, message: string) => {
+    if (!fieldErrors[fieldKey]) {
+      fieldErrors[fieldKey] = message;
+    }
+    errors.push(message);
+  };
+
+  const requirePositiveInt = (
+    fieldKey: keyof EmployeeFormState,
+    label: string
+  ) => {
+    const parsed = parseInt(form[fieldKey], 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      recordError(fieldKey, `${label} wajib dipilih.`);
+    }
+  };
+
+  const requireText = (
+    fieldKey: keyof EmployeeFormState,
+    label: string,
+    maxLength?: number,
+    verb: 'diisi' | 'dipilih' = 'diisi'
+  ) => {
+    const trimmed = form[fieldKey].trim();
+    if (!trimmed) {
+      recordError(fieldKey, `${label} wajib ${verb}.`);
+      return '';
+    }
+    if (maxLength && trimmed.length > maxLength) {
+      recordError(fieldKey, `${label} maksimal ${maxLength} karakter.`);
+    }
+    return trimmed;
+  };
+
+  requirePositiveInt('company_id', 'Perusahaan');
+  requireText('name', 'Nama Lengkap', 150);
+  requireText('nickname', 'Nama Panggilan', 100);
+
+  const nik = form.nik_ktp.trim();
+  if (!nik) {
+    recordError('nik_ktp', 'NIK KTP wajib diisi.');
+  } else if (!NIK_PATTERN.test(nik)) {
+    recordError('nik_ktp', 'NIK KTP harus terdiri dari 16 digit angka.');
+  }
+
+  requirePositiveInt('employee_position_id', 'Jabatan');
+  requirePositiveInt('employment_status_id', 'Status Karyawan');
+  requirePositiveInt('payroll_grade_id', 'Payroll Grade');
+  requirePositiveInt('tax_status_id', 'Status Pajak');
+
+  requireText('gender', 'Jenis Kelamin', 30, 'dipilih');
+  requireText('religion', 'Agama', 30, 'dipilih');
+  requireText('blood_type', 'Golongan Darah', 10, 'dipilih');
+  requireText('mother_name', 'Nama Ibu Kandung', 150);
+  requireText('birth_place', 'Tempat Lahir', 100);
+
+  const birthDate = form.birth_date.trim();
+  if (!birthDate) {
+    recordError('birth_date', 'Tanggal Lahir wajib diisi.');
+  } else if (!DATE_PATTERN.test(birthDate)) {
+    recordError('birth_date', 'Tanggal Lahir harus berformat YYYY-MM-DD.');
+  } else if (!isValidPastDate(birthDate)) {
+    recordError('birth_date', 'Tanggal Lahir harus sebelum hari ini.');
+  }
+
+  const email = requireText('email', 'Email', 150);
+  if (email && !EMAIL_PATTERN.test(email)) {
+    recordError('email', 'Format Email tidak valid.');
+  }
+
+  requireText('phone', 'No. Telepon', 50);
+  requireText('whatsapp_number', 'No. WhatsApp', 30);
+  requireText('emergency_phone_number', 'No. Telepon Darurat', 30);
+  requireText('instagram', 'Instagram', 100);
+  requireText('tiktok', 'TikTok', 100);
+  requireText('bpjs_ketenagakerjaan', 'BPJS Ketenagakerjaan', 50);
+  requireText('bpjs_kesehatan', 'BPJS Kesehatan', 50);
+  requireText('npwp_number', 'Nomor NPWP', 30);
+  requireText('photo_url', 'URL Foto Karyawan', 255);
+  requireText('ktp_address', 'Alamat KTP');
+  requireText('domicile_address', 'Alamat Domisili');
+
+  if (documentRows.length === 0) {
+    recordError(
+      'documents',
+      'Dokumen Karyawan minimal harus melampirkan 1 dokumen.'
+    );
+  } else {
+    const seenTypes = new Set<string>();
+    documentRows.forEach((docRow, idx) => {
+      const rowNum = idx + 1;
+      const docType = docRow.document_type.trim();
+      const fileUrl = docRow.file_url.trim();
+
+      if (!docType) {
+        recordError(
+          `doc_${docRow.rowId}_type`,
+          `Dokumen #${rowNum}: Jenis Dokumen wajib dipilih.`
+        );
+      } else if (seenTypes.has(docType)) {
+        recordError(
+          `doc_${docRow.rowId}_type`,
+          `Dokumen #${rowNum}: Jenis Dokumen tidak boleh duplikat.`
+        );
+      } else {
+        seenTypes.add(docType);
+      }
+
+      if (!fileUrl) {
+        recordError(
+          `doc_${docRow.rowId}_url`,
+          `Dokumen #${rowNum}: URL Dokumen wajib diisi atau unggah berkas.`
+        );
+      } else if (fileUrl.length > 255) {
+        recordError(
+          `doc_${docRow.rowId}_url`,
+          `Dokumen #${rowNum}: URL Dokumen maksimal 255 karakter.`
+        );
+      }
+    });
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    fieldErrors,
+  };
+}
+
+function parseIntStrict(value: string): number {
+  return parseInt(value, 10);
 }
 
 export interface InputKaryawanCrudModalProps {
@@ -164,6 +334,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
     loading,
     uploadingDocument,
     error,
+    errorInfo,
     clearError,
     createEmployee,
     updateEmployee,
@@ -184,21 +355,24 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
     createEmptyEmployeeForm(defaultCompanyId)
   );
   const [nextDocRowId, setNextDocRowId] = useState<number>(2);
-  const [documentRows, setDocumentRows] = useState<
-    Array<EmployeeDocumentInput & { rowId: number }>
-  >(() => [{ rowId: 1, document_type: 'ktp', file_url: '' }]);
+  const [documentRows, setDocumentRows] = useState<DocumentRow[]>(() => [
+    { rowId: 1, document_type: 'ktp', file_url: '' },
+  ]);
   const [uploadingRowId, setUploadingRowId] = useState<number | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pendingAction, setPendingAction] =
     useState<PendingEmployeeAction | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [validationPopup, setValidationPopup] =
+    useState<ValidationPopupState | null>(null);
 
   const pageSize = 10;
 
   const createDefaultDocRow = (
     rowId: number,
     usedTypes: Set<string>
-  ): EmployeeDocumentInput & { rowId: number } => {
+  ): DocumentRow => {
     const nextType =
       enums.jenis_dokumen.find((opt) => !usedTypes.has(opt.value))?.value ??
       enums.jenis_dokumen[0]?.value ??
@@ -221,10 +395,52 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
       setEditingEmployee(null);
       setCurrentPage(1);
       setPendingAction(null);
+      setFieldErrors({});
+      setValidationPopup(null);
       clearError();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, defaultCompanyId]);
+
+  useEffect(() => {
+    if (!isOpen || !errorInfo) {
+      return;
+    }
+
+    if (errorInfo.fieldErrors) {
+      const mapped: Record<string, string> = {};
+      for (const [key, messages] of Object.entries(errorInfo.fieldErrors)) {
+        const firstMsg = messages?.[0];
+        if (!firstMsg) {
+          continue;
+        }
+        const docMatch = /^documents\.(\d+)\.(document_type|file_url)$/.exec(
+          key
+        );
+        if (docMatch) {
+          const idx = Number(docMatch[1]);
+          const row = documentRows[idx];
+          if (row) {
+            mapped[
+              `doc_${row.rowId}_${docMatch[2] === 'document_type' ? 'type' : 'url'}`
+            ] = firstMsg;
+          }
+        } else {
+          mapped[key] = firstMsg;
+        }
+      }
+      if (Object.keys(mapped).length > 0) {
+        setFieldErrors((prev) => ({ ...prev, ...mapped }));
+      }
+    }
+
+    setValidationPopup({
+      title: errorInfo.title,
+      message: errorInfo.message,
+      errors: errorInfo.errors,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [errorInfo, isOpen]);
 
   const selectedCompanyId = parseInt(form.company_id, 10);
 
@@ -328,7 +544,22 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
     return allEmployees.slice(start, start + pageSize);
   }, [allEmployees, safeCurrentPage]);
 
+  const clearFieldError = (keys: string[]) => {
+    setFieldErrors((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const k of keys) {
+        if (k in next) {
+          delete next[k];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  };
+
   const handleFieldChange = (key: keyof EmployeeFormState, value: string) => {
+    clearFieldError([key]);
     setForm((prev) => {
       if (key === 'company_id' && prev.company_id !== value) {
         return {
@@ -354,6 +585,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
     }
     const uploaded = await uploadDocument(file, 'pas_foto');
     if (uploaded?.url) {
+      clearFieldError(['photo_url']);
       setForm((prev) => ({ ...prev, photo_url: uploaded.url }));
     }
   };
@@ -372,6 +604,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
     try {
       const uploaded = await uploadDocument(file, documentType);
       if (uploaded?.url) {
+        clearFieldError([`doc_${rowId}_url`, 'documents']);
         setDocumentRows((prev) =>
           prev.map((row) =>
             row.rowId === rowId ? { ...row, file_url: uploaded.url } : row
@@ -384,6 +617,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
   };
 
   const handleAddDocumentRow = () => {
+    clearFieldError(['documents']);
     const usedTypes = new Set(documentRows.map((row) => row.document_type));
     const newRow = createDefaultDocRow(nextDocRowId, usedTypes);
     setNextDocRowId((prev) => prev + 1);
@@ -394,49 +628,45 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
     rowId: number,
     patch: Partial<EmployeeDocumentInput>
   ) => {
+    clearFieldError([`doc_${rowId}_type`, `doc_${rowId}_url`, 'documents']);
     setDocumentRows((prev) =>
       prev.map((row) => (row.rowId === rowId ? { ...row, ...patch } : row))
     );
   };
 
   const handleRemoveDocumentRow = (rowId: number) => {
+    clearFieldError([`doc_${rowId}_type`, `doc_${rowId}_url`, 'documents']);
     setDocumentRows((prev) => prev.filter((row) => row.rowId !== rowId));
   };
 
-  const buildPayload = (): EmployeePayload | null => {
-    const companyId = parseInt(form.company_id, 10);
-    const name = form.name.trim();
-    if (!Number.isFinite(companyId) || !name) {
-      return null;
-    }
-
+  const buildPayload = (): EmployeePayload => {
     return {
-      company_id: companyId,
-      employee_position_id: nullableInt(form.employee_position_id),
-      employment_status_id: nullableInt(form.employment_status_id),
-      payroll_grade_id: nullableInt(form.payroll_grade_id),
-      tax_status_id: nullableInt(form.tax_status_id),
-      name,
-      nickname: nullableTrimmed(form.nickname),
-      nik_ktp: nullableTrimmed(form.nik_ktp),
-      birth_place: nullableTrimmed(form.birth_place),
-      birth_date: nullableTrimmed(form.birth_date),
-      gender: nullableTrimmed(form.gender),
-      religion: nullableTrimmed(form.religion),
-      blood_type: nullableTrimmed(form.blood_type),
-      mother_name: nullableTrimmed(form.mother_name),
-      email: nullableTrimmed(form.email),
-      phone: nullableTrimmed(form.phone),
-      whatsapp_number: nullableTrimmed(form.whatsapp_number),
-      emergency_phone_number: nullableTrimmed(form.emergency_phone_number),
-      instagram: nullableTrimmed(form.instagram),
-      tiktok: nullableTrimmed(form.tiktok),
-      ktp_address: nullableTrimmed(form.ktp_address),
-      domicile_address: nullableTrimmed(form.domicile_address),
-      bpjs_ketenagakerjaan: nullableTrimmed(form.bpjs_ketenagakerjaan),
-      bpjs_kesehatan: nullableTrimmed(form.bpjs_kesehatan),
-      npwp_number: nullableTrimmed(form.npwp_number),
-      photo_url: nullableTrimmed(form.photo_url),
+      company_id: parseIntStrict(form.company_id),
+      employee_position_id: parseIntStrict(form.employee_position_id),
+      employment_status_id: parseIntStrict(form.employment_status_id),
+      payroll_grade_id: parseIntStrict(form.payroll_grade_id),
+      tax_status_id: parseIntStrict(form.tax_status_id),
+      name: form.name.trim(),
+      nickname: form.nickname.trim(),
+      nik_ktp: form.nik_ktp.trim(),
+      birth_place: form.birth_place.trim(),
+      birth_date: form.birth_date.trim(),
+      gender: form.gender.trim(),
+      religion: form.religion.trim(),
+      blood_type: form.blood_type.trim(),
+      mother_name: form.mother_name.trim(),
+      email: form.email.trim(),
+      phone: form.phone.trim(),
+      whatsapp_number: form.whatsapp_number.trim(),
+      emergency_phone_number: form.emergency_phone_number.trim(),
+      instagram: form.instagram.trim(),
+      tiktok: form.tiktok.trim(),
+      ktp_address: form.ktp_address.trim(),
+      domicile_address: form.domicile_address.trim(),
+      bpjs_ketenagakerjaan: form.bpjs_ketenagakerjaan.trim(),
+      bpjs_kesehatan: form.bpjs_kesehatan.trim(),
+      npwp_number: form.npwp_number.trim(),
+      photo_url: form.photo_url.trim(),
       documents: filledDocuments,
     };
   };
@@ -451,14 +681,26 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
       },
     ]);
     setNextDocRowId((prev) => prev + 1);
+    setFieldErrors({});
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = buildPayload();
-    if (!payload) {
+    const validation = validateEmployeeForm(form, documentRows);
+    if (!validation.valid) {
+      setFieldErrors(validation.fieldErrors);
+      setValidationPopup({
+        title: 'Validasi Formulir Gagal',
+        message:
+          'Semua kolom formulir wajib diisi dan minimal 1 dokumen karyawan harus dilampirkan.',
+        errors: validation.errors,
+      });
       return;
     }
+
+    setFieldErrors({});
+    setValidationPopup(null);
+    const payload = buildPayload();
     if (editingEmployee) {
       setPendingAction({
         type: 'update',
@@ -500,6 +742,8 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
 
   const handleStartEdit = (employee: Employee) => {
     clearError();
+    setFieldErrors({});
+    setValidationPopup(null);
     setEditingEmployee(employee);
     setForm(employeeToFormState(employee));
     const existingDocs = employee.documents ?? [];
@@ -527,6 +771,8 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
 
   const handleCancelEdit = () => {
     clearError();
+    setFieldErrors({});
+    setValidationPopup(null);
     setEditingEmployee(null);
     resetFormAndDocuments();
   };
@@ -689,6 +935,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
             className="flex min-h-0 flex-col rounded-xl border border-border bg-muted/25 p-4 lg:overflow-y-auto"
           >
             <form
+              noValidate
               onSubmit={handleSubmit}
               data-testid="input-karyawan-crud-modal-form"
               className="flex flex-col gap-4"
@@ -699,8 +946,8 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                 </h3>
                 <p className="text-xs text-muted-foreground">
                   {editingEmployee
-                    ? 'Perbarui data karyawan yang dipilih lalu simpan perubahan.'
-                    : 'Lengkapi formulir di bawah ini untuk menambahkan karyawan baru.'}
+                    ? 'Perbarui data karyawan yang dipilih. Semua kolom wajib diisi dan minimal 1 dokumen harus terlampir.'
+                    : 'Lengkapi seluruh kolom di bawah ini dan unggah minimal 1 dokumen untuk menambahkan karyawan baru.'}
                 </p>
               </div>
 
@@ -712,6 +959,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   placeholder="Pilih perusahaan..."
                   options={companyOptions}
                   value={form.company_id}
+                  error={fieldErrors.company_id}
                   onChange={(e) =>
                     handleFieldChange('company_id', e.target.value)
                   }
@@ -723,6 +971,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   placeholder="Contoh: Nadia Putri Pratiwi"
                   required
                   value={form.name}
+                  error={fieldErrors.name}
                   onChange={(e) => handleFieldChange('name', e.target.value)}
                 />
                 <TextInput
@@ -731,6 +980,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   labelPlacement="left"
                   placeholder="Contoh: Nadia"
                   value={form.nickname}
+                  error={fieldErrors.nickname}
                   onChange={(e) =>
                     handleFieldChange('nickname', e.target.value)
                   }
@@ -742,6 +992,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   placeholder="Contoh: 3273011504960001"
                   maxLength={16}
                   value={form.nik_ktp}
+                  error={fieldErrors.nik_ktp}
                   onChange={(e) => handleFieldChange('nik_ktp', e.target.value)}
                 />
 
@@ -753,6 +1004,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   options={positionOptions}
                   disabled={!form.company_id}
                   value={form.employee_position_id}
+                  error={fieldErrors.employee_position_id}
                   onChange={(e) =>
                     handleFieldChange('employee_position_id', e.target.value)
                   }
@@ -765,6 +1017,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   options={statusOptions}
                   disabled={!form.company_id}
                   value={form.employment_status_id}
+                  error={fieldErrors.employment_status_id}
                   onChange={(e) =>
                     handleFieldChange('employment_status_id', e.target.value)
                   }
@@ -777,6 +1030,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   options={gradeOptions}
                   disabled={!form.company_id}
                   value={form.payroll_grade_id}
+                  error={fieldErrors.payroll_grade_id}
                   onChange={(e) =>
                     handleFieldChange('payroll_grade_id', e.target.value)
                   }
@@ -789,6 +1043,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   options={taxStatusOptions}
                   disabled={!form.company_id}
                   value={form.tax_status_id}
+                  error={fieldErrors.tax_status_id}
                   onChange={(e) =>
                     handleFieldChange('tax_status_id', e.target.value)
                   }
@@ -804,6 +1059,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                     label: opt.nama,
                   }))}
                   value={form.gender}
+                  error={fieldErrors.gender}
                   onChange={(e) => handleFieldChange('gender', e.target.value)}
                 />
                 <SelectInput
@@ -816,6 +1072,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                     label: opt.nama,
                   }))}
                   value={form.religion}
+                  error={fieldErrors.religion}
                   onChange={(e) =>
                     handleFieldChange('religion', e.target.value)
                   }
@@ -830,6 +1087,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                     label: opt.nama,
                   }))}
                   value={form.blood_type}
+                  error={fieldErrors.blood_type}
                   onChange={(e) =>
                     handleFieldChange('blood_type', e.target.value)
                   }
@@ -840,6 +1098,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   labelPlacement="left"
                   placeholder="Contoh: Siti Aminah"
                   value={form.mother_name}
+                  error={fieldErrors.mother_name}
                   onChange={(e) =>
                     handleFieldChange('mother_name', e.target.value)
                   }
@@ -851,6 +1110,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   labelPlacement="left"
                   placeholder="Contoh: Bandung"
                   value={form.birth_place}
+                  error={fieldErrors.birth_place}
                   onChange={(e) =>
                     handleFieldChange('birth_place', e.target.value)
                   }
@@ -861,6 +1121,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   labelPlacement="left"
                   type="date"
                   value={form.birth_date}
+                  error={fieldErrors.birth_date}
                   onChange={(e) =>
                     handleFieldChange('birth_date', e.target.value)
                   }
@@ -872,6 +1133,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   type="email"
                   placeholder="Contoh: nadia@foodlab.test"
                   value={form.email}
+                  error={fieldErrors.email}
                   onChange={(e) => handleFieldChange('email', e.target.value)}
                 />
                 <TextInput
@@ -880,6 +1142,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   labelPlacement="left"
                   placeholder="Contoh: 081234567801"
                   value={form.phone}
+                  error={fieldErrors.phone}
                   onChange={(e) => handleFieldChange('phone', e.target.value)}
                 />
 
@@ -889,6 +1152,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   labelPlacement="left"
                   placeholder="Contoh: 081234567801"
                   value={form.whatsapp_number}
+                  error={fieldErrors.whatsapp_number}
                   onChange={(e) =>
                     handleFieldChange('whatsapp_number', e.target.value)
                   }
@@ -899,6 +1163,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   labelPlacement="left"
                   placeholder="Contoh: 081234567899"
                   value={form.emergency_phone_number}
+                  error={fieldErrors.emergency_phone_number}
                   onChange={(e) =>
                     handleFieldChange('emergency_phone_number', e.target.value)
                   }
@@ -909,6 +1174,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   labelPlacement="left"
                   placeholder="Contoh: @nadia.lab"
                   value={form.instagram}
+                  error={fieldErrors.instagram}
                   onChange={(e) =>
                     handleFieldChange('instagram', e.target.value)
                   }
@@ -919,6 +1185,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   labelPlacement="left"
                   placeholder="Contoh: @nadia.tiktok"
                   value={form.tiktok}
+                  error={fieldErrors.tiktok}
                   onChange={(e) => handleFieldChange('tiktok', e.target.value)}
                 />
 
@@ -928,6 +1195,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   labelPlacement="left"
                   placeholder="Nomor BPJS TK"
                   value={form.bpjs_ketenagakerjaan}
+                  error={fieldErrors.bpjs_ketenagakerjaan}
                   onChange={(e) =>
                     handleFieldChange('bpjs_ketenagakerjaan', e.target.value)
                   }
@@ -938,6 +1206,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   labelPlacement="left"
                   placeholder="Nomor BPJS Kesehatan"
                   value={form.bpjs_kesehatan}
+                  error={fieldErrors.bpjs_kesehatan}
                   onChange={(e) =>
                     handleFieldChange('bpjs_kesehatan', e.target.value)
                   }
@@ -948,6 +1217,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   labelPlacement="left"
                   placeholder="Contoh: 9123456789012000"
                   value={form.npwp_number}
+                  error={fieldErrors.npwp_number}
                   onChange={(e) =>
                     handleFieldChange('npwp_number', e.target.value)
                   }
@@ -959,6 +1229,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                     labelPlacement="left"
                     placeholder="Unggah pas foto atau isi URL"
                     value={form.photo_url}
+                    error={fieldErrors.photo_url}
                     onChange={(e) =>
                       handleFieldChange('photo_url', e.target.value)
                     }
@@ -1000,6 +1271,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   rows={2}
                   placeholder="Alamat sesuai KTP"
                   value={form.ktp_address}
+                  error={fieldErrors.ktp_address}
                   onChange={(e) =>
                     handleFieldChange('ktp_address', e.target.value)
                   }
@@ -1011,6 +1283,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   rows={2}
                   placeholder="Alamat tempat tinggal saat ini"
                   value={form.domicile_address}
+                  error={fieldErrors.domicile_address}
                   onChange={(e) =>
                     handleFieldChange('domicile_address', e.target.value)
                   }
@@ -1018,7 +1291,9 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
               </div>
 
               <div
-                className="rounded-xl border border-border bg-card/70 p-3.5"
+                className={`rounded-xl border bg-card/70 p-3.5 ${
+                  fieldErrors.documents ? 'border-red-500' : 'border-border'
+                }`}
                 data-testid="employee-documents-section"
               >
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -1027,7 +1302,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                       Dokumen Karyawan (EmployeeDocument)
                     </h4>
                     <p className="text-xs text-muted-foreground">
-                      Unggah berkas melalui DocumentService atau masukkan URL.
+                      Minimal 1 dokumen wajib dilampirkan. Unggah berkas atau masukkan URL.
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1048,10 +1323,16 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   </div>
                 </div>
 
+                {fieldErrors.documents && (
+                  <p className="mb-2 text-xs font-medium text-red-600" role="status">
+                    {fieldErrors.documents}
+                  </p>
+                )}
+
                 {documentRows.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-border bg-card px-3 py-3 text-center text-xs text-muted-foreground">
                     Belum ada baris dokumen. Klik &ldquo;+ Tambah Dokumen&rdquo;
-                    untuk menambahkan dokumen.
+                    untuk menambahkan dokumen (minimal 1 dokumen).
                   </p>
                 ) : (
                   <div
@@ -1092,6 +1373,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                             labelPlacement="left"
                             options={rowOptions}
                             value={docRow.document_type}
+                            error={fieldErrors[`doc_${docRow.rowId}_type`]}
                             onChange={(e) =>
                               handleUpdateDocumentRow(docRow.rowId, {
                                 document_type: e.target.value,
@@ -1104,6 +1386,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                             labelPlacement="left"
                             placeholder="https://... atau unggah berkas"
                             value={docRow.file_url}
+                            error={fieldErrors[`doc_${docRow.rowId}_url`]}
                             onChange={(e) =>
                               handleUpdateDocumentRow(docRow.rowId, {
                                 file_url: e.target.value,
@@ -1230,6 +1513,14 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
         loading={loading}
         onConfirm={handleConfirmPendingAction}
         onCancel={() => setPendingAction(null)}
+      />
+
+      <ValidationErrorDialog
+        isOpen={isOpen && validationPopup !== null}
+        title={validationPopup?.title}
+        message={validationPopup?.message}
+        errors={validationPopup?.errors ?? []}
+        onClose={() => setValidationPopup(null)}
       />
     </>
   );

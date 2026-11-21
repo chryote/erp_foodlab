@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
+  ApiRequestError,
   createCapitalCompany,
   createCompany,
+  createEmployee,
   createExpenseCategory,
   createExpenseItem,
   createExpenseType,
@@ -91,6 +93,33 @@ describe('General API Client Contract & Error Handling', () => {
     await expect(fetchCapitalCompanies()).rejects.toThrow(
       /Failed to fetch capital companies: 500 - SQLSTATE\[42S02\]/
     );
+  });
+
+  it('throws ApiRequestError with status and field errors on HTTP 422 validation failure', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: false,
+      status: 422,
+      json: async () => ({
+        message: 'NIK KTP sudah terdaftar.',
+        errors: {
+          nik_ktp: ['NIK KTP sudah terdaftar.'],
+          documents: ['Dokumen karyawan minimal harus melampirkan 1 dokumen.'],
+        },
+      }),
+    } as Response);
+
+    try {
+      await createEmployee({ company_id: 1, name: 'Test' });
+      expect.unreachable('Expected ApiRequestError');
+    } catch (err) {
+      expect(err).toBeInstanceOf(ApiRequestError);
+      const apiErr = err as ApiRequestError;
+      expect(apiErr.status).toBe(422);
+      expect(apiErr.errors).toEqual({
+        nik_ktp: ['NIK KTP sudah terdaftar.'],
+        documents: ['Dokumen karyawan minimal harus melampirkan 1 dokumen.'],
+      });
+    }
   });
 
   it('surfaces clear diagnostic message with target URL when fetch throws NetworkError', async () => {

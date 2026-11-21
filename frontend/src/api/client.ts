@@ -497,6 +497,22 @@ function resolveApiBaseUrl(): string {
 
 const API_BASE_URL = resolveApiBaseUrl();
 
+export class ApiRequestError extends Error {
+  status: number;
+  errors?: Record<string, string[]>;
+
+  constructor(
+    message: string,
+    status: number,
+    errors?: Record<string, string[]>
+  ) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.status = status;
+    this.errors = errors;
+  }
+}
+
 async function requestJson<T>(
   endpoint: string,
   options: RequestInit = {},
@@ -533,15 +549,26 @@ async function requestJson<T>(
 
   if (!response.ok) {
     let serverMessage = '';
+    let validationErrors: Record<string, string[]> | undefined;
     try {
-      const errBody = (await response.json()) as { message?: string };
+      const errBody = (await response.json()) as {
+        message?: string;
+        errors?: Record<string, string[]>;
+      };
       if (errBody?.message) {
         serverMessage = ` - ${errBody.message.split('\n')[0]}`;
+      }
+      if (errBody?.errors && typeof errBody.errors === 'object') {
+        validationErrors = errBody.errors;
       }
     } catch {
       // Ignore non-JSON error bodies
     }
-    throw new Error(`${errorPrefix}: ${response.status}${serverMessage}`);
+    throw new ApiRequestError(
+      `${errorPrefix}: ${response.status}${serverMessage}`,
+      response.status,
+      validationErrors
+    );
   }
 
   return response.json() as Promise<T>;

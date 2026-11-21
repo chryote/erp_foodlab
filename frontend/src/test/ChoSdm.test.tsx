@@ -521,9 +521,52 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
       await within(inputKaryawanModal).findByText('Nadia Putri')
     ).toBeInTheDocument();
 
+    // Submitting empty form triggers frontend validation pop-up without calling createEmployee
+    fireEvent.click(
+      within(inputKaryawanModal).getByRole('button', { name: 'Tambah' })
+    );
+    const initialValidationDialog = await screen.findByTestId(
+      'validation-error-dialog'
+    );
+    expect(initialValidationDialog).toHaveTextContent('Validasi Formulir Gagal');
+    expect(
+      within(initialValidationDialog).getByTestId('validation-error-dialog-list')
+    ).toHaveTextContent('Nama Lengkap wajib diisi.');
+    expect(apiClient.createEmployee).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('validation-error-dialog-close'));
+    expect(
+      screen.queryByTestId('validation-error-dialog')
+    ).not.toBeInTheDocument();
+
     fireEvent.change(within(inputKaryawanModal).getByLabelText('Nama Lengkap'), {
       target: { value: 'Budi Santoso' },
     });
+    fireEvent.change(
+      within(inputKaryawanModal).getByLabelText('Nama Panggilan'),
+      { target: { value: 'Budi' } }
+    );
+    fireEvent.change(
+      within(inputKaryawanModal).getByLabelText('NIK KTP (16 Digit)'),
+      { target: { value: '3201010101900001' } }
+    );
+    fireEvent.change(within(inputKaryawanModal).getByLabelText('Jabatan'), {
+      target: { value: '10' },
+    });
+    fireEvent.change(
+      within(inputKaryawanModal).getByLabelText('Status Karyawan'),
+      { target: { value: '20' } }
+    );
+    fireEvent.change(
+      within(inputKaryawanModal).getByLabelText('Payroll Grade'),
+      { target: { value: '30' } }
+    );
+    fireEvent.change(within(inputKaryawanModal).getByLabelText('Status Pajak'), {
+      target: { value: '40' },
+    });
+    fireEvent.change(
+      within(inputKaryawanModal).getByLabelText('Jenis Kelamin'),
+      { target: { value: 'laki_laki' } }
+    );
     fireEvent.change(within(inputKaryawanModal).getByLabelText('Agama'), {
       target: { value: 'islam' },
     });
@@ -532,6 +575,60 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
       {
         target: { value: 'ab' },
       }
+    );
+    fireEvent.change(
+      within(inputKaryawanModal).getByLabelText('Nama Ibu Kandung'),
+      { target: { value: 'Siti Aminah' } }
+    );
+    fireEvent.change(
+      within(inputKaryawanModal).getByLabelText('Tempat Lahir'),
+      { target: { value: 'Bandung' } }
+    );
+    fireEvent.change(
+      within(inputKaryawanModal).getByLabelText('Tanggal Lahir'),
+      { target: { value: '1990-01-01' } }
+    );
+    fireEvent.change(within(inputKaryawanModal).getByLabelText('Email'), {
+      target: { value: 'budi.santoso@foodlab.test' },
+    });
+    fireEvent.change(within(inputKaryawanModal).getByLabelText('No. Telepon'), {
+      target: { value: '081234567890' },
+    });
+    fireEvent.change(
+      within(inputKaryawanModal).getByLabelText('No. WhatsApp'),
+      { target: { value: '081234567890' } }
+    );
+    fireEvent.change(
+      within(inputKaryawanModal).getByLabelText('No. Telepon Darurat'),
+      { target: { value: '081299998888' } }
+    );
+    fireEvent.change(within(inputKaryawanModal).getByLabelText('Instagram'), {
+      target: { value: '@budisantoso' },
+    });
+    fireEvent.change(within(inputKaryawanModal).getByLabelText('TikTok'), {
+      target: { value: '@buditiktok' },
+    });
+    fireEvent.change(
+      within(inputKaryawanModal).getByLabelText('BPJS Ketenagakerjaan'),
+      { target: { value: '11223344556' } }
+    );
+    fireEvent.change(
+      within(inputKaryawanModal).getByLabelText('BPJS Kesehatan'),
+      { target: { value: '0001122334455' } }
+    );
+    fireEvent.change(within(inputKaryawanModal).getByLabelText('Nomor NPWP'), {
+      target: { value: '123456789012345' },
+    });
+    fireEvent.change(
+      within(inputKaryawanModal).getByLabelText('URL Foto Karyawan'),
+      { target: { value: 'https://cdn.foodlab.test/photos/budi.jpg' } }
+    );
+    fireEvent.change(within(inputKaryawanModal).getByLabelText('Alamat KTP'), {
+      target: { value: 'Jl. Merdeka No. 1, Bandung' },
+    });
+    fireEvent.change(
+      within(inputKaryawanModal).getByLabelText('Alamat Domisili'),
+      { target: { value: 'Jl. Sudirman No. 10, Jakarta' } }
     );
 
     // Upload EmployeeDocument via DocumentService endpoint
@@ -672,5 +769,212 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
     expect(
       within(secondViewModal).getByTestId('view-karyawan-total-banner-value')
     ).toHaveTextContent('1 Personel');
+  });
+
+  it('displays validation pop-up on Input Karyawan frontend validation failure (all fields + min 1 document) and backend 422 validation failure', async () => {
+    const company: apiClient.Company = {
+      id: 1,
+      name: 'PT. Slaras Nusa Foodlab',
+      series: 1,
+    };
+
+    vi.mocked(apiClient.fetchErpModules).mockResolvedValue({
+      data: [DEFAULT_CHO_MODULE],
+      meta: { count: 1 },
+    });
+    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
+      data: [company],
+      meta: { count: 1 },
+    });
+    vi.mocked(apiClient.syncActiveCompany).mockResolvedValue({ data: company });
+    vi.mocked(apiClient.fetchChoEnums).mockResolvedValue({
+      data: DEFAULT_CHO_ENUMS,
+    });
+    vi.mocked(apiClient.fetchEmployeePositions).mockResolvedValue({
+      data: [{ id: 10, company_id: 1, code: 'POS-01', name: 'Analis' }],
+      meta: { count: 1 },
+    });
+    vi.mocked(apiClient.fetchEmploymentStatuses).mockResolvedValue({
+      data: [{ id: 20, company_id: 1, code: 'PKWTT', name: 'Tetap' }],
+      meta: { count: 1 },
+    });
+    vi.mocked(apiClient.fetchPayrollGrades).mockResolvedValue({
+      data: [
+        {
+          id: 30,
+          company_id: 1,
+          grade: 1,
+          sub_grade: 'A',
+          level_label: 'Staff',
+          base_salary: 5000000,
+          position_allowance: 0,
+          total_gross: 5000000,
+          bpjs_kesehatan_company: 200000,
+          bpjs_kesehatan_employee: 50000,
+          bpjs_ketenagakerjaan_company: 197000,
+          bpjs_ketenagakerjaan_employee: 100000,
+          net_employee_received: 4850000,
+          total_company_cost: 5397000,
+        },
+      ],
+      meta: { count: 1 },
+    });
+    vi.mocked(apiClient.fetchTaxStatuses).mockResolvedValue({
+      data: [{ id: 40, company_id: 1, code: 'TK/0', name: 'TK/0' }],
+      meta: { count: 1 },
+    });
+    vi.mocked(apiClient.fetchEmployees).mockResolvedValue({
+      data: [],
+      meta: { count: 0 },
+    });
+
+    const backendValidationErr = Object.assign(
+      new Error('Failed to create employee: 422 - NIK KTP sudah terdaftar.'),
+      {
+        status: 422,
+        errors: {
+          nik_ktp: ['NIK KTP sudah terdaftar.'],
+          documents: ['Dokumen karyawan minimal harus melampirkan 1 dokumen.'],
+        },
+      }
+    );
+    vi.mocked(apiClient.createEmployee).mockRejectedValue(backendValidationErr);
+
+    renderApp();
+
+    fireEvent.click(await screen.findByTestId('company-tab-1'));
+    fireEvent.click(screen.getByTestId('module-card-CHO'));
+    fireEvent.click(
+      await screen.findByTestId('horizontal-menu-card-INPUT_SDM')
+    );
+    fireEvent.click(screen.getByTestId('horizontal-menu-card-INPUT_KARYAWAN'));
+
+    const modal = await screen.findByTestId('input-karyawan-crud-modal');
+
+    // Remove the single document row -> must trigger min-1-document error in pop-up
+    fireEvent.click(
+      within(modal).getByTestId('remove-employee-document-row-0')
+    );
+    fireEvent.change(within(modal).getByLabelText('NIK KTP (16 Digit)'), {
+      target: { value: '12345' },
+    });
+    fireEvent.change(within(modal).getByLabelText('Email'), {
+      target: { value: 'invalid-email' },
+    });
+
+    fireEvent.click(within(modal).getByRole('button', { name: 'Tambah' }));
+
+    const frontendPopup = await screen.findByTestId('validation-error-dialog');
+    expect(frontendPopup).toHaveTextContent('Validasi Formulir Gagal');
+    const frontendList = within(frontendPopup).getByTestId(
+      'validation-error-dialog-list'
+    );
+    expect(frontendList).toHaveTextContent(
+      'Dokumen Karyawan minimal harus melampirkan 1 dokumen.'
+    );
+    expect(frontendList).toHaveTextContent(
+      'NIK KTP harus terdiri dari 16 digit angka.'
+    );
+    expect(frontendList).toHaveTextContent('Format Email tidak valid.');
+    expect(frontendList).toHaveTextContent('Nama Lengkap wajib diisi.');
+    expect(frontendList).toHaveTextContent('Alamat Domisili wajib diisi.');
+    expect(apiClient.createEmployee).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId('validation-error-dialog-close'));
+
+    // Fill all fields + 1 document so frontend validation passes and backend 422 triggers pop-up
+    fireEvent.click(within(modal).getByTestId('add-employee-document-btn'));
+    const docRow = await within(modal).findByTestId('employee-document-row-0');
+    fireEvent.change(within(docRow).getByLabelText('URL Dokumen'), {
+      target: { value: 'https://cdn.foodlab.test/docs/ktp.pdf' },
+    });
+
+    fireEvent.change(within(modal).getByLabelText('Nama Lengkap'), {
+      target: { value: 'Rina Kusuma' },
+    });
+    fireEvent.change(within(modal).getByLabelText('Nama Panggilan'), {
+      target: { value: 'Rina' },
+    });
+    fireEvent.change(within(modal).getByLabelText('NIK KTP (16 Digit)'), {
+      target: { value: '3201010101900099' },
+    });
+    fireEvent.change(within(modal).getByLabelText('Jabatan'), {
+      target: { value: '10' },
+    });
+    fireEvent.change(within(modal).getByLabelText('Status Karyawan'), {
+      target: { value: '20' },
+    });
+    fireEvent.change(within(modal).getByLabelText('Payroll Grade'), {
+      target: { value: '30' },
+    });
+    fireEvent.change(within(modal).getByLabelText('Status Pajak'), {
+      target: { value: '40' },
+    });
+    fireEvent.change(within(modal).getByLabelText('Jenis Kelamin'), {
+      target: { value: 'perempuan' },
+    });
+    fireEvent.change(within(modal).getByLabelText('Agama'), {
+      target: { value: 'islam' },
+    });
+    fireEvent.change(within(modal).getByLabelText('Golongan Darah'), {
+      target: { value: 'a' },
+    });
+    fireEvent.change(within(modal).getByLabelText('Nama Ibu Kandung'), {
+      target: { value: 'Dewi' },
+    });
+    fireEvent.change(within(modal).getByLabelText('Tempat Lahir'), {
+      target: { value: 'Jakarta' },
+    });
+    fireEvent.change(within(modal).getByLabelText('Tanggal Lahir'), {
+      target: { value: '1994-03-10' },
+    });
+    fireEvent.change(within(modal).getByLabelText('Email'), {
+      target: { value: 'rina@foodlab.test' },
+    });
+    fireEvent.change(within(modal).getByLabelText('No. Telepon'), {
+      target: { value: '081234567890' },
+    });
+    fireEvent.change(within(modal).getByLabelText('No. WhatsApp'), {
+      target: { value: '081234567890' },
+    });
+    fireEvent.change(within(modal).getByLabelText('No. Telepon Darurat'), {
+      target: { value: '081234567891' },
+    });
+    fireEvent.change(within(modal).getByLabelText('Instagram'), {
+      target: { value: '@rina' },
+    });
+    fireEvent.change(within(modal).getByLabelText('TikTok'), {
+      target: { value: '@rinatiktok' },
+    });
+    fireEvent.change(within(modal).getByLabelText('BPJS Ketenagakerjaan'), {
+      target: { value: '1122334455' },
+    });
+    fireEvent.change(within(modal).getByLabelText('BPJS Kesehatan'), {
+      target: { value: '00011223344' },
+    });
+    fireEvent.change(within(modal).getByLabelText('Nomor NPWP'), {
+      target: { value: '123456789012345' },
+    });
+    fireEvent.change(within(modal).getByLabelText('URL Foto Karyawan'), {
+      target: { value: 'https://cdn.foodlab.test/photos/rina.jpg' },
+    });
+    fireEvent.change(within(modal).getByLabelText('Alamat KTP'), {
+      target: { value: 'Jl. Melati No. 1' },
+    });
+    fireEvent.change(within(modal).getByLabelText('Alamat Domisili'), {
+      target: { value: 'Jl. Mawar No. 2' },
+    });
+
+    fireEvent.click(within(modal).getByRole('button', { name: 'Tambah' }));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    const backendPopup = await screen.findByTestId('validation-error-dialog');
+    expect(backendPopup).toHaveTextContent('Validasi Backend Gagal');
+    expect(
+      within(backendPopup).getByTestId('validation-error-dialog-list')
+    ).toHaveTextContent('NIK KTP sudah terdaftar.');
+    expect(within(modal).getByLabelText('Nama Lengkap')).toHaveValue(
+      'Rina Kusuma'
+    );
   });
 });
