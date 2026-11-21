@@ -108,6 +108,7 @@ class EmployeeService
                 AllowedFilter::exact('employment_status_id'),
                 AllowedFilter::exact('payroll_grade_id'),
                 AllowedFilter::exact('tax_status_id'),
+                AllowedFilter::exact('employee_attendance_code'),
                 AllowedFilter::exact('gender'),
                 AllowedFilter::exact('religion'),
                 AllowedFilter::exact('blood_type'),
@@ -119,12 +120,13 @@ class EmployeeService
                             ->where('name', 'like', $term)
                             ->orWhere('nickname', 'like', $term)
                             ->orWhere('nik_ktp', 'like', $term)
+                            ->orWhere('employee_attendance_code', 'like', $term)
                             ->orWhere('email', 'like', $term)
                             ->orWhere('phone', 'like', $term);
                     });
                 }),
             ])
-            ->allowedSorts(['id', 'name', 'nik_ktp', 'birth_date', 'created_at'])
+            ->allowedSorts(['id', 'name', 'nik_ktp', 'employee_attendance_code', 'birth_date', 'created_at'])
             ->allowedIncludes(self::RELATIONS)
             ->defaultSort('name', '-id');
     }

@@ -68,6 +68,7 @@ class EmployeePositionService
         });
 
         Cache::forget(self::CACHE_KEY_LIST);
+        Cache::forget(EmployeeService::CACHE_KEY_LIST);
 
         return $updated->refresh()->load(self::RELATIONS);
     }

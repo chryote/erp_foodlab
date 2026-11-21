@@ -60,6 +60,18 @@ class EmployeeAttendanceService
     /**
      * @param  array<string, mixed>  $attributes
      */
+    public function scanEmployeeAttendance(array $attributes): EmployeeAttendance
+    {
+        $employeeAttendance = $this->recordAttendanceAction->scan($attributes);
+
+        Cache::forget(self::CACHE_KEY_LIST);
+
+        return $employeeAttendance->load(self::RELATIONS);
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
     public function updateEmployeeAttendance(EmployeeAttendance $employeeAttendance, array $attributes): EmployeeAttendance
     {
         $updated = $this->recordAttendanceAction->execute($attributes, $employeeAttendance);
@@ -85,6 +97,12 @@ class EmployeeAttendanceService
             ->allowedFilters([
                 AllowedFilter::exact('company_id'),
                 AllowedFilter::exact('employee_id'),
+                AllowedFilter::callback('employee_attendance_code', function (Builder $query, mixed $value): void {
+                    $code = trim((string) $value);
+                    $query->whereHas('employee', function (Builder $employeeQuery) use ($code): void {
+                        $employeeQuery->where('employee_attendance_code', $code);
+                    });
+                }),
                 AllowedFilter::exact('employee_shift_id'),
                 AllowedFilter::callback('attendance_date', function (Builder $query, mixed $value): void {
                     $query->whereDate('attendance_date', (string) $value);

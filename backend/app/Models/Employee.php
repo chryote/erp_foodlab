@@ -10,12 +10,92 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class Employee extends Model
 {
     use HasFactory, SoftDeletes;
 
     protected $table = 'employees';
+
+    protected static function booted(): void
+    {
+        static::saved(function (Employee $employee): void {
+            if (
+                $employee->wasRecentlyCreated
+                || $employee->wasChanged(['name', 'employee_position_id'])
+                || $employee->employee_attendance_code === null
+                || $employee->employee_attendance_code === ''
+            ) {
+                $employee->syncAttendanceCode();
+            }
+        });
+    }
+
+    /**
+     * Build the barcode attendance payload:
+     * first token of employee.name before whitespace (alphanumeric only)
+     * + employee_position.name (alphanumeric only)
+     * + employee.id.
+     */
+    public static function formatAttendanceCode(int $id, string $name, ?string $positionName = null): string
+    {
+        $trimmedName = trim($name);
+        $firstToken = $trimmedName === ''
+            ? ''
+            : (preg_split('/\s+/', $trimmedName)[0] ?? '');
+
+        $cleanFirstName = preg_replace('/[^A-Za-z0-9]/', '', Str::ascii($firstToken)) ?? '';
+        $cleanPositionName = $positionName !== null
+            ? (preg_replace('/[^A-Za-z0-9]/', '', Str::ascii($positionName)) ?? '')
+            : '';
+
+        $idSuffix = (string) $id;
+        $maxPrefixLength = max(0, 255 - strlen($idSuffix));
+        $prefix = substr($cleanFirstName.$cleanPositionName, 0, $maxPrefixLength);
+
+        return $prefix.$idSuffix;
+    }
+
+    public function generateAttendanceCode(): string
+    {
+        $positionName = null;
+
+        if ($this->employee_position_id !== null) {
+            if (
+                $this->relationLoaded('employeePosition')
+                && $this->employeePosition !== null
+                && (int) $this->employeePosition->getKey() === (int) $this->employee_position_id
+            ) {
+                $positionName = $this->employeePosition->name;
+            } else {
+                $positionName = EmployeePosition::query()
+                    ->withTrashed()
+                    ->whereKey($this->employee_position_id)
+                    ->value('name');
+            }
+        }
+
+        return self::formatAttendanceCode(
+            (int) $this->getKey(),
+            (string) $this->name,
+            $positionName !== null ? (string) $positionName : null,
+        );
+    }
+
+    public function syncAttendanceCode(): void
+    {
+        if (! $this->exists || $this->getKey() === null) {
+            return;
+        }
+
+        $generated = $this->generateAttendanceCode();
+
+        if ($this->employee_attendance_code !== $generated) {
+            $this->employee_attendance_code = $generated;
+            $this->saveQuietly();
+        }
+    }
 
     protected $fillable = [
         'company_id',

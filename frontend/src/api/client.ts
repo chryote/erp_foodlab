@@ -398,6 +398,7 @@ export interface Employee {
   employment_status_id?: number | null;
   payroll_grade_id?: number | null;
   tax_status_id?: number | null;
+  employee_attendance_code?: string | null;
   name: string;
   email?: string | null;
   phone?: string | null;
@@ -436,6 +437,7 @@ export interface EmployeePayload {
   employment_status_id?: number | null;
   payroll_grade_id?: number | null;
   tax_status_id?: number | null;
+  employee_attendance_code?: string | null;
   name: string;
   email?: string | null;
   phone?: string | null;

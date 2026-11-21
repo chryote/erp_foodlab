@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\EmployeeAttendanceResource;
 use App\Models\EmployeeAttendance;
 use App\Modules\HR\Requests\SaveEmployeeAttendanceRequest;
+use App\Modules\HR\Requests\ScanEmployeeAttendanceRequest;
 use App\Modules\HR\Services\EmployeeAttendanceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -35,6 +36,22 @@ class EmployeeAttendanceController extends Controller
         return (new EmployeeAttendanceResource($employeeAttendance))
             ->response()
             ->setStatusCode(201);
+    }
+
+    public function scan(ScanEmployeeAttendanceRequest $request): JsonResponse
+    {
+        $employeeAttendance = $this->employeeAttendanceService->scanEmployeeAttendance($request->payload());
+        $isClockIn = $employeeAttendance->clock_out_at === null;
+        $statusCode = $employeeAttendance->wasRecentlyCreated ? 201 : 200;
+
+        return (new EmployeeAttendanceResource($employeeAttendance))
+            ->additional([
+                'meta' => [
+                    'action' => $isClockIn ? 'clock_in' : 'clock_out',
+                ],
+            ])
+            ->response()
+            ->setStatusCode($statusCode);
     }
 
     public function show(EmployeeAttendance $employeeAttendance): JsonResponse

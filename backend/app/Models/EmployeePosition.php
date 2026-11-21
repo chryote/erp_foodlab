@@ -29,6 +29,22 @@ class EmployeePosition extends Model
         'company_id' => 'integer',
     ];
 
+    protected static function booted(): void
+    {
+        static::updated(function (EmployeePosition $position): void {
+            if (! $position->wasChanged('name')) {
+                return;
+            }
+
+            $position->employees()
+                ->withTrashed()
+                ->each(function (Employee $employee) use ($position): void {
+                    $employee->setRelation('employeePosition', $position);
+                    $employee->syncAttendanceCode();
+                });
+        });
+    }
+
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);

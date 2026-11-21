@@ -229,6 +229,7 @@ CREATE TABLE `employees` (
   `bpjs_ketenagakerjaan` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `bpjs_kesehatan` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `npwp_number` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `employee_attendance_code` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
@@ -241,6 +242,7 @@ CREATE TABLE `employees` (
   KEY `employees_payroll_grade_id_index` (`payroll_grade_id`),
   KEY `employees_tax_status_id_index` (`tax_status_id`),
   KEY `employees_company_deleted_idx` (`company_id`,`deleted_at`),
+  KEY `employees_employee_attendance_code_index` (`employee_attendance_code`),
   CONSTRAINT `employees_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `employees_employee_position_id_foreign` FOREIGN KEY (`employee_position_id`) REFERENCES `employee_positions` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `employees_employment_status_id_foreign` FOREIGN KEY (`employment_status_id`) REFERENCES `employment_statuses` (`id`) ON DELETE RESTRICT,
@@ -490,5 +492,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (34,'2026_11_21_120
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (35,'2026_11_21_130000_create_employee_shifts_table',21);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (36,'2026_11_21_140000_create_employee_attendances_table',22);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (37,'2026_11_21_150000_create_employee_shift_assignments_table',23);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (38,'2026_11_21_160000_add_employee_attendance_code_to_employees_table',24);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;

@@ -800,6 +800,15 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
       ),
     },
     {
+      key: 'employee_attendance_code',
+      header: 'Kode Absensi',
+      render: (row) => (
+        <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-foreground">
+          {row.employee_attendance_code ?? '-'}
+        </code>
+      ),
+    },
+    {
       key: 'company',
       header: 'Perusahaan',
       render: (row) =>

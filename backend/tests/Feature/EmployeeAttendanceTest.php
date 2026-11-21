@@ -4,7 +4,10 @@ use App\Enums\AttendanceStatusEnum;
 use App\Models\Company;
 use App\Models\Employee;
 use App\Models\EmployeeAttendance;
+use App\Models\EmployeePosition;
 use App\Models\EmployeeShift;
+use App\Models\EmployeeShiftAssignment;
+use App\Modules\HR\Actions\RecordAttendanceAction;
 use App\Modules\HR\Services\EmployeeAttendanceService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
@@ -321,5 +324,150 @@ describe('EmployeeAttendance HR module', function () {
             ->assertJsonPath('data.overtime_minutes', 0);
 
         expect($recreated->json('data.id'))->not->toBe($firstId);
+    });
+
+    it('records attendance via employee_attendance_code and supports first-scan clock-in and second-scan clock-out on the same attendance_date', function () {
+        $companyA = Company::factory()->create(['name' => 'PT. Foodlab Scan A']);
+        $companyB = Company::factory()->create(['name' => 'PT. Foodlab Scan B']);
+
+        $position = EmployeePosition::factory()->create([
+            'company_id' => $companyA->id,
+            'name' => 'Analis QC',
+        ]);
+        $employeeA = Employee::factory()->create([
+            'company_id' => $companyA->id,
+            'employee_position_id' => $position->id,
+            'name' => 'Nadia Putri',
+        ]);
+        $employeeB = Employee::factory()->create([
+            'company_id' => $companyB->id,
+            'name' => 'Citra Lestari',
+        ]);
+
+        $morningShift = EmployeeShift::factory()->create([
+            'company_id' => $companyA->id,
+            'code' => 'SHIFT-PAGI',
+            'start_time' => '08:00:00',
+            'end_time' => '17:00:00',
+            'grace_period_minutes' => 15,
+            'is_overnight' => false,
+        ]);
+
+        EmployeeShiftAssignment::factory()->create([
+            'company_id' => $companyA->id,
+            'employee_id' => $employeeA->id,
+            'employee_shift_id' => $morningShift->id,
+            'effective_date' => '2026-11-01',
+            'end_date' => null,
+        ]);
+
+        // 1. Standard POST /employee-attendances resolves employee_id & company_id from employee_attendance_code
+        $directRes = $this->postJson('/api/v1/modules/hr/employee-attendances', [
+            'employee_attendance_code' => $employeeA->employee_attendance_code,
+            'employee_shift_id' => $morningShift->id,
+            'attendance_date' => '2026-11-20',
+            'clock_in_at' => '2026-11-20 08:05:00',
+            'notes' => 'Input kode barcode',
+        ]);
+
+        $directRes->assertCreated()
+            ->assertJsonPath('data.company_id', $companyA->id)
+            ->assertJsonPath('data.employee_id', $employeeA->id)
+            ->assertJsonPath('data.late_minutes', 0)
+            ->assertJsonPath('data.status', 'present');
+
+        // Filter by employee_attendance_code works
+        $this->getJson('/api/v1/modules/hr/employee-attendances?filter[employee_attendance_code]='.urlencode($employeeA->employee_attendance_code))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.employee.employee_attendance_code', $employeeA->employee_attendance_code);
+
+        // 2. Barcode scan flow: 1st scan clocks in (late 10 mins past 08:15 grace -> 08:25)
+        $firstScan = $this->postJson('/api/v1/modules/hr/employee-attendances/scan', [
+            'employee_attendance_code' => $employeeA->employee_attendance_code,
+            'scanned_at' => '2026-11-21 08:25:00',
+            'notes' => 'Scan masuk gerbang',
+        ]);
+
+        $firstScan->assertCreated()
+            ->assertJsonPath('meta.action', 'clock_in')
+            ->assertJsonPath('data.company_id', $companyA->id)
+            ->assertJsonPath('data.employee_id', $employeeA->id)
+            ->assertJsonPath('data.employee_shift_id', $morningShift->id)
+            ->assertJsonPath('data.attendance_date', '2026-11-21')
+            ->assertJsonPath('data.late_minutes', 10)
+            ->assertJsonPath('data.overtime_minutes', 0)
+            ->assertJsonPath('data.status', 'late')
+            ->assertJsonPath('data.clock_out_at', null);
+
+        $scanAttendanceId = $firstScan->json('data.id');
+        expect(Cache::has(EmployeeAttendanceService::CACHE_KEY_LIST))->toBeFalse();
+
+        // Populate cache to verify second scan invalidates it
+        $this->getJson('/api/v1/modules/hr/employee-attendances')->assertOk();
+        expect(Cache::has(EmployeeAttendanceService::CACHE_KEY_LIST))->toBeTrue();
+
+        // Scan earlier than clock-in fails with 422
+        $this->postJson('/api/v1/modules/hr/employee-attendances/scan', [
+            'employee_attendance_code' => $employeeA->employee_attendance_code,
+            'scanned_at' => '2026-11-21 07:30:00',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['scanned_at']);
+
+        // 3. Barcode scan flow: 2nd scan on the same attendance_date clocks out and computes overtime
+        $secondScan = $this->postJson('/api/v1/modules/hr/employee-attendances/scan', [
+            'employee_attendance_code' => $employeeA->employee_attendance_code,
+            'scanned_at' => '2026-11-21 17:40:00',
+        ]);
+
+        $secondScan->assertOk()
+            ->assertJsonPath('meta.action', 'clock_out')
+            ->assertJsonPath('data.id', $scanAttendanceId)
+            ->assertJsonPath('data.attendance_date', '2026-11-21')
+            ->assertJsonPath('data.late_minutes', 10)
+            ->assertJsonPath('data.overtime_minutes', 40)
+            ->assertJsonPath('data.status', 'late');
+
+        expect($secondScan->json('data.clock_in_at'))->not->toBeNull()
+            ->and($secondScan->json('data.clock_out_at'))->not->toBeNull()
+            ->and(Cache::has(EmployeeAttendanceService::CACHE_KEY_LIST))->toBeFalse();
+
+        // 4. 3rd scan on the same attendance_date returns 422
+        $this->postJson('/api/v1/modules/hr/employee-attendances/scan', [
+            'employee_attendance_code' => $employeeA->employee_attendance_code,
+            'scanned_at' => '2026-11-21 18:00:00',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['attendance_date']);
+
+        // 5. Cross-company mismatch and unknown barcode fail with 422
+        $this->postJson('/api/v1/modules/hr/employee-attendances/scan', [
+            'company_id' => $companyA->id,
+            'employee_attendance_code' => $employeeB->employee_attendance_code,
+            'scanned_at' => '2026-11-21 08:00:00',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['employee_attendance_code']);
+
+        $this->postJson('/api/v1/modules/hr/employee-attendances/scan', [
+            'employee_attendance_code' => 'UNKNOWN999',
+            'scanned_at' => '2026-11-21 08:00:00',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['employee_attendance_code']);
+
+        // 6. Direct RecordAttendanceAction::scan() call (on-time first scan -> present)
+        $action = app(RecordAttendanceAction::class);
+        $directClockIn = $action->scan([
+            'employee_attendance_code' => $employeeB->employee_attendance_code,
+            'scanned_at' => '2026-11-22 08:00:00',
+        ]);
+        expect($directClockIn->employee_id)->toBe($employeeB->id)
+            ->and($directClockIn->status)->toBe(AttendanceStatusEnum::PRESENT)
+            ->and($directClockIn->clock_out_at)->toBeNull();
+
+        $directClockOut = $action->scan([
+            'employee_attendance_code' => $employeeB->employee_attendance_code,
+            'scanned_at' => '2026-11-22 17:00:00',
+        ]);
+        expect($directClockOut->id)->toBe($directClockIn->id)
+            ->and($directClockOut->clock_out_at)->not->toBeNull();
     });
 });

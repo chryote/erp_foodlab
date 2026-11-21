@@ -113,6 +113,12 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
         expect(\App\Models\EmployeeShiftAssignment::query()->count())->toBe($firstCounts['employee_shift_assignments']);
         expect(\App\Models\EmployeeAttendance::query()->count())->toBe($firstCounts['employee_attendances']);
         expect(\App\Models\LabSample::query()->count())->toBe($firstCounts['lab_samples']);
+
+        $nadia = \App\Models\Employee::query()->with('employeePosition')->where('nik_ktp', '3273011504960001')->firstOrFail();
+        $budi = \App\Models\Employee::query()->with('employeePosition')->where('nik_ktp', '3273012208920002')->firstOrFail();
+
+        expect($nadia->employee_attendance_code)->toBe('NadiaSTAFFA'.$nadia->id);
+        expect($budi->employee_attendance_code)->toBe('BudiSTAFFB'.$budi->id);
     });
 
     it('verifies all registered GET API endpoints return 200 OK with CORS headers after seeding', function () {

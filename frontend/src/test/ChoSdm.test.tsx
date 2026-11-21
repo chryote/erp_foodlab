@@ -131,6 +131,7 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
         employment_status_id: 20,
         payroll_grade_id: 30,
         tax_status_id: 40,
+        employee_attendance_code: 'NadiaAnalisKimia101',
         name: 'Nadia Putri',
         nik_ktp: '3273011504960001',
         religion: 'islam',
@@ -153,6 +154,7 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
       {
         id: 102,
         company_id: 2,
+        employee_attendance_code: 'Andi102',
         name: 'Andi Wijaya',
         nik_ktp: '3171010101880003',
         religion: 'katolik',
@@ -267,12 +269,16 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
       url: 'http://localhost:8000/storage/employees/documents/ktp/uploaded-ktp.pdf',
     });
     vi.mocked(apiClient.createEmployee).mockImplementation(async (payload) => {
+      const pos =
+        positionsStore.find((p) => p.id === payload.employee_position_id) ?? null;
+      const firstWord = (payload.name.trim().split(/\s+/)[0] ?? '').replace(/[^A-Za-z0-9]/g, '');
+      const posClean = (pos?.name ?? '').replace(/[^A-Za-z0-9]/g, '');
       const created: apiClient.Employee = {
         id: 103,
         ...payload,
+        employee_attendance_code: `${firstWord}${posClean}103`,
         company: companiesStore.find((c) => c.id === payload.company_id) ?? null,
-        employee_position:
-          positionsStore.find((p) => p.id === payload.employee_position_id) ?? null,
+        employee_position: pos,
         employment_status:
           statusesStore.find((s) => s.id === payload.employment_status_id) ?? null,
         payroll_grade:
@@ -290,12 +296,16 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
       return { data: created };
     });
     vi.mocked(apiClient.updateEmployee).mockImplementation(async (id, payload) => {
+      const pos =
+        positionsStore.find((p) => p.id === payload.employee_position_id) ?? null;
+      const firstWord = (payload.name.trim().split(/\s+/)[0] ?? '').replace(/[^A-Za-z0-9]/g, '');
+      const posClean = (pos?.name ?? '').replace(/[^A-Za-z0-9]/g, '');
       const updated: apiClient.Employee = {
         id,
         ...payload,
+        employee_attendance_code: `${firstWord}${posClean}${id}`,
         company: companiesStore.find((c) => c.id === payload.company_id) ?? null,
-        employee_position:
-          positionsStore.find((p) => p.id === payload.employee_position_id) ?? null,
+        employee_position: pos,
         employment_status:
           statusesStore.find((s) => s.id === payload.employment_status_id) ?? null,
         payroll_grade:
@@ -688,6 +698,9 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
       expect(
         within(inputKaryawanModal).getByText('Budi Santoso')
       ).toBeInTheDocument();
+      expect(
+        within(inputKaryawanModal).getByText('BudiAnalisKimia103')
+      ).toBeInTheDocument();
     });
 
     // Edit Employee via DataTable row button
@@ -736,6 +749,9 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
     await waitFor(() => {
       expect(apiClient.fetchActiveCompanyEmployees).toHaveBeenCalled();
       expect(within(viewModal).getByText('Nadia Putri')).toBeInTheDocument();
+      expect(
+        within(viewModal).getByText('NadiaAnalisKimia101')
+      ).toBeInTheDocument();
       expect(
         within(viewModal).queryByText('Andi Wijaya')
       ).not.toBeInTheDocument();

@@ -75,6 +75,15 @@ export const ViewKaryawanModal: React.FC<ViewKaryawanModalProps> = ({
         ),
       },
       {
+        key: 'employee_attendance_code',
+        label: 'Kode Absensi',
+        renderValue: (row) => (
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-foreground">
+            {row.employee_attendance_code ?? '-'}
+          </code>
+        ),
+      },
+      {
         key: 'employee_position_id',
         label: 'Jabatan',
         renderValue: (row) => row.employee_position?.name ?? '-',
@@ -211,6 +220,10 @@ export const ViewKaryawanModal: React.FC<ViewKaryawanModalProps> = ({
 
             <div className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-muted/25 p-4">
               {[
+                [
+                  'Kode Absensi (Barcode)',
+                  selectedEmployee.employee_attendance_code ?? '-',
+                ],
                 ['NIK KTP', selectedEmployee.nik_ktp ?? '-'],
                 ['Nama Panggilan', selectedEmployee.nickname ?? '-'],
                 [

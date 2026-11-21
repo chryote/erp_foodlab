@@ -22,6 +22,7 @@ Route::prefix('hr')->group(function () {
 
     Route::get('/employee-attendances', [EmployeeAttendanceController::class, 'index'])->name('api.modules.hr.employee-attendances.index');
     Route::post('/employee-attendances', [EmployeeAttendanceController::class, 'store'])->name('api.modules.hr.employee-attendances.store');
+    Route::post('/employee-attendances/scan', [EmployeeAttendanceController::class, 'scan'])->name('api.modules.hr.employee-attendances.scan');
     Route::get('/employee-attendances/{employeeAttendance}', [EmployeeAttendanceController::class, 'show'])->name('api.modules.hr.employee-attendances.show');
     Route::put('/employee-attendances/{employeeAttendance}', [EmployeeAttendanceController::class, 'update'])->name('api.modules.hr.employee-attendances.update');
     Route::patch('/employee-attendances/{employeeAttendance}', [EmployeeAttendanceController::class, 'update'])->name('api.modules.hr.employee-attendances.patch');

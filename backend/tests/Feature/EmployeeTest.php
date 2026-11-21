@@ -78,6 +78,7 @@ describe('Employee CHO module', function () {
                     'employment_status_id',
                     'payroll_grade_id',
                     'tax_status_id',
+                    'employee_attendance_code',
                     'name',
                     'email',
                     'phone',
@@ -130,8 +131,10 @@ describe('Employee CHO module', function () {
             ->assertJsonCount(2, 'data.documents');
 
         $budiId = $createRes->json('data.id');
+        expect($createRes->json('data.employee_attendance_code'))->toBe('BudiAnalisKimia'.$budiId);
         $budiModel = Employee::query()->with('documents')->findOrFail($budiId);
         expect($budiModel->gender)->toBe(JenisKelamin::LAKI_LAKI)
+            ->and($budiModel->employee_attendance_code)->toBe('BudiAnalisKimia'.$budiId)
             ->and($budiModel->religion)->toBe(Agama::ISLAM)
             ->and($budiModel->blood_type)->toBe(GolonganDarah::O)
             ->and($budiModel->documents)->toHaveCount(2)
@@ -200,8 +203,13 @@ describe('Employee CHO module', function () {
             ->assertOk()
             ->assertJsonCount(2, 'data');
 
-        // Search filter across name, nickname, nik_ktp, email, phone
-        foreach (['Andi Wijaya', 'Budi Jr', '3201010101900001', 'andi@foodlab.test', '081300001111'] as $term) {
+        $this->getJson('/api/v1/modules/cho/employees?filter[employee_attendance_code]='.urlencode('BudiAnalisKimia'.$budiId))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $budiId);
+
+        // Search filter across name, nickname, nik_ktp, employee_attendance_code, email, phone
+        foreach (['Andi Wijaya', 'Budi Jr', '3201010101900001', 'BudiAnalisKimia'.$budiId, 'andi@foodlab.test', '081300001111'] as $term) {
             $this->getJson('/api/v1/modules/cho/employees?filter[search]='.urlencode($term))
                 ->assertOk()
                 ->assertJsonCount(1, 'data');
@@ -684,5 +692,91 @@ describe('Employee CHO module', function () {
             'tax_status_id' => $taxA->id,
             'email' => 'reborn@foodlab.test',
         ])->assertCreated();
+    });
+
+    it('auto-generates and updates employee_attendance_code barcode payload across create, update, and position rename', function () {
+        $company = Company::factory()->create();
+        $positionA = EmployeePosition::factory()->create([
+            'company_id' => $company->id,
+            'name' => 'QA / QC - Lab #1',
+        ]);
+        $positionB = EmployeePosition::factory()->create([
+            'company_id' => $company->id,
+            'name' => 'R&D (Senior)',
+        ]);
+        $status = EmploymentStatus::factory()->create(['company_id' => $company->id]);
+        $grade = PayrollGrade::factory()->create(['company_id' => $company->id]);
+        $taxStatus = TaxStatus::factory()->create(['company_id' => $company->id]);
+
+        // Create via API with hyphenated/symbol first token and symbol-heavy position name
+        $createRes = $this->postJson('/api/v1/modules/cho/employees', [
+            'company_id' => $company->id,
+            'employee_position_id' => $positionA->id,
+            'employment_status_id' => $status->id,
+            'payroll_grade_id' => $grade->id,
+            'tax_status_id' => $taxStatus->id,
+            'name' => 'Siti-Nurhaliza Putri, S.Si.',
+            'email' => 'siti@foodlab.test',
+            'phone' => '081234567890',
+            'photo_url' => 'https://cdn.foodlab.test/photos/siti.jpg',
+            'nik_ktp' => '3201010101900111',
+            'nickname' => 'Siti',
+            'birth_place' => 'Bandung',
+            'birth_date' => '1994-03-10',
+            'gender' => JenisKelamin::PEREMPUAN->value,
+            'religion' => Agama::ISLAM->value,
+            'blood_type' => GolonganDarah::A->value,
+            'mother_name' => 'Aminah',
+            'ktp_address' => 'Jl. Merdeka No. 1',
+            'domicile_address' => 'Jl. Merdeka No. 1',
+            'whatsapp_number' => '081234567890',
+            'emergency_phone_number' => '081299998888',
+            'instagram' => '@siti',
+            'tiktok' => '@sititt',
+            'bpjs_ketenagakerjaan' => '11223344556',
+            'bpjs_kesehatan' => '0001122334455',
+            'npwp_number' => '123456789012345',
+            'documents' => [
+                [
+                    'document_type' => JenisDokumen::KTP->value,
+                    'file_url' => 'https://cdn.foodlab.test/docs/siti-ktp.pdf',
+                ],
+            ],
+        ])->assertCreated();
+
+        $employeeId = $createRes->json('data.id');
+        expect($createRes->json('data.employee_attendance_code'))
+            ->toBe('SitiNurhalizaQAQCLab1'.$employeeId);
+
+        // PATCH updating employee name regenerates employee_attendance_code
+        $this->patchJson("/api/v1/modules/cho/employees/{$employeeId}", [
+            'name' => 'Rahmat Hidayat',
+        ])->assertOk()
+            ->assertJsonPath('data.employee_attendance_code', 'RahmatQAQCLab1'.$employeeId);
+
+        // PATCH changing employee_position_id regenerates employee_attendance_code
+        $this->patchJson("/api/v1/modules/cho/employees/{$employeeId}", [
+            'employee_position_id' => $positionB->id,
+        ])->assertOk()
+            ->assertJsonPath('data.employee_attendance_code', 'RahmatRDSenior'.$employeeId);
+
+        // Renaming EmployeePosition updates linked employees' employee_attendance_code
+        $this->putJson("/api/v1/modules/cho/employee-positions/{$positionB->id}", [
+            'company_id' => $company->id,
+            'name' => 'Lead Chem!',
+        ])->assertOk();
+
+        $this->getJson("/api/v1/modules/cho/employees/{$employeeId}")
+            ->assertOk()
+            ->assertJsonPath('data.employee_attendance_code', 'RahmatLeadChem'.$employeeId);
+
+        // Employee without position omits position part cleanly
+        $noPositionEmployee = Employee::factory()->create([
+            'company_id' => $company->id,
+            'employee_position_id' => null,
+            'name' => 'Andi.Pratama Wijaya',
+        ]);
+        expect($noPositionEmployee->employee_attendance_code)
+            ->toBe('AndiPratama'.$noPositionEmployee->id);
     });
 });

@@ -33,6 +33,29 @@ class SaveEmployeeAttendanceRequest extends FormRequest
             }
         }
 
+        if ($this->has('employee_attendance_code') && is_string($this->input('employee_attendance_code'))) {
+            $trimmedCode = trim($this->input('employee_attendance_code'));
+            $normalized['employee_attendance_code'] = $trimmedCode === '' ? null : $trimmedCode;
+
+            if ($trimmedCode !== '' && ! $this->filled('employee_id')) {
+                $employee = Employee::query()
+                    ->where('employee_attendance_code', $trimmedCode)
+                    ->when(
+                        $this->filled('company_id'),
+                        fn ($query) => $query->where('company_id', (int) $this->input('company_id'))
+                    )
+                    ->first(['id', 'company_id']);
+
+                if ($employee !== null) {
+                    $normalized['employee_id'] = $employee->id;
+
+                    if (! $this->filled('company_id')) {
+                        $normalized['company_id'] = $employee->company_id;
+                    }
+                }
+            }
+        }
+
         if ($normalized !== []) {
             $this->merge($normalized);
         }
@@ -49,18 +72,30 @@ class SaveEmployeeAttendanceRequest extends FormRequest
             ? (int) $this->input('company_id')
             : ($attendance instanceof EmployeeAttendance ? (int) $attendance->company_id : 0);
 
+        $codeExistsRule = Rule::exists('employees', 'employee_attendance_code')->whereNull('deleted_at');
+        if ($this->filled('company_id')) {
+            $codeExistsRule->where('company_id', $companyId);
+        }
+
         return [
             'company_id' => [
-                ...$presence,
+                ...($this->isMethod('PATCH') ? ['sometimes', 'required'] : ['required_without:employee_attendance_code']),
                 'integer',
                 Rule::exists('companies', 'id')->whereNull('deleted_at'),
             ],
             'employee_id' => [
-                ...$presence,
+                ...($this->isMethod('PATCH') ? ['sometimes', 'required'] : ['required_without:employee_attendance_code']),
                 'integer',
                 Rule::exists('employees', 'id')
                     ->whereNull('deleted_at')
                     ->where('company_id', $companyId),
+            ],
+            'employee_attendance_code' => [
+                'sometimes',
+                'nullable',
+                'string',
+                'max:255',
+                $codeExistsRule,
             ],
             'employee_shift_id' => [
                 'sometimes',
@@ -191,6 +226,7 @@ class SaveEmployeeAttendanceRequest extends FormRequest
     public function payload(): array
     {
         $validated = $this->validated();
+        unset($validated['employee_attendance_code']);
         $isPatch = $this->isMethod('PATCH');
 
         foreach (['company_id', 'employee_id'] as $intFk) {

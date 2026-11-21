@@ -321,6 +321,7 @@ class DatabaseSeeder extends Seeder
             $employee->company_id = $company->id;
             $employee->deleted_at = null;
             $employee->save();
+            $employee->syncAttendanceCode();
 
             EmployeeDocument::query()->updateOrCreate(
                 [
