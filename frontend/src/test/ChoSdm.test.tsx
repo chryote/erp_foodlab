@@ -469,6 +469,17 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
       ).toBeInTheDocument();
     });
 
+    // Clicking Tambah Dokumen adds a second document row (next unused JenisDokumen)
+    expect(
+      screen.queryByTestId('employee-document-row-1')
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('add-employee-document-btn'));
+    const secondDocRow = await screen.findByTestId('employee-document-row-1');
+    expect(secondDocRow).toBeInTheDocument();
+    fireEvent.change(within(secondDocRow).getByLabelText('URL Dokumen'), {
+      target: { value: 'https://cdn.foodlab.test/docs/kk-budi.pdf' },
+    });
+
     fireEvent.click(
       within(inputKaryawanModal).getByRole('button', { name: 'Tambah' })
     );
@@ -486,6 +497,10 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
               document_type: 'ktp',
               file_url:
                 'http://localhost:8000/storage/employees/documents/ktp/uploaded-ktp.pdf',
+            },
+            {
+              document_type: 'kk',
+              file_url: 'https://cdn.foodlab.test/docs/kk-budi.pdf',
             },
           ],
         })

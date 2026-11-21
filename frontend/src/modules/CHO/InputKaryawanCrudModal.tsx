@@ -5,6 +5,7 @@ import type {
   EmployeeDocumentInput,
   EmployeePayload,
 } from '@/api/client';
+import { resolveDocumentUrl } from '@/lib/utils';
 import {
   Badge,
   Button,
@@ -182,9 +183,11 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
   const [form, setForm] = useState<EmployeeFormState>(() =>
     createEmptyEmployeeForm(defaultCompanyId)
   );
-  const [documents, setDocuments] = useState<EmployeeDocumentInput[]>([]);
-  const [docTypeInput, setDocTypeInput] = useState<string>('ktp');
-  const [docUrlInput, setDocUrlInput] = useState<string>('');
+  const [nextDocRowId, setNextDocRowId] = useState<number>(2);
+  const [documentRows, setDocumentRows] = useState<
+    Array<EmployeeDocumentInput & { rowId: number }>
+  >(() => [{ rowId: 1, document_type: 'ktp', file_url: '' }]);
+  const [uploadingRowId, setUploadingRowId] = useState<number | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pendingAction, setPendingAction] =
@@ -192,12 +195,29 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
 
   const pageSize = 5;
 
+  const createDefaultDocRow = (
+    rowId: number,
+    usedTypes: Set<string>
+  ): EmployeeDocumentInput & { rowId: number } => {
+    const nextType =
+      enums.jenis_dokumen.find((opt) => !usedTypes.has(opt.value))?.value ??
+      enums.jenis_dokumen[0]?.value ??
+      'ktp';
+    return { rowId, document_type: nextType, file_url: '' };
+  };
+
   useEffect(() => {
     if (isOpen) {
       setForm(createEmptyEmployeeForm(defaultCompanyId));
-      setDocuments([]);
-      setDocTypeInput(enums.jenis_dokumen[0]?.value ?? 'ktp');
-      setDocUrlInput('');
+      setDocumentRows([
+        {
+          rowId: 1,
+          document_type: enums.jenis_dokumen[0]?.value ?? 'ktp',
+          file_url: '',
+        },
+      ]);
+      setNextDocRowId(2);
+      setUploadingRowId(null);
       setEditingEmployee(null);
       setCurrentPage(1);
       setPendingAction(null);
@@ -276,14 +296,20 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
     () => new Map(enums.golongan_darah.map((item) => [item.value, item.nama])),
     [enums.golongan_darah]
   );
-  const documentLabelByValue = useMemo(
-    () => new Map(enums.jenis_dokumen.map((item) => [item.value, item.nama])),
+  const docTypeMetaByValue = useMemo(
+    () => new Map(enums.jenis_dokumen.map((item) => [item.value, item])),
     [enums.jenis_dokumen]
   );
 
-  const selectedDocTypeMeta = useMemo(
-    () => enums.jenis_dokumen.find((item) => item.value === docTypeInput),
-    [enums.jenis_dokumen, docTypeInput]
+  const filledDocuments = useMemo(
+    () =>
+      documentRows
+        .filter((d) => d.document_type && d.file_url.trim() !== '')
+        .map((d) => ({
+          document_type: d.document_type,
+          file_url: d.file_url.trim(),
+        })),
+    [documentRows]
   );
 
   const totalPages = Math.max(1, Math.ceil(allEmployees.length / pageSize));
@@ -324,45 +350,48 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
   };
 
   const handleDocumentFileChange = async (
+    rowId: number,
+    documentType: string,
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (!file || !docTypeInput) {
+    if (!file || !documentType) {
       return;
     }
-    const uploaded = await uploadDocument(file, docTypeInput);
-    if (uploaded?.url) {
-      upsertDocument(docTypeInput, uploaded.url);
-    }
-  };
-
-  const upsertDocument = (documentType: string, fileUrl: string) => {
-    const cleanUrl = fileUrl.trim();
-    if (!documentType || !cleanUrl) {
-      return;
-    }
-    setDocuments((prev) => {
-      const exists = prev.some((d) => d.document_type === documentType);
-      if (exists) {
-        return prev.map((d) =>
-          d.document_type === documentType ? { ...d, file_url: cleanUrl } : d
+    setUploadingRowId(rowId);
+    try {
+      const uploaded = await uploadDocument(file, documentType);
+      if (uploaded?.url) {
+        setDocumentRows((prev) =>
+          prev.map((row) =>
+            row.rowId === rowId ? { ...row, file_url: uploaded.url } : row
+          )
         );
       }
-      return [...prev, { document_type: documentType, file_url: cleanUrl }];
-    });
-  };
-
-  const handleAddDocumentUrl = () => {
-    if (!docTypeInput || !docUrlInput.trim()) {
-      return;
+    } finally {
+      setUploadingRowId(null);
     }
-    upsertDocument(docTypeInput, docUrlInput);
-    setDocUrlInput('');
   };
 
-  const handleRemoveDocument = (documentType: string) => {
-    setDocuments((prev) => prev.filter((d) => d.document_type !== documentType));
+  const handleAddDocumentRow = () => {
+    const usedTypes = new Set(documentRows.map((row) => row.document_type));
+    const newRow = createDefaultDocRow(nextDocRowId, usedTypes);
+    setNextDocRowId((prev) => prev + 1);
+    setDocumentRows((prev) => [...prev, newRow]);
+  };
+
+  const handleUpdateDocumentRow = (
+    rowId: number,
+    patch: Partial<EmployeeDocumentInput>
+  ) => {
+    setDocumentRows((prev) =>
+      prev.map((row) => (row.rowId === rowId ? { ...row, ...patch } : row))
+    );
+  };
+
+  const handleRemoveDocumentRow = (rowId: number) => {
+    setDocumentRows((prev) => prev.filter((row) => row.rowId !== rowId));
   };
 
   const buildPayload = (): EmployeePayload | null => {
@@ -399,8 +428,20 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
       bpjs_kesehatan: nullableTrimmed(form.bpjs_kesehatan),
       npwp_number: nullableTrimmed(form.npwp_number),
       photo_url: nullableTrimmed(form.photo_url),
-      documents,
+      documents: filledDocuments,
     };
+  };
+
+  const resetFormAndDocuments = () => {
+    setForm(createEmptyEmployeeForm(defaultCompanyId));
+    setDocumentRows([
+      {
+        rowId: nextDocRowId,
+        document_type: enums.jenis_dokumen[0]?.value ?? 'ktp',
+        file_url: '',
+      },
+    ]);
+    setNextDocRowId((prev) => prev + 1);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -430,23 +471,20 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
     if (action.type === 'create') {
       const created = await createEmployee(action.payload);
       if (created) {
-        setForm(createEmptyEmployeeForm(defaultCompanyId));
-        setDocuments([]);
+        resetFormAndDocuments();
         setCurrentPage(1);
       }
     } else if (action.type === 'update') {
       const updated = await updateEmployee(action.id, action.payload);
       if (updated) {
         setEditingEmployee(null);
-        setForm(createEmptyEmployeeForm(defaultCompanyId));
-        setDocuments([]);
+        resetFormAndDocuments();
       }
     } else if (action.type === 'delete') {
       const removed = await removeEmployee(action.id);
       if (removed && editingEmployee?.id === action.id) {
         setEditingEmployee(null);
-        setForm(createEmptyEmployeeForm(defaultCompanyId));
-        setDocuments([]);
+        resetFormAndDocuments();
       }
     }
   };
@@ -455,19 +493,33 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
     clearError();
     setEditingEmployee(employee);
     setForm(employeeToFormState(employee));
-    setDocuments(
-      (employee.documents ?? []).map((doc) => ({
-        document_type: doc.document_type,
-        file_url: doc.file_url,
-      }))
-    );
+    const existingDocs = employee.documents ?? [];
+    if (existingDocs.length > 0) {
+      const baseId = nextDocRowId;
+      setDocumentRows(
+        existingDocs.map((doc, idx) => ({
+          rowId: baseId + idx,
+          document_type: doc.document_type,
+          file_url: doc.file_url,
+        }))
+      );
+      setNextDocRowId(baseId + existingDocs.length);
+    } else {
+      setDocumentRows([
+        {
+          rowId: nextDocRowId,
+          document_type: enums.jenis_dokumen[0]?.value ?? 'ktp',
+          file_url: '',
+        },
+      ]);
+      setNextDocRowId((prev) => prev + 1);
+    }
   };
 
   const handleCancelEdit = () => {
     clearError();
     setEditingEmployee(null);
-    setForm(createEmptyEmployeeForm(defaultCompanyId));
-    setDocuments([]);
+    resetFormAndDocuments();
   };
 
   const columns: DataTableColumn<Employee>[] = [
@@ -603,7 +655,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
       <Modal
         isOpen={isOpen}
         title="Input Karyawan"
-        subtitle="Kelola data karyawan, enum agama & golongan darah, serta unggah dokumen via DocumentService"
+        subtitle="Kelola data karyawan, enum agama & golongan darah, serta unggah dokumen"
         testId="input-karyawan-crud-modal"
         maxWidthClass="max-w-6xl"
         onClose={onClose}
@@ -837,22 +889,34 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                 value={form.photo_url}
                 onChange={(e) => handleFieldChange('photo_url', e.target.value)}
               />
-              <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-primary hover:underline">
-                <input
-                  type="file"
-                  accept=".jpg,.jpeg,.png"
-                  aria-label="Unggah Pas Foto"
-                  data-testid="employee-photo-file-input"
-                  className="hidden"
-                  disabled={uploadingDocument}
-                  onChange={(e) => void handlePhotoFileChange(e)}
-                />
-                <span>
-                  {uploadingDocument
-                    ? 'Mengunggah foto...'
-                    : 'Unggah Pas Foto (.jpg/.png)'}
-                </span>
-              </label>
+              <div className="flex items-center justify-between gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-primary hover:underline">
+                  <input
+                    type="file"
+                    accept=".jpg,.jpeg,.png"
+                    aria-label="Unggah Pas Foto"
+                    data-testid="employee-photo-file-input"
+                    className="hidden"
+                    disabled={uploadingDocument}
+                    onChange={(e) => void handlePhotoFileChange(e)}
+                  />
+                  <span>
+                    {uploadingDocument
+                      ? 'Mengunggah foto...'
+                      : 'Unggah Pas Foto (.jpg/.png)'}
+                  </span>
+                </label>
+                {form.photo_url.trim() !== '' && (
+                  <a
+                    href={resolveDocumentUrl(form.photo_url)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-medium text-primary hover:underline"
+                  >
+                    Lihat
+                  </a>
+                )}
+              </div>
             </div>
           </div>
 
@@ -881,102 +945,151 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
             className="rounded-xl border border-border bg-muted/30 p-3.5"
             data-testid="employee-documents-section"
           >
-            <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
                   Dokumen Karyawan (EmployeeDocument)
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  Unggah dokumen melalui DocumentService (
-                  {selectedDocTypeMeta?.allowed_formats.join(', ') ??
-                    '.pdf, .jpg, .png'}
-                  ) atau masukkan URL dokumen.
+                  Unggah berkas melalui DocumentService atau masukkan URL, lalu
+                  klik Tambah Dokumen untuk menambah baris dokumen.
                 </p>
               </div>
-              <Badge variant="neutral">{documents.length} dokumen terlampir</Badge>
-            </div>
-
-            <div className="grid grid-cols-1 items-end gap-2.5 sm:grid-cols-4">
-              <SelectInput
-                id="employee-document-type-input"
-                label="Jenis Dokumen"
-                options={enums.jenis_dokumen.map((opt) => ({
-                  value: opt.value,
-                  label: opt.nama,
-                }))}
-                value={docTypeInput}
-                onChange={(e) => setDocTypeInput(e.target.value)}
-              />
-              <TextInput
-                id="employee-document-url-input"
-                label="URL Dokumen"
-                placeholder="https://... atau unggah berkas"
-                value={docUrlInput}
-                onChange={(e) => setDocUrlInput(e.target.value)}
-              />
-              <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-foreground">
-                  Unggah Berkas
-                </span>
-                <label className="flex h-9 cursor-pointer items-center justify-center rounded-lg border border-dashed border-primary/50 bg-card px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/5">
-                  <input
-                    type="file"
-                    accept={
-                      selectedDocTypeMeta?.allowed_formats.join(',') ??
-                      '.pdf,.jpg,.jpeg,.png,.doc,.docx'
-                    }
-                    aria-label="Unggah Berkas Dokumen"
-                    data-testid="employee-document-file-input"
-                    className="hidden"
-                    disabled={uploadingDocument}
-                    onChange={(e) => void handleDocumentFileChange(e)}
-                  />
-                  {uploadingDocument ? 'Mengunggah...' : 'Pilih & Unggah File'}
-                </label>
+              <div className="flex items-center gap-2">
+                <Badge variant="neutral">
+                  {filledDocuments.length} dokumen terlampir
+                </Badge>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  data-testid="add-employee-document-btn"
+                  disabled={documentRows.length >= enums.jenis_dokumen.length}
+                  onClick={handleAddDocumentRow}
+                >
+                  + Tambah Dokumen
+                </Button>
               </div>
-              <Button
-                type="button"
-                variant="secondary"
-                data-testid="add-employee-document-btn"
-                onClick={handleAddDocumentUrl}
-              >
-                Tambah Dokumen
-              </Button>
             </div>
 
-            {documents.length > 0 && (
-              <ul
-                className="mt-3 flex flex-wrap gap-2"
+            {documentRows.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-border bg-card px-3 py-3 text-center text-xs text-muted-foreground">
+                Belum ada baris dokumen. Klik &ldquo;+ Tambah Dokumen&rdquo;
+                untuk menambahkan dokumen.
+              </p>
+            ) : (
+              <div
+                className="flex flex-col gap-2.5"
                 data-testid="employee-documents-list"
               >
-                {documents.map((doc) => (
-                  <li
-                    key={doc.document_type}
-                    className="flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs"
-                  >
-                    <Badge variant="ok">
-                      {documentLabelByValue.get(doc.document_type) ??
-                        doc.document_type}
-                    </Badge>
-                    <a
-                      href={doc.file_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="max-w-[200px] truncate text-primary hover:underline"
+                {documentRows.map((docRow, index) => {
+                  const rowDocMeta = docTypeMetaByValue.get(
+                    docRow.document_type
+                  );
+                  const usedByOtherRows = new Set(
+                    documentRows
+                      .filter((r) => r.rowId !== docRow.rowId)
+                      .map((r) => r.document_type)
+                  );
+                  const rowOptions = enums.jenis_dokumen
+                    .filter(
+                      (opt) =>
+                        opt.value === docRow.document_type ||
+                        !usedByOtherRows.has(opt.value)
+                    )
+                    .map((opt) => ({
+                      value: opt.value,
+                      label: opt.nama,
+                    }));
+                  const isRowUploading =
+                    uploadingDocument && uploadingRowId === docRow.rowId;
+
+                  return (
+                    <div
+                      key={docRow.rowId}
+                      data-testid={`employee-document-row-${index}`}
+                      className="grid grid-cols-1 items-end gap-2.5 rounded-lg border border-border bg-card p-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)_auto]"
                     >
-                      {doc.file_url}
-                    </a>
-                    <button
-                      type="button"
-                      aria-label={`Hapus dokumen ${doc.document_type}`}
-                      onClick={() => handleRemoveDocument(doc.document_type)}
-                      className="cursor-pointer font-semibold text-muted-foreground hover:text-red-600"
-                    >
-                      ×
-                    </button>
-                  </li>
-                ))}
-              </ul>
+                      <SelectInput
+                        id={`employee-document-type-input-${docRow.rowId}`}
+                        label="Jenis Dokumen"
+                        options={rowOptions}
+                        value={docRow.document_type}
+                        onChange={(e) =>
+                          handleUpdateDocumentRow(docRow.rowId, {
+                            document_type: e.target.value,
+                          })
+                        }
+                      />
+                      <TextInput
+                        id={`employee-document-url-input-${docRow.rowId}`}
+                        label="URL Dokumen"
+                        placeholder="https://... atau unggah berkas"
+                        value={docRow.file_url}
+                        onChange={(e) =>
+                          handleUpdateDocumentRow(docRow.rowId, {
+                            file_url: e.target.value,
+                          })
+                        }
+                      />
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-xs font-medium text-foreground">
+                          Unggah Berkas (
+                          {rowDocMeta?.allowed_formats.join(', ') ??
+                            '.pdf, .jpg, .png'}
+                          )
+                        </span>
+                        <label className="flex h-9 cursor-pointer items-center justify-center rounded-lg border border-dashed border-primary/50 bg-background px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/5">
+                          <input
+                            type="file"
+                            accept={
+                              rowDocMeta?.allowed_formats.join(',') ??
+                              '.pdf,.jpg,.jpeg,.png,.doc,.docx'
+                            }
+                            aria-label={`Unggah Berkas Dokumen ${rowDocMeta?.nama ?? index + 1}`}
+                            data-testid={
+                              index === 0
+                                ? 'employee-document-file-input'
+                                : `employee-document-file-input-${index}`
+                            }
+                            className="hidden"
+                            disabled={uploadingDocument}
+                            onChange={(e) =>
+                              void handleDocumentFileChange(
+                                docRow.rowId,
+                                docRow.document_type,
+                                e
+                              )
+                            }
+                          />
+                          {isRowUploading
+                            ? 'Mengunggah...'
+                            : 'Pilih & Unggah File'}
+                        </label>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {docRow.file_url.trim() !== '' && (
+                          <a
+                            href={resolveDocumentUrl(docRow.file_url)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex h-9 items-center rounded-lg border border-border px-2.5 text-xs font-medium text-primary hover:bg-muted"
+                          >
+                            Lihat
+                          </a>
+                        )}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          data-testid={`remove-employee-document-row-${index}`}
+                          onClick={() => handleRemoveDocumentRow(docRow.rowId)}
+                        >
+                          Hapus
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
 

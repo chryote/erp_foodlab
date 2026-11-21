@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { Company, Employee } from '@/api/client';
+import { resolveDocumentUrl } from '@/lib/utils';
 import {
   Badge,
   type CrudComputedColumnConfig,
@@ -191,7 +192,7 @@ export const ViewKaryawanModal: React.FC<ViewKaryawanModalProps> = ({
             {selectedEmployee.photo_url && (
               <div className="flex items-center gap-4 rounded-xl border border-border bg-muted/30 p-3">
                 <img
-                  src={selectedEmployee.photo_url}
+                  src={resolveDocumentUrl(selectedEmployee.photo_url)}
                   alt={selectedEmployee.name}
                   className="size-16 rounded-lg border border-border object-cover"
                 />
@@ -324,7 +325,7 @@ export const ViewKaryawanModal: React.FC<ViewKaryawanModalProps> = ({
                           doc.document_type}
                       </Badge>
                       <a
-                        href={doc.file_url}
+                        href={resolveDocumentUrl(doc.file_url)}
                         target="_blank"
                         rel="noreferrer"
                         className="text-primary hover:underline"

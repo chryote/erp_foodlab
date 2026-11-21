@@ -25,6 +25,10 @@ export default defineConfig({
         target: apiProxyTarget,
         changeOrigin: true,
       },
+      '/storage': {
+        target: apiProxyTarget,
+        changeOrigin: true,
+      },
     },
   },
   preview: {
@@ -32,6 +36,10 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
+        target: apiProxyTarget,
+        changeOrigin: true,
+      },
+      '/storage': {
         target: apiProxyTarget,
         changeOrigin: true,
       },
