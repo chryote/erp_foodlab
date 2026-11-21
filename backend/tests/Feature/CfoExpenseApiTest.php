@@ -227,4 +227,41 @@ describe('CFO Expense Category, Type, and Item CRUD scoped by company_id', funct
         $this->assertNotSoftDeleted('expense_types', ['id' => $type->id]);
         $this->assertNotSoftDeleted('expense_categories', ['id' => $category->id]);
     });
+
+    it('rejects duplicate active expense categories and types within the same scope and allows reuse after soft-delete', function () {
+        $company = Company::factory()->create();
+
+        $cat = $this->postJson('/api/v1/modules/cfo/expense-categories', [
+            'company_id' => $company->id,
+            'name' => '  Bahan   Baku ',
+        ])->assertCreated()
+            ->assertJsonPath('data.name', 'Bahan Baku');
+
+        $catId = $cat->json('data.id');
+
+        $this->postJson('/api/v1/modules/cfo/expense-categories', [
+            'company_id' => $company->id,
+            'name' => 'bahan baku',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
+
+        $type = $this->postJson('/api/v1/modules/cfo/expense-types', [
+            'company_id' => $company->id,
+            'expense_category_id' => $catId,
+            'name' => 'Reagen Cair',
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/modules/cfo/expense-types', [
+            'company_id' => $company->id,
+            'expense_category_id' => $catId,
+            'name' => '  reagen   cair ',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
+
+        // Soft-delete frees names for reuse
+        $this->deleteJson('/api/v1/modules/cfo/expense-types/'.$type->json('data.id'))->assertOk();
+        $this->postJson('/api/v1/modules/cfo/expense-types', [
+            'company_id' => $company->id,
+            'expense_category_id' => $catId,
+            'name' => 'Reagen Cair',
+        ])->assertCreated();
+    });
 });

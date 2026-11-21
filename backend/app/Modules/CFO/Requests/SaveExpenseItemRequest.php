@@ -4,6 +4,7 @@ namespace App\Modules\CFO\Requests;
 
 use App\Models\ExpenseItem;
 use App\Models\ExpenseType;
+use App\Support\InputNormalizer;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -13,6 +14,23 @@ class SaveExpenseItemRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $normalized = [];
+
+        if ($this->has('name') && is_string($this->input('name'))) {
+            $normalized['name'] = InputNormalizer::text($this->input('name'));
+        }
+
+        if ($this->has('detail') && is_string($this->input('detail'))) {
+            $normalized['detail'] = InputNormalizer::nullableText($this->input('detail'));
+        }
+
+        if ($normalized !== []) {
+            $this->merge($normalized);
+        }
     }
 
     /**
@@ -125,7 +143,13 @@ class SaveExpenseItemRequest extends FormRequest
         }
 
         if (array_key_exists('name', $validated)) {
-            $validated['name'] = (string) $validated['name'];
+            $validated['name'] = InputNormalizer::text((string) $validated['name']);
+        }
+
+        if (array_key_exists('detail', $validated)) {
+            $validated['detail'] = $validated['detail'] !== null
+                ? InputNormalizer::nullableText((string) $validated['detail'])
+                : null;
         }
 
         if (array_key_exists('amount', $validated)) {

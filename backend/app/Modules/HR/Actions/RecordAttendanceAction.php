@@ -40,6 +40,30 @@ class RecordAttendanceAction
 
             unset($attributes['employee_attendance_code']);
 
+            $effectiveCompanyId = (int) ($attributes['company_id'] ?? $locked?->company_id ?? 0);
+            $effectiveEmployeeId = (int) ($attributes['employee_id'] ?? $locked?->employee_id ?? 0);
+            $effectiveDateRaw = $attributes['attendance_date'] ?? $locked?->attendance_date;
+            $effectiveDate = $effectiveDateRaw !== null
+                ? CarbonImmutable::parse($effectiveDateRaw)->format('Y-m-d')
+                : null;
+
+            if ($effectiveCompanyId > 0 && $effectiveEmployeeId > 0 && $effectiveDate !== null) {
+                $duplicate = EmployeeAttendance::query()
+                    ->whereNull('deleted_at')
+                    ->where('company_id', $effectiveCompanyId)
+                    ->where('employee_id', $effectiveEmployeeId)
+                    ->whereDate('attendance_date', $effectiveDate)
+                    ->when($locked !== null, fn ($query) => $query->whereKeyNot($locked->getKey()))
+                    ->sharedLock()
+                    ->exists();
+
+                if ($duplicate) {
+                    throw ValidationException::withMessages([
+                        'attendance_date' => ['An active attendance record already exists for this employee on the specified date.'],
+                    ]);
+                }
+            }
+
             $payload = $this->withComputedMetrics($attributes, $locked);
 
             if ($locked !== null) {

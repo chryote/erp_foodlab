@@ -146,4 +146,37 @@ describe('CFO CapitalCompany CRUD API (/api/v1/modules/cfo/capital-companies)', 
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['company_id', 'stakeholder_name', 'capital']);
     });
+
+    it('rejects duplicate active stakeholder_name per company and allows reuse across companies or after soft-delete', function () {
+        $companyA = Company::factory()->create();
+        $companyB = Company::factory()->create();
+
+        $first = $this->postJson('/api/v1/modules/cfo/capital-companies', [
+            'company_id' => $companyA->id,
+            'stakeholder_name' => '  Rian   Pratama ',
+            'capital' => 100000000,
+        ])->assertCreated()
+            ->assertJsonPath('data.stakeholder_name', 'Rian Pratama');
+
+        $this->postJson('/api/v1/modules/cfo/capital-companies', [
+            'company_id' => $companyA->id,
+            'stakeholder_name' => 'rian pratama',
+            'capital' => 50000000,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['stakeholder_name']);
+
+        // Same stakeholder in a different company is allowed
+        $this->postJson('/api/v1/modules/cfo/capital-companies', [
+            'company_id' => $companyB->id,
+            'stakeholder_name' => 'Rian Pratama',
+            'capital' => 75000000,
+        ])->assertCreated();
+
+        // Soft-delete allows re-adding same stakeholder in companyA
+        $this->deleteJson('/api/v1/modules/cfo/capital-companies/'.$first->json('data.id'))->assertOk();
+        $this->postJson('/api/v1/modules/cfo/capital-companies', [
+            'company_id' => $companyA->id,
+            'stakeholder_name' => 'Rian Pratama',
+            'capital' => 120000000,
+        ])->assertCreated();
+    });
 });

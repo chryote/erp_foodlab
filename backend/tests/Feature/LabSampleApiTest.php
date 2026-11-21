@@ -61,4 +61,33 @@ describe('LabSample API (/api/v1/samples)', function () {
         $response->assertUnprocessable()
             ->assertJsonValidationErrors(['batch_code', 'product_name', 'category', 'ph_level', 'moisture_percent']);
     });
+
+    it('rejects duplicate active batch_code (including case/whitespace variants) and allows reuse after soft-delete', function () {
+        $first = $this->postJson('/api/v1/samples', [
+            'batch_code' => '  FL-UNIQ-001  ',
+            'product_name' => 'Susu UHT',
+            'category' => 'Dairy',
+            'ph_level' => 6.6,
+            'moisture_percent' => 86.0,
+        ])->assertCreated()
+            ->assertJsonPath('data.batch_code', 'FL-UNIQ-001');
+
+        $this->postJson('/api/v1/samples', [
+            'batch_code' => 'fl-uniq-001',
+            'product_name' => 'Susu UHT 2',
+            'category' => 'Dairy',
+            'ph_level' => 6.5,
+            'moisture_percent' => 85.0,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['batch_code']);
+
+        LabSample::query()->findOrFail($first->json('data.id'))->delete();
+
+        $this->postJson('/api/v1/samples', [
+            'batch_code' => 'FL-UNIQ-001',
+            'product_name' => 'Susu UHT Reborn',
+            'category' => 'Dairy',
+            'ph_level' => 6.6,
+            'moisture_percent' => 86.0,
+        ])->assertCreated();
+    });
 });

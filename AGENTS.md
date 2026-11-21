@@ -12,6 +12,7 @@ Laravel 11 REST API (`/api/v1/*`) + React 18 (`@tanstack/react-query`) + Tailwin
    - Run `make schema-dump` (`docker compose exec app php artisan schema:dump`) after migration changes; if the app image lacks `mysqldump`, dump from the `mysql` service instead.
    - The dump is a generated MySQL snapshot for reading; Pest runs migrations against in-memory SQLite (keep migrations compatible with both SQLite and MySQL, e.g. `dropForeign(['col'])`).
    - Add composite `(company_id, deleted_at, ...)` and `(deleted_at, <sort_col>, id)` indexes matching `defaultSort` and frequent filters; never add standalone indexes on `created_at`, `updated_at`, `deleted_at`, or low-cardinality columns.
+   - For any soft-deletable table with natural unique keys (e.g. `companies(name, series)`, `capital_companies(company_id, stakeholder_name)`, `expense_categories(company_id, name)`, `expense_types(company_id, expense_category_id, name)`, CHO/HR `code`/`nik_ktp`), use a generated `active_flag` (`CASE WHEN deleted_at IS NULL THEN 1 ELSE NULL END`) in a composite `UNIQUE` index (never bare `deleted_at`) and hide `'active_flag'` in Model `$hidden`.
 3. **PHP Enums for Every Status:**
    - Store backed string enums in `backend/app/Enums/` (e.g., `LabSampleStatus`), cast on the Eloquent Model, and validate with `Rule::enum(...)` in `FormRequest`. Never use raw status strings or magic integers.
 4. **Standardized Filtering, Speed & Auto API Docs:**
@@ -21,14 +22,16 @@ Laravel 11 REST API (`/api/v1/*`) + React 18 (`@tanstack/react-query`) + Tailwin
    - Never run duplicate uncached aggregate queries (`SUM`/`COUNT`) on `index()` when an unpaginated collection is already fetched or cached.
    - `dedoc/scramble` auto-generates OpenAPI docs at `/docs/api` and `/docs/api.json` from `FormRequest` + `JsonResource`.
 5. **Non-Negotiable ERP Data Correctness & Safety Rules:**
-   - Wrap all writes in `DB::transaction(...)`, use `->lockForUpdate()` on updates/deletes and stock/balance changes, and re-verify active parents/uniqueness inside the transaction via `->whereNull('deleted_at')->sharedLock()` to close TOCTOU soft-delete races.
+   - Wrap all writes in `DB::transaction(...)`, use `->lockForUpdate()` on updates/deletes and stock/balance changes, and re-verify active parents/uniqueness inside the transaction via `->whereNull('deleted_at')->sharedLock()` (or `WriteGuard::assertUniqueActive()`) to close TOCTOU soft-delete races.
+   - Normalize text inputs via `App\Support\InputNormalizer` in `FormRequest::prepareForValidation()` and `payload()` (`trim` + collapse repeated whitespace) so padded strings cannot bypass uniqueness; check active uniqueness case-insensitively (`WriteGuard::existsCaseInsensitive()` / `Rule::unique(...)->whereNull('deleted_at')`) in `FormRequest::after()` (with partial `PATCH` fallback to route model values) AND inside `DB::transaction()`.
    - Support partial `PATCH` (`sometimes`) in `FormRequest` + `payload()` without corrupting derived fields (fall back to existing model values), enforce `decimal:0,2` + `max:` bounds (including derived totals in `after()`), and validate cross-field hierarchy/date rules (`type` belongs to `category`, `closing_date >= purchased_on`).
    - Block (`422`) reassigning `company_id` or parent FKs while active children exist.
+   - Support optional `Idempotency-Key` header on transactional `POST` endpoints via `EnforceIdempotencyKey` middleware, and render `UniqueConstraintViolationException` as `422` on `/api/*` so DB-level race collisions never return `500`.
    - Never hard-delete financial/operational records: use `SoftDeletes` and/or a void/cancelled enum status with `restrictOnDelete()` FKs (never `cascadeOnDelete()`). On parent soft-delete, reject (`422`) when referenced or soft-delete all dependent children consistently.
 6. **Feature & Guardrail Tests Over Manual Testing:**
-   - Write one Pest Feature Test per module/entity covering `GET` (filters/sorts/includes/`active_company`), `POST`, `PUT`, partial `PATCH`, `DELETE` (`assertSoftDeleted`), validation `422` (bounds, cross-field, cross-company), and `JsonResource` structure.
+   - Write one Pest Feature Test per module/entity covering `GET` (filters/sorts/includes/`active_company`), `POST`, `PUT`, partial `PATCH`, `DELETE` (`assertSoftDeleted`), validation `422` (bounds, cross-field, cross-company, active duplicates including case/whitespace variants, and re-create after soft delete), and `JsonResource` structure.
    - Start each test with `actingAsErpUser()` and `Cache::flush()` (lists are cached; stale cache causes flaky ordering).
-   - Enforce speed/correctness guardrails in `tests/Unit/ApiPatternGuardrailsTest.php` (zero-query warm cache, N+1 query-count bounds, `per_page` cap, schema & service pattern checks).
+   - Enforce speed/correctness guardrails in `tests/Unit/ApiPatternGuardrailsTest.php` (zero-query warm cache, N+1 query-count bounds, `per_page` cap, schema/model `active_flag` & `$hidden`, Request/Service anti-duplication, and `Idempotency-Key` checks).
    - Verify with `make test-filter FILTER=<Name>Test` and `make test-filter FILTER=ApiPatternGuardrailsTest`.
 7. **Spec-Driven Workflow:**
    - Implement new features from a concise spec (see `docs/SPEC_TEMPLATE.md`) in a fresh chat.

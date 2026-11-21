@@ -5,6 +5,8 @@ namespace App\Modules\CFO\Services;
 use App\Models\CapitalCompany;
 use App\Models\Company;
 use App\Support\IndexQuery;
+use App\Support\InputNormalizer;
+use App\Support\WriteGuard;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -75,8 +77,20 @@ class CapitalCompanyService
 
     public function createCapitalCompany(array $attributes): CapitalCompany
     {
+        $attributes['stakeholder_name'] = InputNormalizer::text((string) $attributes['stakeholder_name']) ?? '';
+
         $capitalCompany = DB::transaction(function () use ($attributes): CapitalCompany {
-            $this->assertActiveCompany((int) $attributes['company_id']);
+            $companyId = (int) $attributes['company_id'];
+            $this->assertActiveCompany($companyId);
+
+            WriteGuard::assertUniqueActive(
+                CapitalCompany::query(),
+                'stakeholder_name',
+                (string) $attributes['stakeholder_name'],
+                ['company_id' => $companyId],
+                'stakeholder_name',
+                'Pemegang saham dengan nama yang sama sudah terdaftar pada perusahaan ini.'
+            );
 
             return CapitalCompany::query()->create($attributes);
         });
@@ -88,10 +102,25 @@ class CapitalCompanyService
 
     public function updateCapitalCompany(CapitalCompany $capitalCompany, array $attributes): CapitalCompany
     {
+        if (array_key_exists('stakeholder_name', $attributes)) {
+            $attributes['stakeholder_name'] = InputNormalizer::text((string) $attributes['stakeholder_name']) ?? '';
+        }
+
         $updated = DB::transaction(function () use ($capitalCompany, $attributes): CapitalCompany {
             $locked = CapitalCompany::query()->lockForUpdate()->findOrFail($capitalCompany->getKey());
             $companyId = (int) ($attributes['company_id'] ?? $locked->company_id);
             $this->assertActiveCompany($companyId);
+
+            $targetStakeholder = (string) ($attributes['stakeholder_name'] ?? $locked->stakeholder_name);
+            WriteGuard::assertUniqueActive(
+                CapitalCompany::query(),
+                'stakeholder_name',
+                $targetStakeholder,
+                ['company_id' => $companyId],
+                'stakeholder_name',
+                'Pemegang saham dengan nama yang sama sudah terdaftar pada perusahaan ini.',
+                $locked->getKey()
+            );
 
             $locked->update($attributes);
 

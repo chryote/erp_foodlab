@@ -19,6 +19,10 @@ class ExpenseCategory extends Model
         'name',
     ];
 
+    protected $hidden = [
+        'active_flag',
+    ];
+
     protected $casts = [
         'company_id' => 'integer',
     ];

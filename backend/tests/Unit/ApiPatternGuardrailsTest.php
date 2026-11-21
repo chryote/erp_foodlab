@@ -8,21 +8,28 @@ use App\Models\Employee;
 use App\Models\EmployeeAttendance;
 use App\Models\EmployeeDocument;
 use App\Models\EmployeePosition;
+use App\Models\EmployeeShift;
+use App\Models\EmployeeShiftAssignment;
 use App\Models\EmploymentStatus;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseItem;
 use App\Models\ExpenseType;
+use App\Models\LabSample;
 use App\Models\PayrollGrade;
 use App\Models\TaxStatus;
 use App\Modules\CFO\Services\CompanyAssetService;
 use App\Modules\CFO\Services\CompanyService;
 use App\Modules\CHO\Services\EmployeeService;
+use App\Modules\HR\Actions\RecordAttendanceAction;
+use App\Modules\HR\Services\EmployeeShiftService;
 use App\Support\ActiveCompany;
 use App\Support\IndexQuery;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
 
@@ -471,5 +478,204 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
         $this->getJson('/api/v1/modules/cho/employee-positions?filter[search]=%20%20%20')
             ->assertOk()
             ->assertJsonCount(2, 'data');
+    });
+
+    it('enforces system-wide anti-duplication guardrails across schema, models, requests, services, and idempotency middleware', function () {
+        $schemaSql = File::get(database_path('schema/mysql-schema.sql'));
+
+        // 1. Any soft-deletable table in mysql-schema.sql with a UNIQUE KEY must use active_flag (never raw deleted_at)
+        preg_match_all('/CREATE TABLE `([^`]+)` \((.*?)\) ENGINE=/s', $schemaSql, $allTables, PREG_SET_ORDER);
+        expect($allTables)->not->toBeEmpty();
+
+        foreach ($allTables as $match) {
+            [, $tableName, $tableSql] = $match;
+            if (! str_contains($tableSql, '`deleted_at`')) {
+                continue;
+            }
+
+            preg_match_all('/UNIQUE KEY `[^`]+` \(([^)]+)\)/', $tableSql, $uniqueKeys);
+            foreach ($uniqueKeys[1] as $cols) {
+                expect(str_contains($cols, '`deleted_at`'))
+                    ->toBeFalse("Table {$tableName} must not put deleted_at in UNIQUE KEY ({$cols}); use active_flag.");
+                expect(str_contains($cols, '`active_flag`'))
+                    ->toBeTrue("Soft-deletable table {$tableName} UNIQUE KEY ({$cols}) must include active_flag.");
+            }
+        }
+
+        // 2. All natural-key soft-deletable tables must have active_flag + _active_unique, and models must hide active_flag
+        $uniqueEntityMap = [
+            'companies' => Company::class,
+            'capital_companies' => CapitalCompany::class,
+            'expense_categories' => ExpenseCategory::class,
+            'expense_types' => ExpenseType::class,
+            'lab_samples' => LabSample::class,
+            'employee_positions' => EmployeePosition::class,
+            'employment_statuses' => EmploymentStatus::class,
+            'payroll_grades' => PayrollGrade::class,
+            'tax_statuses' => TaxStatus::class,
+            'employees' => Employee::class,
+            'employee_documents' => EmployeeDocument::class,
+            'employee_shifts' => EmployeeShift::class,
+            'employee_shift_assignments' => EmployeeShiftAssignment::class,
+            'employee_attendances' => EmployeeAttendance::class,
+        ];
+
+        foreach ($uniqueEntityMap as $table => $modelClass) {
+            preg_match("/CREATE TABLE `{$table}` \\((.*?)\\) ENGINE=/s", $schemaSql, $matches);
+            expect($matches)->toHaveCount(2, "Table {$table} missing from mysql-schema.sql");
+            $tableSql = $matches[1];
+
+            expect($tableSql)
+                ->toContain('`active_flag`')
+                ->toContain('_active_unique`');
+
+            $model = new $modelClass();
+            expect(in_array('active_flag', $model->getHidden(), true))
+                ->toBeTrue("{$modelClass} must hide active_flag from serialization.");
+        }
+
+        // 3. Unique-entity FormRequests must normalize input and validate uniqueness
+        $uniqueRequests = [
+            'Modules/CFO/Requests/SaveCompanyRequest.php',
+            'Modules/CFO/Requests/SaveCapitalCompanyRequest.php',
+            'Modules/CFO/Requests/SaveExpenseCategoryRequest.php',
+            'Modules/CFO/Requests/SaveExpenseTypeRequest.php',
+            'Http/Requests/StoreLabSampleRequest.php',
+            'Modules/CHO/Requests/SaveEmployeePositionRequest.php',
+            'Modules/CHO/Requests/SaveEmploymentStatusRequest.php',
+            'Modules/CHO/Requests/SavePayrollGradeRequest.php',
+            'Modules/CHO/Requests/SaveTaxStatusRequest.php',
+            'Modules/CHO/Requests/SaveEmployeeRequest.php',
+            'Modules/HR/Requests/SaveEmployeeShiftRequest.php',
+            'Modules/HR/Requests/SaveEmployeeAttendanceRequest.php',
+        ];
+
+        foreach ($uniqueRequests as $requestPath) {
+            $code = File::get(app_path($requestPath));
+            expect(str_contains($code, 'prepareForValidation'))
+                ->toBeTrue("{$requestPath} must normalize inputs in prepareForValidation().");
+            $hasUniquenessCheck = str_contains($code, 'WriteGuard::')
+                || str_contains($code, 'Rule::unique')
+                || str_contains($code, 'duplicate');
+            expect($hasUniquenessCheck)->toBeTrue("{$requestPath} must validate active uniqueness.");
+        }
+
+        // 4. Corresponding Services/Actions must re-check active uniqueness inside DB::transaction with sharedLock
+        $lockedWriteGuards = [
+            'Modules/CFO/Services/CompanyService.php',
+            'Modules/CFO/Services/CapitalCompanyService.php',
+            'Modules/CFO/Services/ExpenseCategoryService.php',
+            'Modules/CFO/Services/ExpenseTypeService.php',
+            'Services/LabSampleService.php',
+            'Modules/CHO/Services/EmployeePositionService.php',
+            'Modules/CHO/Services/EmploymentStatusService.php',
+            'Modules/CHO/Services/PayrollGradeService.php',
+            'Modules/CHO/Services/TaxStatusService.php',
+            'Modules/CHO/Actions/AssertEmployeeContextAction.php',
+            'Modules/HR/Services/EmployeeShiftService.php',
+            'Modules/HR/Actions/RecordAttendanceAction.php',
+        ];
+
+        foreach ($lockedWriteGuards as $guardPath) {
+            $code = File::get(app_path($guardPath));
+            $hasTxUniqueLock = str_contains($code, 'WriteGuard::assertUniqueActive(')
+                || str_contains($code, '->sharedLock()');
+            expect($hasTxUniqueLock)->toBeTrue("{$guardPath} must verify active uniqueness with sharedLock inside DB::transaction.");
+        }
+
+        // 5. Runtime duplicate protection (exact, whitespace-padded, case-variant, DB unique key, and re-create after delete)
+        $companyRes = $this->postJson('/api/v1/modules/cfo/companies', [
+            'name' => '  PT.   Anti   Duplikat  ',
+            'series' => 1,
+        ])->assertCreated()
+            ->assertJsonPath('data.name', 'PT. Anti Duplikat')
+            ->assertJsonMissingPath('data.active_flag');
+
+        $companyId = $companyRes->json('data.id');
+
+        $this->postJson('/api/v1/modules/cfo/companies', [
+            'name' => 'pt. anti   duplikat',
+            'series' => 1,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
+
+        // Different series is allowed; partial PATCH colliding with existing (name, series) is blocked
+        $series2 = $this->postJson('/api/v1/modules/cfo/companies', [
+            'name' => 'PT. Anti Duplikat',
+            'series' => 2,
+        ])->assertCreated();
+
+        $this->patchJson('/api/v1/modules/cfo/companies/'.$series2->json('data.id'), [
+            'series' => 1,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
+
+        // Direct DB bypass hits active_flag unique index
+        expect(fn () => Company::factory()->create([
+            'name' => 'PT. Anti Duplikat',
+            'series' => 1,
+        ]))->toThrow(QueryException::class);
+
+        // Service-level sharedLock guards reject bypasses cleanly with ValidationException
+        expect(fn () => app(CompanyService::class)->createCompany([
+            'name' => 'PT. Anti Duplikat',
+            'series' => 1,
+        ]))->toThrow(ValidationException::class);
+
+        $shift = EmployeeShift::factory()->create([
+            'company_id' => $companyId,
+            'code' => 'SHF-DUP',
+        ]);
+        expect(fn () => app(EmployeeShiftService::class)->createEmployeeShift([
+            'company_id' => $companyId,
+            'code' => 'shf-dup',
+            'name' => 'Shift Bypass',
+            'start_time' => '08:00',
+            'end_time' => '17:00',
+        ]))->toThrow(ValidationException::class);
+        $shift->delete();
+
+        $employee = Employee::factory()->create(['company_id' => $companyId]);
+        EmployeeAttendance::factory()->create([
+            'company_id' => $companyId,
+            'employee_id' => $employee->id,
+            'attendance_date' => '2026-11-21',
+        ]);
+        expect(fn () => app(RecordAttendanceAction::class)->execute([
+            'company_id' => $companyId,
+            'employee_id' => $employee->id,
+            'attendance_date' => '2026-11-21',
+        ]))->toThrow(ValidationException::class);
+
+        // 6. Optional Idempotency-Key prevents duplicate transactional POSTs on retries
+        $cat = ExpenseCategory::factory()->create(['company_id' => $companyId, 'name' => 'Operasional']);
+        $type = ExpenseType::factory()->create([
+            'company_id' => $companyId,
+            'expense_category_id' => $cat->id,
+            'name' => 'Konsumsi',
+        ]);
+
+        $idempotencyHeaders = ['Idempotency-Key' => 'idem-expense-001'];
+        $expensePayload = [
+            'company_id' => $companyId,
+            'expense_category_id' => $cat->id,
+            'expense_type_id' => $type->id,
+            'name' => 'Air Mineral Galon',
+            'amount' => 50000,
+            'purchased_on' => '2026-11-21',
+        ];
+
+        $firstPost = $this->postJson('/api/v1/modules/cfo/expense-items', $expensePayload, $idempotencyHeaders)
+            ->assertCreated();
+        $replayPost = $this->postJson('/api/v1/modules/cfo/expense-items', $expensePayload, $idempotencyHeaders)
+            ->assertCreated();
+
+        expect($replayPost->headers->get('X-Idempotency-Replayed'))->toBe('true');
+        expect($replayPost->json('data.id'))->toBe($firstPost->json('data.id'));
+        expect(ExpenseItem::query()->where('company_id', $companyId)->count())->toBe(1);
+
+        // Reusing the same Idempotency-Key with a different payload is rejected with 422
+        $this->postJson('/api/v1/modules/cfo/expense-items', [
+            ...$expensePayload,
+            'amount' => 75000,
+        ], $idempotencyHeaders)->assertUnprocessable()->assertJsonValidationErrors(['idempotency_key']);
     });
 });

@@ -18,6 +18,10 @@ class Company extends Model
         'series',
     ];
 
+    protected $hidden = [
+        'active_flag',
+    ];
+
     protected function casts(): array
     {
         return [

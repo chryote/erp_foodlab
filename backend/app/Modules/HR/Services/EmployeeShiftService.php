@@ -2,8 +2,10 @@
 
 namespace App\Modules\HR\Services;
 
+use App\Models\Company;
 use App\Models\EmployeeShift;
 use App\Support\IndexQuery;
+use App\Support\WriteGuard;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -46,9 +48,14 @@ class EmployeeShiftService
      */
     public function createEmployeeShift(array $attributes): EmployeeShift
     {
-        $employeeShift = DB::transaction(
-            fn (): EmployeeShift => EmployeeShift::query()->create($attributes)
-        );
+        $employeeShift = DB::transaction(function () use ($attributes): EmployeeShift {
+            $this->assertWriteConstraints(
+                (int) $attributes['company_id'],
+                $attributes['code'] ?? null
+            );
+
+            return EmployeeShift::query()->create($attributes);
+        });
 
         Cache::forget(self::CACHE_KEY_LIST);
 
@@ -62,6 +69,10 @@ class EmployeeShiftService
     {
         $updated = DB::transaction(function () use ($employeeShift, $attributes): EmployeeShift {
             $locked = EmployeeShift::query()->lockForUpdate()->findOrFail($employeeShift->getKey());
+            $targetCompanyId = (int) ($attributes['company_id'] ?? $locked->company_id);
+            $targetCode = array_key_exists('code', $attributes) ? $attributes['code'] : $locked->code;
+
+            $this->assertWriteConstraints($targetCompanyId, $targetCode, $locked);
             $locked->update($attributes);
 
             return $locked;
@@ -70,6 +81,33 @@ class EmployeeShiftService
         Cache::forget(self::CACHE_KEY_LIST);
 
         return $updated->refresh()->load(self::RELATIONS);
+    }
+
+    private function assertWriteConstraints(int $companyId, mixed $code, ?EmployeeShift $existing = null): void
+    {
+        $companyExists = Company::query()
+            ->whereNull('deleted_at')
+            ->sharedLock()
+            ->whereKey($companyId)
+            ->exists();
+
+        if (! $companyExists) {
+            throw ValidationException::withMessages([
+                'company_id' => ['The selected company is invalid or has been deleted.'],
+            ]);
+        }
+
+        if ($code !== null && $code !== '') {
+            WriteGuard::assertUniqueActive(
+                EmployeeShift::query(),
+                'code',
+                (string) $code,
+                ['company_id' => $companyId],
+                'code',
+                'The shift code has already been taken for the selected company.',
+                $existing?->getKey()
+            );
+        }
     }
 
     public function deleteEmployeeShift(EmployeeShift $employeeShift): void

@@ -142,4 +142,47 @@ describe('CFO Company CRUD API (/api/v1/modules/cfo/companies)', function () {
         $this->assertSoftDeleted('expense_types', ['id' => $type->id]);
         $this->assertSoftDeleted('expense_items', ['id' => $item->id]);
     });
+
+    it('rejects duplicate active (name, series) including case/whitespace variants and allows re-create after soft-delete', function () {
+        $first = $this->postJson('/api/v1/modules/cfo/companies', [
+            'name' => '  PT.   Slaras Nusa Foodlab  ',
+            'series' => 1,
+        ])->assertCreated()
+            ->assertJsonPath('data.name', 'PT. Slaras Nusa Foodlab');
+
+        $firstId = $first->json('data.id');
+
+        // Exact, case-insensitive, and whitespace-padded duplicates are rejected with 422
+        $this->postJson('/api/v1/modules/cfo/companies', [
+            'name' => 'pt. slaras nusa foodlab',
+            'series' => 1,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
+
+        // Different series with the same company name is allowed
+        $series2 = $this->postJson('/api/v1/modules/cfo/companies', [
+            'name' => 'PT. Slaras Nusa Foodlab',
+            'series' => 2,
+        ])->assertCreated();
+
+        // Updating series 2 back to series 1 collides and is rejected with 422
+        $this->patchJson('/api/v1/modules/cfo/companies/'.$series2->json('data.id'), [
+            'series' => 1,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
+
+        // Updating self keeping same (name, series) succeeds
+        $this->putJson("/api/v1/modules/cfo/companies/{$firstId}", [
+            'name' => 'PT. Slaras Nusa Foodlab',
+            'series' => 1,
+        ])->assertOk();
+
+        // Soft-deleting frees (name, series) for re-creation
+        $this->deleteJson("/api/v1/modules/cfo/companies/{$firstId}")->assertOk();
+
+        $recreated = $this->postJson('/api/v1/modules/cfo/companies', [
+            'name' => 'PT. Slaras Nusa Foodlab',
+            'series' => 1,
+        ])->assertCreated();
+
+        expect($recreated->json('data.id'))->not->toBe($firstId);
+    });
 });

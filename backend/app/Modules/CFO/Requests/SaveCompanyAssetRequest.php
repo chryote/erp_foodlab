@@ -3,6 +3,7 @@
 namespace App\Modules\CFO\Requests;
 
 use App\Models\CompanyAsset;
+use App\Support\InputNormalizer;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -14,6 +15,15 @@ class SaveCompanyAssetRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('name') && is_string($this->input('name'))) {
+            $this->merge([
+                'name' => InputNormalizer::text($this->input('name')),
+            ]);
+        }
     }
 
     /**
@@ -88,7 +98,7 @@ class SaveCompanyAssetRequest extends FormRequest
         }
 
         if (array_key_exists('name', $validated)) {
-            $validated['name'] = (string) $validated['name'];
+            $validated['name'] = InputNormalizer::text((string) $validated['name']);
         }
 
         if (array_key_exists('amount', $validated)) {

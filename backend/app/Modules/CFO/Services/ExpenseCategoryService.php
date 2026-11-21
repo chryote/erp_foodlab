@@ -5,6 +5,8 @@ namespace App\Modules\CFO\Services;
 use App\Models\Company;
 use App\Models\ExpenseCategory;
 use App\Support\IndexQuery;
+use App\Support\InputNormalizer;
+use App\Support\WriteGuard;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -46,8 +48,20 @@ class ExpenseCategoryService
 
     public function createExpenseCategory(array $attributes): ExpenseCategory
     {
+        $attributes['name'] = InputNormalizer::text((string) $attributes['name']) ?? '';
+
         $expenseCategory = DB::transaction(function () use ($attributes): ExpenseCategory {
-            $this->assertActiveCompany((int) $attributes['company_id']);
+            $companyId = (int) $attributes['company_id'];
+            $this->assertActiveCompany($companyId);
+
+            WriteGuard::assertUniqueActive(
+                ExpenseCategory::query(),
+                'name',
+                (string) $attributes['name'],
+                ['company_id' => $companyId],
+                'name',
+                'Kategori pengeluaran dengan nama yang sama sudah terdaftar pada perusahaan ini.'
+            );
 
             return ExpenseCategory::query()->create($attributes);
         });
@@ -59,6 +73,10 @@ class ExpenseCategoryService
 
     public function updateExpenseCategory(ExpenseCategory $expenseCategory, array $attributes): ExpenseCategory
     {
+        if (array_key_exists('name', $attributes)) {
+            $attributes['name'] = InputNormalizer::text((string) $attributes['name']) ?? '';
+        }
+
         $updated = DB::transaction(function () use ($expenseCategory, $attributes): ExpenseCategory {
             $locked = ExpenseCategory::query()->lockForUpdate()->findOrFail($expenseCategory->getKey());
 
@@ -72,6 +90,18 @@ class ExpenseCategoryService
             }
 
             $this->assertActiveCompany($targetCompanyId);
+
+            $targetName = (string) ($attributes['name'] ?? $locked->name);
+            WriteGuard::assertUniqueActive(
+                ExpenseCategory::query(),
+                'name',
+                $targetName,
+                ['company_id' => $targetCompanyId],
+                'name',
+                'Kategori pengeluaran dengan nama yang sama sudah terdaftar pada perusahaan ini.',
+                $locked->getKey()
+            );
+
             $locked->update($attributes);
 
             return $locked;

@@ -2,14 +2,27 @@
 
 namespace App\Modules\CFO\Requests;
 
+use App\Models\CapitalCompany;
+use App\Support\InputNormalizer;
+use App\Support\WriteGuard;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class SaveCapitalCompanyRequest extends FormRequest
 {
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('stakeholder_name') && is_string($this->input('stakeholder_name'))) {
+            $this->merge([
+                'stakeholder_name' => InputNormalizer::text($this->input('stakeholder_name')),
+            ]);
+        }
     }
 
     /**
@@ -37,6 +50,46 @@ class SaveCapitalCompanyRequest extends FormRequest
     }
 
     /**
+     * @return array<int, callable(Validator): void>
+     */
+    public function after(): array
+    {
+        return [
+            function (Validator $validator): void {
+                if ($validator->errors()->hasAny(['company_id', 'stakeholder_name'])) {
+                    return;
+                }
+
+                /** @var CapitalCompany|null $routeCapital */
+                $routeCapital = $this->route('capitalCompany');
+                $effectiveCompanyId = $this->filled('company_id')
+                    ? (int) $this->input('company_id')
+                    : (int) ($routeCapital?->company_id ?? 0);
+                $effectiveStakeholder = $this->has('stakeholder_name')
+                    ? InputNormalizer::text((string) $this->input('stakeholder_name'))
+                    : $routeCapital?->stakeholder_name;
+
+                if ($effectiveCompanyId <= 0 || $effectiveStakeholder === null || $effectiveStakeholder === '') {
+                    return;
+                }
+
+                if (WriteGuard::existsCaseInsensitive(
+                    CapitalCompany::query(),
+                    'stakeholder_name',
+                    $effectiveStakeholder,
+                    ['company_id' => $effectiveCompanyId],
+                    $routeCapital?->getKey()
+                )) {
+                    $validator->errors()->add(
+                        'stakeholder_name',
+                        'Pemegang saham dengan nama yang sama sudah terdaftar pada perusahaan ini.'
+                    );
+                }
+            },
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function payload(): array
@@ -48,7 +101,7 @@ class SaveCapitalCompanyRequest extends FormRequest
         }
 
         if (array_key_exists('stakeholder_name', $validated)) {
-            $validated['stakeholder_name'] = (string) $validated['stakeholder_name'];
+            $validated['stakeholder_name'] = InputNormalizer::text((string) $validated['stakeholder_name']);
         }
 
         if (array_key_exists('capital', $validated)) {

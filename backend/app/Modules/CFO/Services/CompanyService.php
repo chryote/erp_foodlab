@@ -5,6 +5,8 @@ namespace App\Modules\CFO\Services;
 use App\Models\Company;
 use App\Support\ActiveCompany;
 use App\Support\IndexQuery;
+use App\Support\InputNormalizer;
+use App\Support\WriteGuard;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -40,10 +42,24 @@ class CompanyService
 
     public function createCompany(array $attributes): Company
     {
-        $company = DB::transaction(fn (): Company => Company::query()->create([
-            'name' => $attributes['name'],
-            'series' => (int) ($attributes['series'] ?? 1),
-        ]));
+        $name = InputNormalizer::text((string) $attributes['name']) ?? '';
+        $series = (int) ($attributes['series'] ?? 1);
+
+        $company = DB::transaction(function () use ($name, $series): Company {
+            WriteGuard::assertUniqueActive(
+                Company::query(),
+                'name',
+                $name,
+                ['series' => $series],
+                'name',
+                'Perusahaan dengan nama dan seri yang sama sudah terdaftar.'
+            );
+
+            return Company::query()->create([
+                'name' => $name,
+                'series' => $series,
+            ]);
+        });
 
         $this->forgetCaches();
 
@@ -52,8 +68,26 @@ class CompanyService
 
     public function updateCompany(Company $company, array $attributes): Company
     {
+        if (array_key_exists('name', $attributes)) {
+            $attributes['name'] = InputNormalizer::text((string) $attributes['name']) ?? '';
+        }
+
         $updated = DB::transaction(function () use ($company, $attributes): Company {
             $locked = Company::query()->lockForUpdate()->findOrFail($company->getKey());
+
+            $targetName = (string) ($attributes['name'] ?? $locked->name);
+            $targetSeries = (int) ($attributes['series'] ?? $locked->series);
+
+            WriteGuard::assertUniqueActive(
+                Company::query(),
+                'name',
+                $targetName,
+                ['series' => $targetSeries],
+                'name',
+                'Perusahaan dengan nama dan seri yang sama sudah terdaftar.',
+                $locked->getKey()
+            );
+
             $locked->update($attributes);
 
             return $locked;

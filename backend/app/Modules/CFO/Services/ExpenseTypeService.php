@@ -6,6 +6,8 @@ use App\Models\Company;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseType;
 use App\Support\IndexQuery;
+use App\Support\InputNormalizer;
+use App\Support\WriteGuard;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -51,10 +53,24 @@ class ExpenseTypeService
 
     public function createExpenseType(array $attributes): ExpenseType
     {
+        $attributes['name'] = InputNormalizer::text((string) $attributes['name']) ?? '';
+
         $expenseType = DB::transaction(function () use ($attributes): ExpenseType {
-            $this->assertActiveParents(
-                (int) $attributes['company_id'],
-                (int) $attributes['expense_category_id']
+            $companyId = (int) $attributes['company_id'];
+            $categoryId = (int) $attributes['expense_category_id'];
+
+            $this->assertActiveParents($companyId, $categoryId);
+
+            WriteGuard::assertUniqueActive(
+                ExpenseType::query(),
+                'name',
+                (string) $attributes['name'],
+                [
+                    'company_id' => $companyId,
+                    'expense_category_id' => $categoryId,
+                ],
+                'name',
+                'Tipe pengeluaran dengan nama yang sama sudah terdaftar pada kategori ini.'
             );
 
             return ExpenseType::query()->create($attributes);
@@ -67,6 +83,10 @@ class ExpenseTypeService
 
     public function updateExpenseType(ExpenseType $expenseType, array $attributes): ExpenseType
     {
+        if (array_key_exists('name', $attributes)) {
+            $attributes['name'] = InputNormalizer::text((string) $attributes['name']) ?? '';
+        }
+
         $updated = DB::transaction(function () use ($expenseType, $attributes): ExpenseType {
             $locked = ExpenseType::query()->lockForUpdate()->findOrFail($expenseType->getKey());
 
@@ -87,6 +107,21 @@ class ExpenseTypeService
             }
 
             $this->assertActiveParents($targetCompanyId, $targetCategoryId);
+
+            $targetName = (string) ($attributes['name'] ?? $locked->name);
+            WriteGuard::assertUniqueActive(
+                ExpenseType::query(),
+                'name',
+                $targetName,
+                [
+                    'company_id' => $targetCompanyId,
+                    'expense_category_id' => $targetCategoryId,
+                ],
+                'name',
+                'Tipe pengeluaran dengan nama yang sama sudah terdaftar pada kategori ini.',
+                $locked->getKey()
+            );
+
             $locked->update($attributes);
 
             return $locked;

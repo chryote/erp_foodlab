@@ -14,12 +14,14 @@ class ExpenseTypeFactory extends Factory
 {
     protected $model = ExpenseType::class;
 
+    private static int $sequence = 1;
+
     public function definition(): array
     {
         return [
             'expense_category_id' => ExpenseCategory::factory(),
             'company_id' => Company::factory(),
-            'name' => $this->faker->words(2, true),
+            'name' => $this->faker->words(2, true).' #'.self::$sequence++,
         ];
     }
 }

@@ -36,7 +36,9 @@ CREATE TABLE `capital_companies` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
+  `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `capital_companies_company_stakeholder_active_unique` (`company_id`,`stakeholder_name`,`active_flag`),
   KEY `capital_companies_stakeholder_name_index` (`stakeholder_name`),
   KEY `capital_companies_company_deleted_idx` (`company_id`,`deleted_at`),
   KEY `capital_companies_deleted_id_idx` (`deleted_at`,`id`),
@@ -53,7 +55,9 @@ CREATE TABLE `companies` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
+  `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `companies_name_series_active_unique` (`name`,`series`,`active_flag`),
   KEY `companies_deleted_at_index` (`deleted_at`),
   KEY `companies_name_index` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -161,7 +165,7 @@ CREATE TABLE `employee_shift_assignments` (
   `employee_shift_id` bigint unsigned NOT NULL,
   `effective_date` date NOT NULL,
   `end_date` date DEFAULT NULL,
-  `notes` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `notes` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
@@ -233,7 +237,7 @@ CREATE TABLE `employees` (
   `bpjs_ketenagakerjaan` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `bpjs_kesehatan` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `npwp_number` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `employee_attendance_code` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `employee_attendance_code` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
@@ -286,7 +290,9 @@ CREATE TABLE `expense_categories` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
+  `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `expense_categories_company_name_active_unique` (`company_id`,`name`,`active_flag`),
   KEY `expense_categories_name_index` (`name`),
   KEY `expense_categories_company_deleted_idx` (`company_id`,`deleted_at`),
   KEY `expense_categories_deleted_id_idx` (`deleted_at`,`id`),
@@ -338,7 +344,9 @@ CREATE TABLE `expense_types` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
+  `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `expense_types_company_cat_name_active_unique` (`company_id`,`expense_category_id`,`name`,`active_flag`),
   KEY `expense_types_expense_category_id_index` (`expense_category_id`),
   KEY `expense_types_name_index` (`name`),
   KEY `expense_types_company_deleted_idx` (`company_id`,`deleted_at`),
@@ -362,8 +370,9 @@ CREATE TABLE `lab_samples` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
+  `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `lab_samples_batch_code_unique` (`batch_code`),
+  UNIQUE KEY `lab_samples_batch_code_active_unique` (`batch_code`,`active_flag`),
   KEY `lab_samples_category_index` (`category`),
   KEY `lab_samples_status_index` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -508,5 +517,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (37,'2026_11_21_150
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (38,'2026_11_21_160000_add_employee_attendance_code_to_employees_table',24);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (39,'2026_11_21_170000_cfo_indexes_and_fk_hardening',25);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (40,'2026_11_21_180000_cho_query_indexes',26);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (41,'2026_11_21_170000_enforce_cfo_and_lab_active_uniqueness',27);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
