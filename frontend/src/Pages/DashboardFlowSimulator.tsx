@@ -20,7 +20,6 @@ import { ViewOperasionalModal } from '@/modules/CFO/ViewOperasionalModal';
 import { ChoModuleCard } from '@/modules/CHO/ChoModuleCard';
 import { CmoModuleCard } from '@/modules/CMO/CmoModuleCard';
 import { CpoModuleCard } from '@/modules/CPO/CpoModuleCard';
-import '@/App.css';
 
 export interface DashboardProps {
   onLogout?: () => void;

@@ -43,8 +43,8 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
           >
             <span
               className={cn(
-                'absolute top-0.5 size-3 rounded-full bg-white transition-transform',
-                isDark ? 'translate-x-3.5' : 'translate-x-0.5'
+                'absolute left-0.5 top-0.5 size-3 rounded-full bg-white transition-transform',
+                isDark ? 'translate-x-3' : 'translate-x-0'
               )}
             />
           </span>
