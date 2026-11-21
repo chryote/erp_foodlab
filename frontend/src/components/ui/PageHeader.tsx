@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { Company } from '@/api/client';
 import { cn } from '@/lib/utils';
+import { ThemeToggle } from './ThemeToggle';
 
 export interface PageHeaderProps {
   eyebrow?: string;
@@ -113,7 +114,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   };
 
   return (
-    <header className="mb-7 border-b border-border pb-5">
+    <header className="sticky top-0 z-40 mb-7 border-b border-border bg-background pb-5">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0 flex-1">
           {eyebrow && (
@@ -123,9 +124,10 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
           )}
         </div>
 
-        {actions && (
-          <div className="flex shrink-0 items-center gap-3">{actions}</div>
-        )}
+        <div className="flex shrink-0 items-center gap-3">
+          {actions}
+          <ThemeToggle />
+        </div>
       </div>
 
       <div data-testid="header-tiered-tabs" className="mt-3 flex flex-col">
@@ -150,7 +152,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
                   'cursor-pointer rounded-t-lg border px-4 py-1.5 text-xs transition-colors',
                   isSelected
                     ? 'relative z-10 -mb-px border-border border-b-card bg-card font-bold text-primary shadow-2xs'
-                    : 'border-transparent bg-slate-200/60 font-medium text-muted-foreground hover:bg-slate-200 hover:text-foreground'
+                    : 'border-transparent bg-muted/60 font-medium text-muted-foreground hover:bg-muted hover:text-foreground'
                 )}
               >
                 {`Seri ${series}`}

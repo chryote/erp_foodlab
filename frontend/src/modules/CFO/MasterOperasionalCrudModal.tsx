@@ -142,7 +142,7 @@ export const MasterOperasionalCrudModal: React.FC<
       role="tablist"
       aria-label="Master Operasional Tabs"
       data-testid="master-operasional-tabs"
-      className="flex flex-wrap items-end gap-1 border-b border-border pl-1"
+      className="sticky top-0 z-10 flex flex-wrap items-end gap-1 border-b border-border bg-card pl-1"
     >
       {MASTER_OPERASIONAL_TABS.map((tab) => {
         const isSelected = tab.key === activeTab;
@@ -158,7 +158,7 @@ export const MasterOperasionalCrudModal: React.FC<
               'cursor-pointer rounded-t-lg border px-4 py-1.5 text-xs transition-colors',
               isSelected
                 ? 'relative z-10 -mb-px border-border border-b-card bg-card font-bold text-primary shadow-2xs'
-                : 'border-transparent bg-slate-200/60 font-medium text-muted-foreground hover:bg-slate-200 hover:text-foreground'
+                : 'border-transparent bg-muted/60 font-medium text-muted-foreground hover:bg-muted hover:text-foreground'
             )}
           >
             {tab.label}

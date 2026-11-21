@@ -61,6 +61,40 @@ describe('Dashboard', () => {
     expect(onLogout).toHaveBeenCalledOnce();
   });
 
+  it('switches company series and company from the dashboard header', async () => {
+    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
+      data: [
+        { id: 1, name: 'FoodLab Utama', series: 1 },
+        { id: 2, name: 'FoodLab Barat', series: 2 },
+        { id: 3, name: 'FoodLab Timur', series: 2 },
+      ],
+      meta: { count: 3 },
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Dashboard />
+      </QueryClientProvider>
+    );
+
+    fireEvent.click(await screen.findByTestId('dashboard-series-tab-2'));
+    expect(
+      await screen.findByTestId('dashboard-company-tab-2')
+    ).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.click(screen.getByTestId('dashboard-company-tab-3'));
+    expect(screen.getByTestId('dashboard-company-tab-3')).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(
+      screen.getByText('Ringkasan keuangan dan operasional untuk FoodLab Timur.')
+    ).toBeInTheDocument();
+  });
+
   it('shows the selected company asset value and opens the asset view', async () => {
     vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
       data: [{ id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1 }],
