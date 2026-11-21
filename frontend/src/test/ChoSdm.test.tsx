@@ -348,9 +348,32 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
     fireEvent.click(screen.getByTestId('horizontal-menu-card-MASTER_KARYAWAN'));
     const masterModal = await screen.findByTestId('master-karyawan-crud-modal');
     expect(masterModal).toBeInTheDocument();
-    expect(
-      screen.getByTestId('master-karyawan-crud-modal-form')
-    ).toHaveClass('items-start');
+    expect(masterModal).toHaveClass('max-w-[95vw]', 'h-[92vh]', 'max-h-[92vh]');
+
+    const assertVerticalSplitLayout = () => {
+      const splitLayout = screen.getByTestId(
+        'master-karyawan-crud-modal-split-layout'
+      );
+      const formPanel = screen.getByTestId(
+        'master-karyawan-crud-modal-form-panel'
+      );
+      const tablePanel = screen.getByTestId(
+        'master-karyawan-crud-modal-table-panel'
+      );
+      const formEl = screen.getByTestId('master-karyawan-crud-modal-form');
+      expect(splitLayout).toContainElement(formPanel);
+      expect(splitLayout).toContainElement(tablePanel);
+      expect(formPanel).toContainElement(formEl);
+      expect(formEl).toHaveClass('flex-col');
+      expect(
+        screen.getByTestId('master-karyawan-crud-modal-company_id-input-field')
+      ).toHaveClass('sm:grid-cols-[140px_minmax(0,1fr)]');
+      expect(tablePanel).toContainElement(
+        screen.getByTestId('master-karyawan-crud-modal-pagination')
+      );
+    };
+
+    assertVerticalSplitLayout();
 
     expect(
       await within(masterModal).findByText('Analis Kimia')
@@ -383,9 +406,7 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
 
     // Switch to Status Karyawan tab & create
     fireEvent.click(screen.getByTestId('master-karyawan-tab-status'));
-    expect(
-      screen.getByTestId('master-karyawan-crud-modal-form')
-    ).toHaveClass('items-start');
+    assertVerticalSplitLayout();
     expect(
       await within(masterModal).findByText('Karyawan Tetap')
     ).toBeInTheDocument();
@@ -414,6 +435,7 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
 
     // Switch to Payroll Grade tab & create
     fireEvent.click(screen.getByTestId('master-karyawan-tab-grade'));
+    assertVerticalSplitLayout();
     expect(await within(masterModal).findByText('Staff')).toBeInTheDocument();
     fireEvent.change(within(masterModal).getByLabelText('Grade'), {
       target: { value: '2' },
@@ -442,9 +464,7 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
 
     // Switch to Status Pajak tab & create
     fireEvent.click(screen.getByTestId('master-karyawan-tab-pajak'));
-    expect(
-      screen.getByTestId('master-karyawan-crud-modal-form')
-    ).toHaveClass('items-start');
+    assertVerticalSplitLayout();
     expect(
       await within(masterModal).findByText('Tidak Kawin 0')
     ).toBeInTheDocument();

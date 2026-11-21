@@ -267,41 +267,78 @@ export const MasterKaryawanCrudModal: React.FC<
   const modalSubtitle =
     'Kelola jabatan, status karyawan, payroll grade, dan status pajak perusahaan';
 
+  const commonCrudProps = {
+    isOpen,
+    title: modalTitle,
+    subtitle: modalSubtitle,
+    testId: 'master-karyawan-crud-modal',
+    tabs: tabsBar,
+    layout: 'split' as const,
+    labelPlacement: 'left' as const,
+    modalSize: 'expanded' as const,
+    pageSize: 10,
+    loading,
+    error,
+    onClose,
+  };
+
+  const parseCompanyNamePayload = (values: Record<string, string>) => {
+    const companyId = parseInt(values.company_id ?? '', 10);
+    const name = (values.name ?? '').trim();
+    if (!Number.isFinite(companyId) || !name) {
+      return null;
+    }
+    return { company_id: companyId, name };
+  };
+
+  const parsePayrollGradePayload = (values: Record<string, string>) => {
+    const companyId = parseInt(values.company_id ?? '', 10);
+    const grade = parseInt(values.grade ?? '', 10);
+    const subGrade = (values.sub_grade ?? '').trim();
+    const levelLabel = (values.level_label ?? '').trim();
+    const baseSalary = parseFloat(values.base_salary ?? '');
+    const positionAllowance = values.position_allowance
+      ? parseFloat(values.position_allowance)
+      : 0;
+    if (
+      !Number.isFinite(companyId) ||
+      !Number.isFinite(grade) ||
+      grade < 1 ||
+      !subGrade ||
+      !Number.isFinite(baseSalary)
+    ) {
+      return null;
+    }
+    return {
+      company_id: companyId,
+      grade,
+      sub_grade: subGrade,
+      level_label: levelLabel || null,
+      base_salary: baseSalary,
+      position_allowance: Number.isFinite(positionAllowance)
+        ? positionAllowance
+        : 0,
+    };
+  };
+
   if (activeTab === 'status') {
     return (
       <CrudModal
+        {...commonCrudProps}
         resetKey={`status-${company?.id ?? 0}`}
-        isOpen={isOpen}
-        title={modalTitle}
-        subtitle={modalSubtitle}
-        testId="master-karyawan-crud-modal"
-        tabs={tabsBar}
         fields={statusFields}
-        formAlign="start"
         emptyMessage="Belum ada data status karyawan."
-        pageSize={5}
         items={allStatuses}
-        loading={loading}
-        error={error}
-        onClose={onClose}
         onCreate={async (values) => {
-          const companyId = parseInt(values.company_id ?? '', 10);
-          const name = (values.name ?? '').trim();
-          if (Number.isFinite(companyId) && name) {
-            await createStatus({
-              company_id: companyId,
-              name,
-            });
+          const payload = parseCompanyNamePayload(values);
+          if (payload) {
+            await createStatus(payload);
           }
         }}
         onUpdate={async (id, values) => {
-          const companyId = parseInt(values.company_id ?? '', 10);
-          const name = (values.name ?? '').trim();
-          if (Number.isFinite(companyId) && name) {
-            await updateStatus(id, {
-              company_id: companyId,
-              name,
-            });
+          const payload = parseCompanyNamePayload(values);
+          if (payload) {
+            await updateStatus(id, payload);
           }
         }}
         onDelete={async (id) => {
@@ -314,74 +351,22 @@ export const MasterKaryawanCrudModal: React.FC<
   if (activeTab === 'grade') {
     return (
       <CrudModal
+        {...commonCrudProps}
         resetKey={`grade-${company?.id ?? 0}`}
-        isOpen={isOpen}
-        title={modalTitle}
-        subtitle={modalSubtitle}
-        testId="master-karyawan-crud-modal"
-        tabs={tabsBar}
         fields={gradeFields}
         computedColumns={gradeComputedColumns}
         emptyMessage="Belum ada data payroll grade."
-        pageSize={5}
         items={allGrades}
-        loading={loading}
-        error={error}
-        onClose={onClose}
         onCreate={async (values) => {
-          const companyId = parseInt(values.company_id ?? '', 10);
-          const grade = parseInt(values.grade ?? '', 10);
-          const subGrade = (values.sub_grade ?? '').trim();
-          const levelLabel = (values.level_label ?? '').trim();
-          const baseSalary = parseFloat(values.base_salary ?? '');
-          const positionAllowance = values.position_allowance
-            ? parseFloat(values.position_allowance)
-            : 0;
-          if (
-            Number.isFinite(companyId) &&
-            Number.isFinite(grade) &&
-            grade >= 1 &&
-            subGrade &&
-            Number.isFinite(baseSalary)
-          ) {
-            await createGrade({
-              company_id: companyId,
-              grade,
-              sub_grade: subGrade,
-              level_label: levelLabel || null,
-              base_salary: baseSalary,
-              position_allowance: Number.isFinite(positionAllowance)
-                ? positionAllowance
-                : 0,
-            });
+          const payload = parsePayrollGradePayload(values);
+          if (payload) {
+            await createGrade(payload);
           }
         }}
         onUpdate={async (id, values) => {
-          const companyId = parseInt(values.company_id ?? '', 10);
-          const grade = parseInt(values.grade ?? '', 10);
-          const subGrade = (values.sub_grade ?? '').trim();
-          const levelLabel = (values.level_label ?? '').trim();
-          const baseSalary = parseFloat(values.base_salary ?? '');
-          const positionAllowance = values.position_allowance
-            ? parseFloat(values.position_allowance)
-            : 0;
-          if (
-            Number.isFinite(companyId) &&
-            Number.isFinite(grade) &&
-            grade >= 1 &&
-            subGrade &&
-            Number.isFinite(baseSalary)
-          ) {
-            await updateGrade(id, {
-              company_id: companyId,
-              grade,
-              sub_grade: subGrade,
-              level_label: levelLabel || null,
-              base_salary: baseSalary,
-              position_allowance: Number.isFinite(positionAllowance)
-                ? positionAllowance
-                : 0,
-            });
+          const payload = parsePayrollGradePayload(values);
+          if (payload) {
+            await updateGrade(id, payload);
           }
         }}
         onDelete={async (id) => {
@@ -394,38 +379,21 @@ export const MasterKaryawanCrudModal: React.FC<
   if (activeTab === 'pajak') {
     return (
       <CrudModal
+        {...commonCrudProps}
         resetKey={`pajak-${company?.id ?? 0}`}
-        isOpen={isOpen}
-        title={modalTitle}
-        subtitle={modalSubtitle}
-        testId="master-karyawan-crud-modal"
-        tabs={tabsBar}
         fields={taxStatusFields}
-        formAlign="start"
         emptyMessage="Belum ada data status pajak."
-        pageSize={5}
         items={allTaxStatuses}
-        loading={loading}
-        error={error}
-        onClose={onClose}
         onCreate={async (values) => {
-          const companyId = parseInt(values.company_id ?? '', 10);
-          const name = (values.name ?? '').trim();
-          if (Number.isFinite(companyId) && name) {
-            await createTaxStatus({
-              company_id: companyId,
-              name,
-            });
+          const payload = parseCompanyNamePayload(values);
+          if (payload) {
+            await createTaxStatus(payload);
           }
         }}
         onUpdate={async (id, values) => {
-          const companyId = parseInt(values.company_id ?? '', 10);
-          const name = (values.name ?? '').trim();
-          if (Number.isFinite(companyId) && name) {
-            await updateTaxStatus(id, {
-              company_id: companyId,
-              name,
-            });
+          const payload = parseCompanyNamePayload(values);
+          if (payload) {
+            await updateTaxStatus(id, payload);
           }
         }}
         onDelete={async (id) => {
@@ -437,38 +405,21 @@ export const MasterKaryawanCrudModal: React.FC<
 
   return (
     <CrudModal
+      {...commonCrudProps}
       resetKey={`jabatan-${company?.id ?? 0}`}
-      isOpen={isOpen}
-      title={modalTitle}
-      subtitle={modalSubtitle}
-      testId="master-karyawan-crud-modal"
-      tabs={tabsBar}
       fields={positionFields}
-      formAlign="start"
       emptyMessage="Belum ada data jabatan karyawan."
-      pageSize={5}
       items={allPositions}
-      loading={loading}
-      error={error}
-      onClose={onClose}
       onCreate={async (values) => {
-        const companyId = parseInt(values.company_id ?? '', 10);
-        const name = (values.name ?? '').trim();
-        if (Number.isFinite(companyId) && name) {
-          await createPosition({
-            company_id: companyId,
-            name,
-          });
+        const payload = parseCompanyNamePayload(values);
+        if (payload) {
+          await createPosition(payload);
         }
       }}
       onUpdate={async (id, values) => {
-        const companyId = parseInt(values.company_id ?? '', 10);
-        const name = (values.name ?? '').trim();
-        if (Number.isFinite(companyId) && name) {
-          await updatePosition(id, {
-            company_id: companyId,
-            name,
-          });
+        const payload = parseCompanyNamePayload(values);
+        if (payload) {
+          await updatePosition(id, payload);
         }
       }}
       onDelete={async (id) => {

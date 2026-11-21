@@ -12,6 +12,8 @@ export interface ModalProps {
   subtitle?: string;
   testId?: string;
   maxWidthClass?: string;
+  dialogClassName?: string;
+  bodyClassName?: string;
   onClose: () => void;
   children: React.ReactNode;
   footer?: React.ReactNode;
@@ -23,6 +25,8 @@ export const Modal: React.FC<ModalProps> = ({
   subtitle,
   testId = 'ui-modal',
   maxWidthClass = 'max-w-3xl',
+  dialogClassName,
+  bodyClassName,
   onClose,
   children,
   footer,
@@ -44,11 +48,12 @@ export const Modal: React.FC<ModalProps> = ({
         data-testid={testId}
         className={cn(
           'flex max-h-[85vh] w-full flex-col overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl',
-          maxWidthClass
+          maxWidthClass,
+          dialogClassName
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-4">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-6 py-4">
           <div>
             <h2 className="text-lg font-bold tracking-tight">{title}</h2>
             {subtitle && (
@@ -64,12 +69,18 @@ export const Modal: React.FC<ModalProps> = ({
           </Button>
         </div>
 
-        <div className="flex flex-col gap-4 overflow-y-auto px-6 py-5 [&>*]:shrink-0">
+        <div
+          className={cn(
+            'flex flex-col gap-4 overflow-y-auto px-6 py-5',
+            !bodyClassName && '[&>*]:shrink-0',
+            bodyClassName
+          )}
+        >
           {children}
         </div>
 
         {footer && (
-          <div className="flex justify-end gap-2.5 border-t border-border px-6 py-3.5">
+          <div className="flex shrink-0 justify-end gap-2.5 border-t border-border px-6 py-3.5">
             {footer}
           </div>
         )}
@@ -78,40 +89,94 @@ export const Modal: React.FC<ModalProps> = ({
   );
 };
 
+export type FieldLabelPlacement = 'top' | 'left';
+
+interface FieldWrapperProps {
+  id?: string;
+  label?: string;
+  labelPlacement?: FieldLabelPlacement;
+  alignTop?: boolean;
+  children: React.ReactNode;
+}
+
+const FieldWrapper: React.FC<FieldWrapperProps> = ({
+  id,
+  label,
+  labelPlacement = 'top',
+  alignTop = false,
+  children,
+}) => {
+  if (labelPlacement === 'left') {
+    return (
+      <div
+        data-testid={id ? `${id}-field` : undefined}
+        className="grid min-w-0 grid-cols-1 items-center gap-1.5 sm:grid-cols-[140px_minmax(0,1fr)] sm:gap-3"
+      >
+        {label && (
+          <ShadcnLabel
+            htmlFor={id}
+            className={cn(
+              'leading-snug text-foreground',
+              alignTop && 'sm:self-start sm:pt-2'
+            )}
+          >
+            {label}
+          </ShadcnLabel>
+        )}
+        <div className="min-w-0">{children}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+      {label && <ShadcnLabel htmlFor={id}>{label}</ShadcnLabel>}
+      {children}
+    </div>
+  );
+};
+
 export interface TextInputProps
   extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
+  labelPlacement?: FieldLabelPlacement;
 }
 
 export const TextInput: React.FC<TextInputProps> = ({
   label,
+  labelPlacement = 'top',
   id,
   className,
   ...rest
 }) => {
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-      {label && <ShadcnLabel htmlFor={id}>{label}</ShadcnLabel>}
+    <FieldWrapper id={id} label={label} labelPlacement={labelPlacement}>
       <ShadcnInput id={id} className={className} {...rest} />
-    </div>
+    </FieldWrapper>
   );
 };
 
 export interface TextareaInputProps
   extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
+  labelPlacement?: FieldLabelPlacement;
 }
 
 export const TextareaInput: React.FC<TextareaInputProps> = ({
   label,
+  labelPlacement = 'top',
   id,
   className,
   rows = 2,
   ...rest
 }) => {
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-      {label && <ShadcnLabel htmlFor={id}>{label}</ShadcnLabel>}
+    <FieldWrapper
+      id={id}
+      label={label}
+      labelPlacement={labelPlacement}
+      alignTop={true}
+    >
       <textarea
         id={id}
         rows={rows}
@@ -121,7 +186,7 @@ export const TextareaInput: React.FC<TextareaInputProps> = ({
         )}
         {...rest}
       />
-    </div>
+    </FieldWrapper>
   );
 };
 
@@ -131,6 +196,7 @@ export interface DecimalInputProps
     'type' | 'value' | 'onChange'
   > {
   label?: string;
+  labelPlacement?: FieldLabelPlacement;
   value: string;
   onChange: (rawValue: string) => void;
 }
@@ -184,6 +250,7 @@ export function parseDecimalInputRaw(displayValue: string): string {
 
 export const DecimalInput: React.FC<DecimalInputProps> = ({
   label,
+  labelPlacement = 'top',
   id,
   value,
   onChange,
@@ -198,8 +265,7 @@ export const DecimalInput: React.FC<DecimalInputProps> = ({
   };
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-      {label && <ShadcnLabel htmlFor={id}>{label}</ShadcnLabel>}
+    <FieldWrapper id={id} label={label} labelPlacement={labelPlacement}>
       <ShadcnInput
         id={id}
         type="text"
@@ -209,7 +275,7 @@ export const DecimalInput: React.FC<DecimalInputProps> = ({
         onChange={handleChange}
         {...rest}
       />
-    </div>
+    </FieldWrapper>
   );
 };
 
@@ -221,12 +287,14 @@ export interface SelectOption {
 export interface SelectInputProps
   extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
+  labelPlacement?: FieldLabelPlacement;
   placeholder?: string;
   options: SelectOption[];
 }
 
 export const SelectInput: React.FC<SelectInputProps> = ({
   label,
+  labelPlacement = 'top',
   id,
   placeholder = 'Pilih opsi...',
   options,
@@ -234,8 +302,7 @@ export const SelectInput: React.FC<SelectInputProps> = ({
   ...rest
 }) => {
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-      {label && <ShadcnLabel htmlFor={id}>{label}</ShadcnLabel>}
+    <FieldWrapper id={id} label={label} labelPlacement={labelPlacement}>
       <select
         id={id}
         className={cn(
@@ -251,7 +318,7 @@ export const SelectInput: React.FC<SelectInputProps> = ({
           </option>
         ))}
       </select>
-    </div>
+    </FieldWrapper>
   );
 };
 
@@ -429,6 +496,11 @@ export interface CrudModalProps<T extends CrudEntity> {
   inputLabel?: string;
   inputPlaceholder?: string;
   fields?: CrudFieldConfig<T>[];
+  layout?: 'stacked' | 'split';
+  labelPlacement?: FieldLabelPlacement;
+  modalSize?: 'default' | 'expanded';
+  maxWidthClass?: string;
+  dialogClassName?: string;
   formLayout?: 'auto' | 'single-row';
   formAlign?: 'start' | 'end';
   computedColumns?: CrudComputedColumnConfig<T>[];
@@ -459,6 +531,11 @@ export function CrudModal<T extends CrudEntity>({
   inputLabel = 'Nama',
   inputPlaceholder = 'Masukkan nama...',
   fields,
+  layout = 'stacked',
+  labelPlacement = 'top',
+  modalSize = 'default',
+  maxWidthClass,
+  dialogClassName,
   formLayout = 'auto',
   formAlign,
   computedColumns = [],
@@ -763,6 +840,7 @@ export function CrudModal<T extends CrudEntity>({
           key={field.key}
           id={`${testId}-${field.key}-input`}
           label={field.label}
+          labelPlacement={labelPlacement}
           placeholder={field.placeholder}
           options={resolvedOptions}
           disabled={isFieldDisabled}
@@ -777,6 +855,7 @@ export function CrudModal<T extends CrudEntity>({
           key={field.key}
           id={`${testId}-${field.key}-input`}
           label={field.label}
+          labelPlacement={labelPlacement}
           placeholder={field.placeholder}
           value={formValues[field.key] ?? ''}
           onChange={(rawVal) => handleFieldChange(field.key, rawVal)}
@@ -789,6 +868,7 @@ export function CrudModal<T extends CrudEntity>({
           key={field.key}
           id={`${testId}-${field.key}-input`}
           label={field.label}
+          labelPlacement={labelPlacement}
           placeholder={field.placeholder}
           rows={field.rows ?? 2}
           value={formValues[field.key] ?? ''}
@@ -805,6 +885,7 @@ export function CrudModal<T extends CrudEntity>({
         step={field.step}
         min={field.min}
         label={field.label}
+        labelPlacement={labelPlacement}
         placeholder={field.placeholder}
         className={
           isPickerOnlyDate
@@ -844,6 +925,52 @@ export function CrudModal<T extends CrudEntity>({
     );
   };
 
+  const isSplitLayout = layout === 'split';
+  const isExpandedModal = modalSize === 'expanded';
+  const resolvedMaxWidthClass =
+    maxWidthClass ??
+    (isExpandedModal
+      ? 'max-w-[95vw]'
+      : isSingleRowForm
+        ? 'max-w-7xl'
+        : isMultiRowForm
+          ? 'max-w-5xl'
+          : 'max-w-3xl');
+  const resolvedDialogClassName =
+    dialogClassName ?? (isExpandedModal ? 'h-[92vh] max-h-[92vh]' : undefined);
+
+  const formActionButtons = (
+    <>
+      <Button type="submit" variant="primary" disabled={loading}>
+        {editingItem ? 'Perbarui' : 'Tambah'}
+      </Button>
+      {editingItem && (
+        <Button type="button" variant="ghost" onClick={handleCancelEdit}>
+          Batal
+        </Button>
+      )}
+    </>
+  );
+
+  const dataTableElement = (
+    <DataTable
+      columns={columns}
+      data={paginatedItems}
+      rowKey={(row) => row.id}
+      emptyMessage={emptyMessage}
+    />
+  );
+
+  const paginationElement = (
+    <Pagination
+      currentPage={safeCurrentPage}
+      totalPages={totalPages}
+      totalItems={items.length}
+      testId={`${testId}-pagination`}
+      onPageChange={setCurrentPage}
+    />
+  );
+
   return (
     <>
       <Modal
@@ -851,105 +978,142 @@ export function CrudModal<T extends CrudEntity>({
         title={title}
         subtitle={subtitle}
         testId={testId}
-        maxWidthClass={
-          isSingleRowForm
-            ? 'max-w-7xl'
-            : isMultiRowForm
-              ? 'max-w-5xl'
-              : 'max-w-3xl'
+        maxWidthClass={resolvedMaxWidthClass}
+        dialogClassName={resolvedDialogClassName}
+        bodyClassName={
+          isSplitLayout
+            ? 'flex-1 min-h-0 overflow-y-auto lg:overflow-hidden'
+            : undefined
         }
         onClose={onClose}
       >
-        {tabs}
+        {tabs && <div className="shrink-0">{tabs}</div>}
 
         {error && (
           <div
             role="alert"
-            className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700"
+            className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700"
           >
             {error}
           </div>
         )}
 
-        {!readOnly && (
-          <form
-            onSubmit={handleSubmit}
-            data-testid={`${testId}-form`}
-            className={
-              isSingleRowForm
-                ? cn(
-                    'flex flex-wrap gap-2.5 border-b border-border pb-4',
-                    alignStart ? 'items-start' : 'items-end'
-                  )
-                : isMultiRowForm
-                  ? cn(
-                      'grid grid-cols-1 gap-3 border-b border-border pb-4 sm:grid-cols-2 md:grid-cols-4',
-                      alignStart ? 'items-start' : 'items-end'
-                    )
-                  : cn(
-                      'flex flex-wrap gap-2.5 border-b border-border pb-4',
-                      alignStart ? 'items-start' : 'items-end'
-                    )
-            }
+        {isSplitLayout ? (
+          <div
+            data-testid={`${testId}-split-layout`}
+            className={cn(
+              'grid min-h-0 flex-1 grid-cols-1 gap-6',
+              !readOnly &&
+                (labelPlacement === 'left'
+                  ? 'lg:grid-cols-[420px_minmax(0,1fr)] xl:grid-cols-[460px_minmax(0,1fr)]'
+                  : 'lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[400px_minmax(0,1fr)]')
+            )}
           >
-            {resolvedFields.map((field) => {
-              const control = renderFieldControl(field);
-              if (!isSingleRowForm) {
-                return control;
-              }
-              return (
-                <div
-                  key={field.key}
-                  className="flex min-w-[140px] flex-1 flex-col"
+            {!readOnly && (
+              <div
+                data-testid={`${testId}-form-panel`}
+                className="flex min-h-0 flex-col rounded-xl border border-border bg-muted/25 p-4 lg:overflow-y-auto"
+              >
+                <form
+                  onSubmit={handleSubmit}
+                  data-testid={`${testId}-form`}
+                  className="flex flex-col gap-4"
                 >
-                  {control}
-                </div>
-              );
-            })}
+                  <div className="border-b border-border pb-2.5">
+                    <h3 className="text-sm font-semibold text-foreground">
+                      {editingItem ? 'Edit Data' : 'Tambah Data'}
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      {editingItem
+                        ? 'Perbarui data yang dipilih lalu simpan perubahan.'
+                        : 'Lengkapi formulir di bawah ini untuk menambahkan data baru.'}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3">
+                    {resolvedFields.map((field) => renderFieldControl(field))}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                    {formActionButtons}
+                  </div>
+                </form>
+              </div>
+            )}
+
             <div
-              className={
-                isSingleRowForm
-                  ? cn(
-                      'flex shrink-0 items-center gap-2',
-                      alignStart && 'pt-[20px]'
-                    )
-                  : isMultiRowForm
-                    ? 'flex items-center justify-end gap-2 sm:pt-[20px] md:justify-start'
-                    : cn('flex items-center gap-2', alignStart && 'pt-[20px]')
-              }
+              data-testid={`${testId}-table-panel`}
+              className="flex min-h-0 min-w-0 flex-col justify-between gap-4 rounded-xl border border-border bg-card p-4"
             >
-              <Button type="submit" variant="primary" disabled={loading}>
-                {editingItem ? 'Perbarui' : 'Tambah'}
-              </Button>
-              {editingItem && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={handleCancelEdit}
-                >
-                  Batal
-                </Button>
-              )}
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto">
+                {summary}
+                {dataTableElement}
+              </div>
+
+              <div className="shrink-0 border-t border-border pt-3">
+                {paginationElement}
+              </div>
             </div>
-          </form>
+          </div>
+        ) : (
+          <>
+            {!readOnly && (
+              <form
+                onSubmit={handleSubmit}
+                data-testid={`${testId}-form`}
+                className={
+                  isSingleRowForm
+                    ? cn(
+                        'flex flex-wrap gap-2.5 border-b border-border pb-4',
+                        alignStart ? 'items-start' : 'items-end'
+                      )
+                    : isMultiRowForm
+                      ? cn(
+                          'grid grid-cols-1 gap-3 border-b border-border pb-4 sm:grid-cols-2 md:grid-cols-4',
+                          alignStart ? 'items-start' : 'items-end'
+                        )
+                      : cn(
+                          'flex flex-wrap gap-2.5 border-b border-border pb-4',
+                          alignStart ? 'items-start' : 'items-end'
+                        )
+                }
+              >
+                {resolvedFields.map((field) => {
+                  const control = renderFieldControl(field);
+                  if (!isSingleRowForm) {
+                    return control;
+                  }
+                  return (
+                    <div
+                      key={field.key}
+                      className="flex min-w-[140px] flex-1 flex-col"
+                    >
+                      {control}
+                    </div>
+                  );
+                })}
+                <div
+                  className={
+                    isSingleRowForm
+                      ? cn(
+                          'flex shrink-0 items-center gap-2',
+                          alignStart && 'pt-[20px]'
+                        )
+                      : isMultiRowForm
+                        ? 'flex items-center justify-end gap-2 sm:pt-[20px] md:justify-start'
+                        : cn('flex items-center gap-2', alignStart && 'pt-[20px]')
+                  }
+                >
+                  {formActionButtons}
+                </div>
+              </form>
+            )}
+
+            {summary}
+            {dataTableElement}
+            {paginationElement}
+          </>
         )}
-
-        {summary}
-
-        <DataTable
-          columns={columns}
-          data={paginatedItems}
-          rowKey={(row) => row.id}
-          emptyMessage={emptyMessage}
-        />
-
-        <Pagination
-          currentPage={safeCurrentPage}
-          totalPages={totalPages}
-          totalItems={items.length}
-          testId={`${testId}-pagination`}
-          onPageChange={setCurrentPage}
-        />
       </Modal>
 
       <ConfirmDialog
