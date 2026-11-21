@@ -38,6 +38,7 @@ export const CFO_MENU_ITEMS: HorizontalMenuItem[] = [
     title: 'Input Aset',
     children: CFO_INPUT_ASET_ITEMS,
   },
+  { code: 'ARUS_KAS', title: 'Arus Kas' },
   { code: 'LABA_RUGI', title: 'Laba Rugi' },
   { code: 'NERACA', title: 'Neraca' },
 ];

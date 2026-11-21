@@ -37,7 +37,7 @@ export const HorizontalMenuCard: React.FC<HorizontalMenuCardProps> = ({
       data-testid={`horizontal-menu-card-${code}`}
       aria-pressed={isSelected}
       className={cn(
-        'flex min-h-[54px] items-center justify-center rounded-xl border border-border bg-card px-4 py-3 text-center text-sm font-semibold text-card-foreground transition-all hover:-translate-y-0.5 hover:shadow-md cursor-pointer',
+        'flex min-h-[40px] items-center justify-center rounded-lg border border-border bg-card px-3 py-2 text-center text-[13px] font-semibold leading-tight text-card-foreground transition-all hover:-translate-y-0.5 hover:shadow-md cursor-pointer',
         isSelected && ACCENT_SELECTED_CLASSES[accent]
       )}
       onClick={onClick}
@@ -68,7 +68,7 @@ export const HorizontalMenu: React.FC<HorizontalMenuProps> = ({
     <nav
       aria-label={ariaLabel}
       data-testid={testId}
-      className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-5"
+      className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-6"
     >
       {items.map((item) => (
         <HorizontalMenuCard
@@ -95,7 +95,7 @@ export const HorizontalMenuStack: React.FC<HorizontalMenuStackProps> = ({
   ...rest
 }) => {
   return (
-    <div className={cn('flex flex-col gap-3', className)} {...rest}>
+    <div className={cn('flex flex-col gap-2.5', className)} {...rest}>
       {children}
     </div>
   );

@@ -253,6 +253,7 @@ describe('App ERP Main Menu integration', () => {
     expect(screen.getByText('Input Modal')).toBeInTheDocument();
     expect(screen.getByText('Input Operasional')).toBeInTheDocument();
     expect(screen.getByText('Input Aset')).toBeInTheDocument();
+    expect(screen.getByText('Arus Kas')).toBeInTheDocument();
     expect(screen.getByText('Laba Rugi')).toBeInTheDocument();
     expect(screen.getByText('Neraca')).toBeInTheDocument();
 
