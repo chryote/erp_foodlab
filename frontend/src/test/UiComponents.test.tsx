@@ -14,6 +14,7 @@ import {
   PageHeader,
   SummaryBanner,
 } from '../components/ui';
+import { initializeTheme } from '../lib/theme';
 
 describe('Reusable UI Components (src/components/ui)', () => {
   it('renders ModuleLauncherCard with text-only title and compact 50% smaller height', () => {
@@ -427,6 +428,28 @@ describe('Reusable UI Components (src/components/ui)', () => {
       'PT. Dairy Nusantara'
     );
     expect(screen.queryByTestId('company-tab-1')).not.toBeInTheDocument();
+  });
+
+  it('toggles and persists the global theme from PageHeader', () => {
+    window.localStorage.clear();
+    document.documentElement.removeAttribute('data-theme');
+    render(<PageHeader title="Dashboard" />);
+
+    const toggle = screen.getByTestId('theme-toggle');
+    expect(toggle).toHaveAttribute('aria-label', 'Switch to dark mode');
+    fireEvent.click(toggle);
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+    expect(window.localStorage.getItem('erp_foodlab.theme')).toBe('dark');
+    expect(toggle).toHaveAttribute('aria-label', 'Switch to light mode');
+
+    document.documentElement.removeAttribute('data-theme');
+    initializeTheme();
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+
+    fireEvent.click(toggle);
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light');
+    expect(window.localStorage.getItem('erp_foodlab.theme')).toBe('light');
   });
 
   it('keeps secondary company tabs unselected when selectedCompanyId is null', () => {

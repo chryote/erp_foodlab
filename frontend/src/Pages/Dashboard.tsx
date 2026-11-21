@@ -3,10 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import {
   ArrowUpRight,
   Building2,
-  CalendarDays,
   CircleDollarSign,
   ClipboardList,
-  LogOut,
+  Landmark,
   Plus,
   ReceiptText,
   Users,
@@ -18,9 +17,15 @@ import {
   type Company,
   type ExpenseItem,
 } from '@/api/client';
-import { Button, Card, CardHeader, PageHeader } from '@/components/ui';
+import {
+  Button,
+  Card,
+  CardHeader,
+  DashboardHeader,
+} from '@/components/ui';
 import { setActiveCompanyId } from '@/lib/activeCompanyStorage';
 import {
+  useCompanyAssetCrudResource,
   useCapitalOverviewResource,
   useMasterOperasionalCrudResource,
 } from '@/lib/cfoResources';
@@ -29,12 +34,13 @@ import {
   formatCapitalIdr,
 } from '@/modules/CFO/CapitalCompanyCrudModal';
 import { ExpenseItemCrudModal } from '@/modules/CFO/ExpenseItemCrudModal';
+import { ViewCompanyAssetModal } from '@/modules/CFO/ViewCompanyAssetModal';
 import {
   formatCurrentMonthDateRange,
   ViewOperasionalModal,
 } from '@/modules/CFO/ViewOperasionalModal';
 
-type DashboardModal = 'capital' | 'expense' | 'operations' | null;
+type DashboardModal = 'capital' | 'expense' | 'operations' | 'assets' | null;
 
 export interface DashboardProps {
   onLogout?: () => void | Promise<void>;
@@ -136,18 +142,6 @@ function getItemCategoryId(
   );
 }
 
-function getUserInitials(name: string): string {
-  return (
-    name
-      .trim()
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((part) => part[0] ?? '')
-      .join('')
-      .toLocaleUpperCase() || 'U'
-  );
-}
-
 export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(
     null
@@ -183,6 +177,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     loading: operationsLoading,
     error: operationsError,
   } = useMasterOperasionalCrudResource(Boolean(selectedCompany), selectedCompany);
+  const {
+    assets: companyAssets,
+    loading: assetLoading,
+    error: assetError,
+  } = useCompanyAssetCrudResource(Boolean(selectedCompany), selectedCompany);
 
   const referenceDate = new Date();
   const year = referenceDate.getFullYear();
@@ -214,6 +213,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           .filter(Boolean)
       ).size,
     [companyCapital]
+  );
+
+  const totalAssetValue = useMemo(
+    () =>
+      companyAssets.reduce((total, asset) => {
+        const amount = Number(asset.total_price);
+        return Number.isFinite(amount) ? total + amount : total;
+      }, 0),
+    [companyAssets]
   );
 
   const currentMonthItems = useMemo(
@@ -302,73 +310,41 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       ? currentUserQuery.error.message
       : 'Gagal memuat data pengguna.'
     : null;
-  const errors = [userError, capitalError, operationsError].filter(
-    (message): message is string => Boolean(message)
-  );
+  const errors = [
+    userError,
+    capitalError,
+    operationsError,
+    assetError,
+  ].filter((message): message is string => Boolean(message));
 
   return (
     <div className="min-h-screen bg-background">
-      <main className="mx-auto max-w-[1360px] px-4 py-7 sm:px-6 lg:px-8">
-        <PageHeader
-          eyebrow="Dashboard"
-          title="PT. Slaras Nusa Foodlab"
-          subtitle={
-            selectedCompany
+      <DashboardHeader
+        companies={companies}
+        selectedSeries={selectedCompany?.series ?? 1}
+        selectedCompanyId={selectedCompany?.id ?? null}
+        user={currentUserQuery.data}
+        userLoading={currentUserQuery.isLoading}
+        dateRange={dateRange}
+        onSelectSeries={handleSelectSeries}
+        onSelectCompany={handleSelectCompany}
+        onLogout={onLogout}
+      />
+
+      <main className="mx-auto max-w-340 px-4 py-7 sm:px-6 lg:px-8">
+        <div className="mb-6">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-primary">
+            Dashboard
+          </p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+            PT. Slaras Nusa Foodlab
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {selectedCompany
               ? `Ringkasan keuangan dan operasional untuk ${selectedCompany.name}.`
-              : 'Ringkasan keuangan dan operasional perusahaan.'
-          }
-          companies={companies}
-          selectedSeries={selectedCompany?.series ?? 1}
-          selectedCompanyId={selectedCompany?.id ?? null}
-          onSelectSeries={handleSelectSeries}
-          onSelectCompany={handleSelectCompany}
-          actions={
-            <>
-              {currentUserQuery.data ? (
-                <div
-                  aria-label={`Pengguna aktif: ${currentUserQuery.data.name}, ${currentUserQuery.data.email}`}
-                  className="flex items-center gap-2 rounded-full border border-border bg-card py-1 pl-1 pr-3"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-semibold text-primary"
-                  >
-                    {getUserInitials(currentUserQuery.data.name)}
-                  </span>
-                  <span className="hidden min-w-0 sm:block">
-                    <span className="block max-w-40 truncate text-xs font-semibold text-foreground">
-                      {currentUserQuery.data.name}
-                    </span>
-                    <span className="block max-w-40 truncate text-[11px] text-muted-foreground">
-                      {currentUserQuery.data.email}
-                    </span>
-                  </span>
-                </div>
-              ) : currentUserQuery.isLoading ? (
-                <span
-                  role="status"
-                  className="hidden text-xs text-muted-foreground sm:inline"
-                >
-                  Memuat pengguna...
-                </span>
-              ) : null}
-              <span className="hidden items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground xl:inline-flex">
-                <CalendarDays aria-hidden="true" className="size-4" />
-                {dateRange}
-              </span>
-              {onLogout && (
-                <Button
-                  variant="secondary"
-                  aria-label="Keluar"
-                  onClick={onLogout}
-                >
-                  <LogOut aria-hidden="true" className="size-4 sm:mr-1.5" />
-                  <span className="hidden sm:inline">Keluar</span>
-                </Button>
-              )}
-            </>
-          }
-        />
+              : 'Ringkasan keuangan dan operasional perusahaan.'}
+          </p>
+        </div>
 
         {errors.map((message) => (
           <div
@@ -389,7 +365,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
 
         <section
           aria-label="Ringkasan keuangan dan operasional"
-          className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+          className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"
         >
           <MetricCard
             label="Total Kapital"
@@ -418,6 +394,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             description="Nama pemegang saham unik pada data kapital."
             icon={<Users aria-hidden="true" className="size-5" />}
             loading={capitalLoading}
+          />
+          <MetricCard
+            label="Total Nilai Aset"
+            value={formatCapitalIdr(totalAssetValue)}
+            description={`${companyAssets.length} aset terdaftar untuk ${selectedCompany?.name ?? 'perusahaan terpilih'}.`}
+            icon={<Landmark aria-hidden="true" className="size-5" />}
+            loading={assetLoading}
           />
         </section>
 
@@ -495,7 +478,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             <CardHeader
               eyebrow="AKSES CEPAT"
               title="Kelola data"
-              subtitle="Buka pencatatan modal dan operasional."
+              subtitle="Buka pencatatan modal, aset, dan operasional."
             />
             <div className="grid gap-3 px-6 pb-6 sm:grid-cols-2 lg:grid-cols-1">
               <button
@@ -543,6 +526,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                   className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
                 />
               </button>
+
+              <button
+                type="button"
+                disabled={!selectedCompany}
+                onClick={() => setActiveModal('assets')}
+                className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span className="rounded-lg bg-amber-500/10 p-2.5 text-amber-700">
+                  <Landmark aria-hidden="true" className="size-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold text-foreground">
+                    View aset perusahaan
+                  </span>
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    Lihat daftar aset dan total nilainya
+                  </span>
+                </span>
+                <ArrowUpRight
+                  aria-hidden="true"
+                  className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+                />
+              </button>
             </div>
           </Card>
         </section>
@@ -566,7 +572,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
               }
             />
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+              <table className="w-full min-w-160 border-collapse text-left text-sm">
                 <thead>
                   <tr className="border-y border-border bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
                     <th scope="col" className="px-6 py-3 font-semibold">
@@ -622,7 +628,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                           key={item.id}
                           className="transition-colors hover:bg-muted/30"
                         >
-                          <td className="max-w-[260px] px-6 py-4">
+                          <td className="max-w-65 px-6 py-4">
                             <span className="block truncate font-medium text-foreground">
                               {item.name}
                             </span>
@@ -667,6 +673,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         isOpen={activeModal === 'operations'}
         company={selectedCompany}
         referenceDate={referenceDate}
+        onClose={() => setActiveModal(null)}
+      />
+      <ViewCompanyAssetModal
+        isOpen={activeModal === 'assets'}
+        company={selectedCompany}
         onClose={() => setActiveModal(null)}
       />
     </div>

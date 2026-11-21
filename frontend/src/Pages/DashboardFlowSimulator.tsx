@@ -31,7 +31,6 @@ import { MasterKaryawanCrudModal } from '@/modules/CHO/MasterKaryawanCrudModal';
 import { ViewKaryawanModal } from '@/modules/CHO/ViewKaryawanModal';
 import { CmoModuleCard } from '@/modules/CMO/CmoModuleCard';
 import { CpoModuleCard } from '@/modules/CPO/CpoModuleCard';
-import '@/App.css';
 
 export interface DashboardProps {
   onLogout?: () => void;

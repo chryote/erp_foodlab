@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { login } from '@/api/client';
-import { Button, Card, CardHeader, TextInput } from '@/components/ui';
+import { Button, Card, CardHeader, TextInput, ThemeToggle } from '@/components/ui';
 
 export interface LoginPageProps {
   onAuthenticated: (token: string, developmentMode: boolean) => void;
@@ -33,7 +33,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticated }) => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-100 px-6 py-12">
+    <div className="relative flex min-h-screen items-center justify-center bg-background px-6 py-12">
+      <div className="fixed right-4 top-4 z-10">
+        <ThemeToggle showLabel />
+      </div>
       <Card className="w-full max-w-md" aria-label="Login ERP FoodLab">
         <CardHeader
           eyebrow="ENTERPRISE RESOURCE PLANNING"
