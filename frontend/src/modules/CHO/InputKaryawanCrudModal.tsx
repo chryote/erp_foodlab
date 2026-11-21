@@ -1105,12 +1105,20 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
           </div>
         </form>
 
-        <DataTable
-          columns={columns}
-          data={paginatedEmployees}
-          rowKey={(row) => row.id}
-          emptyMessage="Belum ada data karyawan."
-        />
+        <div className="flex shrink-0 flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Daftar Karyawan
+            </h3>
+            <Badge variant="neutral">{allEmployees.length} karyawan</Badge>
+          </div>
+          <DataTable
+            columns={columns}
+            data={paginatedEmployees}
+            rowKey={(row) => row.id}
+            emptyMessage="Belum ada data karyawan."
+          />
+        </div>
 
         <Pagination
           currentPage={safeCurrentPage}

@@ -289,6 +289,33 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
       employeesStore = [created, ...employeesStore];
       return { data: created };
     });
+    vi.mocked(apiClient.updateEmployee).mockImplementation(async (id, payload) => {
+      const updated: apiClient.Employee = {
+        id,
+        ...payload,
+        company: companiesStore.find((c) => c.id === payload.company_id) ?? null,
+        employee_position:
+          positionsStore.find((p) => p.id === payload.employee_position_id) ?? null,
+        employment_status:
+          statusesStore.find((s) => s.id === payload.employment_status_id) ?? null,
+        payroll_grade:
+          gradesStore.find((g) => g.id === payload.payroll_grade_id) ?? null,
+        tax_status:
+          taxStatusesStore.find((t) => t.id === payload.tax_status_id) ?? null,
+        documents: (payload.documents ?? []).map((doc, idx) => ({
+          id: 600 + idx,
+          employee_id: id,
+          document_type: doc.document_type,
+          file_url: doc.file_url,
+        })),
+      };
+      employeesStore = employeesStore.map((e) => (e.id === id ? updated : e));
+      return { data: updated };
+    });
+    vi.mocked(apiClient.deleteEmployee).mockImplementation(async (id) => {
+      employeesStore = employeesStore.filter((e) => e.id !== id);
+      return { message: 'Employee deleted successfully.' };
+    });
 
     renderApp();
 
@@ -510,6 +537,38 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
       ).toBeInTheDocument();
     });
 
+    // Edit Employee via DataTable row button
+    fireEvent.click(within(inputKaryawanModal).getByTestId('edit-row-103'));
+    fireEvent.change(within(inputKaryawanModal).getByLabelText('Nama Lengkap'), {
+      target: { value: 'Budi Santoso, S.Si.' },
+    });
+    fireEvent.click(
+      within(inputKaryawanModal).getByRole('button', { name: 'Perbarui' })
+    );
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    await waitFor(() => {
+      expect(apiClient.updateEmployee).toHaveBeenCalledWith(
+        103,
+        expect.objectContaining({
+          name: 'Budi Santoso, S.Si.',
+        })
+      );
+      expect(
+        within(inputKaryawanModal).getByText('Budi Santoso, S.Si.')
+      ).toBeInTheDocument();
+    });
+
+    // Delete Employee via DataTable row button
+    fireEvent.click(within(inputKaryawanModal).getByTestId('delete-row-103'));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+    await waitFor(() => {
+      expect(apiClient.deleteEmployee).toHaveBeenCalledWith(103);
+      expect(
+        within(inputKaryawanModal).queryByText('Budi Santoso, S.Si.')
+      ).not.toBeInTheDocument();
+    });
+
     fireEvent.click(
       within(inputKaryawanModal).getByRole('button', { name: 'Tutup Modal' })
     );
@@ -520,14 +579,13 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
     await waitFor(() => {
       expect(apiClient.fetchActiveCompanyEmployees).toHaveBeenCalled();
       expect(within(viewModal).getByText('Nadia Putri')).toBeInTheDocument();
-      expect(within(viewModal).getByText('Budi Santoso')).toBeInTheDocument();
       expect(
         within(viewModal).queryByText('Andi Wijaya')
       ).not.toBeInTheDocument();
     });
     expect(
       within(viewModal).getByTestId('view-karyawan-total-banner-value')
-    ).toHaveTextContent('2 Personel');
+    ).toHaveTextContent('1 Personel');
 
     fireEvent.click(
       within(viewModal).getByRole('button', { name: 'Tutup Modal' })

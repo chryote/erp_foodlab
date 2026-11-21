@@ -41,25 +41,27 @@ export function DataTable<T>({
   }
 
   return (
-    <ShadcnTable>
-      <ShadcnTableHeader>
-        <ShadcnTableRow>
-          {columns.map((col) => (
-            <ShadcnTableHead key={col.key}>{col.header}</ShadcnTableHead>
-          ))}
-        </ShadcnTableRow>
-      </ShadcnTableHeader>
-      <ShadcnTableBody>
-        {data.map((row, index) => (
-          <ShadcnTableRow key={rowKey(row)}>
+    <div className="w-full shrink-0">
+      <ShadcnTable>
+        <ShadcnTableHeader>
+          <ShadcnTableRow>
             {columns.map((col) => (
-              <ShadcnTableCell key={col.key}>
-                {col.render(row, index)}
-              </ShadcnTableCell>
+              <ShadcnTableHead key={col.key}>{col.header}</ShadcnTableHead>
             ))}
           </ShadcnTableRow>
-        ))}
-      </ShadcnTableBody>
-    </ShadcnTable>
+        </ShadcnTableHeader>
+        <ShadcnTableBody>
+          {data.map((row, index) => (
+            <ShadcnTableRow key={rowKey(row)}>
+              {columns.map((col) => (
+                <ShadcnTableCell key={col.key}>
+                  {col.render(row, index)}
+                </ShadcnTableCell>
+              ))}
+            </ShadcnTableRow>
+          ))}
+        </ShadcnTableBody>
+      </ShadcnTable>
+    </div>
   );
 }

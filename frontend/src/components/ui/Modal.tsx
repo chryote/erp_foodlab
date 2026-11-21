@@ -64,7 +64,7 @@ export const Modal: React.FC<ModalProps> = ({
           </Button>
         </div>
 
-        <div className="flex flex-col gap-4 overflow-y-auto px-6 py-5">
+        <div className="flex flex-col gap-4 overflow-y-auto px-6 py-5 [&>*]:shrink-0">
           {children}
         </div>
 
