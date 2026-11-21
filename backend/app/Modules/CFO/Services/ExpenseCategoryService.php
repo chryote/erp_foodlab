@@ -2,6 +2,7 @@
 
 namespace App\Modules\CFO\Services;
 
+use App\Models\Company;
 use App\Models\ExpenseCategory;
 use App\Support\IndexQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -19,11 +20,18 @@ class ExpenseCategoryService
     public const CACHE_KEY_LIST = 'erp_foodlab:cfo:expense_categories:list';
 
     /**
+     * @var array<int, string>
+     */
+    private const RELATIONS = ['company'];
+
+    /**
      * @return LengthAwarePaginator|Collection<int, ExpenseCategory>
      */
     public function list(Request $request): LengthAwarePaginator|Collection
     {
-        $query = IndexQuery::withDefaultRelations($this->query($request), $request, ['company']);
+        $query = IndexQuery::withDefaultRelations($this->query($request), $request, self::RELATIONS);
+
+        IndexQuery::applyActiveCompanyFilter($query->getEloquentBuilder(), $request);
 
         if (IndexQuery::isPaginated($request)) {
             return IndexQuery::paginate($query, $request);
@@ -38,19 +46,32 @@ class ExpenseCategoryService
 
     public function createExpenseCategory(array $attributes): ExpenseCategory
     {
-        $expenseCategory = DB::transaction(
-            fn (): ExpenseCategory => ExpenseCategory::query()->create($attributes)
-        );
+        $expenseCategory = DB::transaction(function () use ($attributes): ExpenseCategory {
+            $this->assertActiveCompany((int) $attributes['company_id']);
+
+            return ExpenseCategory::query()->create($attributes);
+        });
 
         $this->forgetCaches();
 
-        return $expenseCategory->load('company');
+        return $expenseCategory->load(self::RELATIONS);
     }
 
     public function updateExpenseCategory(ExpenseCategory $expenseCategory, array $attributes): ExpenseCategory
     {
         $updated = DB::transaction(function () use ($expenseCategory, $attributes): ExpenseCategory {
             $locked = ExpenseCategory::query()->lockForUpdate()->findOrFail($expenseCategory->getKey());
+
+            $targetCompanyId = (int) ($attributes['company_id'] ?? $locked->company_id);
+            if ($targetCompanyId !== (int) $locked->company_id && ($locked->expenseTypes()->exists() || $locked->expenseItems()->exists())) {
+                throw ValidationException::withMessages([
+                    'company_id' => [
+                        'Cannot change company for an expense category that is still referenced by expense types or items.',
+                    ],
+                ]);
+            }
+
+            $this->assertActiveCompany($targetCompanyId);
             $locked->update($attributes);
 
             return $locked;
@@ -58,7 +79,7 @@ class ExpenseCategoryService
 
         $this->forgetCaches();
 
-        return $updated->refresh()->load('company');
+        return $updated->refresh()->load(self::RELATIONS);
     }
 
     public function deleteExpenseCategory(ExpenseCategory $expenseCategory): void
@@ -86,12 +107,32 @@ class ExpenseCategoryService
             ->allowedFilters([
                 AllowedFilter::exact('company_id'),
                 AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
-                    $query->where('name', 'like', '%'.trim((string) $value).'%');
+                    $escaped = IndexQuery::escapeLike($value);
+                    if ($escaped === null) {
+                        return;
+                    }
+
+                    IndexQuery::whereLike($query, 'name', $escaped);
                 }),
             ])
             ->allowedSorts(['id', 'name', 'created_at', 'updated_at'])
-            ->allowedIncludes(['company'])
+            ->allowedIncludes(self::RELATIONS)
             ->defaultSort('-id');
+    }
+
+    private function assertActiveCompany(int $companyId): void
+    {
+        $exists = Company::query()
+            ->whereNull('deleted_at')
+            ->sharedLock()
+            ->whereKey($companyId)
+            ->exists();
+
+        if (! $exists) {
+            throw ValidationException::withMessages([
+                'company_id' => ['The selected company is invalid or has been deleted.'],
+            ]);
+        }
     }
 
     private function forgetCaches(): void

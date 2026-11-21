@@ -25,6 +25,18 @@ final class ActiveCompany
         return "erp_foodlab:active_company:user:{$userId}";
     }
 
+    public static function cacheKeyForCompany(int $companyId): string
+    {
+        return "erp_foodlab:active_company:model:{$companyId}";
+    }
+
+    public static function forgetCompanyCache(?int $companyId): void
+    {
+        if ($companyId !== null && $companyId > 0) {
+            Cache::forget(self::cacheKeyForCompany($companyId));
+        }
+    }
+
     public static function set(?Company $company): void
     {
         self::$current = $company;
@@ -54,7 +66,13 @@ final class ActiveCompany
             return null;
         }
 
-        $company = Company::query()->find($companyId);
+        $cacheKey = self::cacheKeyForCompany($companyId);
+        $company = Cache::remember($cacheKey, 60, fn (): ?Company => Company::query()->find($companyId));
+
+        if ($company === null) {
+            Cache::forget($cacheKey);
+        }
+
         self::set($company);
 
         return $company;
@@ -95,6 +113,7 @@ final class ActiveCompany
             Cache::put(self::cacheKeyForUser((int) $user->getKey()), $companyId, $ttl);
         }
         Cache::put(self::GLOBAL_CACHE_KEY, $companyId, $ttl);
+        Cache::put(self::cacheKeyForCompany($companyId), $company, 60);
         self::set($company);
     }
 

@@ -39,7 +39,8 @@ CREATE TABLE `capital_companies` (
   PRIMARY KEY (`id`),
   KEY `capital_companies_stakeholder_name_index` (`stakeholder_name`),
   KEY `capital_companies_company_deleted_idx` (`company_id`,`deleted_at`),
-  CONSTRAINT `capital_companies_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE CASCADE
+  KEY `capital_companies_deleted_id_idx` (`deleted_at`,`id`),
+  CONSTRAINT `capital_companies_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `companies`;
@@ -75,7 +76,8 @@ CREATE TABLE `company_assets` (
   KEY `company_assets_company_id_asset_date_index` (`company_id`,`asset_date`),
   KEY `company_assets_asset_date_index` (`asset_date`),
   KEY `company_assets_name_index` (`name`),
-  KEY `company_assets_company_deleted_idx` (`company_id`,`deleted_at`),
+  KEY `company_assets_comp_del_date_id_idx` (`company_id`,`deleted_at`,`asset_date`,`id`),
+  KEY `company_assets_del_date_id_idx` (`deleted_at`,`asset_date`,`id`),
   CONSTRAINT `company_assets_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -283,7 +285,8 @@ CREATE TABLE `expense_categories` (
   PRIMARY KEY (`id`),
   KEY `expense_categories_name_index` (`name`),
   KEY `expense_categories_company_deleted_idx` (`company_id`,`deleted_at`),
-  CONSTRAINT `expense_categories_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE CASCADE
+  KEY `expense_categories_deleted_id_idx` (`deleted_at`,`id`),
+  CONSTRAINT `expense_categories_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `expense_items`;
@@ -311,11 +314,13 @@ CREATE TABLE `expense_items` (
   KEY `expense_items_purchased_on_index` (`purchased_on`),
   KEY `expense_items_closing_date_index` (`closing_date`),
   KEY `expense_items_employee_id_index` (`employee_id`),
-  KEY `expense_items_company_deleted_idx` (`company_id`,`deleted_at`),
-  CONSTRAINT `expense_items_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE CASCADE,
+  KEY `expense_items_comp_del_purchased_idx` (`company_id`,`deleted_at`,`purchased_on`),
+  KEY `expense_items_comp_del_cat_type_idx` (`company_id`,`deleted_at`,`expense_category_id`,`expense_type_id`),
+  KEY `expense_items_deleted_id_idx` (`deleted_at`,`id`),
+  CONSTRAINT `expense_items_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `expense_items_employee_id_foreign` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`) ON DELETE RESTRICT,
-  CONSTRAINT `expense_items_expense_category_id_foreign` FOREIGN KEY (`expense_category_id`) REFERENCES `expense_categories` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `expense_items_expense_type_id_foreign` FOREIGN KEY (`expense_type_id`) REFERENCES `expense_types` (`id`) ON DELETE CASCADE
+  CONSTRAINT `expense_items_expense_category_id_foreign` FOREIGN KEY (`expense_category_id`) REFERENCES `expense_categories` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `expense_items_expense_type_id_foreign` FOREIGN KEY (`expense_type_id`) REFERENCES `expense_types` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `expense_types`;
@@ -333,8 +338,10 @@ CREATE TABLE `expense_types` (
   KEY `expense_types_expense_category_id_index` (`expense_category_id`),
   KEY `expense_types_name_index` (`name`),
   KEY `expense_types_company_deleted_idx` (`company_id`,`deleted_at`),
-  CONSTRAINT `expense_types_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `expense_types_expense_category_id_foreign` FOREIGN KEY (`expense_category_id`) REFERENCES `expense_categories` (`id`) ON DELETE CASCADE
+  KEY `expense_types_comp_cat_del_idx` (`company_id`,`expense_category_id`,`deleted_at`),
+  KEY `expense_types_deleted_id_idx` (`deleted_at`,`id`),
+  CONSTRAINT `expense_types_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `expense_types_expense_category_id_foreign` FOREIGN KEY (`expense_category_id`) REFERENCES `expense_categories` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `lab_samples`;
@@ -493,5 +500,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (35,'2026_11_21_130
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (36,'2026_11_21_140000_create_employee_attendances_table',22);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (37,'2026_11_21_150000_create_employee_shift_assignments_table',23);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (38,'2026_11_21_160000_add_employee_attendance_code_to_employees_table',24);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (39,'2026_11_21_170000_cfo_indexes_and_fk_hardening',25);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;

@@ -16,9 +16,11 @@ class SaveCompanyRequest extends FormRequest
      */
     public function rules(): array
     {
+        $requiredRule = $this->isMethod('PATCH') ? ['sometimes', 'required'] : ['required'];
+
         return [
-            'name' => ['required', 'string', 'max:150'],
-            'series' => ['sometimes', 'required', 'integer', 'min:1'],
+            'name' => [...$requiredRule, 'string', 'max:150'],
+            'series' => ['sometimes', 'required', 'integer', 'min:1', 'max:999999'],
         ];
     }
 
@@ -28,7 +30,10 @@ class SaveCompanyRequest extends FormRequest
     public function payload(): array
     {
         $validated = $this->validated();
-        $validated['name'] = (string) $validated['name'];
+
+        if (array_key_exists('name', $validated)) {
+            $validated['name'] = (string) $validated['name'];
+        }
 
         if (array_key_exists('series', $validated)) {
             $validated['series'] = (int) $validated['series'];

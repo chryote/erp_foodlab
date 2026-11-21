@@ -2,6 +2,7 @@
 
 use App\Models\CapitalCompany;
 use App\Models\Company;
+use App\Models\CompanyAsset;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseItem;
 use App\Models\ExpenseType;
@@ -120,6 +121,7 @@ describe('CFO Company CRUD API (/api/v1/modules/cfo/companies)', function () {
     it('soft-deletes dependent financial records when a company is deleted', function () {
         $company = Company::factory()->create();
         $capital = CapitalCompany::factory()->create(['company_id' => $company->id]);
+        $asset = CompanyAsset::factory()->create(['company_id' => $company->id]);
         $category = ExpenseCategory::factory()->create(['company_id' => $company->id]);
         $type = ExpenseType::factory()->create([
             'company_id' => $company->id,
@@ -135,6 +137,7 @@ describe('CFO Company CRUD API (/api/v1/modules/cfo/companies)', function () {
 
         $this->assertSoftDeleted('companies', ['id' => $company->id]);
         $this->assertSoftDeleted('capital_companies', ['id' => $capital->id]);
+        $this->assertSoftDeleted('company_assets', ['id' => $asset->id]);
         $this->assertSoftDeleted('expense_categories', ['id' => $category->id]);
         $this->assertSoftDeleted('expense_types', ['id' => $type->id]);
         $this->assertSoftDeleted('expense_items', ['id' => $item->id]);

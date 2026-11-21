@@ -17,13 +17,15 @@ class SaveExpenseCategoryRequest extends FormRequest
      */
     public function rules(): array
     {
+        $requiredRule = $this->isMethod('PATCH') ? ['sometimes', 'required'] : ['required'];
+
         return [
             'company_id' => [
-                'required',
+                ...$requiredRule,
                 'integer',
                 Rule::exists('companies', 'id')->whereNull('deleted_at'),
             ],
-            'name' => ['required', 'string', 'max:150'],
+            'name' => [...$requiredRule, 'string', 'max:150'],
         ];
     }
 
@@ -33,8 +35,14 @@ class SaveExpenseCategoryRequest extends FormRequest
     public function payload(): array
     {
         $validated = $this->validated();
-        $validated['company_id'] = (int) $validated['company_id'];
-        $validated['name'] = (string) $validated['name'];
+
+        if (array_key_exists('company_id', $validated)) {
+            $validated['company_id'] = (int) $validated['company_id'];
+        }
+
+        if (array_key_exists('name', $validated)) {
+            $validated['name'] = (string) $validated['name'];
+        }
 
         return $validated;
     }

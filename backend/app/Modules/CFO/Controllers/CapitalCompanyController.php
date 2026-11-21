@@ -21,11 +21,13 @@ class CapitalCompanyController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $result = $this->capitalCompanyService->listWithTotal($request);
+
         return $this->respondWithList(
             CapitalCompanyResource::class,
-            $this->capitalCompanyService->list($request),
+            $result['items'],
             [
-                'total_capital' => $this->capitalCompanyService->totalCapital($request),
+                'total_capital' => $result['total_capital'],
                 'cache_key' => CapitalCompanyService::CACHE_KEY_LIST,
             ]
         );
