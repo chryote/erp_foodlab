@@ -1,11 +1,13 @@
 <?php
 
+use App\Http\Controllers\ActiveCompanyController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\ErpMenuController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\LabSampleController;
 use App\Http\Controllers\MetricsController;
+use App\Http\Middleware\ResolveActiveCompany;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', HealthController::class)->name('api.health');
@@ -16,9 +18,13 @@ Route::prefix('v1')->group(function () {
         ->middleware('throttle:5,1')
         ->name('api.auth.login');
 
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', ResolveActiveCompany::class])->group(function () {
         Route::get('/auth/me', [AuthController::class, 'me'])->name('api.auth.me');
         Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.auth.logout');
+
+        // Active Company global context
+        Route::get('/active-company', [ActiveCompanyController::class, 'show'])->name('api.active-company.show');
+        Route::post('/active-company', [ActiveCompanyController::class, 'update'])->name('api.active-company.update');
 
         // ERP Main Menu Modules Summary + Dedicated Module Routes
         Route::get('/modules', ErpMenuController::class)->name('api.modules.index');

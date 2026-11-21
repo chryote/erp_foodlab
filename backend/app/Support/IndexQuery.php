@@ -62,6 +62,10 @@ final class IndexQuery
             return false;
         }
 
+        if ($request->boolean('active_company')) {
+            return false;
+        }
+
         if ($request->filled('filter') || $request->filled('sort') || $request->filled('include')) {
             return false;
         }

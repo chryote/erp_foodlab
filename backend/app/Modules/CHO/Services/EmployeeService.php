@@ -43,11 +43,21 @@ class EmployeeService
     {
         $query = IndexQuery::withDefaultRelations($this->query($request), $request, self::RELATIONS);
 
+        if ($request->boolean('active_company')) {
+            $activeCompanyId = active_company_id();
+
+            if ($activeCompanyId !== null) {
+                $query->where('company_id', $activeCompanyId);
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+
         if (IndexQuery::isPaginated($request)) {
             return IndexQuery::paginate($query, $request);
         }
 
-        if (IndexQuery::isCacheable($request)) {
+        if (! $request->boolean('active_company') && IndexQuery::isCacheable($request)) {
             return Cache::remember(self::CACHE_KEY_LIST, 60, fn () => $query->get());
         }
 

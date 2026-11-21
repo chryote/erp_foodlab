@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\LoginRequest;
 use App\Http\Resources\UserResource;
+use App\Support\ActiveCompany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -36,6 +37,8 @@ class AuthController extends Controller
         if ($currentToken instanceof PersonalAccessToken) {
             $currentToken->delete();
         }
+
+        ActiveCompany::persist($request->user(), null);
 
         return response()->json([
             'message' => 'Logged out successfully.',

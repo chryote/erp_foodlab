@@ -2,14 +2,17 @@
 
 namespace App\Modules\CHO\Controllers;
 
+use App\Enums\JenisDokumen;
 use App\Http\Controllers\Concerns\RespondsWithApiList;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\EmployeeResource;
 use App\Models\Employee;
 use App\Modules\CHO\Requests\SaveEmployeeRequest;
 use App\Modules\CHO\Services\EmployeeService;
+use App\Services\DocumentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class EmployeeController extends Controller
 {
@@ -65,5 +68,30 @@ class EmployeeController extends Controller
         return response()->json([
             'message' => 'Employee deleted successfully.',
         ]);
+    }
+
+    public function uploadDocument(Request $request, DocumentService $documents): JsonResponse
+    {
+        $documentType = $request->filled('document_type')
+            ? JenisDokumen::tryFrom($request->string('document_type')->toString())
+            : null;
+
+        $request->validate([
+            'document_type' => ['sometimes', 'nullable', Rule::enum(JenisDokumen::class)],
+            'document' => $documents->rules(documentType: $documentType),
+        ]);
+
+        $directory = $documentType !== null
+            ? $documentType->storageDirectory('employees')
+            : 'employees/documents';
+
+        $uploaded = $documents->upload(
+            file: $request->file('document'),
+            directory: $directory,
+            skipValidation: true,
+            documentType: $documentType,
+        );
+
+        return response()->json($uploaded, 201);
     }
 }

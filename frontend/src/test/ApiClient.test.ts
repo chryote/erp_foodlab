@@ -10,7 +10,9 @@ import {
   deleteExpenseCategory,
   deleteExpenseItem,
   deleteExpenseType,
+  fetchActiveCompanyEmployees,
   fetchCapitalCompanies,
+  fetchChoEnums,
   fetchCompanies,
   fetchErpModules,
   fetchExpenseCategories,
@@ -18,12 +20,17 @@ import {
   fetchExpenseTypes,
   fetchHealthStatus,
   fetchLabSamples,
+  syncActiveCompany,
   updateCapitalCompany,
   updateCompany,
   updateExpenseCategory,
   updateExpenseItem,
   updateExpenseType,
 } from '../api/client';
+import {
+  clearActiveCompanyId,
+  setActiveCompanyId,
+} from '../lib/activeCompanyStorage';
 
 describe('General API Client Contract & Error Handling', () => {
   const originalFetch = globalThis.fetch;
@@ -33,6 +40,7 @@ describe('General API Client Contract & Error Handling', () => {
   });
 
   afterEach(() => {
+    clearActiveCompanyId();
     globalThis.fetch = originalFetch;
   });
 
@@ -171,5 +179,28 @@ describe('General API Client Contract & Error Handling', () => {
       expect(deleteOpts.method).toBe('DELETE');
       expect(deleteOpts.body).toBeUndefined();
     }
+  });
+
+  it('sends X-Active-Company-Id header when an active company is stored and calls CHO active company endpoints', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: [] }),
+    } as Response);
+
+    setActiveCompanyId(7);
+    await fetchChoEnums();
+    await fetchActiveCompanyEmployees();
+    await syncActiveCompany(7);
+
+    const calls = vi.mocked(globalThis.fetch).mock.calls;
+    expect(calls).toHaveLength(3);
+    for (const call of calls) {
+      const options = call[1] as RequestInit;
+      const headers = options.headers as Record<string, string>;
+      expect(headers['X-Active-Company-Id']).toBe('7');
+    }
+    expect(String(calls[1][0])).toContain('/v1/modules/cho/employees?active_company=1');
+    expect(String(calls[2][0])).toContain('/v1/active-company');
   });
 });

@@ -1,3 +1,5 @@
+import { clearActiveCompanyId } from '@/lib/activeCompanyStorage';
+
 export const AUTH_TOKEN_STORAGE_KEY = 'erp_foodlab.auth_token';
 export const DEVELOPMENT_MODE_STORAGE_KEY = 'erp_foodlab.development_mode';
 
@@ -54,6 +56,8 @@ export function setDevelopmentMode(enabled: boolean): void {
 }
 
 export function clearAuthToken(): void {
+  clearActiveCompanyId();
+
   if (typeof window === 'undefined') {
     return;
   }

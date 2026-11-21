@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('cho')->group(function () {
     Route::get('/', [ChoController::class, 'index'])->name('api.modules.cho.index');
+    Route::get('/enums', [ChoController::class, 'enums'])->name('api.modules.cho.enums');
 
     Route::get('/employee-positions', [EmployeePositionController::class, 'index'])->name('api.modules.cho.employee-positions.index');
     Route::post('/employee-positions', [EmployeePositionController::class, 'store'])->name('api.modules.cho.employee-positions.store');
@@ -41,6 +42,7 @@ Route::prefix('cho')->group(function () {
 
     Route::get('/employees', [EmployeeController::class, 'index'])->name('api.modules.cho.employees.index');
     Route::post('/employees', [EmployeeController::class, 'store'])->name('api.modules.cho.employees.store');
+    Route::post('/employees/upload-document', [EmployeeController::class, 'uploadDocument'])->name('api.modules.cho.employees.upload-document');
     Route::get('/employees/{employee}', [EmployeeController::class, 'show'])->name('api.modules.cho.employees.show');
     Route::put('/employees/{employee}', [EmployeeController::class, 'update'])->name('api.modules.cho.employees.update');
     Route::patch('/employees/{employee}', [EmployeeController::class, 'update'])->name('api.modules.cho.employees.patch');

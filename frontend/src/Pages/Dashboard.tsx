@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowUpRight,
@@ -13,11 +13,13 @@ import {
 } from 'lucide-react';
 import {
   fetchCurrentUser,
+  syncActiveCompany,
   type AuthUser,
   type Company,
   type ExpenseItem,
 } from '@/api/client';
 import { Button, Card, CardHeader, PageHeader } from '@/components/ui';
+import { setActiveCompanyId } from '@/lib/activeCompanyStorage';
 import {
   useCapitalOverviewResource,
   useMasterOperasionalCrudResource,
@@ -170,6 +172,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     companies[0] ??
     null;
 
+  useEffect(() => {
+    setActiveCompanyId(selectedCompany?.id ?? null);
+  }, [selectedCompany?.id]);
+
   const {
     categories,
     types,
@@ -279,11 +285,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     const firstCompanyInSeries = companies.find(
       (company) => (company.series ?? 1) === series
     );
-    setSelectedCompanyId(firstCompanyInSeries?.id ?? null);
+    const nextId = firstCompanyInSeries?.id ?? null;
+    setSelectedCompanyId(nextId);
+    setActiveCompanyId(nextId);
+    void Promise.resolve(syncActiveCompany(nextId)).catch(() => undefined);
   };
 
   const handleSelectCompany = (company: Company) => {
     setSelectedCompanyId(company.id);
+    setActiveCompanyId(company.id);
+    void Promise.resolve(syncActiveCompany(company.id)).catch(() => undefined);
   };
 
   const userError = currentUserQuery.error

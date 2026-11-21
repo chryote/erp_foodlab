@@ -1,6 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import type { Company, ErpModuleOverview } from '@/api/client';
+import {
+  type Company,
+  type ErpModuleOverview,
+  syncActiveCompany,
+} from '@/api/client';
 import { type HorizontalMenuItem, Button, PageHeader } from '@/components/ui';
+import { setActiveCompanyId } from '@/lib/activeCompanyStorage';
 import {
   useCompanyCrudResource,
   useErpModulesQuery,
@@ -17,7 +22,13 @@ import { ExpenseItemCrudModal } from '@/modules/CFO/ExpenseItemCrudModal';
 import { MasterOperasionalCrudModal } from '@/modules/CFO/MasterOperasionalCrudModal';
 import { ViewCompanyAssetModal } from '@/modules/CFO/ViewCompanyAssetModal';
 import { ViewOperasionalModal } from '@/modules/CFO/ViewOperasionalModal';
-import { ChoModuleCard } from '@/modules/CHO/ChoModuleCard';
+import {
+  ChoHorizontalMenu,
+  ChoModuleCard,
+} from '@/modules/CHO/ChoModuleCard';
+import { InputKaryawanCrudModal } from '@/modules/CHO/InputKaryawanCrudModal';
+import { MasterKaryawanCrudModal } from '@/modules/CHO/MasterKaryawanCrudModal';
+import { ViewKaryawanModal } from '@/modules/CHO/ViewKaryawanModal';
 import { CmoModuleCard } from '@/modules/CMO/CmoModuleCard';
 import { CpoModuleCard } from '@/modules/CPO/CpoModuleCard';
 import '@/App.css';
@@ -63,14 +74,22 @@ export const DashboardFlowSimulator: React.FC<DashboardProps> = ({ onLogout }) =
     setSelectedChildSubMenu(null);
   }, [companyResource.companies, selectedCompany]);
 
+  useEffect(() => {
+    setActiveCompanyId(selectedCompany?.id ?? null);
+  }, [selectedCompany?.id]);
+
   const handleSelectSeries = useCallback(() => {
     setSelectedCompany(null);
     setSelectedModule(null);
     setSelectedSubMenu(null);
     setSelectedChildSubMenu(null);
+    setActiveCompanyId(null);
+    void Promise.resolve(syncActiveCompany(null)).catch(() => undefined);
   }, []);
 
   const handleSelectCompany = useCallback((company: Company) => {
+    setActiveCompanyId(company.id);
+    void Promise.resolve(syncActiveCompany(company.id)).catch(() => undefined);
     setSelectedCompany((prev) => {
       if (prev?.id !== company.id) {
         setSelectedModule(null);
@@ -162,6 +181,17 @@ export const DashboardFlowSimulator: React.FC<DashboardProps> = ({ onLogout }) =
               </section>
             )}
 
+            {selectedModule?.code === 'CHO' && (
+              <section aria-label="CHO Module Navigation">
+                <ChoHorizontalMenu
+                  selectedCode={selectedSubMenu?.code ?? null}
+                  selectedChildCode={selectedChildSubMenu?.code ?? null}
+                  onSelect={handleSelectSubMenu}
+                  onSelectChild={setSelectedChildSubMenu}
+                />
+              </section>
+            )}
+
             <CompanyCrudModal
               isOpen={selectedChildSubMenu?.code === 'PERUSAHAAN'}
               companyResource={companyResource}
@@ -204,6 +234,26 @@ export const DashboardFlowSimulator: React.FC<DashboardProps> = ({ onLogout }) =
 
             <ViewCompanyAssetModal
               isOpen={selectedChildSubMenu?.code === 'VIEW_ASET'}
+              company={selectedCompany}
+              onClose={() => setSelectedChildSubMenu(null)}
+            />
+
+            <MasterKaryawanCrudModal
+              isOpen={selectedChildSubMenu?.code === 'MASTER_KARYAWAN'}
+              company={selectedCompany}
+              companies={companyResource.companies}
+              onClose={() => setSelectedChildSubMenu(null)}
+            />
+
+            <InputKaryawanCrudModal
+              isOpen={selectedChildSubMenu?.code === 'INPUT_KARYAWAN'}
+              company={selectedCompany}
+              companies={companyResource.companies}
+              onClose={() => setSelectedChildSubMenu(null)}
+            />
+
+            <ViewKaryawanModal
+              isOpen={selectedChildSubMenu?.code === 'VIEW_KARYAWAN'}
               company={selectedCompany}
               onClose={() => setSelectedChildSubMenu(null)}
             />
