@@ -5,6 +5,8 @@ namespace App\Modules\CHO\Services;
 use App\Models\Company;
 use App\Models\TaxStatus;
 use App\Support\IndexQuery;
+use App\Support\InputNormalizer;
+use App\Support\WriteGuard;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -49,10 +51,16 @@ class TaxStatusService
      */
     public function createTaxStatus(array $attributes): TaxStatus
     {
+        $attributes['name'] = InputNormalizer::text((string) $attributes['name']) ?? '';
+        if (array_key_exists('code', $attributes)) {
+            $attributes['code'] = $attributes['code'] !== null ? InputNormalizer::nullableText((string) $attributes['code']) : null;
+        }
+
         $taxStatus = DB::transaction(function () use ($attributes): TaxStatus {
             $this->assertWriteConstraints(
                 (int) $attributes['company_id'],
-                $attributes['code'] ?? null
+                $attributes['code'] ?? null,
+                $attributes['name']
             );
 
             return TaxStatus::query()->create($attributes);
@@ -68,6 +76,13 @@ class TaxStatusService
      */
     public function updateTaxStatus(TaxStatus $taxStatus, array $attributes): TaxStatus
     {
+        if (array_key_exists('name', $attributes)) {
+            $attributes['name'] = InputNormalizer::text((string) $attributes['name']) ?? '';
+        }
+        if (array_key_exists('code', $attributes)) {
+            $attributes['code'] = $attributes['code'] !== null ? InputNormalizer::nullableText((string) $attributes['code']) : null;
+        }
+
         $updated = DB::transaction(function () use ($taxStatus, $attributes): TaxStatus {
             $locked = TaxStatus::query()->lockForUpdate()->findOrFail($taxStatus->getKey());
 
@@ -81,7 +96,8 @@ class TaxStatusService
             }
 
             $targetCode = array_key_exists('code', $attributes) ? $attributes['code'] : $locked->code;
-            $this->assertWriteConstraints($targetCompanyId, $targetCode, $locked);
+            $targetName = (string) ($attributes['name'] ?? $locked->name);
+            $this->assertWriteConstraints($targetCompanyId, $targetCode, $targetName, $locked);
 
             $locked->update($attributes);
 
@@ -135,7 +151,7 @@ class TaxStatusService
             ->defaultSort('code', 'id');
     }
 
-    private function assertWriteConstraints(int $companyId, mixed $code, ?TaxStatus $existing = null): void
+    private function assertWriteConstraints(int $companyId, mixed $code, string $name, ?TaxStatus $existing = null): void
     {
         $companyExists = Company::query()
             ->whereNull('deleted_at')
@@ -149,20 +165,13 @@ class TaxStatusService
             ]);
         }
 
-        if ($code !== null && $code !== '') {
-            $duplicate = TaxStatus::query()
-                ->whereNull('deleted_at')
-                ->where('company_id', $companyId)
-                ->where('code', (string) $code)
-                ->when($existing !== null, fn (Builder $query) => $query->whereKeyNot($existing->getKey()))
-                ->sharedLock()
-                ->exists();
-
-            if ($duplicate) {
-                throw ValidationException::withMessages([
-                    'code' => ['The code has already been taken.'],
-                ]);
-            }
-        }
+        WriteGuard::assertCompanyCodeAndNameUnique(
+            TaxStatus::class,
+            $companyId,
+            $code !== null ? (string) $code : null,
+            $name,
+            'Status pajak dengan nama yang sama sudah terdaftar pada perusahaan ini.',
+            $existing?->getKey()
+        );
     }
 }

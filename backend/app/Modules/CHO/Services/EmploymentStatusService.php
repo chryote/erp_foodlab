@@ -5,6 +5,8 @@ namespace App\Modules\CHO\Services;
 use App\Models\Company;
 use App\Models\EmploymentStatus;
 use App\Support\IndexQuery;
+use App\Support\InputNormalizer;
+use App\Support\WriteGuard;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -49,10 +51,16 @@ class EmploymentStatusService
      */
     public function createEmploymentStatus(array $attributes): EmploymentStatus
     {
+        $attributes['name'] = InputNormalizer::text((string) $attributes['name']) ?? '';
+        if (array_key_exists('code', $attributes)) {
+            $attributes['code'] = $attributes['code'] !== null ? InputNormalizer::nullableText((string) $attributes['code']) : null;
+        }
+
         $employmentStatus = DB::transaction(function () use ($attributes): EmploymentStatus {
             $this->assertWriteConstraints(
                 (int) $attributes['company_id'],
-                $attributes['code'] ?? null
+                $attributes['code'] ?? null,
+                $attributes['name']
             );
 
             return EmploymentStatus::query()->create($attributes);
@@ -68,6 +76,13 @@ class EmploymentStatusService
      */
     public function updateEmploymentStatus(EmploymentStatus $employmentStatus, array $attributes): EmploymentStatus
     {
+        if (array_key_exists('name', $attributes)) {
+            $attributes['name'] = InputNormalizer::text((string) $attributes['name']) ?? '';
+        }
+        if (array_key_exists('code', $attributes)) {
+            $attributes['code'] = $attributes['code'] !== null ? InputNormalizer::nullableText((string) $attributes['code']) : null;
+        }
+
         $updated = DB::transaction(function () use ($employmentStatus, $attributes): EmploymentStatus {
             $locked = EmploymentStatus::query()->lockForUpdate()->findOrFail($employmentStatus->getKey());
 
@@ -81,7 +96,8 @@ class EmploymentStatusService
             }
 
             $targetCode = array_key_exists('code', $attributes) ? $attributes['code'] : $locked->code;
-            $this->assertWriteConstraints($targetCompanyId, $targetCode, $locked);
+            $targetName = (string) ($attributes['name'] ?? $locked->name);
+            $this->assertWriteConstraints($targetCompanyId, $targetCode, $targetName, $locked);
 
             $locked->update($attributes);
 
@@ -135,7 +151,7 @@ class EmploymentStatusService
             ->defaultSort('name', 'id');
     }
 
-    private function assertWriteConstraints(int $companyId, mixed $code, ?EmploymentStatus $existing = null): void
+    private function assertWriteConstraints(int $companyId, mixed $code, string $name, ?EmploymentStatus $existing = null): void
     {
         $companyExists = Company::query()
             ->whereNull('deleted_at')
@@ -149,20 +165,13 @@ class EmploymentStatusService
             ]);
         }
 
-        if ($code !== null && $code !== '') {
-            $duplicate = EmploymentStatus::query()
-                ->whereNull('deleted_at')
-                ->where('company_id', $companyId)
-                ->where('code', (string) $code)
-                ->when($existing !== null, fn (Builder $query) => $query->whereKeyNot($existing->getKey()))
-                ->sharedLock()
-                ->exists();
-
-            if ($duplicate) {
-                throw ValidationException::withMessages([
-                    'code' => ['The code has already been taken.'],
-                ]);
-            }
-        }
+        WriteGuard::assertCompanyCodeAndNameUnique(
+            EmploymentStatus::class,
+            $companyId,
+            $code !== null ? (string) $code : null,
+            $name,
+            'Status karyawan dengan nama yang sama sudah terdaftar pada perusahaan ini.',
+            $existing?->getKey()
+        );
     }
 }

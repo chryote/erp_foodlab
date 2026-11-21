@@ -13,12 +13,16 @@ class EmploymentStatusFactory extends Factory
 {
     protected $model = EmploymentStatus::class;
 
+    private static int $sequence = 1;
+
     public function definition(): array
     {
+        $seq = self::$sequence++;
+
         return [
             'company_id' => Company::factory(),
-            'code' => strtoupper($this->faker->unique()->bothify('STS-###??')),
-            'name' => $this->faker->unique()->words(2, true),
+            'code' => strtoupper($this->faker->unique()->bothify('STS-###??')).'-'.$seq,
+            'name' => $this->faker->words(2, true).' #'.$seq,
             'description' => $this->faker->sentence(),
         ];
     }

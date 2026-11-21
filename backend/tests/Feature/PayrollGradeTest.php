@@ -244,7 +244,7 @@ describe('PayrollGrade CHO module', function () {
         $this->postJson('/api/v1/modules/cho/payroll-grades', [
             'company_id' => $company->id,
             'grade' => 1,
-            'sub_grade' => 'A',
+            'sub_grade' => '  a ',
             'base_salary' => 5000000,
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['sub_grade']);

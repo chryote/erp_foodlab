@@ -250,4 +250,31 @@ describe('TaxStatus CHO module', function () {
             'name' => 'Tax Reborn',
         ])->assertCreated();
     });
+
+    it('rejects duplicate active tax status names (even without code, case/whitespace variants) and allows reuse after soft-delete', function () {
+        $companyA = Company::factory()->create();
+        $companyB = Company::factory()->create();
+
+        $first = $this->postJson('/api/v1/modules/cho/tax-statuses', [
+            'company_id' => $companyA->id,
+            'name' => '  Tidak   Kawin / 0 Tanggungan ',
+        ])->assertCreated()
+            ->assertJsonPath('data.name', 'Tidak Kawin / 0 Tanggungan');
+
+        $this->postJson('/api/v1/modules/cho/tax-statuses', [
+            'company_id' => $companyA->id,
+            'name' => 'tidak kawin / 0 tanggungan',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
+
+        $this->postJson('/api/v1/modules/cho/tax-statuses', [
+            'company_id' => $companyB->id,
+            'name' => 'Tidak Kawin / 0 Tanggungan',
+        ])->assertCreated();
+
+        $this->deleteJson('/api/v1/modules/cho/tax-statuses/'.$first->json('data.id'))->assertOk();
+        $this->postJson('/api/v1/modules/cho/tax-statuses', [
+            'company_id' => $companyA->id,
+            'name' => 'Tidak Kawin / 0 Tanggungan',
+        ])->assertCreated();
+    });
 });

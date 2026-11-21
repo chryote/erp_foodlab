@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -12,6 +13,75 @@ use Illuminate\Validation\ValidationException;
  */
 final class WriteGuard
 {
+    /**
+     * @param  class-string<Model>  $modelClass
+     * @return array<string, string>
+     */
+    public static function findCompanyCodeAndNameDuplicateErrors(
+        string $modelClass,
+        int $companyId,
+        ?string $code,
+        ?string $name,
+        string $duplicateNameMessage,
+        mixed $ignoreKey = null,
+        bool $sharedLock = false,
+    ): array {
+        $errors = [];
+
+        if ($code !== null && $code !== '' && self::existsCaseInsensitive(
+            $modelClass::query(),
+            'code',
+            $code,
+            ['company_id' => $companyId],
+            $ignoreKey,
+            $sharedLock
+        )) {
+            $errors['code'] = 'The code has already been taken.';
+        }
+
+        if ($name !== null && $name !== '' && self::existsCaseInsensitive(
+            $modelClass::query(),
+            'name',
+            $name,
+            ['company_id' => $companyId],
+            $ignoreKey,
+            $sharedLock
+        )) {
+            $errors['name'] = $duplicateNameMessage;
+        }
+
+        return $errors;
+    }
+
+    /**
+     * @param  class-string<Model>  $modelClass
+     */
+    public static function assertCompanyCodeAndNameUnique(
+        string $modelClass,
+        int $companyId,
+        ?string $code,
+        ?string $name,
+        string $duplicateNameMessage,
+        mixed $ignoreKey = null,
+        bool $sharedLock = true,
+    ): void {
+        $errors = self::findCompanyCodeAndNameDuplicateErrors(
+            $modelClass,
+            $companyId,
+            $code,
+            $name,
+            $duplicateNameMessage,
+            $ignoreKey,
+            $sharedLock
+        );
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages(
+                array_map(static fn (string $message): array => [$message], $errors)
+            );
+        }
+    }
+
     /**
      * @param  array<string, mixed>  $scopeFilters
      */

@@ -3,6 +3,8 @@
 namespace App\Modules\CHO\Requests;
 
 use App\Models\PayrollGrade;
+use App\Support\InputNormalizer;
+use App\Support\WriteGuard;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -18,10 +20,18 @@ class SavePayrollGradeRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        if (is_string($this->input('sub_grade'))) {
-            $this->merge([
-                'sub_grade' => trim($this->input('sub_grade')),
-            ]);
+        $normalized = [];
+
+        if ($this->has('sub_grade') && is_string($this->input('sub_grade'))) {
+            $normalized['sub_grade'] = InputNormalizer::text($this->input('sub_grade'));
+        }
+
+        if ($this->has('level_label') && is_string($this->input('level_label'))) {
+            $normalized['level_label'] = InputNormalizer::nullableText($this->input('level_label'));
+        }
+
+        if ($normalized !== []) {
+            $this->merge($normalized);
         }
     }
 
@@ -88,19 +98,23 @@ class SavePayrollGradeRequest extends FormRequest
                     ? (int) $this->input('grade')
                     : $payrollGrade?->grade;
                 $subGrade = $this->has('sub_grade')
-                    ? trim((string) $this->input('sub_grade'))
+                    ? InputNormalizer::text((string) $this->input('sub_grade'))
                     : $payrollGrade?->sub_grade;
 
                 if ($companyId === null || $grade === null || $subGrade === null || $subGrade === '') {
                     return;
                 }
 
-                $duplicateExists = PayrollGrade::query()
-                    ->where('company_id', $companyId)
-                    ->where('grade', $grade)
-                    ->where('sub_grade', $subGrade)
-                    ->when($payrollGrade !== null, fn ($query) => $query->whereKeyNot($payrollGrade->getKey()))
-                    ->exists();
+                $duplicateExists = WriteGuard::existsCaseInsensitive(
+                    PayrollGrade::query(),
+                    'sub_grade',
+                    $subGrade,
+                    [
+                        'company_id' => $companyId,
+                        'grade' => $grade,
+                    ],
+                    $payrollGrade?->getKey()
+                );
 
                 if ($duplicateExists) {
                     $errorField = $this->has('sub_grade') ? 'sub_grade' : 'grade';
@@ -129,12 +143,12 @@ class SavePayrollGradeRequest extends FormRequest
         }
 
         if (array_key_exists('sub_grade', $validated)) {
-            $validated['sub_grade'] = trim((string) $validated['sub_grade']);
+            $validated['sub_grade'] = InputNormalizer::text((string) $validated['sub_grade']);
         }
 
         if (array_key_exists('level_label', $validated)) {
             $validated['level_label'] = $validated['level_label'] !== null
-                ? trim((string) $validated['level_label'])
+                ? InputNormalizer::nullableText((string) $validated['level_label'])
                 : null;
         }
 

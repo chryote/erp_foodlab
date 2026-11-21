@@ -251,4 +251,31 @@ describe('EmploymentStatus CHO module', function () {
             'name' => 'Status Reborn',
         ])->assertCreated();
     });
+
+    it('rejects duplicate active status names (even without code, case/whitespace variants) and allows reuse after soft-delete', function () {
+        $companyA = Company::factory()->create();
+        $companyB = Company::factory()->create();
+
+        $first = $this->postJson('/api/v1/modules/cho/employment-statuses', [
+            'company_id' => $companyA->id,
+            'name' => '  Karyawan   Tetap ',
+        ])->assertCreated()
+            ->assertJsonPath('data.name', 'Karyawan Tetap');
+
+        $this->postJson('/api/v1/modules/cho/employment-statuses', [
+            'company_id' => $companyA->id,
+            'name' => 'karyawan tetap',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
+
+        $this->postJson('/api/v1/modules/cho/employment-statuses', [
+            'company_id' => $companyB->id,
+            'name' => 'Karyawan Tetap',
+        ])->assertCreated();
+
+        $this->deleteJson('/api/v1/modules/cho/employment-statuses/'.$first->json('data.id'))->assertOk();
+        $this->postJson('/api/v1/modules/cho/employment-statuses', [
+            'company_id' => $companyA->id,
+            'name' => 'Karyawan Tetap',
+        ])->assertCreated();
+    });
 });

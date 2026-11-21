@@ -7,6 +7,7 @@ use App\Enums\GolonganDarah;
 use App\Enums\JenisDokumen;
 use App\Enums\JenisKelamin;
 use App\Models\Employee;
+use App\Support\InputNormalizer;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -59,7 +60,7 @@ class SaveEmployeeRequest extends FormRequest
             $value = $this->input($field);
 
             if (is_string($value)) {
-                $normalized[$field] = trim($value);
+                $normalized[$field] = InputNormalizer::text($value);
             }
         }
 

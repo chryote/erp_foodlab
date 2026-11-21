@@ -149,6 +149,7 @@ CREATE TABLE `employee_positions` (
   `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `employee_positions_company_code_active_unique` (`company_id`,`code`,`active_flag`),
+  UNIQUE KEY `employee_positions_company_name_active_unique` (`company_id`,`name`,`active_flag`),
   KEY `employee_positions_name_index` (`name`),
   KEY `employee_positions_comp_del_name_id_idx` (`company_id`,`deleted_at`,`name`,`id`),
   KEY `employee_positions_del_name_id_idx` (`deleted_at`,`name`,`id`),
@@ -274,6 +275,7 @@ CREATE TABLE `employment_statuses` (
   `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `employment_statuses_company_code_active_unique` (`company_id`,`code`,`active_flag`),
+  UNIQUE KEY `employment_statuses_company_name_active_unique` (`company_id`,`name`,`active_flag`),
   KEY `employment_statuses_name_index` (`name`),
   KEY `employment_statuses_comp_del_name_id_idx` (`company_id`,`deleted_at`,`name`,`id`),
   KEY `employment_statuses_del_name_id_idx` (`deleted_at`,`name`,`id`),
@@ -451,6 +453,7 @@ CREATE TABLE `tax_statuses` (
   `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `tax_statuses_company_code_active_unique` (`company_id`,`code`,`active_flag`),
+  UNIQUE KEY `tax_statuses_company_name_active_unique` (`company_id`,`name`,`active_flag`),
   KEY `tax_statuses_name_index` (`name`),
   KEY `tax_statuses_comp_del_code_id_idx` (`company_id`,`deleted_at`,`code`,`id`),
   KEY `tax_statuses_del_code_id_idx` (`deleted_at`,`code`,`id`),
@@ -518,5 +521,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (38,'2026_11_21_160
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (39,'2026_11_21_170000_cfo_indexes_and_fk_hardening',25);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (40,'2026_11_21_180000_cho_query_indexes',26);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (41,'2026_11_21_170000_enforce_cfo_and_lab_active_uniqueness',27);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (42,'2026_11_21_173000_enforce_cho_name_active_uniqueness',28);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;

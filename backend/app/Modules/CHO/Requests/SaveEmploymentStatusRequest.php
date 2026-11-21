@@ -3,8 +3,11 @@
 namespace App\Modules\CHO\Requests;
 
 use App\Models\EmploymentStatus;
+use App\Support\InputNormalizer;
+use App\Support\WriteGuard;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class SaveEmploymentStatusRequest extends FormRequest
 {
@@ -18,17 +21,15 @@ class SaveEmploymentStatusRequest extends FormRequest
         $normalized = [];
 
         if ($this->has('code') && is_string($this->input('code'))) {
-            $trimmed = trim($this->input('code'));
-            $normalized['code'] = $trimmed === '' ? null : $trimmed;
+            $normalized['code'] = InputNormalizer::nullableText($this->input('code'));
         }
 
         if ($this->has('name') && is_string($this->input('name'))) {
-            $normalized['name'] = trim($this->input('name'));
+            $normalized['name'] = InputNormalizer::text($this->input('name'));
         }
 
         if ($this->has('description') && is_string($this->input('description'))) {
-            $trimmed = trim($this->input('description'));
-            $normalized['description'] = $trimmed === '' ? null : $trimmed;
+            $normalized['description'] = InputNormalizer::nullableText($this->input('description'));
         }
 
         if ($normalized !== []) {
@@ -69,6 +70,50 @@ class SaveEmploymentStatusRequest extends FormRequest
     }
 
     /**
+     * @return array<int, callable(Validator): void>
+     */
+    public function after(): array
+    {
+        return [
+            function (Validator $validator): void {
+                if ($validator->errors()->hasAny(['company_id', 'code', 'name'])) {
+                    return;
+                }
+
+                /** @var EmploymentStatus|null $employmentStatus */
+                $employmentStatus = $this->route('employmentStatus');
+                $effectiveCompanyId = $this->filled('company_id')
+                    ? (int) $this->input('company_id')
+                    : (int) ($employmentStatus?->company_id ?? 0);
+
+                if ($effectiveCompanyId <= 0) {
+                    return;
+                }
+
+                $effectiveCode = $this->has('code')
+                    ? ($this->input('code') !== null ? InputNormalizer::nullableText((string) $this->input('code')) : null)
+                    : $employmentStatus?->code;
+                $effectiveName = $this->has('name')
+                    ? InputNormalizer::text((string) $this->input('name'))
+                    : $employmentStatus?->name;
+
+                $errors = WriteGuard::findCompanyCodeAndNameDuplicateErrors(
+                    EmploymentStatus::class,
+                    $effectiveCompanyId,
+                    $effectiveCode,
+                    $effectiveName,
+                    'Status karyawan dengan nama yang sama sudah terdaftar pada perusahaan ini.',
+                    $employmentStatus?->getKey()
+                );
+
+                foreach ($errors as $field => $message) {
+                    $validator->errors()->add($field, $message);
+                }
+            },
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function payload(): array
@@ -80,17 +125,19 @@ class SaveEmploymentStatusRequest extends FormRequest
         }
 
         if (array_key_exists('code', $validated)) {
-            $code = $validated['code'] !== null ? trim((string) $validated['code']) : null;
-            $validated['code'] = ($code === null || $code === '') ? null : $code;
+            $validated['code'] = $validated['code'] !== null
+                ? InputNormalizer::nullableText((string) $validated['code'])
+                : null;
         }
 
         if (array_key_exists('name', $validated)) {
-            $validated['name'] = trim((string) $validated['name']);
+            $validated['name'] = InputNormalizer::text((string) $validated['name']);
         }
 
         if (array_key_exists('description', $validated)) {
-            $description = $validated['description'] !== null ? trim((string) $validated['description']) : null;
-            $validated['description'] = ($description === null || $description === '') ? null : $description;
+            $validated['description'] = $validated['description'] !== null
+                ? InputNormalizer::nullableText((string) $validated['description'])
+                : null;
         }
 
         return $validated;

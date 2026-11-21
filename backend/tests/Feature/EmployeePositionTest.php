@@ -250,4 +250,34 @@ describe('EmployeePosition CHO module', function () {
             'name' => 'QC Inspector Reborn',
         ])->assertCreated();
     });
+
+    it('rejects duplicate active position names (even without code, case/whitespace variants) and allows reuse after soft-delete', function () {
+        $companyA = Company::factory()->create();
+        $companyB = Company::factory()->create();
+
+        $first = $this->postJson('/api/v1/modules/cho/employee-positions', [
+            'company_id' => $companyA->id,
+            'name' => '  Analis   Mikrobiologi  ',
+        ])->assertCreated()
+            ->assertJsonPath('data.name', 'Analis Mikrobiologi');
+
+        // Duplicate name without code (matches UI MasterKaryawan modal payload) fails with 422
+        $this->postJson('/api/v1/modules/cho/employee-positions', [
+            'company_id' => $companyA->id,
+            'name' => 'analis mikrobiologi',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
+
+        // Same name in another company is allowed
+        $this->postJson('/api/v1/modules/cho/employee-positions', [
+            'company_id' => $companyB->id,
+            'name' => 'Analis Mikrobiologi',
+        ])->assertCreated();
+
+        // Soft-delete frees the name for re-create in companyA
+        $this->deleteJson('/api/v1/modules/cho/employee-positions/'.$first->json('data.id'))->assertOk();
+        $this->postJson('/api/v1/modules/cho/employee-positions', [
+            'company_id' => $companyA->id,
+            'name' => 'Analis Mikrobiologi',
+        ])->assertCreated();
+    });
 });

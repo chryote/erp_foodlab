@@ -579,8 +579,19 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
         foreach ($lockedWriteGuards as $guardPath) {
             $code = File::get(app_path($guardPath));
             $hasTxUniqueLock = str_contains($code, 'WriteGuard::assertUniqueActive(')
+                || str_contains($code, 'WriteGuard::assertCompanyCodeAndNameUnique(')
                 || str_contains($code, '->sharedLock()');
             expect($hasTxUniqueLock)->toBeTrue("{$guardPath} must verify active uniqueness with sharedLock inside DB::transaction.");
+        }
+
+        // CHO master dictionaries with optional code must enforce BOTH code and name active uniqueness
+        foreach (['employee_positions', 'employment_statuses', 'tax_statuses'] as $choMasterTable) {
+            preg_match("/CREATE TABLE `{$choMasterTable}` \\((.*?)\\) ENGINE=/s", $schemaSql, $choMatch);
+            expect($choMatch)->toHaveCount(2);
+            expect(str_contains($choMatch[1], "{$choMasterTable}_company_code_active_unique"))
+                ->toBeTrue("{$choMasterTable} must enforce active code uniqueness.");
+            expect(str_contains($choMatch[1], "{$choMasterTable}_company_name_active_unique"))
+                ->toBeTrue("{$choMasterTable} must enforce active name uniqueness even when code is null.");
         }
 
         // 5. Runtime duplicate protection (exact, whitespace-padded, case-variant, DB unique key, and re-create after delete)
@@ -677,5 +688,57 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             ...$expensePayload,
             'amount' => 75000,
         ], $idempotencyHeaders)->assertUnprocessable()->assertJsonValidationErrors(['idempotency_key']);
+
+        // 7. CHO anti-duplication guardrails (name uniqueness with null code, case/whitespace variants, DB unique key)
+        $this->postJson('/api/v1/modules/cho/employee-positions', [
+            'company_id' => $companyId,
+            'name' => '  Analis   Kimia  ',
+        ])->assertCreated()
+            ->assertJsonPath('data.name', 'Analis Kimia');
+
+        $this->postJson('/api/v1/modules/cho/employee-positions', [
+            'company_id' => $companyId,
+            'name' => 'analis kimia',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
+
+        $this->postJson('/api/v1/modules/cho/employment-statuses', [
+            'company_id' => $companyId,
+            'name' => 'Karyawan Kontrak',
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/modules/cho/employment-statuses', [
+            'company_id' => $companyId,
+            'name' => '  karyawan   kontrak ',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
+
+        $this->postJson('/api/v1/modules/cho/tax-statuses', [
+            'company_id' => $companyId,
+            'name' => 'TK / 0',
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/modules/cho/tax-statuses', [
+            'company_id' => $companyId,
+            'name' => '  tk / 0 ',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
+
+        $this->postJson('/api/v1/modules/cho/payroll-grades', [
+            'company_id' => $companyId,
+            'grade' => 1,
+            'sub_grade' => '  A ',
+            'base_salary' => 5000000,
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/modules/cho/payroll-grades', [
+            'company_id' => $companyId,
+            'grade' => 1,
+            'sub_grade' => 'a',
+            'base_salary' => 5500000,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['sub_grade']);
+
+        expect(fn () => EmployeePosition::factory()->create([
+            'company_id' => $companyId,
+            'code' => 'UNIQUE-CODE-X',
+            'name' => 'Analis Kimia',
+        ]))->toThrow(QueryException::class);
     });
 });

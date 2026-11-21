@@ -13,12 +13,16 @@ class TaxStatusFactory extends Factory
 {
     protected $model = TaxStatus::class;
 
+    private static int $sequence = 1;
+
     public function definition(): array
     {
+        $seq = self::$sequence++;
+
         return [
             'company_id' => Company::factory(),
-            'code' => strtoupper($this->faker->unique()->bothify('TAX-###??')),
-            'name' => $this->faker->unique()->words(2, true),
+            'code' => strtoupper($this->faker->unique()->bothify('TAX-###??')).'-'.$seq,
+            'name' => $this->faker->words(2, true).' #'.$seq,
             'description' => $this->faker->sentence(),
         ];
     }

@@ -5,6 +5,8 @@ namespace App\Modules\CHO\Services;
 use App\Models\Company;
 use App\Models\PayrollGrade;
 use App\Support\IndexQuery;
+use App\Support\InputNormalizer;
+use App\Support\WriteGuard;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -51,6 +53,13 @@ class PayrollGradeService
      */
     public function createPayrollGrade(array $attributes): PayrollGrade
     {
+        $attributes['sub_grade'] = InputNormalizer::text((string) $attributes['sub_grade']) ?? '';
+        if (array_key_exists('level_label', $attributes)) {
+            $attributes['level_label'] = $attributes['level_label'] !== null
+                ? InputNormalizer::nullableText((string) $attributes['level_label'])
+                : null;
+        }
+
         $payrollGrade = DB::transaction(function () use ($attributes): PayrollGrade {
             $this->assertWriteConstraints(
                 (int) $attributes['company_id'],
@@ -71,6 +80,15 @@ class PayrollGradeService
      */
     public function updatePayrollGrade(PayrollGrade $payrollGrade, array $attributes): PayrollGrade
     {
+        if (array_key_exists('sub_grade', $attributes)) {
+            $attributes['sub_grade'] = InputNormalizer::text((string) $attributes['sub_grade']) ?? '';
+        }
+        if (array_key_exists('level_label', $attributes)) {
+            $attributes['level_label'] = $attributes['level_label'] !== null
+                ? InputNormalizer::nullableText((string) $attributes['level_label'])
+                : null;
+        }
+
         $updated = DB::transaction(function () use ($payrollGrade, $attributes): PayrollGrade {
             $locked = PayrollGrade::query()->lockForUpdate()->findOrFail($payrollGrade->getKey());
 
@@ -214,19 +232,17 @@ class PayrollGradeService
             ]);
         }
 
-        $duplicate = PayrollGrade::query()
-            ->whereNull('deleted_at')
-            ->where('company_id', $companyId)
-            ->where('grade', $grade)
-            ->where('sub_grade', $subGrade)
-            ->when($existing !== null, fn (Builder $query) => $query->whereKeyNot($existing->getKey()))
-            ->sharedLock()
-            ->exists();
-
-        if ($duplicate) {
-            throw ValidationException::withMessages([
-                'sub_grade' => ['The combination of grade and sub grade has already been taken.'],
-            ]);
-        }
+        WriteGuard::assertUniqueActive(
+            PayrollGrade::query(),
+            'sub_grade',
+            $subGrade,
+            [
+                'company_id' => $companyId,
+                'grade' => $grade,
+            ],
+            'sub_grade',
+            'The combination of grade and sub grade has already been taken.',
+            $existing?->getKey()
+        );
     }
 }
