@@ -133,10 +133,10 @@ Copy-Item backend/.env.example backend/.env
 Copy-Item frontend/.env.example frontend/.env
 ```
 
-2. Build and start all containers in detached mode (using `-V` to initialize fresh `/var/www/html/vendor` and `/app/node_modules` anonymous volumes):
+2. Build and start all containers in detached mode (using `-V` to initialize fresh `/var/www/html/vendor` and `/app/node_modules` anonymous volumes, and `--wait` so `mysql`, `redis`, and `app` finish startup/healthchecks first):
 
 ```powershell
-docker compose up -d --build -V
+docker compose up -d --build -V --wait
 ```
 
 3. Generate the Laravel application key and run database migrations & seeders:
@@ -151,7 +151,33 @@ The seeder creates a local-development administrator: **`admin@foodlab.test` / `
 4. *(Whenever you add new Composer or npm packages)* Rebuild and refresh the anonymous volumes so the running containers pick up the new dependencies:
 
 ```powershell
-docker compose up -d --build -V app frontend
+docker compose up -d --build -V --wait app frontend
+```
+
+### Resetting & Re-migrating the Database
+
+- **Reset all tables, load `backend/database/schema/mysql-schema.sql` (plus any newer migrations), and re-seed:**
+
+```powershell
+docker compose exec app php artisan migrate:fresh --seed
+```
+
+- **Reset all tables and re-run every PHP migration file from scratch** *(bypassing `mysql-schema.sql`)*:
+
+```powershell
+docker compose exec app php artisan migrate:fresh --schema-path=/dev/null --seed
+```
+
+- **Rebuild `app` and immediately reset/re-seed in one command** *(use `--wait` so `app` finishes its entrypoint before `exec` runs)*:
+
+```powershell
+docker compose up -d --build --wait app; if ($LASTEXITCODE -eq 0) { docker compose exec app php artisan migrate:fresh --seed }
+```
+
+- **Full Docker MySQL/Redis volume reset from scratch** *(wipes database volumes completely, re-runs `docker/mysql/init.sql`, regenerates key, migrates, and seeds)*:
+
+```powershell
+docker compose down -v; if ($LASTEXITCODE -eq 0) { docker compose up -d --build --wait }; if ($LASTEXITCODE -eq 0) { docker compose exec app php artisan key:generate; docker compose exec app php artisan migrate:fresh --seed }
 ```
 
 ### Service Endpoints

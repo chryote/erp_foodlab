@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\ErpMenuController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\LabSampleController;
@@ -34,5 +35,8 @@ Route::prefix('v1')->group(function () {
         Route::get('/samples', [LabSampleController::class, 'index'])->name('api.samples.index');
         Route::post('/samples', [LabSampleController::class, 'store'])->name('api.samples.store');
         Route::get('/samples/{labSample}', [LabSampleController::class, 'show'])->name('api.samples.show');
+
+        // Document Uploads
+        Route::post('/documents', [DocumentController::class, 'store'])->name('api.documents.store');
     });
 });

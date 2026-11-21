@@ -76,9 +76,37 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
         }
     });
 
-    it('runs DatabaseSeeder without errors and populates expected records', function () {
+    it('runs DatabaseSeeder without errors and populates expected records idempotently', function () {
         expect(fn () => Artisan::call('db:seed', ['--class' => DatabaseSeeder::class]))
             ->not->toThrow(Throwable::class);
+
+        $firstCounts = [
+            'users' => \App\Models\User::query()->count(),
+            'companies' => \App\Models\Company::query()->count(),
+            'capital_companies' => \App\Models\CapitalCompany::query()->count(),
+            'expense_categories' => \App\Models\ExpenseCategory::query()->count(),
+            'expense_types' => \App\Models\ExpenseType::query()->count(),
+            'expense_items' => \App\Models\ExpenseItem::query()->count(),
+            'company_assets' => \App\Models\CompanyAsset::query()->count(),
+            'employee_positions' => \App\Models\EmployeePosition::query()->count(),
+            'employment_statuses' => \App\Models\EmploymentStatus::query()->count(),
+            'payroll_grades' => \App\Models\PayrollGrade::query()->count(),
+            'tax_statuses' => \App\Models\TaxStatus::query()->count(),
+            'employees' => \App\Models\Employee::query()->count(),
+            'employee_documents' => \App\Models\EmployeeDocument::query()->count(),
+            'lab_samples' => \App\Models\LabSample::query()->count(),
+        ];
+
+        foreach ($firstCounts as $table => $count) {
+            expect($count)->toBeGreaterThan(0, "Expected table '{$table}' to be populated by DatabaseSeeder.");
+        }
+
+        expect(fn () => Artisan::call('db:seed', ['--class' => DatabaseSeeder::class]))
+            ->not->toThrow(Throwable::class);
+
+        expect(\App\Models\Company::query()->count())->toBe($firstCounts['companies']);
+        expect(\App\Models\Employee::query()->count())->toBe($firstCounts['employees']);
+        expect(\App\Models\LabSample::query()->count())->toBe($firstCounts['lab_samples']);
     });
 
     it('verifies all registered GET API endpoints return 200 OK with CORS headers after seeding', function () {
