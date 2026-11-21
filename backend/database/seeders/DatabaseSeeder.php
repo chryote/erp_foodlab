@@ -214,15 +214,15 @@ class DatabaseSeeder extends Seeder
     {
         $analystPosition = $this->upsertByCode(EmployeePosition::class, [
             'company_id' => $company->id,
-            'code' => 'POS-LAB-01',
-            'name' => 'Analis Laboratorium',
-            'description' => 'Melaksanakan pengujian kimia dan mikrobiologi sampel pangan',
+            'code' => 'STF-A',
+            'name' => 'STAFF A',
+            'description' => 'Deskripsi Pekerjaan',
         ]);
         $qaPosition = $this->upsertByCode(EmployeePosition::class, [
             'company_id' => $company->id,
-            'code' => 'POS-QA-01',
-            'name' => 'Supervisor Quality Assurance',
-            'description' => 'Mengawasi standar mutu ISO 17025 dan validasi hasil uji',
+            'code' => 'STF-B',
+            'name' => 'STAFF B',
+            'description' => 'Deskripsi Pekerjaan',
         ]);
 
         $permanentStatus = $this->upsertByCode(EmploymentStatus::class, [

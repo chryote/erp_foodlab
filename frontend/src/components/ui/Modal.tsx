@@ -430,6 +430,7 @@ export interface CrudModalProps<T extends CrudEntity> {
   inputPlaceholder?: string;
   fields?: CrudFieldConfig<T>[];
   formLayout?: 'auto' | 'single-row';
+  formAlign?: 'start' | 'end';
   computedColumns?: CrudComputedColumnConfig<T>[];
   rowActions?: CrudRowActionConfig<T>[];
   summary?: React.ReactNode;
@@ -459,6 +460,7 @@ export function CrudModal<T extends CrudEntity>({
   inputPlaceholder = 'Masukkan nama...',
   fields,
   formLayout = 'auto',
+  formAlign,
   computedColumns = [],
   rowActions = [],
   summary,
@@ -744,6 +746,7 @@ export function CrudModal<T extends CrudEntity>({
 
   const isSingleRowForm = formLayout === 'single-row';
   const isMultiRowForm = !isSingleRowForm && resolvedFields.length > 4;
+  const alignStart = (formAlign ?? (isMultiRowForm ? 'start' : 'end')) === 'start';
 
   const renderFieldControl = (field: CrudFieldConfig<T>) => {
     const isFieldDisabled =
@@ -874,10 +877,19 @@ export function CrudModal<T extends CrudEntity>({
             data-testid={`${testId}-form`}
             className={
               isSingleRowForm
-                ? 'flex flex-wrap items-end gap-2.5 border-b border-border pb-4'
+                ? cn(
+                    'flex flex-wrap gap-2.5 border-b border-border pb-4',
+                    alignStart ? 'items-start' : 'items-end'
+                  )
                 : isMultiRowForm
-                  ? 'grid grid-cols-1 items-start gap-3 border-b border-border pb-4 sm:grid-cols-2 md:grid-cols-4'
-                  : 'flex flex-wrap items-end gap-2.5 border-b border-border pb-4'
+                  ? cn(
+                      'grid grid-cols-1 gap-3 border-b border-border pb-4 sm:grid-cols-2 md:grid-cols-4',
+                      alignStart ? 'items-start' : 'items-end'
+                    )
+                  : cn(
+                      'flex flex-wrap gap-2.5 border-b border-border pb-4',
+                      alignStart ? 'items-start' : 'items-end'
+                    )
             }
           >
             {resolvedFields.map((field) => {
@@ -897,10 +909,13 @@ export function CrudModal<T extends CrudEntity>({
             <div
               className={
                 isSingleRowForm
-                  ? 'flex shrink-0 items-center gap-2'
+                  ? cn(
+                      'flex shrink-0 items-center gap-2',
+                      alignStart && 'pt-[20px]'
+                    )
                   : isMultiRowForm
                     ? 'flex items-center justify-end gap-2 sm:pt-[20px] md:justify-start'
-                    : 'flex items-center gap-2'
+                    : cn('flex items-center gap-2', alignStart && 'pt-[20px]')
               }
             >
               <Button type="submit" variant="primary" disabled={loading}>

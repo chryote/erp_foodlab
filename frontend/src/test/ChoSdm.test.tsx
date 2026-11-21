@@ -321,6 +321,9 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
     fireEvent.click(screen.getByTestId('horizontal-menu-card-MASTER_KARYAWAN'));
     const masterModal = await screen.findByTestId('master-karyawan-crud-modal');
     expect(masterModal).toBeInTheDocument();
+    expect(
+      screen.getByTestId('master-karyawan-crud-modal-form')
+    ).toHaveClass('items-start');
 
     expect(
       await within(masterModal).findByText('Analis Kimia')
@@ -348,6 +351,9 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
 
     // Switch to Status Karyawan tab & create
     fireEvent.click(screen.getByTestId('master-karyawan-tab-status'));
+    expect(
+      screen.getByTestId('master-karyawan-crud-modal-form')
+    ).toHaveClass('items-start');
     expect(
       await within(masterModal).findByText('Karyawan Tetap')
     ).toBeInTheDocument();
@@ -398,6 +404,9 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
 
     // Switch to Status Pajak tab & create
     fireEvent.click(screen.getByTestId('master-karyawan-tab-pajak'));
+    expect(
+      screen.getByTestId('master-karyawan-crud-modal-form')
+    ).toHaveClass('items-start');
     expect(
       await within(masterModal).findByText('Tidak Kawin 0')
     ).toBeInTheDocument();

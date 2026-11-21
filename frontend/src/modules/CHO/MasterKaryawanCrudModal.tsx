@@ -113,7 +113,7 @@ export const MasterKaryawanCrudModal: React.FC<
       {
         key: 'name',
         label: 'Nama Jabatan',
-        placeholder: 'Contoh: Analis Laboratorium',
+        placeholder: 'Contoh: Melakukan tugas A dan B',
       },
       {
         key: 'description',
@@ -319,6 +319,7 @@ export const MasterKaryawanCrudModal: React.FC<
         testId="master-karyawan-crud-modal"
         tabs={tabsBar}
         fields={statusFields}
+        formAlign="start"
         emptyMessage="Belum ada data status karyawan."
         pageSize={5}
         items={allStatuses}
@@ -450,6 +451,7 @@ export const MasterKaryawanCrudModal: React.FC<
         testId="master-karyawan-crud-modal"
         tabs={tabsBar}
         fields={taxStatusFields}
+        formAlign="start"
         emptyMessage="Belum ada data status pajak."
         pageSize={5}
         items={allTaxStatuses}
@@ -500,6 +502,7 @@ export const MasterKaryawanCrudModal: React.FC<
       testId="master-karyawan-crud-modal"
       tabs={tabsBar}
       fields={positionFields}
+      formAlign="start"
       emptyMessage="Belum ada data jabatan karyawan."
       pageSize={5}
       items={allPositions}
