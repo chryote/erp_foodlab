@@ -33,7 +33,7 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-6 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-6 backdrop-blur-xs"
       data-testid={`${testId}-backdrop`}
       onClick={onClose}
     >
@@ -268,14 +268,14 @@ export const SummaryBanner: React.FC<SummaryBannerProps> = ({
 }) => {
   return (
     <div
-      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-4 py-3"
+      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/35 bg-primary/10 px-4 py-3"
       data-testid={testId}
     >
       <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
       <strong
-        className="text-base font-bold text-emerald-700"
+        className="text-base font-bold text-primary"
         data-testid={`${testId}-value`}
       >
         {value}
@@ -315,7 +315,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/45 p-6 backdrop-blur-xs"
+      className="fixed inset-0 z-60 flex items-center justify-center bg-black/45 p-6 backdrop-blur-xs"
       data-testid={`${testId}-backdrop`}
       onClick={onCancel}
     >
@@ -862,7 +862,7 @@ export function CrudModal<T extends CrudEntity>({
         {error && (
           <div
             role="alert"
-            className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700"
+            className="rounded-lg border border-primary/30 bg-primary/5 px-3.5 py-2.5 text-sm text-primary"
           >
             {error}
           </div>

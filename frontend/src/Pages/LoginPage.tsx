@@ -52,7 +52,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticated }) => {
           {error && (
             <div
               role="alert"
-              className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700"
+              className="rounded-lg border border-primary/30 bg-primary/5 px-3.5 py-2.5 text-sm text-primary"
             >
               {error}
             </div>

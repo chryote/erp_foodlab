@@ -339,7 +339,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           <div
             key={message}
             role="alert"
-            className="mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            className="mb-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-primary"
           >
             {message}
           </div>
@@ -476,7 +476,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                 onClick={() => setActiveModal('capital')}
                 className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <span className="rounded-lg bg-emerald-500/10 p-2.5 text-emerald-700">
+                <span className="rounded-lg bg-primary/10 p-2.5 text-primary">
                   <Building2 aria-hidden="true" className="size-5" />
                 </span>
                 <span className="min-w-0 flex-1">
@@ -499,7 +499,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                 onClick={() => setActiveModal('expense')}
                 className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <span className="rounded-lg bg-blue-500/10 p-2.5 text-blue-700">
+                <span className="rounded-lg bg-primary/10 p-2.5 text-primary">
                   <Plus aria-hidden="true" className="size-5" />
                 </span>
                 <span className="min-w-0 flex-1">
@@ -522,7 +522,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                 onClick={() => setActiveModal('assets')}
                 className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <span className="rounded-lg bg-amber-500/10 p-2.5 text-amber-700">
+                <span className="rounded-lg bg-primary/10 p-2.5 text-primary">
                   <Landmark aria-hidden="true" className="size-5" />
                 </span>
                 <span className="min-w-0 flex-1">
