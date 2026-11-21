@@ -1,30 +1,26 @@
-## Feature: HR / EmployeeAttendance
-- **Table:** `employee_attendances`
+## Feature: HR / EmployeeShiftAssignment
+- **Table:** `employee_shift_assignments`
   - `id` (`bigIncrements`)
   - `company_id` (`foreignId` -> `companies.id`, `restrictOnDelete()`)
   - `employee_id` (`foreignId` -> `employees.id`, `restrictOnDelete()`)
-  - `employee_shift_id` (`foreignId` -> `employee_shifts.id`, nullable, `restrictOnDelete()`)
-  - `attendance_date` (`date`)
-  - `clock_in_at` (`timestamp`, nullable)
-  - `clock_out_at` (`timestamp`, nullable)
-  - `late_minutes` (`unsignedSmallInteger`, default `0`)
-  - `overtime_minutes` (`unsignedSmallInteger`, default `0`)
-  - `status` (`string(30)`, default `'present'`)
-  - `notes` (`string(500)`, nullable)
+  - `employee_shift_id` (`foreignId` -> `employee_shifts.id`, `restrictOnDelete()`)
+  - `effective_date` (`date`)
+  - `end_date` (`date`, nullable — `NULL` means currently active/ongoing)
+  - `notes` (`string(255)`, nullable)
   - `timestamps()`, `softDeletes()`
 - **Schema & DB Guardrails:**
-  - **Money / Totals:** N/A (if overtime pay is stored later, use `decimal(18, 2)`)
+  - **Money / Totals:** N/A
   - **Tenant & FKs:** Scoped to `company_id`; explicit FKs on `company_id`, `employee_id`, and `employee_shift_id`, all with `restrictOnDelete()`
-  - **Soft-Delete Uniqueness:** Generated `active_flag` (`unsignedTinyInteger()->nullable()->storedAs('IF(deleted_at IS NULL, 1, NULL)')`, add `'active_flag'` to Model `$hidden`); `unique(['company_id', 'employee_id', 'attendance_date', 'active_flag'])`
-  - **Indexing:** Composite `(company_id, deleted_at)`, `(company_id, attendance_date)`, and `(employee_id, attendance_date)`; no standalone indexes on `created_at`, `updated_at`, `deleted_at`, or `status`
-- **Enum (`app/Enums/`):** `AttendanceStatusEnum: present | late | absent | leave | sick | holiday`
+  - **Soft-Delete Uniqueness:** Generated `active_flag` (`unsignedTinyInteger()->nullable()->storedAs('IF(deleted_at IS NULL, 1, NULL)')`, add `'active_flag'` to Model `$hidden`); `unique(['company_id', 'employee_id', 'effective_date', 'active_flag'])`
+  - **Indexing:** Composite `(company_id, deleted_at)` and `(employee_id, effective_date, end_date)`; no standalone indexes on `created_at`, `updated_at`, or `deleted_at`
+- **Enum (`app/Enums/`):** N/A (active status is derived from `effective_date` / `end_date`)
 - **Relations:** `belongsTo(Company::class)`, `belongsTo(Employee::class)`, `belongsTo(EmployeeShift::class)`
-- **Endpoints (`/api/v1/modules/hr/employee-attendances`):** `index`, `store`, `show`, `update`, `destroy`
-- **QueryBuilder (`Service::list`):** filters=[`company_id`, `employee_id`, `employee_shift_id`, `attendance_date`, `status`], sorts=[`attendance_date`, `clock_in_at`, `late_minutes`, `overtime_minutes`], includes=[`company`, `employee`, `employeeShift`]
+- **Endpoints (`/api/v1/modules/hr/employee-shift-assignments`):** `index`, `store`, `show`, `update`, `destroy`
+- **QueryBuilder (`Service::list`):** filters=[`company_id`, `employee_id`, `employee_shift_id`, `effective_date`, `end_date`], sorts=[`effective_date`, `end_date`, `created_at`], includes=[`company`, `employee`, `employeeShift`]
 - **Safety / Business Rules:**
   - Validate `employee_id` and `employee_shift_id` belong to the same `company_id`
-  - Validate `clock_out_at >= clock_in_at` when both are provided
-  - `RecordAttendanceAction` inside `DB::transaction()` to compute `late_minutes` (respecting shift `grace_period_minutes`) and `overtime_minutes`
-- **Seeder (`database/seeders/DatabaseSeeder.php`):** idempotent sample attendance rows for seeded employees (`updateOrCreate` / `withTrashed()` on `(company_id, employee_id, attendance_date)` inside `DB::transaction()`, end with `Cache::flush()`); assert `employee_attendances` populated in `SystemIntegrityTest`
-- **Pest Test (`tests/Feature/EmployeeAttendanceTest.php`):** CRUD, filters, 422 validation (cross-company employee/shift mismatch, invalid clock-out time), soft delete, active-duplicate `(employee_id, attendance_date)` rejection + re-create after soft delete
-- **Verify:** `php artisan migrate:fresh --seed` (and repeat `db:seed`), `make schema-dump`, `make test-filter FILTER=EmployeeAttendanceTest`
+  - Validate `end_date >= effective_date` when `end_date` is provided
+  - Reject overlapping active date ranges for the same `employee_id` inside `DB::transaction()` (with `lockForUpdate()` on the employee's active assignments)
+- **Seeder (`database/seeders/DatabaseSeeder.php`):** idempotent initial shift assignment for each seeded employee (`updateOrCreate` / `withTrashed()` on `(company_id, employee_id, effective_date)` inside `DB::transaction()`, end with `Cache::flush()`); assert `employee_shift_assignments` populated in `SystemIntegrityTest`
+- **Pest Test (`tests/Feature/EmployeeShiftAssignmentTest.php`):** CRUD, filters, 422 validation (cross-company mismatch, `end_date < effective_date`, overlapping date ranges), soft delete, active-duplicate rejection + re-create after soft delete
+- **Verify:** `php artisan migrate:fresh --seed` (and repeat `db:seed`), `make schema-dump`, `make test-filter FILTER=EmployeeShiftAssignmentTest`

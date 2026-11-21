@@ -16,6 +16,7 @@ use App\Models\EmployeeAttendance;
 use App\Models\EmployeeDocument;
 use App\Models\EmployeePosition;
 use App\Models\EmployeeShift;
+use App\Models\EmployeeShiftAssignment;
 use App\Models\EmploymentStatus;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseItem;
@@ -43,6 +44,7 @@ class DatabaseSeeder extends Seeder
             $this->seedCfoAssets($company);
             $this->seedChoModule($company);
             $this->seedEmployeeShifts();
+            $this->seedEmployeeShiftAssignments();
             $this->seedEmployeeAttendances();
         });
 
@@ -438,6 +440,45 @@ class DatabaseSeeder extends Seeder
                 $shift->deleted_at = null;
                 $shift->save();
             }
+        }
+    }
+
+    private function seedEmployeeShiftAssignments(): void
+    {
+        $employees = Employee::query()->orderBy('id')->get();
+
+        foreach ($employees as $employee) {
+            $shift = EmployeeShift::query()
+                ->where('company_id', $employee->company_id)
+                ->where('code', 'SHIFT-PAGI')
+                ->first()
+                ?? EmployeeShift::query()
+                    ->where('company_id', $employee->company_id)
+                    ->orderBy('id')
+                    ->first();
+
+            if ($shift === null) {
+                continue;
+            }
+
+            $effectiveDate = '2026-11-01';
+
+            $assignment = EmployeeShiftAssignment::query()
+                ->withTrashed()
+                ->where('company_id', $employee->company_id)
+                ->where('employee_id', $employee->id)
+                ->whereDate('effective_date', $effectiveDate)
+                ->orderByRaw('deleted_at IS NOT NULL')
+                ->first() ?? new EmployeeShiftAssignment();
+
+            $assignment->company_id = $employee->company_id;
+            $assignment->employee_id = $employee->id;
+            $assignment->employee_shift_id = $shift->id;
+            $assignment->effective_date = $effectiveDate;
+            $assignment->end_date = null;
+            $assignment->notes = 'Penugasan shift awal karyawan';
+            $assignment->deleted_at = null;
+            $assignment->save();
         }
     }
 

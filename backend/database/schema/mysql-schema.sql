@@ -92,8 +92,8 @@ CREATE TABLE `employee_attendances` (
   `clock_out_at` timestamp NULL DEFAULT NULL,
   `late_minutes` smallint unsigned NOT NULL DEFAULT '0',
   `overtime_minutes` smallint unsigned NOT NULL DEFAULT '0',
-  `status` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'present',
-  `notes` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'present',
+  `notes` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
@@ -145,6 +145,31 @@ CREATE TABLE `employee_positions` (
   KEY `employee_positions_name_index` (`name`),
   KEY `employee_positions_company_deleted_idx` (`company_id`,`deleted_at`),
   CONSTRAINT `employee_positions_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `employee_shift_assignments`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `employee_shift_assignments` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `company_id` bigint unsigned NOT NULL,
+  `employee_id` bigint unsigned NOT NULL,
+  `employee_shift_id` bigint unsigned NOT NULL,
+  `effective_date` date NOT NULL,
+  `end_date` date DEFAULT NULL,
+  `notes` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) STORED,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `employee_shift_assignments_company_emp_eff_active_unique` (`company_id`,`employee_id`,`effective_date`,`active_flag`),
+  KEY `employee_shift_assignments_employee_shift_id_foreign` (`employee_shift_id`),
+  KEY `employee_shift_assignments_company_deleted_idx` (`company_id`,`deleted_at`),
+  KEY `employee_shift_assignments_emp_date_range_idx` (`employee_id`,`effective_date`,`end_date`),
+  CONSTRAINT `employee_shift_assignments_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `employee_shift_assignments_employee_id_foreign` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `employee_shift_assignments_employee_shift_id_foreign` FOREIGN KEY (`employee_shift_id`) REFERENCES `employee_shifts` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `employee_shifts`;
@@ -464,5 +489,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (32,'2026_11_21_000
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (34,'2026_11_21_120000_database_wide_cleanup',20);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (35,'2026_11_21_130000_create_employee_shifts_table',21);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (36,'2026_11_21_140000_create_employee_attendances_table',22);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (37,'2026_11_21_150000_create_employee_shift_assignments_table',23);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
