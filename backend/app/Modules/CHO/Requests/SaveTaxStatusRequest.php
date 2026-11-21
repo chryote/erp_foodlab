@@ -2,6 +2,7 @@
 
 namespace App\Modules\CHO\Requests;
 
+use App\Models\TaxStatus;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -42,6 +43,9 @@ class SaveTaxStatusRequest extends FormRequest
     {
         $presence = $this->isMethod('PATCH') ? ['sometimes', 'required'] : ['required'];
         $taxStatus = $this->route('taxStatus');
+        $companyId = $this->filled('company_id')
+            ? (int) $this->input('company_id')
+            : ($taxStatus instanceof TaxStatus ? (int) $taxStatus->company_id : 0);
 
         return [
             'company_id' => [
@@ -54,7 +58,10 @@ class SaveTaxStatusRequest extends FormRequest
                 'nullable',
                 'string',
                 'max:20',
-                Rule::unique('tax_statuses', 'code')->ignore($taxStatus),
+                Rule::unique('tax_statuses', 'code')
+                    ->where('company_id', $companyId)
+                    ->whereNull('deleted_at')
+                    ->ignore($taxStatus),
             ],
             'name' => [...$presence, 'string', 'max:100'],
             'description' => ['sometimes', 'nullable', 'string'],

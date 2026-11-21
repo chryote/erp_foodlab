@@ -139,7 +139,10 @@ class SaveEmployeeRequest extends FormRequest
                 ...$presence,
                 'string',
                 'digits:16',
-                Rule::unique('employees', 'nik_ktp')->ignore($employee),
+                Rule::unique('employees', 'nik_ktp')
+                    ->where('company_id', $companyId)
+                    ->whereNull('deleted_at')
+                    ->ignore($employee),
             ],
             'nickname' => [...$presence, 'string', 'max:100'],
             'birth_place' => [...$presence, 'string', 'max:100'],

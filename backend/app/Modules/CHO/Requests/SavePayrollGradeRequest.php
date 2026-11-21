@@ -54,13 +54,16 @@ class SavePayrollGradeRequest extends FormRequest
     {
         return [
             function (Validator $validator): void {
-                if ($validator->errors()->hasAny(['grade', 'sub_grade'])) {
+                if ($validator->errors()->hasAny(['company_id', 'grade', 'sub_grade'])) {
                     return;
                 }
 
                 /** @var PayrollGrade|null $payrollGrade */
                 $payrollGrade = $this->route('payrollGrade');
 
+                $companyId = $this->filled('company_id')
+                    ? (int) $this->input('company_id')
+                    : $payrollGrade?->company_id;
                 $grade = $this->has('grade')
                     ? (int) $this->input('grade')
                     : $payrollGrade?->grade;
@@ -68,11 +71,12 @@ class SavePayrollGradeRequest extends FormRequest
                     ? trim((string) $this->input('sub_grade'))
                     : $payrollGrade?->sub_grade;
 
-                if ($grade === null || $subGrade === null || $subGrade === '') {
+                if ($companyId === null || $grade === null || $subGrade === null || $subGrade === '') {
                     return;
                 }
 
                 $duplicateExists = PayrollGrade::query()
+                    ->where('company_id', $companyId)
                     ->where('grade', $grade)
                     ->where('sub_grade', $subGrade)
                     ->when($payrollGrade !== null, fn ($query) => $query->whereKeyNot($payrollGrade->getKey()))

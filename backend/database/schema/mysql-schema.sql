@@ -32,17 +32,13 @@ CREATE TABLE `capital_companies` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `company_id` bigint unsigned NOT NULL,
   `stakeholder_name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
-  `capital` double NOT NULL,
+  `capital` decimal(18,2) NOT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `capital_companies_company_id_index` (`company_id`),
-  KEY `capital_companies_capital_index` (`capital`),
-  KEY `capital_companies_created_at_index` (`created_at`),
-  KEY `capital_companies_updated_at_index` (`updated_at`),
-  KEY `capital_companies_deleted_at_index` (`deleted_at`),
   KEY `capital_companies_stakeholder_name_index` (`stakeholder_name`),
+  KEY `capital_companies_company_deleted_idx` (`company_id`,`deleted_at`),
   CONSTRAINT `capital_companies_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -57,11 +53,8 @@ CREATE TABLE `companies` (
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `companies_created_at_index` (`created_at`),
-  KEY `companies_updated_at_index` (`updated_at`),
   KEY `companies_deleted_at_index` (`deleted_at`),
-  KEY `companies_name_index` (`name`),
-  KEY `companies_series_index` (`series`)
+  KEY `companies_name_index` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `company_assets`;
@@ -73,20 +66,16 @@ CREATE TABLE `company_assets` (
   `asset_date` date NOT NULL,
   `name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `amount` int unsigned NOT NULL DEFAULT '1',
-  `price_per_unit` double NOT NULL DEFAULT '0',
-  `total_price` double NOT NULL DEFAULT '0',
+  `price_per_unit` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `total_price` decimal(18,2) NOT NULL DEFAULT '0.00',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `company_assets_company_id_asset_date_index` (`company_id`,`asset_date`),
   KEY `company_assets_asset_date_index` (`asset_date`),
-  KEY `company_assets_amount_index` (`amount`),
-  KEY `company_assets_total_price_index` (`total_price`),
-  KEY `company_assets_created_at_index` (`created_at`),
-  KEY `company_assets_updated_at_index` (`updated_at`),
-  KEY `company_assets_deleted_at_index` (`deleted_at`),
   KEY `company_assets_name_index` (`name`),
+  KEY `company_assets_company_deleted_idx` (`company_id`,`deleted_at`),
   CONSTRAINT `company_assets_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -101,13 +90,10 @@ CREATE TABLE `employee_documents` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
+  `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `employee_documents_employee_id_document_type_deleted_at_unique` (`employee_id`,`document_type`,`deleted_at`),
-  KEY `employee_documents_employee_id_index` (`employee_id`),
+  UNIQUE KEY `employee_documents_emp_type_active_unique` (`employee_id`,`document_type`,`active_flag`),
   KEY `employee_documents_document_type_index` (`document_type`),
-  KEY `employee_documents_created_at_index` (`created_at`),
-  KEY `employee_documents_updated_at_index` (`updated_at`),
-  KEY `employee_documents_deleted_at_index` (`deleted_at`),
   CONSTRAINT `employee_documents_employee_id_foreign` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -123,13 +109,11 @@ CREATE TABLE `employee_positions` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
+  `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `employee_positions_code_unique` (`code`),
-  KEY `employee_positions_company_id_index` (`company_id`),
-  KEY `employee_positions_created_at_index` (`created_at`),
-  KEY `employee_positions_updated_at_index` (`updated_at`),
-  KEY `employee_positions_deleted_at_index` (`deleted_at`),
+  UNIQUE KEY `employee_positions_company_code_active_unique` (`company_id`,`code`,`active_flag`),
   KEY `employee_positions_name_index` (`name`),
+  KEY `employee_positions_company_deleted_idx` (`company_id`,`deleted_at`),
   CONSTRAINT `employee_positions_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -167,19 +151,15 @@ CREATE TABLE `employees` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
+  `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `employees_nik_ktp_unique` (`nik_ktp`),
-  KEY `employees_company_id_index` (`company_id`),
+  UNIQUE KEY `employees_company_nik_active_unique` (`company_id`,`nik_ktp`,`active_flag`),
   KEY `employees_employee_position_id_index` (`employee_position_id`),
-  KEY `employees_created_at_index` (`created_at`),
-  KEY `employees_updated_at_index` (`updated_at`),
-  KEY `employees_deleted_at_index` (`deleted_at`),
   KEY `employees_name_index` (`name`),
   KEY `employees_employment_status_id_index` (`employment_status_id`),
   KEY `employees_payroll_grade_id_index` (`payroll_grade_id`),
   KEY `employees_tax_status_id_index` (`tax_status_id`),
-  KEY `employees_gender_index` (`gender`),
-  KEY `employees_religion_index` (`religion`),
+  KEY `employees_company_deleted_idx` (`company_id`,`deleted_at`),
   CONSTRAINT `employees_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `employees_employee_position_id_foreign` FOREIGN KEY (`employee_position_id`) REFERENCES `employee_positions` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `employees_employment_status_id_foreign` FOREIGN KEY (`employment_status_id`) REFERENCES `employment_statuses` (`id`) ON DELETE RESTRICT,
@@ -199,13 +179,11 @@ CREATE TABLE `employment_statuses` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
+  `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `employment_statuses_code_unique` (`code`),
-  KEY `employment_statuses_company_id_index` (`company_id`),
-  KEY `employment_statuses_created_at_index` (`created_at`),
-  KEY `employment_statuses_updated_at_index` (`updated_at`),
-  KEY `employment_statuses_deleted_at_index` (`deleted_at`),
+  UNIQUE KEY `employment_statuses_company_code_active_unique` (`company_id`,`code`,`active_flag`),
   KEY `employment_statuses_name_index` (`name`),
+  KEY `employment_statuses_company_deleted_idx` (`company_id`,`deleted_at`),
   CONSTRAINT `employment_statuses_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -220,11 +198,8 @@ CREATE TABLE `expense_categories` (
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `expense_categories_created_at_index` (`created_at`),
-  KEY `expense_categories_updated_at_index` (`updated_at`),
-  KEY `expense_categories_deleted_at_index` (`deleted_at`),
   KEY `expense_categories_name_index` (`name`),
-  KEY `expense_categories_company_id_index` (`company_id`),
+  KEY `expense_categories_company_deleted_idx` (`company_id`,`deleted_at`),
   CONSTRAINT `expense_categories_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -237,7 +212,7 @@ CREATE TABLE `expense_items` (
   `expense_type_id` bigint unsigned NOT NULL,
   `company_id` bigint unsigned NOT NULL,
   `name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `amount` double NOT NULL,
+  `amount` decimal(18,2) NOT NULL,
   `purchased_on` date DEFAULT NULL,
   `closing_date` date DEFAULT NULL,
   `employee_id` bigint unsigned DEFAULT NULL,
@@ -249,15 +224,13 @@ CREATE TABLE `expense_items` (
   KEY `expense_items_expense_type_id_foreign` (`expense_type_id`),
   KEY `expense_items_company_id_foreign` (`company_id`),
   KEY `expense_items_cat_type_comp_idx` (`expense_category_id`,`expense_type_id`,`company_id`),
-  KEY `expense_items_amount_index` (`amount`),
-  KEY `expense_items_created_at_index` (`created_at`),
-  KEY `expense_items_updated_at_index` (`updated_at`),
-  KEY `expense_items_deleted_at_index` (`deleted_at`),
   KEY `expense_items_name_index` (`name`),
   KEY `expense_items_purchased_on_index` (`purchased_on`),
   KEY `expense_items_closing_date_index` (`closing_date`),
   KEY `expense_items_employee_id_index` (`employee_id`),
+  KEY `expense_items_company_deleted_idx` (`company_id`,`deleted_at`),
   CONSTRAINT `expense_items_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `expense_items_employee_id_foreign` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `expense_items_expense_category_id_foreign` FOREIGN KEY (`expense_category_id`) REFERENCES `expense_categories` (`id`) ON DELETE CASCADE,
   CONSTRAINT `expense_items_expense_type_id_foreign` FOREIGN KEY (`expense_type_id`) REFERENCES `expense_types` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -275,11 +248,8 @@ CREATE TABLE `expense_types` (
   `deleted_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `expense_types_expense_category_id_index` (`expense_category_id`),
-  KEY `expense_types_created_at_index` (`created_at`),
-  KEY `expense_types_updated_at_index` (`updated_at`),
-  KEY `expense_types_deleted_at_index` (`deleted_at`),
   KEY `expense_types_name_index` (`name`),
-  KEY `expense_types_company_id_index` (`company_id`),
+  KEY `expense_types_company_deleted_idx` (`company_id`,`deleted_at`),
   CONSTRAINT `expense_types_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE CASCADE,
   CONSTRAINT `expense_types_expense_category_id_foreign` FOREIGN KEY (`expense_category_id`) REFERENCES `expense_categories` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -323,25 +293,22 @@ CREATE TABLE `payroll_grades` (
   `grade` tinyint unsigned NOT NULL,
   `sub_grade` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `level_label` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `base_salary` double NOT NULL,
-  `position_allowance` double NOT NULL DEFAULT '0',
-  `total_gross` double NOT NULL,
-  `bpjs_kesehatan_company` double NOT NULL,
-  `bpjs_kesehatan_employee` double NOT NULL,
-  `bpjs_ketenagakerjaan_company` double NOT NULL,
-  `bpjs_ketenagakerjaan_employee` double NOT NULL,
-  `net_employee_received` double NOT NULL,
-  `total_company_cost` double NOT NULL,
+  `base_salary` decimal(18,2) NOT NULL,
+  `position_allowance` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `total_gross` decimal(18,2) NOT NULL,
+  `bpjs_kesehatan_company` decimal(18,2) NOT NULL,
+  `bpjs_kesehatan_employee` decimal(18,2) NOT NULL,
+  `bpjs_ketenagakerjaan_company` decimal(18,2) NOT NULL,
+  `bpjs_ketenagakerjaan_employee` decimal(18,2) NOT NULL,
+  `net_employee_received` decimal(18,2) NOT NULL,
+  `total_company_cost` decimal(18,2) NOT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
+  `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `payroll_grades_grade_sub_grade_deleted_at_unique` (`grade`,`sub_grade`,`deleted_at`),
-  KEY `payroll_grades_company_id_index` (`company_id`),
-  KEY `payroll_grades_created_at_index` (`created_at`),
-  KEY `payroll_grades_updated_at_index` (`updated_at`),
-  KEY `payroll_grades_deleted_at_index` (`deleted_at`),
-  KEY `payroll_grades_grade_index` (`grade`),
+  UNIQUE KEY `payroll_grades_company_grade_sub_active_unique` (`company_id`,`grade`,`sub_grade`,`active_flag`),
+  KEY `payroll_grades_company_deleted_idx` (`company_id`,`deleted_at`),
   CONSTRAINT `payroll_grades_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -377,13 +344,11 @@ CREATE TABLE `tax_statuses` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
+  `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `tax_statuses_code_unique` (`code`),
-  KEY `tax_statuses_company_id_index` (`company_id`),
-  KEY `tax_statuses_created_at_index` (`created_at`),
-  KEY `tax_statuses_updated_at_index` (`updated_at`),
-  KEY `tax_statuses_deleted_at_index` (`deleted_at`),
+  UNIQUE KEY `tax_statuses_company_code_active_unique` (`company_id`,`code`,`active_flag`),
   KEY `tax_statuses_name_index` (`name`),
+  KEY `tax_statuses_company_deleted_idx` (`company_id`,`deleted_at`),
   CONSTRAINT `tax_statuses_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -440,5 +405,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (29,'2026_11_20_200
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (30,'2026_11_21_000001_make_code_nullable_on_employee_positions_table',17);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (31,'2026_11_21_000002_make_code_nullable_on_employment_statuses_table',18);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (32,'2026_11_21_000003_make_code_nullable_on_tax_statuses_table',19);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (34,'2026_11_21_120000_database_wide_cleanup',20);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;

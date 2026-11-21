@@ -9,6 +9,7 @@ use App\Http\Resources\LabSampleResource;
 use App\Http\Resources\UserResource;
 use App\Models\CapitalCompany;
 use App\Models\Company;
+use App\Models\Employee;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseItem;
 use App\Models\ExpenseType;
@@ -69,6 +70,10 @@ describe('Model JsonResources', function () {
             'name' => 'Dairy',
         ]);
 
+        $employee = Employee::factory()->create([
+            'company_id' => $company->id,
+        ]);
+
         $item = ExpenseItem::factory()->create([
             'company_id' => $company->id,
             'expense_category_id' => $category->id,
@@ -77,7 +82,7 @@ describe('Model JsonResources', function () {
             'amount' => 2500000.25,
             'purchased_on' => '2026-11-19',
             'closing_date' => '2026-11-30',
-            'employee_id' => 7,
+            'employee_id' => $employee->id,
             'detail' => 'Stok mingguan',
         ]);
 
@@ -98,7 +103,7 @@ describe('Model JsonResources', function () {
         expect($unloadedItem['amount'])->toBe(2500000.25);
         expect($unloadedItem['purchased_on'])->toBe('2026-11-19');
         expect($unloadedItem['closing_date'])->toBe('2026-11-30');
-        expect($unloadedItem['employee_id'])->toBe(7);
+        expect($unloadedItem['employee_id'])->toBe($employee->id);
 
         // With loaded relations, nested resources must use snake_case keys
         $company->load('capitalCompanies');

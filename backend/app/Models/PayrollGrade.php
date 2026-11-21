@@ -30,6 +30,10 @@ class PayrollGrade extends Model
         'total_company_cost',
     ];
 
+    protected $hidden = [
+        'active_flag',
+    ];
+
     protected $casts = [
         'company_id' => 'integer',
         'grade' => 'integer',

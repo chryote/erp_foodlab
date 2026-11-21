@@ -44,7 +44,14 @@ class SaveExpenseItemRequest extends FormRequest
             'amount' => ['required', 'numeric', 'min:0'],
             'purchased_on' => ['required', 'date_format:Y-m-d'],
             'closing_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
-            'employee_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'employee_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists('employees', 'id')
+                    ->whereNull('deleted_at')
+                    ->where('company_id', $companyId),
+            ],
             'detail' => ['sometimes', 'nullable', 'string', 'max:500'],
         ];
     }

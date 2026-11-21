@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Company;
+use App\Models\Employee;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseItem;
 use App\Models\ExpenseType;
@@ -135,6 +136,9 @@ describe('CFO Expense Category, Type, and Item CRUD scoped by company_id', funct
             'name' => 'Bubuk Premium',
         ])->assertOk()->assertJsonPath('data.name', 'Bubuk Premium');
 
+        $employeeA = Employee::factory()->create(['company_id' => $companyA->id]);
+        $employeeB = Employee::factory()->create(['company_id' => $companyB->id]);
+
         $this->putJson("/api/v1/modules/cfo/expense-items/{$itemAId}", [
             'company_id' => $companyA->id,
             'expense_category_id' => $catAId,
@@ -143,12 +147,25 @@ describe('CFO Expense Category, Type, and Item CRUD scoped by company_id', funct
             'amount' => 2500000,
             'purchased_on' => '2026-11-20',
             'closing_date' => null,
-            'employee_id' => 5,
+            'employee_id' => $employeeB->id,
+            'detail' => 'Cross-company employee rejected',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['employee_id']);
+
+        $this->putJson("/api/v1/modules/cfo/expense-items/{$itemAId}", [
+            'company_id' => $companyA->id,
+            'expense_category_id' => $catAId,
+            'expense_type_id' => $typeAId,
+            'name' => 'Bubuk Coklat Dark',
+            'amount' => 2500000,
+            'purchased_on' => '2026-11-20',
+            'closing_date' => null,
+            'employee_id' => $employeeA->id,
             'detail' => 'Revisi pembelian',
         ])->assertOk()
             ->assertJsonPath('data.name', 'Bubuk Coklat Dark')
             ->assertJsonPath('data.purchased_on', '2026-11-20')
-            ->assertJsonPath('data.employee_id', 5)
+            ->assertJsonPath('data.employee_id', $employeeA->id)
             ->assertJsonPath('data.detail', 'Revisi pembelian');
 
         $this->deleteJson("/api/v1/modules/cfo/expense-items/{$itemAId}")->assertOk();

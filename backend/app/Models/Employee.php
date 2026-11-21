@@ -46,6 +46,10 @@ class Employee extends Model
         'npwp_number',
     ];
 
+    protected $hidden = [
+        'active_flag',
+    ];
+
     protected function casts(): array
     {
         return [

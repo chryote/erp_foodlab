@@ -20,6 +20,10 @@ class EmployeeDocument extends Model
         'file_url',
     ];
 
+    protected $hidden = [
+        'active_flag',
+    ];
+
     protected function casts(): array
     {
         return [

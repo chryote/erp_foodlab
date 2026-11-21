@@ -326,7 +326,7 @@ describe('Employee CHO module', function () {
             'nik_ktp' => '3201010101909999',
         ]);
 
-        // Soft-deleted company, soft-deleted master FKs, invalid enums, duplicate nik_ktp, bad birth_date, duplicate document_type
+        // Soft-deleted company, soft-deleted master FKs, invalid enums, bad birth_date, duplicate document_type
         $this->postJson('/api/v1/modules/cho/employees', [
             'company_id' => $deletedCompany->id,
             'employee_position_id' => $deletedPosition->id,
@@ -358,7 +358,6 @@ describe('Employee CHO module', function () {
                 'payroll_grade_id',
                 'tax_status_id',
                 'email',
-                'nik_ktp',
                 'birth_date',
                 'gender',
                 'religion',
@@ -366,6 +365,14 @@ describe('Employee CHO module', function () {
                 'documents.0.document_type',
                 'documents.1.document_type',
             ]);
+
+        // Duplicate nik_ktp within the same active company returns 422
+        $this->postJson('/api/v1/modules/cho/employees', [
+            'company_id' => $company->id,
+            'name' => 'Duplicate NIK Employee',
+            'nik_ktp' => $existing->nik_ktp,
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['nik_ktp']);
 
         // Invalid document_type enum, non-16-digit nik_ktp, invalid birth_date format, missing name
         $this->postJson('/api/v1/modules/cho/employees', [
@@ -582,5 +589,100 @@ describe('Employee CHO module', function () {
             'documents' => [],
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['nickname', 'documents']);
+    });
+
+    it('allows nik_ktp reuse across companies or after soft-delete and re-syncing soft-deleted document types', function () {
+        $companyA = Company::factory()->create();
+        $companyB = Company::factory()->create();
+
+        $posA = EmployeePosition::factory()->create(['company_id' => $companyA->id]);
+        $statusA = EmploymentStatus::factory()->create(['company_id' => $companyA->id]);
+        $gradeA = PayrollGrade::factory()->create(['company_id' => $companyA->id]);
+        $taxA = TaxStatus::factory()->create(['company_id' => $companyA->id]);
+
+        $posB = EmployeePosition::factory()->create(['company_id' => $companyB->id]);
+        $statusB = EmploymentStatus::factory()->create(['company_id' => $companyB->id]);
+        $gradeB = PayrollGrade::factory()->create(['company_id' => $companyB->id]);
+        $taxB = TaxStatus::factory()->create(['company_id' => $companyB->id]);
+
+        $nik = '3201010101907777';
+
+        $employeeA = Employee::factory()->create([
+            'company_id' => $companyA->id,
+            'employee_position_id' => $posA->id,
+            'employment_status_id' => $statusA->id,
+            'payroll_grade_id' => $gradeA->id,
+            'tax_status_id' => $taxA->id,
+            'nik_ktp' => $nik,
+        ]);
+
+        // Re-syncing a previously soft-deleted document_type succeeds
+        $this->patchJson("/api/v1/modules/cho/employees/{$employeeA->id}", [
+            'documents' => [
+                ['document_type' => JenisDokumen::KTP->value, 'file_url' => 'https://cdn.foodlab.test/docs/ktp-1.pdf'],
+                ['document_type' => JenisDokumen::NPWP->value, 'file_url' => 'https://cdn.foodlab.test/docs/npwp-1.pdf'],
+            ],
+        ])->assertOk();
+
+        $this->patchJson("/api/v1/modules/cho/employees/{$employeeA->id}", [
+            'documents' => [
+                ['document_type' => JenisDokumen::KTP->value, 'file_url' => 'https://cdn.foodlab.test/docs/ktp-1.pdf'],
+            ],
+        ])->assertOk();
+
+        $this->patchJson("/api/v1/modules/cho/employees/{$employeeA->id}", [
+            'documents' => [
+                ['document_type' => JenisDokumen::KTP->value, 'file_url' => 'https://cdn.foodlab.test/docs/ktp-1.pdf'],
+                ['document_type' => JenisDokumen::NPWP->value, 'file_url' => 'https://cdn.foodlab.test/docs/npwp-2.pdf'],
+            ],
+        ])->assertOk();
+
+        $basePayloadB = [
+            'company_id' => $companyB->id,
+            'employee_position_id' => $posB->id,
+            'employment_status_id' => $statusB->id,
+            'payroll_grade_id' => $gradeB->id,
+            'tax_status_id' => $taxB->id,
+            'name' => 'Cross Company Employee',
+            'email' => 'cross@foodlab.test',
+            'phone' => '08123456789',
+            'photo_url' => 'https://cdn.foodlab.test/photos/cross.jpg',
+            'nik_ktp' => $nik,
+            'nickname' => 'Cross',
+            'birth_place' => 'Bandung',
+            'birth_date' => '1991-02-02',
+            'gender' => 'laki_laki',
+            'religion' => 'islam',
+            'blood_type' => GolonganDarah::O->value,
+            'mother_name' => 'Siti',
+            'ktp_address' => 'Jl. KTP',
+            'domicile_address' => 'Jl. Domisili',
+            'whatsapp_number' => '08123456789',
+            'emergency_phone_number' => '08123456780',
+            'instagram' => '@cross',
+            'tiktok' => '@crosstt',
+            'bpjs_ketenagakerjaan' => '1111111111',
+            'bpjs_kesehatan' => '2222222222',
+            'npwp_number' => '333333333333333',
+            'documents' => [
+                ['document_type' => JenisDokumen::KTP->value, 'file_url' => 'https://cdn.foodlab.test/docs/ktp-b.pdf'],
+            ],
+        ];
+
+        // Same nik_ktp in another company succeeds
+        $this->postJson('/api/v1/modules/cho/employees', $basePayloadB)->assertCreated();
+
+        // Soft-deleting employeeA allows reusing nik_ktp in companyA
+        $this->deleteJson("/api/v1/modules/cho/employees/{$employeeA->id}")->assertOk();
+
+        $this->postJson('/api/v1/modules/cho/employees', [
+            ...$basePayloadB,
+            'company_id' => $companyA->id,
+            'employee_position_id' => $posA->id,
+            'employment_status_id' => $statusA->id,
+            'payroll_grade_id' => $gradeA->id,
+            'tax_status_id' => $taxA->id,
+            'email' => 'reborn@foodlab.test',
+        ])->assertCreated();
     });
 });

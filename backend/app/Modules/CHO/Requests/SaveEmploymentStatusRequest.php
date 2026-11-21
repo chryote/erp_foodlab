@@ -2,6 +2,7 @@
 
 namespace App\Modules\CHO\Requests;
 
+use App\Models\EmploymentStatus;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -42,6 +43,9 @@ class SaveEmploymentStatusRequest extends FormRequest
     {
         $presence = $this->isMethod('PATCH') ? ['sometimes', 'required'] : ['required'];
         $employmentStatus = $this->route('employmentStatus');
+        $companyId = $this->filled('company_id')
+            ? (int) $this->input('company_id')
+            : ($employmentStatus instanceof EmploymentStatus ? (int) $employmentStatus->company_id : 0);
 
         return [
             'company_id' => [
@@ -54,7 +58,10 @@ class SaveEmploymentStatusRequest extends FormRequest
                 'nullable',
                 'string',
                 'max:50',
-                Rule::unique('employment_statuses', 'code')->ignore($employmentStatus),
+                Rule::unique('employment_statuses', 'code')
+                    ->where('company_id', $companyId)
+                    ->whereNull('deleted_at')
+                    ->ignore($employmentStatus),
             ],
             'name' => [...$presence, 'string', 'max:100'],
             'description' => ['sometimes', 'nullable', 'string'],

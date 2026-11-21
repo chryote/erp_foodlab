@@ -236,5 +236,19 @@ describe('EmploymentStatus CHO module', function () {
             ->assertJsonStructure(['message']);
 
         $this->assertSoftDeleted('employment_statuses', ['id' => $existing->id]);
+
+        // Same code is allowed across different companies and can be reused after soft-delete
+        $otherCompany = Company::factory()->create();
+        $this->postJson('/api/v1/modules/cho/employment-statuses', [
+            'company_id' => $otherCompany->id,
+            'code' => $other->code,
+            'name' => 'Status Beta',
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/modules/cho/employment-statuses', [
+            'company_id' => $company->id,
+            'code' => $existing->code,
+            'name' => 'Status Reborn',
+        ])->assertCreated();
     });
 });

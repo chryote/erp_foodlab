@@ -49,4 +49,9 @@ class ExpenseItem extends Model
     {
         return $this->belongsTo(Company::class);
     }
+
+    public function employee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class);
+    }
 }

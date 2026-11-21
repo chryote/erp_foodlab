@@ -33,7 +33,7 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
         }
     });
 
-    it('ensures docker-entrypoint.sh enforces storage permissions and runs migrations on startup', function () {
+    it('ensures docker-entrypoint.sh enforces storage permissions and hands off to php-fpm entrypoint', function () {
         $entrypointPath = base_path('docker-entrypoint.sh');
         expect(file_exists($entrypointPath))->toBeTrue();
 
@@ -41,7 +41,7 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
         expect($contents)
             ->toContain('chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache')
             ->toContain('chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache')
-            ->toContain('php artisan migrate --force');
+            ->toContain('exec docker-php-entrypoint "$@"');
     });
 
     it('discovers all Eloquent models and verifies their database tables and fillable columns exist', function () {

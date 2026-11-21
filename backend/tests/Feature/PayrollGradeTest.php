@@ -306,5 +306,21 @@ describe('PayrollGrade CHO module', function () {
             ->assertJsonStructure(['message']);
 
         $this->assertSoftDeleted('payroll_grades', ['id' => $existing->id]);
+
+        // Same (grade, sub_grade) is allowed in another company and can be reused after soft-delete
+        $otherCompany = Company::factory()->create();
+        $this->postJson('/api/v1/modules/cho/payroll-grades', [
+            'company_id' => $otherCompany->id,
+            'grade' => 2,
+            'sub_grade' => 'A',
+            'base_salary' => 7000000,
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/modules/cho/payroll-grades', [
+            'company_id' => $company->id,
+            'grade' => 1,
+            'sub_grade' => 'A',
+            'base_salary' => 5500000,
+        ])->assertCreated();
     });
 });

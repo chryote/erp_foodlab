@@ -235,5 +235,19 @@ describe('EmployeePosition CHO module', function () {
             ->assertJsonStructure(['message']);
 
         $this->assertSoftDeleted('employee_positions', ['id' => $existing->id]);
+
+        // Same code is allowed across different companies and can be reused after soft-delete
+        $otherCompany = Company::factory()->create();
+        $this->postJson('/api/v1/modules/cho/employee-positions', [
+            'company_id' => $otherCompany->id,
+            'code' => 'QC-02',
+            'name' => 'QC Supervisor Beta',
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/modules/cho/employee-positions', [
+            'company_id' => $company->id,
+            'code' => 'QC-01',
+            'name' => 'QC Inspector Reborn',
+        ])->assertCreated();
     });
 });

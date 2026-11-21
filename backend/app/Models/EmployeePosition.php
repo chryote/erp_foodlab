@@ -21,6 +21,10 @@ class EmployeePosition extends Model
         'description',
     ];
 
+    protected $hidden = [
+        'active_flag',
+    ];
+
     protected $casts = [
         'company_id' => 'integer',
     ];

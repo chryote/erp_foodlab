@@ -235,5 +235,19 @@ describe('TaxStatus CHO module', function () {
             ->assertJsonStructure(['message']);
 
         $this->assertSoftDeleted('tax_statuses', ['id' => $existing->id]);
+
+        // Same code is allowed across different companies and can be reused after soft-delete
+        $otherCompany = Company::factory()->create();
+        $this->postJson('/api/v1/modules/cho/tax-statuses', [
+            'company_id' => $otherCompany->id,
+            'code' => $other->code,
+            'name' => 'Tax Beta',
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/modules/cho/tax-statuses', [
+            'company_id' => $company->id,
+            'code' => $existing->code,
+            'name' => 'Tax Reborn',
+        ])->assertCreated();
     });
 });
