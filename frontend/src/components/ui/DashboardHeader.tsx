@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
-import { Building2, LogOut } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { LogOut } from 'lucide-react';
 import type { AuthUser, Company } from '@/api/client';
 import { Button } from './Button';
+import { ConfirmDialog } from './Modal';
 import { ThemeToggle } from './ThemeToggle';
 import { cn } from '@/lib/utils';
 
@@ -28,6 +29,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   onSelectCompany,
   onLogout,
 }) => {
+  const [logoutConfirmationOpen, setLogoutConfirmationOpen] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
   const seriesList = useMemo(
     () =>
       Array.from(new Set(companies.map((company) => company.series ?? 1))).sort(
@@ -43,7 +46,22 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     (company) => (company.series ?? 1) === activeSeries
   );
 
+  const handleConfirmLogout = async () => {
+    if (!onLogout) {
+      return;
+    }
+
+    setLogoutLoading(true);
+    try {
+      await onLogout();
+    } finally {
+      setLogoutLoading(false);
+      setLogoutConfirmationOpen(false);
+    }
+  };
+
   return (
+    <>
     <header className="sticky top-0 z-40 border-b border-border bg-background shadow-sm">
       <div className="mx-auto max-w-340 px-4 sm:px-6 lg:px-8">
         <div className="flex min-h-14 items-center gap-4 border-b border-border">
@@ -125,7 +143,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               <Button
                 variant="secondary"
                 aria-label="Keluar"
-                onClick={() => void onLogout()}
+                onClick={() => setLogoutConfirmationOpen(true)}
                 className="size-9 px-0"
               >
                 <LogOut aria-hidden="true" className="size-4" />
@@ -174,5 +192,17 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         </div>
       </div>
     </header>
+    <ConfirmDialog
+      isOpen={logoutConfirmationOpen}
+      title="Konfirmasi keluar"
+      message="Anda yakin ingin keluar dari aplikasi?"
+      confirmLabel={logoutLoading ? 'Keluar...' : 'Ya, keluar'}
+      cancelLabel="Batal"
+      loading={logoutLoading}
+      testId="logout-confirm-dialog"
+      onConfirm={handleConfirmLogout}
+      onCancel={() => setLogoutConfirmationOpen(false)}
+    />
+    </>
   );
 };

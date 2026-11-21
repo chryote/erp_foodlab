@@ -1,6 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import type { Company, ErpModuleOverview } from '@/api/client';
-import { type HorizontalMenuItem, Button, PageHeader } from '@/components/ui';
+import {
+  type HorizontalMenuItem,
+  Button,
+  ConfirmDialog,
+  PageHeader,
+} from '@/components/ui';
 import {
   useCompanyCrudResource,
   useErpModulesQuery,
@@ -22,11 +27,13 @@ import { CmoModuleCard } from '@/modules/CMO/CmoModuleCard';
 import { CpoModuleCard } from '@/modules/CPO/CpoModuleCard';
 
 export interface DashboardProps {
-  onLogout?: () => void;
+  onLogout?: () => void | Promise<void>;
 }
 
 export const DashboardFlowSimulator: React.FC<DashboardProps> = ({ onLogout }) => {
   const { modulesMap } = useErpModulesQuery();
+  const [logoutConfirmationOpen, setLogoutConfirmationOpen] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [selectedModule, setSelectedModule] =
     useState<ErpModuleOverview | null>(null);
@@ -100,6 +107,7 @@ export const DashboardFlowSimulator: React.FC<DashboardProps> = ({ onLogout }) =
   }, []);
 
   return (
+    <>
     <div className="mx-auto max-w-[1360px] px-6 py-8">
       <PageHeader
         eyebrow="ENTERPRISE RESOURCE PLANNING"
@@ -110,7 +118,11 @@ export const DashboardFlowSimulator: React.FC<DashboardProps> = ({ onLogout }) =
         onSelectCompany={handleSelectCompany}
         actions={
           onLogout ? (
-            <Button variant="secondary" onClick={onLogout}>
+            <Button
+              variant="secondary"
+              aria-label="Keluar"
+              onClick={() => setLogoutConfirmationOpen(true)}
+            >
               Keluar
             </Button>
           ) : undefined
@@ -209,7 +221,27 @@ export const DashboardFlowSimulator: React.FC<DashboardProps> = ({ onLogout }) =
           </>
         )}
       </main>
+      <ConfirmDialog
+        isOpen={logoutConfirmationOpen}
+        title="Konfirmasi keluar"
+        message="Anda yakin ingin keluar dari aplikasi? Perubahan yang belum disimpan dapat hilang."
+        confirmLabel={logoutLoading ? 'Keluar...' : 'Ya, keluar'}
+        cancelLabel="Batal"
+        loading={logoutLoading}
+        testId="logout-confirm-dialog"
+        onConfirm={async () => {
+          setLogoutLoading(true);
+          try {
+            await onLogout?.();
+          } finally {
+            setLogoutLoading(false);
+            setLogoutConfirmationOpen(false);
+          }
+        }}
+        onCancel={() => setLogoutConfirmationOpen(false)}
+      />
     </div>
+    </>
   );
 };
 

@@ -52,6 +52,7 @@ describe('App ERP Main Menu integration', () => {
     );
 
     fireEvent.click(await screen.findByRole('button', { name: 'Keluar' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Ya, keluar' }));
 
     await waitFor(() => {
       expect(screen.getByTestId('current-path')).toHaveTextContent('/login');
@@ -132,6 +133,7 @@ describe('App ERP Main Menu integration', () => {
       );
     });
     fireEvent.click(await screen.findByRole('button', { name: 'Keluar' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Ya, keluar' }));
     await waitFor(() => {
       expect(screen.getByTestId('current-path')).toHaveTextContent(/^\/login$/);
     });
