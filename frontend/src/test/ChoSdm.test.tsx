@@ -389,9 +389,17 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
     expect(
       await within(masterModal).findByText('Karyawan Tetap')
     ).toBeInTheDocument();
-    fireEvent.change(within(masterModal).getByLabelText('Kode Status'), {
-      target: { value: 'PKWT' },
-    });
+
+    // Status Karyawan tab only renders Pilih Perusahaan & Nama Status (no Kode Status or Deskripsi)
+    expect(within(masterModal).queryByLabelText('Kode Status')).not.toBeInTheDocument();
+    expect(within(masterModal).queryByLabelText('Deskripsi')).not.toBeInTheDocument();
+    expect(
+      within(masterModal).queryByRole('columnheader', { name: 'Kode Status' })
+    ).not.toBeInTheDocument();
+    expect(
+      within(masterModal).queryByRole('columnheader', { name: 'Deskripsi' })
+    ).not.toBeInTheDocument();
+
     fireEvent.change(within(masterModal).getByLabelText('Nama Status'), {
       target: { value: 'Karyawan Kontrak' },
     });
@@ -400,9 +408,7 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
     await waitFor(() => {
       expect(apiClient.createEmploymentStatus).toHaveBeenCalledWith({
         company_id: 1,
-        code: 'PKWT',
         name: 'Karyawan Kontrak',
-        description: null,
       });
     });
 
@@ -442,9 +448,17 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
     expect(
       await within(masterModal).findByText('Tidak Kawin 0')
     ).toBeInTheDocument();
-    fireEvent.change(within(masterModal).getByLabelText('Kode Pajak'), {
-      target: { value: 'K/1' },
-    });
+
+    // Status Pajak tab only renders Pilih Perusahaan & Nama Status Pajak (no Kode Pajak or Deskripsi)
+    expect(within(masterModal).queryByLabelText('Kode Pajak')).not.toBeInTheDocument();
+    expect(within(masterModal).queryByLabelText('Deskripsi')).not.toBeInTheDocument();
+    expect(
+      within(masterModal).queryByRole('columnheader', { name: 'Kode Pajak' })
+    ).not.toBeInTheDocument();
+    expect(
+      within(masterModal).queryByRole('columnheader', { name: 'Deskripsi' })
+    ).not.toBeInTheDocument();
+
     fireEvent.change(within(masterModal).getByLabelText('Nama Status Pajak'), {
       target: { value: 'Kawin 1' },
     });
@@ -453,10 +467,9 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
     await waitFor(() => {
       expect(apiClient.createTaxStatus).toHaveBeenCalledWith({
         company_id: 1,
-        code: 'K/1',
         name: 'Kawin 1',
-        description: null,
       });
+      expect(within(masterModal).getByText('Kawin 1')).toBeInTheDocument();
     });
 
     fireEvent.click(within(masterModal).getByRole('button', { name: 'Tutup Modal' }));

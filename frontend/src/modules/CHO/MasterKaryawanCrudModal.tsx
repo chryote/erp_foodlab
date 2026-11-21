@@ -126,23 +126,9 @@ export const MasterKaryawanCrudModal: React.FC<
         renderValue: (row) => renderCompanyName(row.company_id, row.company),
       },
       {
-        key: 'code',
-        label: 'Kode Status',
-        placeholder: 'Contoh: PKWTT',
-      },
-      {
         key: 'name',
         label: 'Nama Status',
         placeholder: 'Contoh: Karyawan Tetap',
-      },
-      {
-        key: 'description',
-        label: 'Deskripsi',
-        type: 'textarea',
-        rows: 1,
-        optional: true,
-        placeholder: 'Opsional: keterangan status kerja',
-        renderValue: (row) => (row.description ? row.description : '-'),
       },
     ],
     [companyOptions, defaultCompanyId, renderCompanyName]
@@ -235,23 +221,9 @@ export const MasterKaryawanCrudModal: React.FC<
         renderValue: (row) => renderCompanyName(row.company_id, row.company),
       },
       {
-        key: 'code',
-        label: 'Kode Pajak',
-        placeholder: 'Contoh: TK/0',
-      },
-      {
         key: 'name',
         label: 'Nama Status Pajak',
         placeholder: 'Contoh: Tidak Kawin / 0 Tanggungan',
-      },
-      {
-        key: 'description',
-        label: 'Deskripsi',
-        type: 'textarea',
-        rows: 1,
-        optional: true,
-        placeholder: 'Opsional: keterangan PTKP',
-        renderValue: (row) => (row.description ? row.description : '-'),
       },
     ],
     [companyOptions, defaultCompanyId, renderCompanyName]
@@ -314,29 +286,21 @@ export const MasterKaryawanCrudModal: React.FC<
         onClose={onClose}
         onCreate={async (values) => {
           const companyId = parseInt(values.company_id ?? '', 10);
-          const code = (values.code ?? '').trim();
           const name = (values.name ?? '').trim();
-          const description = (values.description ?? '').trim();
-          if (Number.isFinite(companyId) && code && name) {
+          if (Number.isFinite(companyId) && name) {
             await createStatus({
               company_id: companyId,
-              code,
               name,
-              description: description || null,
             });
           }
         }}
         onUpdate={async (id, values) => {
           const companyId = parseInt(values.company_id ?? '', 10);
-          const code = (values.code ?? '').trim();
           const name = (values.name ?? '').trim();
-          const description = (values.description ?? '').trim();
-          if (Number.isFinite(companyId) && code && name) {
+          if (Number.isFinite(companyId) && name) {
             await updateStatus(id, {
               company_id: companyId,
-              code,
               name,
-              description: description || null,
             });
           }
         }}
@@ -446,29 +410,21 @@ export const MasterKaryawanCrudModal: React.FC<
         onClose={onClose}
         onCreate={async (values) => {
           const companyId = parseInt(values.company_id ?? '', 10);
-          const code = (values.code ?? '').trim();
           const name = (values.name ?? '').trim();
-          const description = (values.description ?? '').trim();
-          if (Number.isFinite(companyId) && code && name) {
+          if (Number.isFinite(companyId) && name) {
             await createTaxStatus({
               company_id: companyId,
-              code,
               name,
-              description: description || null,
             });
           }
         }}
         onUpdate={async (id, values) => {
           const companyId = parseInt(values.company_id ?? '', 10);
-          const code = (values.code ?? '').trim();
           const name = (values.name ?? '').trim();
-          const description = (values.description ?? '').trim();
-          if (Number.isFinite(companyId) && code && name) {
+          if (Number.isFinite(companyId) && name) {
             await updateTaxStatus(id, {
               company_id: companyId,
-              code,
               name,
-              description: description || null,
             });
           }
         }}

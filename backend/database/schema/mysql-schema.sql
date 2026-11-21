@@ -193,7 +193,7 @@ DROP TABLE IF EXISTS `employment_statuses`;
 CREATE TABLE `employment_statuses` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `company_id` bigint unsigned NOT NULL,
-  `code` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `code` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `created_at` timestamp NULL DEFAULT NULL,
@@ -371,7 +371,7 @@ DROP TABLE IF EXISTS `tax_statuses`;
 CREATE TABLE `tax_statuses` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `company_id` bigint unsigned NOT NULL,
-  `code` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `code` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `created_at` timestamp NULL DEFAULT NULL,
@@ -438,5 +438,7 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (27,'2026_11_20_180
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (28,'2026_11_20_190000_add_profile_fields_to_employees_table',16);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (29,'2026_11_20_200000_create_employee_documents_table',16);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (30,'2026_11_21_000001_make_code_nullable_on_employee_positions_table',17);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (31,'2026_11_21_000002_make_code_nullable_on_employment_statuses_table',18);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (32,'2026_11_21_000003_make_code_nullable_on_tax_statuses_table',19);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;

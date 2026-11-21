@@ -14,16 +14,24 @@ class SaveTaxStatusRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        if (is_string($this->input('code'))) {
-            $this->merge([
-                'code' => trim($this->input('code')),
-            ]);
+        $normalized = [];
+
+        if ($this->has('code') && is_string($this->input('code'))) {
+            $trimmed = trim($this->input('code'));
+            $normalized['code'] = $trimmed === '' ? null : $trimmed;
         }
 
-        if (is_string($this->input('name'))) {
-            $this->merge([
-                'name' => trim($this->input('name')),
-            ]);
+        if ($this->has('name') && is_string($this->input('name'))) {
+            $normalized['name'] = trim($this->input('name'));
+        }
+
+        if ($this->has('description') && is_string($this->input('description'))) {
+            $trimmed = trim($this->input('description'));
+            $normalized['description'] = $trimmed === '' ? null : $trimmed;
+        }
+
+        if ($normalized !== []) {
+            $this->merge($normalized);
         }
     }
 
@@ -42,7 +50,8 @@ class SaveTaxStatusRequest extends FormRequest
                 Rule::exists('companies', 'id')->whereNull('deleted_at'),
             ],
             'code' => [
-                ...$presence,
+                'sometimes',
+                'nullable',
                 'string',
                 'max:20',
                 Rule::unique('tax_statuses', 'code')->ignore($taxStatus),
@@ -64,7 +73,8 @@ class SaveTaxStatusRequest extends FormRequest
         }
 
         if (array_key_exists('code', $validated)) {
-            $validated['code'] = trim((string) $validated['code']);
+            $code = $validated['code'] !== null ? trim((string) $validated['code']) : null;
+            $validated['code'] = ($code === null || $code === '') ? null : $code;
         }
 
         if (array_key_exists('name', $validated)) {
@@ -72,9 +82,8 @@ class SaveTaxStatusRequest extends FormRequest
         }
 
         if (array_key_exists('description', $validated)) {
-            $validated['description'] = $validated['description'] !== null
-                ? (string) $validated['description']
-                : null;
+            $description = $validated['description'] !== null ? trim((string) $validated['description']) : null;
+            $validated['description'] = ($description === null || $description === '') ? null : $description;
         }
 
         return $validated;

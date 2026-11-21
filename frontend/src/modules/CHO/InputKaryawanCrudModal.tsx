@@ -260,7 +260,10 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
             !Number.isFinite(selectedCompanyId) ||
             Number(s.company_id) === selectedCompanyId
         )
-        .map((s) => ({ value: String(s.id), label: `${s.code} - ${s.name}` })),
+        .map((s) => ({
+          value: String(s.id),
+          label: s.code ? `${s.code} - ${s.name}` : s.name,
+        })),
     [allStatuses, selectedCompanyId]
   );
 
@@ -287,7 +290,10 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
             !Number.isFinite(selectedCompanyId) ||
             Number(t.company_id) === selectedCompanyId
         )
-        .map((t) => ({ value: String(t.id), label: `${t.code} - ${t.name}` })),
+        .map((t) => ({
+          value: String(t.id),
+          label: t.code ? `${t.code} - ${t.name}` : t.name,
+        })),
     [allTaxStatuses, selectedCompanyId]
   );
 

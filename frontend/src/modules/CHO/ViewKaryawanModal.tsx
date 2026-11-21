@@ -95,7 +95,7 @@ export const ViewKaryawanModal: React.FC<ViewKaryawanModalProps> = ({
       {
         key: 'tax_status_id',
         label: 'Status Pajak',
-        renderValue: (row) => row.tax_status?.code ?? '-',
+        renderValue: (row) => row.tax_status?.code || row.tax_status?.name || '-',
       },
       {
         key: 'religion',

@@ -275,7 +275,7 @@ export interface EmployeePositionsListResponse {
 export interface EmploymentStatus {
   id: number;
   company_id: number;
-  code: string;
+  code?: string | null;
   name: string;
   description?: string | null;
   company?: Company | null;
@@ -286,7 +286,7 @@ export interface EmploymentStatus {
 
 export interface EmploymentStatusPayload {
   company_id: number;
-  code: string;
+  code?: string | null;
   name: string;
   description?: string | null;
 }
@@ -348,7 +348,7 @@ export interface PayrollGradesListResponse {
 export interface TaxStatus {
   id: number;
   company_id: number;
-  code: string;
+  code?: string | null;
   name: string;
   description?: string | null;
   company?: Company | null;
@@ -359,7 +359,7 @@ export interface TaxStatus {
 
 export interface TaxStatusPayload {
   company_id: number;
-  code: string;
+  code?: string | null;
   name: string;
   description?: string | null;
 }
