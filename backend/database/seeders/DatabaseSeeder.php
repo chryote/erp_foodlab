@@ -6,12 +6,14 @@ use App\Enums\Agama;
 use App\Enums\GolonganDarah;
 use App\Enums\JenisDokumen;
 use App\Enums\JenisKelamin;
+use App\Enums\ShiftStatusEnum;
 use App\Models\CapitalCompany;
 use App\Models\Company;
 use App\Models\CompanyAsset;
 use App\Models\Employee;
 use App\Models\EmployeeDocument;
 use App\Models\EmployeePosition;
+use App\Models\EmployeeShift;
 use App\Models\EmploymentStatus;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseItem;
@@ -38,6 +40,7 @@ class DatabaseSeeder extends Seeder
             $this->seedCfoOperations($company);
             $this->seedCfoAssets($company);
             $this->seedChoModule($company);
+            $this->seedEmployeeShifts();
         });
 
         Cache::flush();
@@ -378,5 +381,60 @@ class DatabaseSeeder extends Seeder
                 'total_company_cost' => $totalGross + $bpjsKesCompany + $bpjsTkCompany,
             ]
         );
+    }
+
+    private function seedEmployeeShifts(): void
+    {
+        $shifts = [
+            [
+                'code' => 'SHIFT-PAGI',
+                'name' => 'Shift Pagi',
+                'start_time' => '07:00:00',
+                'end_time' => '15:00:00',
+                'break_minutes' => 60,
+                'grace_period_minutes' => 15,
+                'is_overnight' => false,
+                'status' => ShiftStatusEnum::ACTIVE,
+                'description' => 'Shift kerja pagi laboratorium dan operasional',
+            ],
+            [
+                'code' => 'SHIFT-SIANG',
+                'name' => 'Shift Siang',
+                'start_time' => '15:00:00',
+                'end_time' => '23:00:00',
+                'break_minutes' => 60,
+                'grace_period_minutes' => 15,
+                'is_overnight' => false,
+                'status' => ShiftStatusEnum::ACTIVE,
+                'description' => 'Shift kerja siang operasional dan produksi',
+            ],
+            [
+                'code' => 'SHIFT-MALAM',
+                'name' => 'Shift Malam',
+                'start_time' => '23:00:00',
+                'end_time' => '07:00:00',
+                'break_minutes' => 60,
+                'grace_period_minutes' => 15,
+                'is_overnight' => true,
+                'status' => ShiftStatusEnum::ACTIVE,
+                'description' => 'Shift kerja malam lintas hari',
+            ],
+        ];
+
+        foreach (Company::query()->get() as $company) {
+            foreach ($shifts as $payload) {
+                $shift = EmployeeShift::query()
+                    ->withTrashed()
+                    ->where('company_id', $company->id)
+                    ->where('code', $payload['code'])
+                    ->orderByRaw('deleted_at IS NOT NULL')
+                    ->first() ?? new EmployeeShift();
+
+                $shift->fill($payload);
+                $shift->company_id = $company->id;
+                $shift->deleted_at = null;
+                $shift->save();
+            }
+        }
     }
 }

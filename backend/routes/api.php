@@ -35,6 +35,7 @@ Route::prefix('v1')->group(function () {
             require base_path('app/Modules/CPO/routes.php');
             require base_path('app/Modules/CDO/routes.php');
             require base_path('app/Modules/CMO/routes.php');
+            require base_path('app/Modules/HR/routes.php');
         });
 
         // FoodLab Quality Control Samples

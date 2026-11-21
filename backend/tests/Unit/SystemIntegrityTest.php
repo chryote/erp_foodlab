@@ -94,6 +94,7 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
             'tax_statuses' => \App\Models\TaxStatus::query()->count(),
             'employees' => \App\Models\Employee::query()->count(),
             'employee_documents' => \App\Models\EmployeeDocument::query()->count(),
+            'employee_shifts' => \App\Models\EmployeeShift::query()->count(),
             'lab_samples' => \App\Models\LabSample::query()->count(),
         ];
 
@@ -106,6 +107,7 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
 
         expect(\App\Models\Company::query()->count())->toBe($firstCounts['companies']);
         expect(\App\Models\Employee::query()->count())->toBe($firstCounts['employees']);
+        expect(\App\Models\EmployeeShift::query()->count())->toBe($firstCounts['employee_shifts']);
         expect(\App\Models\LabSample::query()->count())->toBe($firstCounts['lab_samples']);
     });
 
