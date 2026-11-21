@@ -106,23 +106,9 @@ export const MasterKaryawanCrudModal: React.FC<
         renderValue: (row) => renderCompanyName(row.company_id, row.company),
       },
       {
-        key: 'code',
-        label: 'Kode Jabatan',
-        placeholder: 'Contoh: POS-LAB-01',
-      },
-      {
         key: 'name',
         label: 'Nama Jabatan',
         placeholder: 'Contoh: Melakukan tugas A dan B',
-      },
-      {
-        key: 'description',
-        label: 'Deskripsi',
-        type: 'textarea',
-        rows: 1,
-        optional: true,
-        placeholder: 'Opsional: uraian tugas jabatan',
-        renderValue: (row) => (row.description ? row.description : '-'),
       },
     ],
     [companyOptions, defaultCompanyId, renderCompanyName]
@@ -511,29 +497,21 @@ export const MasterKaryawanCrudModal: React.FC<
       onClose={onClose}
       onCreate={async (values) => {
         const companyId = parseInt(values.company_id ?? '', 10);
-        const code = (values.code ?? '').trim();
         const name = (values.name ?? '').trim();
-        const description = (values.description ?? '').trim();
-        if (Number.isFinite(companyId) && code && name) {
+        if (Number.isFinite(companyId) && name) {
           await createPosition({
             company_id: companyId,
-            code,
             name,
-            description: description || null,
           });
         }
       }}
       onUpdate={async (id, values) => {
         const companyId = parseInt(values.company_id ?? '', 10);
-        const code = (values.code ?? '').trim();
         const name = (values.name ?? '').trim();
-        const description = (values.description ?? '').trim();
-        if (Number.isFinite(companyId) && code && name) {
+        if (Number.isFinite(companyId) && name) {
           await updatePosition(id, {
             company_id: companyId,
-            code,
             name,
-            description: description || null,
           });
         }
       }}

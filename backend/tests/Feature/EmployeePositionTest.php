@@ -126,6 +126,53 @@ describe('EmployeePosition CHO module', function () {
         $this->getJson("/api/v1/modules/cho/employee-positions/{$qaId}")->assertNotFound();
     });
 
+    it('allows nullable code and description on create and update without unique collision', function () {
+        $company = Company::factory()->create();
+
+        // Create with only company_id and name (code & description omitted)
+        $first = $this->postJson('/api/v1/modules/cho/employee-positions', [
+            'company_id' => $company->id,
+            'name' => 'Staff A',
+        ])->assertCreated()
+            ->assertJsonPath('data.code', null)
+            ->assertJsonPath('data.name', 'Staff A')
+            ->assertJsonPath('data.description', null);
+
+        // Create second position with empty/whitespace code & description (both normalized to null, no unique conflict)
+        $second = $this->postJson('/api/v1/modules/cho/employee-positions', [
+            'company_id' => $company->id,
+            'code' => '   ',
+            'name' => 'Staff B',
+            'description' => '',
+        ])->assertCreated()
+            ->assertJsonPath('data.code', null)
+            ->assertJsonPath('data.name', 'Staff B')
+            ->assertJsonPath('data.description', null);
+
+        expect($first->json('data.id'))->not->toBe($second->json('data.id'));
+
+        // Update to add a code, then clear it back to null
+        $secondId = $second->json('data.id');
+        $this->putJson("/api/v1/modules/cho/employee-positions/{$secondId}", [
+            'company_id' => $company->id,
+            'code' => 'POS-B',
+            'name' => 'Staff B',
+            'description' => 'Tugas B',
+        ])->assertOk()
+            ->assertJsonPath('data.code', 'POS-B')
+            ->assertJsonPath('data.description', 'Tugas B');
+
+        $this->putJson("/api/v1/modules/cho/employee-positions/{$secondId}", [
+            'company_id' => $company->id,
+            'code' => null,
+            'name' => 'Staff B Updated',
+            'description' => null,
+        ])->assertOk()
+            ->assertJsonPath('data.code', null)
+            ->assertJsonPath('data.name', 'Staff B Updated')
+            ->assertJsonPath('data.description', null);
+    });
+
     it('returns 422 on duplicate code, empty name, and soft-delete while referenced by active employees', function () {
         $company = Company::factory()->create();
 

@@ -245,7 +245,10 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
             !Number.isFinite(selectedCompanyId) ||
             Number(p.company_id) === selectedCompanyId
         )
-        .map((p) => ({ value: String(p.id), label: `${p.code} - ${p.name}` })),
+        .map((p) => ({
+          value: String(p.id),
+          label: p.code ? `${p.code} - ${p.name}` : p.name,
+        })),
     [allPositions, selectedCompanyId]
   );
 

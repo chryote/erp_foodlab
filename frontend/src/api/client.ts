@@ -244,7 +244,7 @@ export interface ChoEnums {
 export interface EmployeePosition {
   id: number;
   company_id: number;
-  code: string;
+  code?: string | null;
   name: string;
   description?: string | null;
   company?: Company | null;
@@ -255,7 +255,7 @@ export interface EmployeePosition {
 
 export interface EmployeePositionPayload {
   company_id: number;
-  code: string;
+  code?: string | null;
   name: string;
   description?: string | null;
 }

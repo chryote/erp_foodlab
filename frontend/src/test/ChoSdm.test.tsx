@@ -169,7 +169,7 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
     }));
     vi.mocked(apiClient.createEmployeePosition).mockImplementation(async (payload) => {
       const created: apiClient.EmployeePosition = {
-        id: 11,
+        id: 10 + positionsStore.length,
         ...payload,
         company: companiesStore.find((c) => c.id === payload.company_id) ?? null,
       };
@@ -356,10 +356,17 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
       await within(masterModal).findByText('Analis Kimia')
     ).toBeInTheDocument();
 
-    // Create Position
-    fireEvent.change(within(masterModal).getByLabelText('Kode Jabatan'), {
-      target: { value: 'POS-QA-02' },
-    });
+    // Jabatan tab only renders Pilih Perusahaan & Nama Jabatan (no Kode Jabatan or Deskripsi)
+    expect(within(masterModal).queryByLabelText('Kode Jabatan')).not.toBeInTheDocument();
+    expect(within(masterModal).queryByLabelText('Deskripsi')).not.toBeInTheDocument();
+    expect(
+      within(masterModal).queryByRole('columnheader', { name: 'Kode Jabatan' })
+    ).not.toBeInTheDocument();
+    expect(
+      within(masterModal).queryByRole('columnheader', { name: 'Deskripsi' })
+    ).not.toBeInTheDocument();
+
+    // Create Position with only Pilih Perusahaan & Nama Jabatan
     fireEvent.change(within(masterModal).getByLabelText('Nama Jabatan'), {
       target: { value: 'Supervisor QA' },
     });
@@ -369,9 +376,7 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
     await waitFor(() => {
       expect(apiClient.createEmployeePosition).toHaveBeenCalledWith({
         company_id: 1,
-        code: 'POS-QA-02',
         name: 'Supervisor QA',
-        description: null,
       });
       expect(within(masterModal).getByText('Supervisor QA')).toBeInTheDocument();
     });
