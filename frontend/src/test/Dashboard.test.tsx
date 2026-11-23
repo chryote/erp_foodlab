@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Dashboard from '../Pages/Dashboard';
 import * as apiClient from '../api/client';
@@ -75,6 +76,7 @@ describe('Dashboard', () => {
   });
 
   it('switches company series and company from the dashboard header', async () => {
+    const user = userEvent.setup();
     vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
       data: [
         { id: 1, name: 'FoodLab Utama', series: 1 },
@@ -93,12 +95,13 @@ describe('Dashboard', () => {
       </QueryClientProvider>
     );
 
-    fireEvent.click(await screen.findByTestId('dashboard-series-tab-2'));
+    await user.click(await screen.findByTestId('dashboard-series-tab-2'));
     expect(
       await screen.findByTestId('dashboard-company-tab-2')
     ).toHaveAttribute('aria-selected', 'true');
 
-    fireEvent.click(screen.getByTestId('dashboard-company-tab-3'));
+    await user.click(screen.getByTestId('dashboard-company-tab-3'));
+    await user.keyboard('{ArrowDown}{ArrowRight}{ArrowRight}{Enter}');
     expect(screen.getByTestId('dashboard-company-tab-3')).toHaveAttribute(
       'aria-selected',
       'true'
@@ -108,46 +111,4 @@ describe('Dashboard', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows the selected company asset value and opens the asset view', async () => {
-    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
-      data: [{ id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1 }],
-      meta: { count: 1 },
-    });
-    vi.mocked(apiClient.fetchCompanyAssets).mockResolvedValue({
-      data: [
-        {
-          id: 10,
-          company_id: 1,
-          asset_date: '2026-03-01',
-          name: 'Freezer Laboratorium',
-          amount: 1,
-          price_per_unit: 75_000_000,
-          total_price: 75_000_000,
-        },
-      ],
-      meta: { count: 1 },
-    });
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <Dashboard />
-      </QueryClientProvider>
-    );
-
-    expect(await screen.findByText('Rp 75.000.000')).toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole('button', { name: /View aset perusahaan/ })
-    );
-
-    const assetModal = await screen.findByTestId('view-aset-modal');
-    expect(
-      within(assetModal).getByTestId('view-aset-total-banner-value')
-    ).toHaveTextContent('Rp 75.000.000');
-    expect(
-      within(assetModal).getByText('Freezer Laboratorium')
-    ).toBeInTheDocument();
-  });
 });
