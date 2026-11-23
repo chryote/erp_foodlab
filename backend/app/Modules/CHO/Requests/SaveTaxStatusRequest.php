@@ -44,23 +44,14 @@ class SaveTaxStatusRequest extends FormRequest
     {
         $presence = $this->isMethod('PATCH') ? ['sometimes', 'required'] : ['required'];
         $taxStatus = $this->route('taxStatus');
-        $companyId = $this->filled('company_id')
-            ? (int) $this->input('company_id')
-            : ($taxStatus instanceof TaxStatus ? (int) $taxStatus->company_id : 0);
 
         return [
-            'company_id' => [
-                ...$presence,
-                'integer',
-                Rule::exists('companies', 'id')->whereNull('deleted_at'),
-            ],
             'code' => [
                 'sometimes',
                 'nullable',
                 'string',
                 'max:20',
                 Rule::unique('tax_statuses', 'code')
-                    ->where('company_id', $companyId)
                     ->whereNull('deleted_at')
                     ->ignore($taxStatus),
             ],
@@ -76,19 +67,12 @@ class SaveTaxStatusRequest extends FormRequest
     {
         return [
             function (Validator $validator): void {
-                if ($validator->errors()->hasAny(['company_id', 'code', 'name'])) {
+                if ($validator->errors()->hasAny(['code', 'name'])) {
                     return;
                 }
 
                 /** @var TaxStatus|null $taxStatus */
                 $taxStatus = $this->route('taxStatus');
-                $effectiveCompanyId = $this->filled('company_id')
-                    ? (int) $this->input('company_id')
-                    : (int) ($taxStatus?->company_id ?? 0);
-
-                if ($effectiveCompanyId <= 0) {
-                    return;
-                }
 
                 $effectiveCode = $this->has('code')
                     ? ($this->input('code') !== null ? InputNormalizer::nullableText((string) $this->input('code')) : null)
@@ -97,12 +81,12 @@ class SaveTaxStatusRequest extends FormRequest
                     ? InputNormalizer::text((string) $this->input('name'))
                     : $taxStatus?->name;
 
-                $errors = WriteGuard::findCompanyCodeAndNameDuplicateErrors(
+                $errors = WriteGuard::findCodeAndNameDuplicateErrors(
                     TaxStatus::class,
-                    $effectiveCompanyId,
                     $effectiveCode,
                     $effectiveName,
-                    'Status pajak dengan nama yang sama sudah terdaftar pada perusahaan ini.',
+                    'Status pajak dengan nama yang sama sudah terdaftar.',
+                    [],
                     $taxStatus?->getKey()
                 );
 
@@ -119,10 +103,6 @@ class SaveTaxStatusRequest extends FormRequest
     public function payload(): array
     {
         $validated = $this->validated();
-
-        if (array_key_exists('company_id', $validated)) {
-            $validated['company_id'] = (int) $validated['company_id'];
-        }
 
         if (array_key_exists('code', $validated)) {
             $validated['code'] = $validated['code'] !== null

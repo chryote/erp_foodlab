@@ -91,8 +91,7 @@ class SavePayrollItemRequest extends FormRequest
                 'nullable',
                 'integer',
                 Rule::exists('employee_positions', 'id')
-                    ->whereNull('deleted_at')
-                    ->where('company_id', $companyId),
+                    ->whereNull('deleted_at'),
             ],
             'payroll_group' => ['sometimes', 'required', 'string', Rule::enum(PayrollGroup::class)],
             'bank_account_number' => ['sometimes', 'nullable', 'string', 'max:50'],
@@ -225,14 +224,13 @@ class SavePayrollItemRequest extends FormRequest
                 if (! $validator->errors()->has('employee_position_id') && $effectivePositionId !== null) {
                     $positionValid = EmployeePosition::query()
                         ->whereNull('deleted_at')
-                        ->where('company_id', $effectiveCompanyId)
                         ->whereKey((int) $effectivePositionId)
                         ->exists();
 
                     if (! $positionValid) {
                         $validator->errors()->add(
                             'employee_position_id',
-                            'The selected employee position does not belong to the specified company.'
+                            'The selected employee position is invalid or has been deleted.'
                         );
                     }
                 }

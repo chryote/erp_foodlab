@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -15,7 +14,6 @@ class EmployeePosition extends Model
     protected $table = 'employee_positions';
 
     protected $fillable = [
-        'company_id',
         'code',
         'name',
         'description',
@@ -23,10 +21,6 @@ class EmployeePosition extends Model
 
     protected $hidden = [
         'active_flag',
-    ];
-
-    protected $casts = [
-        'company_id' => 'integer',
     ];
 
     protected static function booted(): void
@@ -44,11 +38,6 @@ class EmployeePosition extends Model
                     $employee->syncAttendanceCode();
                 });
         });
-    }
-
-    public function company(): BelongsTo
-    {
-        return $this->belongsTo(Company::class);
     }
 
     public function employees(): HasMany

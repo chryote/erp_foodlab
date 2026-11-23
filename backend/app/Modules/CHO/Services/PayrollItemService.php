@@ -84,7 +84,7 @@ class PayrollItemService
             $this->assertActiveCompany($companyId);
             $payrollRun = $this->lockAndAssertMutablePayrollRun($payrollRunId, $companyId);
             $this->assertActiveEmployee($employeeId, $companyId);
-            $this->assertActivePosition($positionId, $companyId);
+            $this->assertActivePosition($positionId);
 
             WriteGuard::assertUniqueActive(
                 PayrollItem::query(),
@@ -170,7 +170,7 @@ class PayrollItemService
 
             $this->assertActiveCompany($targetCompanyId);
             $this->assertActiveEmployee($targetEmployeeId, $targetCompanyId);
-            $this->assertActivePosition($targetPositionId !== null ? (int) $targetPositionId : null, $targetCompanyId);
+            $this->assertActivePosition($targetPositionId !== null ? (int) $targetPositionId : null);
 
             WriteGuard::assertUniqueActive(
                 PayrollItem::query(),
@@ -416,7 +416,7 @@ class PayrollItemService
         }
     }
 
-    private function assertActivePosition(?int $positionId, int $companyId): void
+    private function assertActivePosition(?int $positionId): void
     {
         if ($positionId === null) {
             return;
@@ -424,14 +424,13 @@ class PayrollItemService
 
         $exists = EmployeePosition::query()
             ->whereNull('deleted_at')
-            ->where('company_id', $companyId)
             ->sharedLock()
             ->whereKey($positionId)
             ->exists();
 
         if (! $exists) {
             throw ValidationException::withMessages([
-                'employee_position_id' => ['The selected employee position does not belong to the specified company.'],
+                'employee_position_id' => ['The selected employee position is invalid or has been deleted.'],
             ]);
         }
     }

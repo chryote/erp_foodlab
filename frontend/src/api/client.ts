@@ -243,18 +243,15 @@ export interface ChoEnums {
 
 export interface EmployeePosition {
   id: number;
-  company_id: number;
   code?: string | null;
   name: string;
   description?: string | null;
-  company?: Company | null;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
 }
 
 export interface EmployeePositionPayload {
-  company_id: number;
   code?: string | null;
   name: string;
   description?: string | null;
@@ -274,18 +271,15 @@ export interface EmployeePositionsListResponse {
 
 export interface EmploymentStatus {
   id: number;
-  company_id: number;
   code?: string | null;
   name: string;
   description?: string | null;
-  company?: Company | null;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
 }
 
 export interface EmploymentStatusPayload {
-  company_id: number;
   code?: string | null;
   name: string;
   description?: string | null;
@@ -305,7 +299,6 @@ export interface EmploymentStatusesListResponse {
 
 export interface PayrollGrade {
   id: number;
-  company_id: number;
   grade: number;
   sub_grade: string;
   level_label?: string | null;
@@ -318,14 +311,12 @@ export interface PayrollGrade {
   bpjs_ketenagakerjaan_employee: number;
   net_employee_received: number;
   total_company_cost: number;
-  company?: Company | null;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
 }
 
 export interface PayrollGradePayload {
-  company_id: number;
   grade: number;
   sub_grade: string;
   level_label?: string | null;
@@ -347,18 +338,15 @@ export interface PayrollGradesListResponse {
 
 export interface TaxStatus {
   id: number;
-  company_id: number;
   code?: string | null;
   name: string;
   description?: string | null;
-  company?: Company | null;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
 }
 
 export interface TaxStatusPayload {
-  company_id: number;
   code?: string | null;
   name: string;
   description?: string | null;

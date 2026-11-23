@@ -6,7 +6,6 @@ use App\Models\PayrollGrade;
 use App\Support\InputNormalizer;
 use App\Support\WriteGuard;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class SavePayrollGradeRequest extends FormRequest
@@ -46,11 +45,6 @@ class SavePayrollGradeRequest extends FormRequest
         $presence = $this->isMethod('PATCH') ? ['sometimes', 'required'] : ['required'];
 
         return [
-            'company_id' => [
-                ...$presence,
-                'integer',
-                Rule::exists('companies', 'id')->whereNull('deleted_at'),
-            ],
             'grade' => [...$presence, 'integer', 'min:1', 'max:255'],
             'sub_grade' => [...$presence, 'string', 'max:10'],
             'level_label' => ['sometimes', 'nullable', 'string', 'max:150'],
@@ -87,13 +81,10 @@ class SavePayrollGradeRequest extends FormRequest
                     }
                 }
 
-                if ($validator->errors()->hasAny(['company_id', 'grade', 'sub_grade'])) {
+                if ($validator->errors()->hasAny(['grade', 'sub_grade'])) {
                     return;
                 }
 
-                $companyId = $this->filled('company_id')
-                    ? (int) $this->input('company_id')
-                    : $payrollGrade?->company_id;
                 $grade = $this->has('grade')
                     ? (int) $this->input('grade')
                     : $payrollGrade?->grade;
@@ -101,7 +92,7 @@ class SavePayrollGradeRequest extends FormRequest
                     ? InputNormalizer::text((string) $this->input('sub_grade'))
                     : $payrollGrade?->sub_grade;
 
-                if ($companyId === null || $grade === null || $subGrade === null || $subGrade === '') {
+                if ($grade === null || $subGrade === null || $subGrade === '') {
                     return;
                 }
 
@@ -110,7 +101,6 @@ class SavePayrollGradeRequest extends FormRequest
                     'sub_grade',
                     $subGrade,
                     [
-                        'company_id' => $companyId,
                         'grade' => $grade,
                     ],
                     $payrollGrade?->getKey()
@@ -133,10 +123,6 @@ class SavePayrollGradeRequest extends FormRequest
     public function payload(): array
     {
         $validated = $this->validated();
-
-        if (array_key_exists('company_id', $validated)) {
-            $validated['company_id'] = (int) $validated['company_id'];
-        }
 
         if (array_key_exists('grade', $validated)) {
             $validated['grade'] = (int) $validated['grade'];

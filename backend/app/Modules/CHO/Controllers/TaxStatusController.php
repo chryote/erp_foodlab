@@ -39,7 +39,7 @@ class TaxStatusController extends Controller
 
     public function show(TaxStatus $taxStatus): JsonResponse
     {
-        return (new TaxStatusResource($taxStatus->load('company')))->response();
+        return (new TaxStatusResource($taxStatus))->response();
     }
 
     public function update(SaveTaxStatusRequest $request, TaxStatus $taxStatus): JsonResponse

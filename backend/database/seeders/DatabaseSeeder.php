@@ -228,42 +228,36 @@ class DatabaseSeeder extends Seeder
     private function seedChoModule(Company $company): void
     {
         $analystPosition = $this->upsertByCode(EmployeePosition::class, [
-            'company_id' => $company->id,
             'code' => 'STF-A',
             'name' => 'STAFF A',
             'description' => 'Deskripsi Pekerjaan',
         ]);
         $qaPosition = $this->upsertByCode(EmployeePosition::class, [
-            'company_id' => $company->id,
             'code' => 'STF-B',
             'name' => 'STAFF B',
             'description' => 'Deskripsi Pekerjaan',
         ]);
 
         $permanentStatus = $this->upsertByCode(EmploymentStatus::class, [
-            'company_id' => $company->id,
             'code' => 'PKWTT',
             'name' => 'Karyawan Tetap',
             'description' => 'Perjanjian Kerja Waktu Tidak Tertentu',
         ]);
         $contractStatus = $this->upsertByCode(EmploymentStatus::class, [
-            'company_id' => $company->id,
             'code' => 'PKWT',
             'name' => 'Karyawan Kontrak',
             'description' => 'Perjanjian Kerja Waktu Tertentu',
         ]);
 
-        $staffGrade = $this->upsertPayrollGrade($company->id, 1, 'A', 'staff, spv', 5500000.0, 500000.0);
-        $spvGrade = $this->upsertPayrollGrade($company->id, 2, 'A', 'supervisor', 8500000.0, 1500000.0);
+        $staffGrade = $this->upsertPayrollGrade(1, 'A', 'staff, spv', 5500000.0, 500000.0);
+        $spvGrade = $this->upsertPayrollGrade(2, 'A', 'supervisor', 8500000.0, 1500000.0);
 
         $tk0Tax = $this->upsertByCode(TaxStatus::class, [
-            'company_id' => $company->id,
             'code' => 'TK/0',
             'name' => 'Tidak Kawin / 0 Tanggungan',
             'description' => 'PTKP Wajib Pajak Orang Pribadi tidak kawin tanpa tanggungan',
         ]);
         $k1Tax = $this->upsertByCode(TaxStatus::class, [
-            'company_id' => $company->id,
             'code' => 'K/1',
             'name' => 'Kawin / 1 Tanggungan',
             'description' => 'PTKP Wajib Pajak kawin dengan 1 tanggungan',
@@ -362,7 +356,6 @@ class DatabaseSeeder extends Seeder
     }
 
     private function upsertPayrollGrade(
-        int $companyId,
         int $grade,
         string $subGrade,
         string $levelLabel,
@@ -381,7 +374,6 @@ class DatabaseSeeder extends Seeder
                 'sub_grade' => $subGrade,
             ],
             [
-                'company_id' => $companyId,
                 'level_label' => $levelLabel,
                 'base_salary' => $baseSalary,
                 'position_allowance' => $positionAllowance,
@@ -604,12 +596,10 @@ class DatabaseSeeder extends Seeder
         ] as $posData) {
             $position = EmployeePosition::query()
                 ->withTrashed()
-                ->where('company_id', $company->id)
                 ->where('name', $posData['name'])
                 ->orderByRaw('deleted_at IS NOT NULL')
                 ->first() ?? new EmployeePosition();
             $position->fill($posData);
-            $position->company_id = $company->id;
             $position->deleted_at = null;
             $position->save();
 

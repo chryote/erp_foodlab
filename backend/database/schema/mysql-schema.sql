@@ -139,7 +139,6 @@ DROP TABLE IF EXISTS `employee_positions`;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_positions` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `company_id` bigint unsigned NOT NULL,
   `code` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
@@ -148,12 +147,10 @@ CREATE TABLE `employee_positions` (
   `deleted_at` timestamp NULL DEFAULT NULL,
   `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `employee_positions_company_code_active_unique` (`company_id`,`code`,`active_flag`),
-  UNIQUE KEY `employee_positions_company_name_active_unique` (`company_id`,`name`,`active_flag`),
+  UNIQUE KEY `employee_positions_code_active_unique` (`code`,`active_flag`),
+  UNIQUE KEY `employee_positions_name_active_unique` (`name`,`active_flag`),
   KEY `employee_positions_name_index` (`name`),
-  KEY `employee_positions_comp_del_name_id_idx` (`company_id`,`deleted_at`,`name`,`id`),
-  KEY `employee_positions_del_name_id_idx` (`deleted_at`,`name`,`id`),
-  CONSTRAINT `employee_positions_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT
+  KEY `employee_positions_del_name_id_idx` (`deleted_at`,`name`,`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `employee_shift_assignments`;
@@ -265,7 +262,6 @@ DROP TABLE IF EXISTS `employment_statuses`;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employment_statuses` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `company_id` bigint unsigned NOT NULL,
   `code` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
@@ -274,12 +270,10 @@ CREATE TABLE `employment_statuses` (
   `deleted_at` timestamp NULL DEFAULT NULL,
   `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `employment_statuses_company_code_active_unique` (`company_id`,`code`,`active_flag`),
-  UNIQUE KEY `employment_statuses_company_name_active_unique` (`company_id`,`name`,`active_flag`),
+  UNIQUE KEY `employment_statuses_code_active_unique` (`code`,`active_flag`),
+  UNIQUE KEY `employment_statuses_name_active_unique` (`name`,`active_flag`),
   KEY `employment_statuses_name_index` (`name`),
-  KEY `employment_statuses_comp_del_name_id_idx` (`company_id`,`deleted_at`,`name`,`id`),
-  KEY `employment_statuses_del_name_id_idx` (`deleted_at`,`name`,`id`),
-  CONSTRAINT `employment_statuses_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT
+  KEY `employment_statuses_del_name_id_idx` (`deleted_at`,`name`,`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `expense_categories`;
@@ -394,7 +388,6 @@ DROP TABLE IF EXISTS `payroll_grades`;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `payroll_grades` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `company_id` bigint unsigned NOT NULL,
   `grade` tinyint unsigned NOT NULL,
   `sub_grade` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `level_label` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -412,10 +405,8 @@ CREATE TABLE `payroll_grades` (
   `deleted_at` timestamp NULL DEFAULT NULL,
   `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `payroll_grades_company_grade_sub_active_unique` (`company_id`,`grade`,`sub_grade`,`active_flag`),
-  KEY `payroll_grades_comp_del_grade_sub_idx` (`company_id`,`deleted_at`,`grade`,`sub_grade`),
-  KEY `payroll_grades_del_grade_sub_idx` (`deleted_at`,`grade`,`sub_grade`),
-  CONSTRAINT `payroll_grades_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT
+  UNIQUE KEY `payroll_grades_grade_sub_active_unique` (`grade`,`sub_grade`,`active_flag`),
+  KEY `payroll_grades_del_grade_sub_idx` (`deleted_at`,`grade`,`sub_grade`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `payroll_items`;
@@ -527,7 +518,6 @@ DROP TABLE IF EXISTS `tax_statuses`;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `tax_statuses` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `company_id` bigint unsigned NOT NULL,
   `code` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
@@ -536,12 +526,10 @@ CREATE TABLE `tax_statuses` (
   `deleted_at` timestamp NULL DEFAULT NULL,
   `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `tax_statuses_company_code_active_unique` (`company_id`,`code`,`active_flag`),
-  UNIQUE KEY `tax_statuses_company_name_active_unique` (`company_id`,`name`,`active_flag`),
+  UNIQUE KEY `tax_statuses_code_active_unique` (`code`,`active_flag`),
+  UNIQUE KEY `tax_statuses_name_active_unique` (`name`,`active_flag`),
   KEY `tax_statuses_name_index` (`name`),
-  KEY `tax_statuses_comp_del_code_id_idx` (`company_id`,`deleted_at`,`code`,`id`),
-  KEY `tax_statuses_del_code_id_idx` (`deleted_at`,`code`,`id`),
-  CONSTRAINT `tax_statuses_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT
+  KEY `tax_statuses_del_code_id_idx` (`deleted_at`,`code`,`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `users`;
@@ -610,5 +598,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (43,'2026_11_23_100
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (44,'2026_11_23_100100_create_payroll_items_table',29);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (45,'2026_11_23_110000_update_payroll_items_table_for_spec',30);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (46,'2026_11_23_120000_add_finalization_fields_to_payroll_items_table',31);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (47,'2026_11_23_130000_make_cho_master_tables_company_agnostic',32);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;

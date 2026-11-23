@@ -196,10 +196,7 @@ export function useChoEnumsResource(enabled: boolean) {
   };
 }
 
-export function useMasterKaryawanCrudResource(
-  enabled: boolean,
-  company: Company | null
-) {
+export function useMasterKaryawanCrudResource(enabled: boolean) {
   const queryClient = useQueryClient();
   const [mutationError, setMutationError] = useState<string | null>(null);
 
@@ -244,37 +241,10 @@ export function useMasterKaryawanCrudResource(
   const allGrades = gradesQuery.data ?? [];
   const allTaxStatuses = taxStatusesQuery.data ?? [];
 
-  const positions = useMemo(
-    () =>
-      company
-        ? allPositions.filter((p) => Number(p.company_id) === company.id)
-        : allPositions,
-    [allPositions, company]
-  );
-
-  const statuses = useMemo(
-    () =>
-      company
-        ? allStatuses.filter((s) => Number(s.company_id) === company.id)
-        : allStatuses,
-    [allStatuses, company]
-  );
-
-  const grades = useMemo(
-    () =>
-      company
-        ? allGrades.filter((g) => Number(g.company_id) === company.id)
-        : allGrades,
-    [allGrades, company]
-  );
-
-  const taxStatuses = useMemo(
-    () =>
-      company
-        ? allTaxStatuses.filter((t) => Number(t.company_id) === company.id)
-        : allTaxStatuses,
-    [allTaxStatuses, company]
-  );
+  const positions = allPositions;
+  const statuses = allStatuses;
+  const grades = allGrades;
+  const taxStatuses = allTaxStatuses;
 
   const invalidateEmployeeRefs = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: choQueryKeys.employees });
@@ -670,7 +640,7 @@ export function useMasterKaryawanCrudResource(
 
 export function useEmployeeCrudResource(
   enabled: boolean,
-  company: Company | null
+  _company: Company | null
 ) {
   const queryClient = useQueryClient();
   const [mutationError, setMutationError] = useState<string | null>(null);
@@ -678,7 +648,7 @@ export function useEmployeeCrudResource(
   const errorSeqRef = useRef(0);
   const [uploadingDocument, setUploadingDocument] = useState(false);
 
-  const master = useMasterKaryawanCrudResource(enabled, company);
+  const master = useMasterKaryawanCrudResource(enabled);
   const enumsResource = useChoEnumsResource(enabled);
 
   const employeesQuery = useQuery<Employee[]>({

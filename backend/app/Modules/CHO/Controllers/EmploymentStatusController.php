@@ -39,7 +39,7 @@ class EmploymentStatusController extends Controller
 
     public function show(EmploymentStatus $employmentStatus): JsonResponse
     {
-        return (new EmploymentStatusResource($employmentStatus->load('company')))->response();
+        return (new EmploymentStatusResource($employmentStatus))->response();
     }
 
     public function update(SaveEmploymentStatusRequest $request, EmploymentStatus $employmentStatus): JsonResponse

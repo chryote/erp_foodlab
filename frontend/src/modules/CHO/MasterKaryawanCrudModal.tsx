@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type {
-  Company,
   EmployeePosition,
   EmploymentStatus,
   PayrollGrade,
@@ -29,14 +28,12 @@ export const MASTER_KARYAWAN_TABS: Array<{
 
 export interface MasterKaryawanCrudModalProps {
   isOpen: boolean;
-  company: Company | null;
-  companies?: Company[];
   onClose: () => void;
 }
 
 export const MasterKaryawanCrudModal: React.FC<
   MasterKaryawanCrudModalProps
-> = ({ isOpen, company, companies, onClose }) => {
+> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState<MasterKaryawanTabKey>('jabatan');
 
   const {
@@ -59,7 +56,7 @@ export const MasterKaryawanCrudModal: React.FC<
     createTaxStatus,
     updateTaxStatus,
     removeTaxStatus,
-  } = useMasterKaryawanCrudResource(isOpen, company);
+  } = useMasterKaryawanCrudResource(isOpen);
 
   useEffect(() => {
     if (!isOpen) {
@@ -68,83 +65,30 @@ export const MasterKaryawanCrudModal: React.FC<
     }
   }, [isOpen, clearError]);
 
-  const availableCompanies = useMemo<Company[]>(() => {
-    if (companies && companies.length > 0) {
-      return companies;
-    }
-    return company ? [company] : [];
-  }, [companies, company]);
-
-  const defaultCompanyId = company ? String(company.id) : '';
-
-  const companyOptions = useMemo(
-    () =>
-      availableCompanies.map((c) => ({
-        value: String(c.id),
-        label: c.name,
-      })),
-    [availableCompanies]
-  );
-
-  const renderCompanyName = useMemo(
-    () => (companyId: number | undefined, fallbackCompany?: Company | null) =>
-      availableCompanies.find((c) => c.id === Number(companyId))?.name ??
-      fallbackCompany?.name ??
-      String(companyId ?? ''),
-    [availableCompanies]
-  );
-
   const positionFields = useMemo<CrudFieldConfig<EmployeePosition>[]>(
     () => [
-      {
-        key: 'company_id',
-        label: 'Pilih Perusahaan',
-        type: 'select',
-        placeholder: 'Pilih perusahaan...',
-        defaultValue: defaultCompanyId,
-        options: companyOptions,
-        renderValue: (row) => renderCompanyName(row.company_id, row.company),
-      },
       {
         key: 'name',
         label: 'Nama Jabatan',
         placeholder: 'Contoh: Melakukan tugas A dan B',
       },
     ],
-    [companyOptions, defaultCompanyId, renderCompanyName]
+    []
   );
 
   const statusFields = useMemo<CrudFieldConfig<EmploymentStatus>[]>(
     () => [
-      {
-        key: 'company_id',
-        label: 'Pilih Perusahaan',
-        type: 'select',
-        placeholder: 'Pilih perusahaan...',
-        defaultValue: defaultCompanyId,
-        options: companyOptions,
-        renderValue: (row) => renderCompanyName(row.company_id, row.company),
-      },
       {
         key: 'name',
         label: 'Nama Status',
         placeholder: 'Contoh: Karyawan Tetap',
       },
     ],
-    [companyOptions, defaultCompanyId, renderCompanyName]
+    []
   );
 
   const gradeFields = useMemo<CrudFieldConfig<PayrollGrade>[]>(
     () => [
-      {
-        key: 'company_id',
-        label: 'Pilih Perusahaan',
-        type: 'select',
-        placeholder: 'Pilih perusahaan...',
-        defaultValue: defaultCompanyId,
-        options: companyOptions,
-        renderValue: (row) => renderCompanyName(row.company_id, row.company),
-      },
       {
         key: 'grade',
         label: 'Grade',
@@ -183,7 +127,7 @@ export const MasterKaryawanCrudModal: React.FC<
           formatCapitalIdr(Number(row.position_allowance ?? 0)),
       },
     ],
-    [companyOptions, defaultCompanyId, renderCompanyName]
+    []
   );
 
   const gradeComputedColumns = useMemo<
@@ -212,21 +156,12 @@ export const MasterKaryawanCrudModal: React.FC<
   const taxStatusFields = useMemo<CrudFieldConfig<TaxStatus>[]>(
     () => [
       {
-        key: 'company_id',
-        label: 'Pilih Perusahaan',
-        type: 'select',
-        placeholder: 'Pilih perusahaan...',
-        defaultValue: defaultCompanyId,
-        options: companyOptions,
-        renderValue: (row) => renderCompanyName(row.company_id, row.company),
-      },
-      {
         key: 'name',
         label: 'Nama Status Pajak',
         placeholder: 'Contoh: Tidak Kawin / 0 Tanggungan',
       },
     ],
-    [companyOptions, defaultCompanyId, renderCompanyName]
+    []
   );
 
   const tabsBar = (
@@ -265,7 +200,7 @@ export const MasterKaryawanCrudModal: React.FC<
 
   const modalTitle = 'Master Karyawan';
   const modalSubtitle =
-    'Kelola jabatan, status karyawan, payroll grade, dan status pajak perusahaan';
+    'Kelola jabatan, status karyawan, payroll grade, dan status pajak untuk seluruh perusahaan';
 
   const commonCrudProps = {
     isOpen,
@@ -282,17 +217,15 @@ export const MasterKaryawanCrudModal: React.FC<
     onClose,
   };
 
-  const parseCompanyNamePayload = (values: Record<string, string>) => {
-    const companyId = parseInt(values.company_id ?? '', 10);
+  const parseNamePayload = (values: Record<string, string>) => {
     const name = (values.name ?? '').trim();
-    if (!Number.isFinite(companyId) || !name) {
+    if (!name) {
       return null;
     }
-    return { company_id: companyId, name };
+    return { name };
   };
 
   const parsePayrollGradePayload = (values: Record<string, string>) => {
-    const companyId = parseInt(values.company_id ?? '', 10);
     const grade = parseInt(values.grade ?? '', 10);
     const subGrade = (values.sub_grade ?? '').trim();
     const levelLabel = (values.level_label ?? '').trim();
@@ -301,7 +234,6 @@ export const MasterKaryawanCrudModal: React.FC<
       ? parseFloat(values.position_allowance)
       : 0;
     if (
-      !Number.isFinite(companyId) ||
       !Number.isFinite(grade) ||
       grade < 1 ||
       !subGrade ||
@@ -310,7 +242,6 @@ export const MasterKaryawanCrudModal: React.FC<
       return null;
     }
     return {
-      company_id: companyId,
       grade,
       sub_grade: subGrade,
       level_label: levelLabel || null,
@@ -325,18 +256,18 @@ export const MasterKaryawanCrudModal: React.FC<
     return (
       <CrudModal
         {...commonCrudProps}
-        resetKey={`status-${company?.id ?? 0}`}
+        resetKey="status"
         fields={statusFields}
         emptyMessage="Belum ada data status karyawan."
         items={allStatuses}
         onCreate={async (values) => {
-          const payload = parseCompanyNamePayload(values);
+          const payload = parseNamePayload(values);
           if (payload) {
             await createStatus(payload);
           }
         }}
         onUpdate={async (id, values) => {
-          const payload = parseCompanyNamePayload(values);
+          const payload = parseNamePayload(values);
           if (payload) {
             await updateStatus(id, payload);
           }
@@ -352,7 +283,7 @@ export const MasterKaryawanCrudModal: React.FC<
     return (
       <CrudModal
         {...commonCrudProps}
-        resetKey={`grade-${company?.id ?? 0}`}
+        resetKey="grade"
         fields={gradeFields}
         computedColumns={gradeComputedColumns}
         emptyMessage="Belum ada data payroll grade."
@@ -380,18 +311,18 @@ export const MasterKaryawanCrudModal: React.FC<
     return (
       <CrudModal
         {...commonCrudProps}
-        resetKey={`pajak-${company?.id ?? 0}`}
+        resetKey="pajak"
         fields={taxStatusFields}
         emptyMessage="Belum ada data status pajak."
         items={allTaxStatuses}
         onCreate={async (values) => {
-          const payload = parseCompanyNamePayload(values);
+          const payload = parseNamePayload(values);
           if (payload) {
             await createTaxStatus(payload);
           }
         }}
         onUpdate={async (id, values) => {
-          const payload = parseCompanyNamePayload(values);
+          const payload = parseNamePayload(values);
           if (payload) {
             await updateTaxStatus(id, payload);
           }
@@ -406,18 +337,18 @@ export const MasterKaryawanCrudModal: React.FC<
   return (
     <CrudModal
       {...commonCrudProps}
-      resetKey={`jabatan-${company?.id ?? 0}`}
+      resetKey="jabatan"
       fields={positionFields}
       emptyMessage="Belum ada data jabatan karyawan."
       items={allPositions}
       onCreate={async (values) => {
-        const payload = parseCompanyNamePayload(values);
+        const payload = parseNamePayload(values);
         if (payload) {
           await createPosition(payload);
         }
       }}
       onUpdate={async (id, values) => {
-        const payload = parseCompanyNamePayload(values);
+        const payload = parseNamePayload(values);
         if (payload) {
           await updatePosition(id, payload);
         }

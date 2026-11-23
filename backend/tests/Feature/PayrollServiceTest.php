@@ -40,15 +40,12 @@ describe('PayrollService & Input Payroll CHO workflow', function () {
 
     it('calculates PPh 21 accurately using Pasal 17 annualized brackets and PTKP', function () {
         $service = app(PayrollService::class);
-        $company = Company::factory()->create();
 
         $tk0 = TaxStatus::factory()->create([
-            'company_id' => $company->id,
             'code' => 'TK/0',
             'name' => 'Tidak Kawin / 0 Tanggungan',
         ]);
         $k0 = TaxStatus::factory()->create([
-            'company_id' => $company->id,
             'code' => 'K/0',
             'name' => 'Kawin / 0 Tanggungan',
         ]);
@@ -74,11 +71,10 @@ describe('PayrollService & Input Payroll CHO workflow', function () {
         $company = Company::factory()->create(['name' => 'CV Area 31']);
         $otherCompany = Company::factory()->create(['name' => 'PT. Other']);
 
-        $posSpv = EmployeePosition::factory()->create(['company_id' => $company->id, 'name' => 'SPV']);
-        $posOutlet = EmployeePosition::factory()->create(['company_id' => $company->id, 'name' => 'Outlet']);
+        $posSpv = EmployeePosition::factory()->create(['name' => 'SPV']);
+        $posOutlet = EmployeePosition::factory()->create(['name' => 'Outlet']);
 
         $gradeOffice = PayrollGrade::factory()->create([
-            'company_id' => $company->id,
             'grade' => 2,
             'sub_grade' => 'A',
             'base_salary' => 2416600,
@@ -88,7 +84,6 @@ describe('PayrollService & Input Payroll CHO workflow', function () {
             'bpjs_ketenagakerjaan_employee' => 48332,
         ]);
         $gradeOutlet = PayrollGrade::factory()->create([
-            'company_id' => $company->id,
             'grade' => 1,
             'sub_grade' => 'A',
             'base_salary' => 1750000, // 70,000 per day for 25 effective days
@@ -99,7 +94,6 @@ describe('PayrollService & Input Payroll CHO workflow', function () {
         ]);
 
         $tk0 = TaxStatus::factory()->create([
-            'company_id' => $company->id,
             'code' => 'TK/0',
             'name' => 'Tidak Kawin 0',
         ]);
