@@ -137,7 +137,9 @@ describe('App ERP Main Menu integration', () => {
     await waitFor(() => {
       expect(screen.getByTestId('current-path')).toHaveTextContent(/^\/$/);
     });
-    expect(await screen.findByText('Dashboard')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('img', { name: 'Dashboard Illustration' })
+    ).toBeInTheDocument();
   });
 
   it('opens the flow simulator after login when development mode is enabled', async () => {

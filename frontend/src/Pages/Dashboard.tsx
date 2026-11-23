@@ -25,6 +25,7 @@ import {
   getDashboardMenuPage,
   getDashboardMenuRoute,
 } from '@/pages/menuPages';
+import { useTheme } from '@/lib/theme';
 
 export interface DashboardProps {
   onLogout?: () => void | Promise<void>;
@@ -33,6 +34,7 @@ export interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const theme = useTheme();
   const routeCompanyId = getDashboardMenuCompanyId(location.pathname);
   const isMenuRoute = location.pathname.startsWith('/dashboard/company/');
   const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(
@@ -148,12 +150,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     assetError,
   ].filter((message): message is string => Boolean(message));
 
-
-  const activeModule = selectedModule
-    ? modulesMap[selectedModule.code] ?? selectedModule
-    : null;
-  const activeContentTitle =
-    selectedChildSubMenu?.title ?? selectedSubMenu?.title ?? 'Ringkasan';
   const MenuPage = getDashboardMenuPage(location.pathname);
   const routeCompanyDoesNotExist =
     routeCompanyId !== null &&
@@ -207,28 +203,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         {MenuPage ? (
           <MenuPage />
         ) : (
-          <>
-            <div className="mb-6">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-primary">
-                {activeModule ? activeModule.code : 'Dashboard'}
-              </p>
-              <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">
-                {activeModule ? activeContentTitle : 'PT. Slaras Nusa Foodlab'}
-              </h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {selectedCompany
-                  ? `Ringkasan keuangan dan operasional untuk ${selectedCompany.name}.`
-                  : 'Pilih perusahaan untuk melihat ringkasan keuangan dan operasional.'}
-              </p>
-            </div>
-
-            {!capitalLoading && companies.length === 0 && (
-              <div className="mb-6 rounded-xl border border-dashed border-border bg-card px-5 py-6 text-sm text-muted-foreground">
-                Belum ada data perusahaan. Tambahkan perusahaan untuk mulai
-                melihat ringkasan operasional.
-              </div>
-            )}
-          </>
+          <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border bg-card/50 p-6 text-center">
+            <img src={theme === 'dark' ? '/white-logo.png' : '/black-logo.png'}
+              alt="Dashboard Illustration"
+              className="mx-auto max-h-96 opacity-30"
+            />
+            <p className="text-sm text-muted-foreground" />
+          </div>
         )}
       </main>
 

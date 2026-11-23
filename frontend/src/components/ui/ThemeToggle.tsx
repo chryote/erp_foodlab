@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Moon, Sun } from 'lucide-react';
-import { getTheme, setTheme, type Theme } from '@/lib/theme';
+import { setTheme, useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
 export interface ThemeToggleProps {
@@ -10,13 +10,11 @@ export interface ThemeToggleProps {
 export const ThemeToggle: React.FC<ThemeToggleProps> = ({
   showLabel = false,
 }) => {
-  const [theme, setCurrentTheme] = useState<Theme>(getTheme);
+  const theme = useTheme();
   const isDark = theme === 'dark';
 
   const handleToggle = () => {
-    const nextTheme = isDark ? 'light' : 'dark';
-    setTheme(nextTheme);
-    setCurrentTheme(nextTheme);
+    setTheme(isDark ? 'light' : 'dark');
   };
 
   return (
