@@ -18,7 +18,6 @@ class PayrollGradeResource extends JsonResource
     {
         return [
             'id' => (int) $this->id,
-            'company_id' => (int) $this->company_id,
             'grade' => (int) $this->grade,
             'sub_grade' => $this->sub_grade,
             'level_label' => $this->level_label,
@@ -31,7 +30,6 @@ class PayrollGradeResource extends JsonResource
             'bpjs_ketenagakerjaan_employee' => (float) $this->bpjs_ketenagakerjaan_employee,
             'net_employee_received' => (float) $this->net_employee_received,
             'total_company_cost' => (float) $this->total_company_cost,
-            'company' => $this->whenLoaded('company', fn ($company) => new CompanyResource($company)),
             'employees' => EmployeeResource::collection($this->whenLoaded('employees')),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

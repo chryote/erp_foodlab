@@ -15,6 +15,77 @@ final class WriteGuard
 {
     /**
      * @param  class-string<Model>  $modelClass
+     * @param  array<string, mixed>  $scopeFilters
+     * @return array<string, string>
+     */
+    public static function findCodeAndNameDuplicateErrors(
+        string $modelClass,
+        ?string $code,
+        ?string $name,
+        string $duplicateNameMessage,
+        array $scopeFilters = [],
+        mixed $ignoreKey = null,
+        bool $sharedLock = false,
+    ): array {
+        $errors = [];
+
+        if ($code !== null && $code !== '' && self::existsCaseInsensitive(
+            $modelClass::query(),
+            'code',
+            $code,
+            $scopeFilters,
+            $ignoreKey,
+            $sharedLock
+        )) {
+            $errors['code'] = 'The code has already been taken.';
+        }
+
+        if ($name !== null && $name !== '' && self::existsCaseInsensitive(
+            $modelClass::query(),
+            'name',
+            $name,
+            $scopeFilters,
+            $ignoreKey,
+            $sharedLock
+        )) {
+            $errors['name'] = $duplicateNameMessage;
+        }
+
+        return $errors;
+    }
+
+    /**
+     * @param  class-string<Model>  $modelClass
+     * @param  array<string, mixed>  $scopeFilters
+     */
+    public static function assertCodeAndNameUnique(
+        string $modelClass,
+        ?string $code,
+        ?string $name,
+        string $duplicateNameMessage,
+        array $scopeFilters = [],
+        mixed $ignoreKey = null,
+        bool $sharedLock = true,
+    ): void {
+        $errors = self::findCodeAndNameDuplicateErrors(
+            $modelClass,
+            $code,
+            $name,
+            $duplicateNameMessage,
+            $scopeFilters,
+            $ignoreKey,
+            $sharedLock
+        );
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages(
+                array_map(static fn (string $message): array => [$message], $errors)
+            );
+        }
+    }
+
+    /**
+     * @param  class-string<Model>  $modelClass
      * @return array<string, string>
      */
     public static function findCompanyCodeAndNameDuplicateErrors(
@@ -26,31 +97,15 @@ final class WriteGuard
         mixed $ignoreKey = null,
         bool $sharedLock = false,
     ): array {
-        $errors = [];
-
-        if ($code !== null && $code !== '' && self::existsCaseInsensitive(
-            $modelClass::query(),
-            'code',
+        return self::findCodeAndNameDuplicateErrors(
+            $modelClass,
             $code,
-            ['company_id' => $companyId],
-            $ignoreKey,
-            $sharedLock
-        )) {
-            $errors['code'] = 'The code has already been taken.';
-        }
-
-        if ($name !== null && $name !== '' && self::existsCaseInsensitive(
-            $modelClass::query(),
-            'name',
             $name,
+            $duplicateNameMessage,
             ['company_id' => $companyId],
             $ignoreKey,
             $sharedLock
-        )) {
-            $errors['name'] = $duplicateNameMessage;
-        }
-
-        return $errors;
+        );
     }
 
     /**
@@ -65,21 +120,15 @@ final class WriteGuard
         mixed $ignoreKey = null,
         bool $sharedLock = true,
     ): void {
-        $errors = self::findCompanyCodeAndNameDuplicateErrors(
+        self::assertCodeAndNameUnique(
             $modelClass,
-            $companyId,
             $code,
             $name,
             $duplicateNameMessage,
+            ['company_id' => $companyId],
             $ignoreKey,
             $sharedLock
         );
-
-        if ($errors !== []) {
-            throw ValidationException::withMessages(
-                array_map(static fn (string $message): array => [$message], $errors)
-            );
-        }
     }
 
     /**

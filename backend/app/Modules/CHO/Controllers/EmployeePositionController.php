@@ -39,7 +39,7 @@ class EmployeePositionController extends Controller
 
     public function show(EmployeePosition $employeePosition): JsonResponse
     {
-        return (new EmployeePositionResource($employeePosition->load('company')))->response();
+        return (new EmployeePositionResource($employeePosition))->response();
     }
 
     public function update(SaveEmployeePositionRequest $request, EmployeePosition $employeePosition): JsonResponse

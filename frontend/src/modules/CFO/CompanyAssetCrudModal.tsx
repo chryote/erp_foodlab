@@ -148,8 +148,10 @@ export const CompanyAssetCrudModal: React.FC<CompanyAssetCrudModalProps> = ({
       title="Master Aset"
       subtitle="Kelola data aset perusahaan pada modul CFO"
       testId="company-asset-crud-modal"
+      layout="split"
+      labelPlacement="left"
+      modalSize="expanded"
       fields={fields}
-      formLayout="single-row"
       computedColumns={computedColumns}
       summary={
         <SummaryBanner
@@ -159,7 +161,7 @@ export const CompanyAssetCrudModal: React.FC<CompanyAssetCrudModalProps> = ({
         />
       }
       emptyMessage="Belum ada data aset perusahaan."
-      pageSize={5}
+      pageSize={10}
       items={allAssets}
       loading={loading}
       error={error}

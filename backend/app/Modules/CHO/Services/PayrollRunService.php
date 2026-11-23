@@ -307,10 +307,15 @@ class PayrollRunService
         );
     }
 
-    private function forgetCaches(int $companyId): void
+    public static function forgetListCache(): void
     {
         Cache::forget(self::CACHE_KEY_LIST);
-        Cache::forget(PayrollItemService::CACHE_KEY_LIST);
+    }
+
+    private function forgetCaches(int $companyId): void
+    {
+        self::forgetListCache();
+        PayrollItemService::forgetListCache();
         Cache::forget(ChoService::CACHE_KEY);
         ActiveCompany::forgetCompanyCache($companyId);
     }

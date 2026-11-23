@@ -142,7 +142,7 @@ export const MasterOperasionalCrudModal: React.FC<
       role="tablist"
       aria-label="Master Operasional Tabs"
       data-testid="master-operasional-tabs"
-      className="sticky top-0 z-10 flex flex-wrap items-end gap-1 border-b border-border bg-card pl-1"
+      className="flex flex-wrap items-end gap-1 border-b border-border pl-1"
     >
       {MASTER_OPERASIONAL_TABS.map((tab) => {
         const isSelected = tab.key === activeTab;
@@ -168,25 +168,29 @@ export const MasterOperasionalCrudModal: React.FC<
     </div>
   );
 
-  const modalTitle = 'Master Operasional';
-  const modalSubtitle = 'Kelola kategori dan tipe operasional perusahaan';
+  const commonCrudProps = {
+    isOpen,
+    title: 'Master Operasional',
+    subtitle: 'Kelola kategori dan tipe operasional perusahaan',
+    testId: 'master-operasional-crud-modal',
+    tabs: tabsBar,
+    layout: 'split' as const,
+    labelPlacement: 'left' as const,
+    modalSize: 'expanded' as const,
+    pageSize: 10,
+    loading,
+    error,
+    onClose,
+  };
 
   if (activeTab === 'tipe') {
     return (
       <CrudModal
+        {...commonCrudProps}
         resetKey={`tipe-${company?.id ?? 0}`}
-        isOpen={isOpen}
-        title={modalTitle}
-        subtitle={modalSubtitle}
-        testId="master-operasional-crud-modal"
-        tabs={tabsBar}
         fields={tipeFields}
         emptyMessage="Belum ada data tipe operasional."
-        pageSize={5}
         items={allTypes}
-        loading={loading}
-        error={error}
-        onClose={onClose}
         onCreate={async (values) => {
           const companyId = parseInt(values.company_id ?? '', 10);
           const categoryId = parseInt(values.expense_category_id ?? '', 10);
@@ -212,19 +216,11 @@ export const MasterOperasionalCrudModal: React.FC<
 
   return (
     <CrudModal
+      {...commonCrudProps}
       resetKey={`kategori-${company?.id ?? 0}`}
-      isOpen={isOpen}
-      title={modalTitle}
-      subtitle={modalSubtitle}
-      testId="master-operasional-crud-modal"
-      tabs={tabsBar}
       fields={kategoriFields}
       emptyMessage="Belum ada data kategori operasional."
-      pageSize={5}
       items={allCategories}
-      loading={loading}
-      error={error}
-      onClose={onClose}
       onCreate={async (values) => {
         const companyId = parseInt(values.company_id ?? '', 10);
         const name = (values.name ?? '').trim();

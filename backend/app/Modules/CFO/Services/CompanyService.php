@@ -127,10 +127,6 @@ class CompanyService
             $locked->employeeShiftAssignments()->delete();
             $locked->employeeShifts()->delete();
             $locked->employees()->delete();
-            $locked->employeePositions()->delete();
-            $locked->employmentStatuses()->delete();
-            $locked->payrollGrades()->delete();
-            $locked->taxStatuses()->delete();
 
             $locked->delete();
         });
@@ -179,10 +175,6 @@ class CompanyService
             ExpenseTypeService::CACHE_KEY_LIST,
             ExpenseItemService::CACHE_KEY_LIST,
             'erp_foodlab:cho:employees:list',
-            'erp_foodlab:cho:employee_positions:list',
-            'erp_foodlab:cho:employment_statuses:list',
-            'erp_foodlab:cho:payroll_grades:list',
-            'erp_foodlab:cho:tax_statuses:list',
             PayrollRunService::CACHE_KEY_LIST,
             PayrollItemService::CACHE_KEY_LIST,
             'erp_foodlab:hr:employee_shifts:list',

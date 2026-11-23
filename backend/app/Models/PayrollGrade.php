@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -15,7 +14,6 @@ class PayrollGrade extends Model
     protected $table = 'payroll_grades';
 
     protected $fillable = [
-        'company_id',
         'grade',
         'sub_grade',
         'level_label',
@@ -35,7 +33,6 @@ class PayrollGrade extends Model
     ];
 
     protected $casts = [
-        'company_id' => 'integer',
         'grade' => 'integer',
         'base_salary' => 'float',
         'position_allowance' => 'float',
@@ -47,11 +44,6 @@ class PayrollGrade extends Model
         'net_employee_received' => 'float',
         'total_company_cost' => 'float',
     ];
-
-    public function company(): BelongsTo
-    {
-        return $this->belongsTo(Company::class);
-    }
 
     public function employees(): HasMany
     {

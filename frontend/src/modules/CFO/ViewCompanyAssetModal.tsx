@@ -81,6 +81,8 @@ export const ViewCompanyAssetModal: React.FC<
           : 'Ringkasan nilai aset perusahaan pada modul CFO'
       }
       testId="view-aset-modal"
+      layout="split"
+      modalSize="expanded"
       fields={fields}
       computedColumns={computedColumns}
       summary={
@@ -91,7 +93,7 @@ export const ViewCompanyAssetModal: React.FC<
         />
       }
       emptyMessage="Belum ada data aset perusahaan."
-      pageSize={5}
+      pageSize={10}
       items={assets}
       loading={loading}
       error={error}

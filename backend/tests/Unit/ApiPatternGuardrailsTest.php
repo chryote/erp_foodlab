@@ -96,14 +96,26 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             File::glob(app_path('Modules/CHO/Services/*Service.php'))
         );
 
+        $companyAgnosticMasterServices = [
+            'EmployeePositionService.php',
+            'EmploymentStatusService.php',
+            'PayrollGradeService.php',
+            'TaxStatusService.php',
+        ];
+
         foreach ($guardedServices as $servicePath) {
             $contents = File::get($servicePath);
             if (! str_contains($contents, 'CACHE_KEY_LIST')) {
                 continue;
             }
 
+            if (! in_array(basename($servicePath), $companyAgnosticMasterServices, true)) {
+                expect($contents)->toContain('IndexQuery::applyActiveCompanyFilter(');
+            } else {
+                expect($contents)->not->toContain('IndexQuery::applyActiveCompanyFilter(');
+            }
+
             expect($contents)
-                ->toContain('IndexQuery::applyActiveCompanyFilter(')
                 ->toContain('IndexQuery::escapeLike(')
                 ->not->toMatch('/->(?:or)?[wW]here\(\s*[\'"](?:capital|amount|price_per_unit|total_price|grade|base_salary|position_allowance|total_gross|total_company_cost|net_employee_received|bpjs_kesehatan|bpjs_ketenagakerjaan|bonus|overtime|deduction|thr|pph21|total_net)[\'"]\s*,\s*[\'"]like[\'"]/');
         }
@@ -344,20 +356,18 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
         $companyB = Company::factory()->create(['name' => 'PT. CHO Beta']);
 
         $positionA = EmployeePosition::factory()->create([
-            'company_id' => $companyA->id,
             'code' => 'QA_100%',
             'name' => 'Analis 100% Pangan',
         ]);
-        $statusA = EmploymentStatus::factory()->create(['company_id' => $companyA->id, 'name' => 'Tetap']);
+        $statusA = EmploymentStatus::factory()->create(['name' => 'Tetap']);
         $gradeA = PayrollGrade::factory()->create([
-            'company_id' => $companyA->id,
             'grade' => 2,
             'sub_grade' => 'A',
             'level_label' => 'Supervisor',
         ]);
-        $taxA = TaxStatus::factory()->create(['company_id' => $companyA->id, 'code' => 'TK/0']);
+        $taxA = TaxStatus::factory()->create(['code' => 'TK/0']);
 
-        $positionB = EmployeePosition::factory()->create(['company_id' => $companyB->id]);
+        $positionB = EmployeePosition::factory()->create();
 
         $employees = Employee::factory()->count(5)->create([
             'company_id' => $companyA->id,
@@ -422,42 +432,42 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
         $this->patchJson("/api/v1/modules/cho/tax-statuses/{$taxA->id}", ['name' => 'TK/0 Revisi'])->assertOk();
         expect(Cache::has(EmployeeService::CACHE_KEY_LIST))->toBeFalse();
 
-        // 4. ?active_company=1 filters ALL 5 CHO endpoints
+        // 4. ?active_company=1 filters employees while company-agnostic master endpoints return all records for every company
+        $this->getJson('/api/v1/modules/cho/employees?active_company=1', ['X-Active-Company-Id' => (string) $companyB->id])
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+
         foreach ([
-            '/api/v1/modules/cho/employee-positions?active_company=1',
-            '/api/v1/modules/cho/employment-statuses?active_company=1',
-            '/api/v1/modules/cho/payroll-grades?active_company=1',
-            '/api/v1/modules/cho/tax-statuses?active_company=1',
-            '/api/v1/modules/cho/employees?active_company=1',
-        ] as $endpoint) {
-            $expectedCount = str_contains($endpoint, 'employee-positions') ? 1 : 0;
+            '/api/v1/modules/cho/employee-positions?active_company=1' => 2,
+            '/api/v1/modules/cho/employment-statuses?active_company=1' => 1,
+            '/api/v1/modules/cho/payroll-grades?active_company=1' => 1,
+            '/api/v1/modules/cho/tax-statuses?active_company=1' => 1,
+        ] as $endpoint => $expectedCount) {
             $this->getJson($endpoint, ['X-Active-Company-Id' => (string) $companyB->id])
                 ->assertOk()
                 ->assertJsonCount($expectedCount, 'data');
         }
 
-        // 5. Reassigning company_id on master records or employees while referenced fails with 422
-        $this->patchJson("/api/v1/modules/cho/employee-positions/{$positionA->id}", ['company_id' => $companyB->id])
-            ->assertUnprocessable()->assertJsonValidationErrors(['company_id']);
-        $this->patchJson("/api/v1/modules/cho/employment-statuses/{$statusA->id}", ['company_id' => $companyB->id])
-            ->assertUnprocessable()->assertJsonValidationErrors(['company_id']);
-        $this->patchJson("/api/v1/modules/cho/payroll-grades/{$gradeA->id}", ['company_id' => $companyB->id])
-            ->assertUnprocessable()->assertJsonValidationErrors(['company_id']);
-        $this->patchJson("/api/v1/modules/cho/tax-statuses/{$taxA->id}", ['company_id' => $companyB->id])
-            ->assertUnprocessable()->assertJsonValidationErrors(['company_id']);
-
-        // PATCH changing Employee company_id without updating company-scoped FKs fails with 422
+        // 5. Employees in any company can use company-agnostic master records, and moving an employee with active attendance fails with 422
         $targetEmployee = $employees->first();
-        $this->patchJson("/api/v1/modules/cho/employees/{$targetEmployee->id}", [
+        $employeeB = Employee::factory()->create([
             'company_id' => $companyB->id,
-            'employee_position_id' => $positionB->id,
-        ])->assertUnprocessable()->assertJsonValidationErrors(['employment_status_id']);
+            'employee_position_id' => $positionA->id,
+            'employment_status_id' => $statusA->id,
+            'payroll_grade_id' => $gradeA->id,
+            'tax_status_id' => $taxA->id,
+        ]);
+        expect($employeeB->company_id)->toBe($companyB->id);
 
-        // 6. Deleting an Employee referenced by active attendance fails with 422
+        // 6. Deleting an Employee referenced by active attendance fails with 422, and changing its company_id fails with 422
         $attendance = EmployeeAttendance::factory()->create([
             'company_id' => $companyA->id,
             'employee_id' => $targetEmployee->id,
         ]);
+        $this->patchJson("/api/v1/modules/cho/employees/{$targetEmployee->id}", [
+            'company_id' => $companyB->id,
+            'employee_position_id' => $positionB->id,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['company_id']);
         $this->deleteJson("/api/v1/modules/cho/employees/{$targetEmployee->id}")
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['employee']);
@@ -465,14 +475,12 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
 
         // 7. PayrollGrade numeric bounds & decimal:0,2 return 422 (not 500)
         $this->postJson('/api/v1/modules/cho/payroll-grades', [
-            'company_id' => $companyA->id,
             'grade' => 9,
             'sub_grade' => 'Z',
             'base_salary' => 5000000.123,
         ])->assertUnprocessable()->assertJsonValidationErrors(['base_salary']);
 
         $this->postJson('/api/v1/modules/cho/payroll-grades', [
-            'company_id' => $companyA->id,
             'grade' => 9,
             'sub_grade' => 'Z',
             'base_salary' => 9999999999999999.00,
@@ -648,20 +656,30 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
         foreach ($lockedWriteGuards as $guardPath) {
             $code = File::get(app_path($guardPath));
             $hasTxUniqueLock = str_contains($code, 'WriteGuard::assertUniqueActive(')
+                || str_contains($code, 'WriteGuard::assertCodeAndNameUnique(')
                 || str_contains($code, 'WriteGuard::assertCompanyCodeAndNameUnique(')
                 || str_contains($code, '->sharedLock()');
             expect($hasTxUniqueLock)->toBeTrue("{$guardPath} must verify active uniqueness with sharedLock inside DB::transaction.");
         }
 
-        // CHO master dictionaries with optional code must enforce BOTH code and name active uniqueness
+        // CHO company-agnostic master dictionaries with optional code must enforce BOTH code and name active uniqueness
         foreach (['employee_positions', 'employment_statuses', 'tax_statuses'] as $choMasterTable) {
             preg_match("/CREATE TABLE `{$choMasterTable}` \\((.*?)\\) ENGINE=/s", $schemaSql, $choMatch);
             expect($choMatch)->toHaveCount(2);
-            expect(str_contains($choMatch[1], "{$choMasterTable}_company_code_active_unique"))
+            expect(str_contains($choMatch[1], '`company_id`'))
+                ->toBeFalse("{$choMasterTable} must be company-agnostic without company_id.");
+            expect(str_contains($choMatch[1], "{$choMasterTable}_code_active_unique"))
                 ->toBeTrue("{$choMasterTable} must enforce active code uniqueness.");
-            expect(str_contains($choMatch[1], "{$choMasterTable}_company_name_active_unique"))
+            expect(str_contains($choMatch[1], "{$choMasterTable}_name_active_unique"))
                 ->toBeTrue("{$choMasterTable} must enforce active name uniqueness even when code is null.");
         }
+
+        preg_match('/CREATE TABLE `payroll_grades` \((.*?)\) ENGINE=/s', $schemaSql, $gradeMatch);
+        expect($gradeMatch)->toHaveCount(2);
+        expect(str_contains($gradeMatch[1], '`company_id`'))
+            ->toBeFalse('payroll_grades must be company-agnostic without company_id.');
+        expect(str_contains($gradeMatch[1], 'payroll_grades_grade_sub_active_unique'))
+            ->toBeTrue('payroll_grades must enforce global active (grade, sub_grade) uniqueness.');
 
         // 5. Runtime duplicate protection (exact, whitespace-padded, case-variant, DB unique key, and re-create after delete)
         $companyRes = $this->postJson('/api/v1/modules/cfo/companies', [
@@ -760,52 +778,43 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
 
         // 7. CHO anti-duplication guardrails (name uniqueness with null code, case/whitespace variants, DB unique key)
         $this->postJson('/api/v1/modules/cho/employee-positions', [
-            'company_id' => $companyId,
             'name' => '  Analis   Kimia  ',
         ])->assertCreated()
             ->assertJsonPath('data.name', 'Analis Kimia');
 
         $this->postJson('/api/v1/modules/cho/employee-positions', [
-            'company_id' => $companyId,
             'name' => 'analis kimia',
         ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
 
         $this->postJson('/api/v1/modules/cho/employment-statuses', [
-            'company_id' => $companyId,
             'name' => 'Karyawan Kontrak',
         ])->assertCreated();
 
         $this->postJson('/api/v1/modules/cho/employment-statuses', [
-            'company_id' => $companyId,
             'name' => '  karyawan   kontrak ',
         ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
 
         $this->postJson('/api/v1/modules/cho/tax-statuses', [
-            'company_id' => $companyId,
             'name' => 'TK / 0',
         ])->assertCreated();
 
         $this->postJson('/api/v1/modules/cho/tax-statuses', [
-            'company_id' => $companyId,
             'name' => '  tk / 0 ',
         ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
 
         $this->postJson('/api/v1/modules/cho/payroll-grades', [
-            'company_id' => $companyId,
             'grade' => 1,
             'sub_grade' => '  A ',
             'base_salary' => 5000000,
         ])->assertCreated();
 
         $this->postJson('/api/v1/modules/cho/payroll-grades', [
-            'company_id' => $companyId,
             'grade' => 1,
             'sub_grade' => 'a',
             'base_salary' => 5500000,
         ])->assertUnprocessable()->assertJsonValidationErrors(['sub_grade']);
 
         expect(fn () => EmployeePosition::factory()->create([
-            'company_id' => $companyId,
             'code' => 'UNIQUE-CODE-X',
             'name' => 'Analis Kimia',
         ]))->toThrow(QueryException::class);

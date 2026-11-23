@@ -14,10 +14,10 @@ describe('PayrollGrade CHO module', function () {
 
     it('supports CRUD, exact derived payroll calculations, QueryBuilder filtering/sorting/includes, caching, and JsonResource structure', function () {
         $company = Company::factory()->create(['name' => 'PT. Foodlab Nusantara']);
+        $otherCompany = Company::factory()->create(['name' => 'PT. Foodlab Cabang']);
 
         // Store with forged derived fields & omitted position_allowance (defaults to 0)
         $createNoAllowanceRes = $this->postJson('/api/v1/modules/cho/payroll-grades', [
-            'company_id' => $company->id,
             'grade' => 1,
             'sub_grade' => 'B',
             'level_label' => 'staff, spv',
@@ -31,7 +31,6 @@ describe('PayrollGrade CHO module', function () {
             ->assertJsonStructure([
                 'data' => [
                     'id',
-                    'company_id',
                     'grade',
                     'sub_grade',
                     'level_label',
@@ -44,14 +43,14 @@ describe('PayrollGrade CHO module', function () {
                     'bpjs_ketenagakerjaan_employee',
                     'net_employee_received',
                     'total_company_cost',
-                    'company',
                     'created_at',
                     'updated_at',
                     'deleted_at',
                 ],
             ])
+            ->assertJsonMissingPath('data.company_id')
+            ->assertJsonMissingPath('data.company')
             ->assertJsonMissingPath('data.employees')
-            ->assertJsonPath('data.company_id', $company->id)
             ->assertJsonPath('data.grade', 1)
             ->assertJsonPath('data.sub_grade', 'B')
             ->assertJsonPath('data.level_label', 'staff, spv');
@@ -76,7 +75,6 @@ describe('PayrollGrade CHO module', function () {
 
         // Store with base_salary + position_allowance
         $createWithAllowanceRes = $this->postJson('/api/v1/modules/cho/payroll-grades', [
-            'company_id' => $company->id,
             'grade' => 1,
             'sub_grade' => 'A',
             'level_label' => 'staff khusus, spv khusus',
@@ -95,9 +93,8 @@ describe('PayrollGrade CHO module', function () {
 
         $grade1AId = $createWithAllowanceRes->json('data.id');
 
-        // Create grade 2 A with factory & attach employee
+        // Create grade 2 A with factory & attach employees across multiple companies
         $grade2A = PayrollGrade::factory()->create([
-            'company_id' => $company->id,
             'grade' => 2,
             'sub_grade' => 'A',
             'level_label' => 'manager',
@@ -109,6 +106,11 @@ describe('PayrollGrade CHO module', function () {
             'company_id' => $company->id,
             'payroll_grade_id' => $grade2A->id,
             'name' => 'Andi Wijaya',
+        ]);
+        Employee::factory()->create([
+            'company_id' => $otherCompany->id,
+            'payroll_grade_id' => $grade2A->id,
+            'name' => 'Manager Cabang',
         ]);
 
         // Unfiltered list uses defaultSort('grade', 'sub_grade') and populates cache
@@ -163,12 +165,10 @@ describe('PayrollGrade CHO module', function () {
             ->assertOk()
             ->assertJsonPath('data.id', $grade1AId)
             ->assertJsonPath('data.grade', 1)
-            ->assertJsonPath('data.sub_grade', 'A')
-            ->assertJsonPath('data.company.name', 'PT. Foodlab Nusantara');
+            ->assertJsonPath('data.sub_grade', 'A');
 
         // Update (PUT) recomputes derived fields and forgets cache
         $putRes = $this->putJson("/api/v1/modules/cho/payroll-grades/{$grade1BId}", [
-            'company_id' => $company->id,
             'grade' => 1,
             'sub_grade' => 'B',
             'level_label' => 'staff senior',
@@ -214,7 +214,6 @@ describe('PayrollGrade CHO module', function () {
 
         // Re-creating a previously soft-deleted (grade, sub_grade) succeeds
         $this->postJson('/api/v1/modules/cho/payroll-grades', [
-            'company_id' => $company->id,
             'grade' => 1,
             'sub_grade' => 'B',
             'base_salary' => 4500000,
@@ -225,7 +224,6 @@ describe('PayrollGrade CHO module', function () {
         $company = Company::factory()->create();
 
         $existing = PayrollGrade::factory()->create([
-            'company_id' => $company->id,
             'grade' => 1,
             'sub_grade' => 'A',
             'base_salary' => 5000000,
@@ -233,7 +231,6 @@ describe('PayrollGrade CHO module', function () {
         ]);
 
         $other = PayrollGrade::factory()->create([
-            'company_id' => $company->id,
             'grade' => 2,
             'sub_grade' => 'A',
             'base_salary' => 7000000,
@@ -242,7 +239,6 @@ describe('PayrollGrade CHO module', function () {
 
         // Duplicate (grade, sub_grade) and negative base_salary/position_allowance on store
         $this->postJson('/api/v1/modules/cho/payroll-grades', [
-            'company_id' => $company->id,
             'grade' => 1,
             'sub_grade' => '  a ',
             'base_salary' => 5000000,
@@ -250,7 +246,6 @@ describe('PayrollGrade CHO module', function () {
             ->assertJsonValidationErrors(['sub_grade']);
 
         $this->postJson('/api/v1/modules/cho/payroll-grades', [
-            'company_id' => $company->id,
             'grade' => 0,
             'sub_grade' => str_repeat('X', 11),
             'level_label' => str_repeat('L', 151),
@@ -261,7 +256,6 @@ describe('PayrollGrade CHO module', function () {
 
         // Duplicate (grade, sub_grade) on PUT
         $this->putJson("/api/v1/modules/cho/payroll-grades/{$other->id}", [
-            'company_id' => $company->id,
             'grade' => 1,
             'sub_grade' => 'A',
             'base_salary' => 7000000,
@@ -273,18 +267,6 @@ describe('PayrollGrade CHO module', function () {
             'grade' => 1,
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['grade']);
-
-        // Soft-deleted company is rejected
-        $deletedCompany = Company::factory()->create();
-        $deletedCompany->delete();
-
-        $this->postJson('/api/v1/modules/cho/payroll-grades', [
-            'company_id' => $deletedCompany->id,
-            'grade' => 3,
-            'sub_grade' => 'A',
-            'base_salary' => 8000000,
-        ])->assertUnprocessable()
-            ->assertJsonValidationErrors(['company_id']);
 
         // Block soft delete (422) if referenced by active employees
         $employee = Employee::factory()->create([
@@ -307,17 +289,8 @@ describe('PayrollGrade CHO module', function () {
 
         $this->assertSoftDeleted('payroll_grades', ['id' => $existing->id]);
 
-        // Same (grade, sub_grade) is allowed in another company and can be reused after soft-delete
-        $otherCompany = Company::factory()->create();
+        // Same (grade, sub_grade) can be reused globally after soft-delete
         $this->postJson('/api/v1/modules/cho/payroll-grades', [
-            'company_id' => $otherCompany->id,
-            'grade' => 2,
-            'sub_grade' => 'A',
-            'base_salary' => 7000000,
-        ])->assertCreated();
-
-        $this->postJson('/api/v1/modules/cho/payroll-grades', [
-            'company_id' => $company->id,
             'grade' => 1,
             'sub_grade' => 'A',
             'base_salary' => 5500000,

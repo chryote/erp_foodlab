@@ -44,23 +44,14 @@ class SaveEmployeePositionRequest extends FormRequest
     {
         $presence = $this->isMethod('PATCH') ? ['sometimes', 'required'] : ['required'];
         $employeePosition = $this->route('employeePosition');
-        $companyId = $this->filled('company_id')
-            ? (int) $this->input('company_id')
-            : ($employeePosition instanceof EmployeePosition ? (int) $employeePosition->company_id : 0);
 
         return [
-            'company_id' => [
-                ...$presence,
-                'integer',
-                Rule::exists('companies', 'id')->whereNull('deleted_at'),
-            ],
             'code' => [
                 'sometimes',
                 'nullable',
                 'string',
                 'max:50',
                 Rule::unique('employee_positions', 'code')
-                    ->where('company_id', $companyId)
                     ->whereNull('deleted_at')
                     ->ignore($employeePosition),
             ],
@@ -76,19 +67,12 @@ class SaveEmployeePositionRequest extends FormRequest
     {
         return [
             function (Validator $validator): void {
-                if ($validator->errors()->hasAny(['company_id', 'code', 'name'])) {
+                if ($validator->errors()->hasAny(['code', 'name'])) {
                     return;
                 }
 
                 /** @var EmployeePosition|null $employeePosition */
                 $employeePosition = $this->route('employeePosition');
-                $effectiveCompanyId = $this->filled('company_id')
-                    ? (int) $this->input('company_id')
-                    : (int) ($employeePosition?->company_id ?? 0);
-
-                if ($effectiveCompanyId <= 0) {
-                    return;
-                }
 
                 $effectiveCode = $this->has('code')
                     ? ($this->input('code') !== null ? InputNormalizer::nullableText((string) $this->input('code')) : null)
@@ -97,12 +81,12 @@ class SaveEmployeePositionRequest extends FormRequest
                     ? InputNormalizer::text((string) $this->input('name'))
                     : $employeePosition?->name;
 
-                $errors = WriteGuard::findCompanyCodeAndNameDuplicateErrors(
+                $errors = WriteGuard::findCodeAndNameDuplicateErrors(
                     EmployeePosition::class,
-                    $effectiveCompanyId,
                     $effectiveCode,
                     $effectiveName,
-                    'Jabatan dengan nama yang sama sudah terdaftar pada perusahaan ini.',
+                    'Jabatan dengan nama yang sama sudah terdaftar.',
+                    [],
                     $employeePosition?->getKey()
                 );
 
@@ -119,10 +103,6 @@ class SaveEmployeePositionRequest extends FormRequest
     public function payload(): array
     {
         $validated = $this->validated();
-
-        if (array_key_exists('company_id', $validated)) {
-            $validated['company_id'] = (int) $validated['company_id'];
-        }
 
         if (array_key_exists('code', $validated)) {
             $validated['code'] = $validated['code'] !== null

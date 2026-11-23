@@ -71,14 +71,13 @@ class AssertEmployeeContextAction
 
             $exists = $modelClass::query()
                 ->whereNull('deleted_at')
-                ->where('company_id', $companyId)
                 ->sharedLock()
                 ->whereKey((int) $rawId)
                 ->exists();
 
             if (! $exists) {
                 throw ValidationException::withMessages([
-                    $field => ["The selected {$field} is invalid for this company."],
+                    $field => ["The selected {$field} is invalid or has been deleted."],
                 ]);
             }
         }

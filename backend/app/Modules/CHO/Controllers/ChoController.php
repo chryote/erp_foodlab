@@ -7,6 +7,7 @@ use App\Enums\GolonganDarah;
 use App\Enums\JenisDokumen;
 use App\Enums\JenisKelamin;
 use App\Enums\PayrollGroup;
+use App\Enums\PayrollItemStatus;
 use App\Enums\PayrollRunStatus;
 use App\Http\Controllers\Controller;
 use App\Modules\CHO\Services\ChoService;
@@ -35,6 +36,7 @@ class ChoController extends Controller
                 'jenis_dokumen' => JenisDokumen::options(),
                 'payroll_run_status' => PayrollRunStatus::options(),
                 'payroll_group' => PayrollGroup::options(),
+                'payroll_item_status' => PayrollItemStatus::options(),
             ],
         ]);
     }

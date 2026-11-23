@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\Company;
 use App\Models\PayrollGrade;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -16,7 +15,6 @@ class PayrollGradeFactory extends Factory
     public function definition(): array
     {
         return [
-            'company_id' => Company::factory(),
             'grade' => $this->faker->numberBetween(1, 20),
             'sub_grade' => strtoupper($this->faker->unique()->bothify('?##')),
             'level_label' => $this->faker->randomElement([

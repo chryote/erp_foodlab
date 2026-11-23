@@ -18,11 +18,9 @@ class EmploymentStatusResource extends JsonResource
     {
         return [
             'id' => (int) $this->id,
-            'company_id' => (int) $this->company_id,
             'code' => $this->code,
             'name' => $this->name,
             'description' => $this->description,
-            'company' => $this->whenLoaded('company', fn ($company) => new CompanyResource($company)),
             'employees' => EmployeeResource::collection($this->whenLoaded('employees')),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

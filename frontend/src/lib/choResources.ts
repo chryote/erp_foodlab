@@ -18,6 +18,8 @@ import {
   type EmploymentStatusPayload,
   type PayrollGrade,
   type PayrollGradePayload,
+  type PayrollWorkspaceData,
+  type SaveEmployeePayrollPayload,
   type TaxStatus,
   type TaxStatusPayload,
   createEmployee,
@@ -45,7 +47,10 @@ import {
   fetchEmployees,
   fetchEmploymentStatuses,
   fetchPayrollGrades,
+  fetchPayrollWorkspace,
   fetchTaxStatuses,
+  finalizeEmployeePayrollRow,
+  saveEmployeePayrollRow,
   updateEmployee,
   updateEmployeeAttendance,
   updateEmployeePosition,
@@ -105,6 +110,8 @@ export const choQueryKeys = {
   employeeShifts: ['cho', 'hr', 'employee-shifts'] as const,
   employeeShiftAssignments: ['cho', 'hr', 'employee-shift-assignments'] as const,
   employeeAttendances: ['cho', 'hr', 'employee-attendances'] as const,
+  payrollWorkspace: (companyId: number | null, period: string) =>
+    ['cho', 'payroll', 'workspace', companyId, period] as const,
 };
 
 export interface ApiErrorInfo {
@@ -189,10 +196,7 @@ export function useChoEnumsResource(enabled: boolean) {
   };
 }
 
-export function useMasterKaryawanCrudResource(
-  enabled: boolean,
-  company: Company | null
-) {
+export function useMasterKaryawanCrudResource(enabled: boolean) {
   const queryClient = useQueryClient();
   const [mutationError, setMutationError] = useState<string | null>(null);
 
@@ -237,37 +241,10 @@ export function useMasterKaryawanCrudResource(
   const allGrades = gradesQuery.data ?? [];
   const allTaxStatuses = taxStatusesQuery.data ?? [];
 
-  const positions = useMemo(
-    () =>
-      company
-        ? allPositions.filter((p) => Number(p.company_id) === company.id)
-        : allPositions,
-    [allPositions, company]
-  );
-
-  const statuses = useMemo(
-    () =>
-      company
-        ? allStatuses.filter((s) => Number(s.company_id) === company.id)
-        : allStatuses,
-    [allStatuses, company]
-  );
-
-  const grades = useMemo(
-    () =>
-      company
-        ? allGrades.filter((g) => Number(g.company_id) === company.id)
-        : allGrades,
-    [allGrades, company]
-  );
-
-  const taxStatuses = useMemo(
-    () =>
-      company
-        ? allTaxStatuses.filter((t) => Number(t.company_id) === company.id)
-        : allTaxStatuses,
-    [allTaxStatuses, company]
-  );
+  const positions = allPositions;
+  const statuses = allStatuses;
+  const grades = allGrades;
+  const taxStatuses = allTaxStatuses;
 
   const invalidateEmployeeRefs = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: choQueryKeys.employees });
@@ -663,7 +640,7 @@ export function useMasterKaryawanCrudResource(
 
 export function useEmployeeCrudResource(
   enabled: boolean,
-  company: Company | null
+  _company: Company | null
 ) {
   const queryClient = useQueryClient();
   const [mutationError, setMutationError] = useState<string | null>(null);
@@ -671,7 +648,7 @@ export function useEmployeeCrudResource(
   const errorSeqRef = useRef(0);
   const [uploadingDocument, setUploadingDocument] = useState(false);
 
-  const master = useMasterKaryawanCrudResource(enabled, company);
+  const master = useMasterKaryawanCrudResource(enabled);
   const enumsResource = useChoEnumsResource(enabled);
 
   const employeesQuery = useQuery<Employee[]>({
@@ -1291,5 +1268,106 @@ export function useEmployeeAttendanceCrudResource(
     createAttendance,
     updateAttendance,
     removeAttendance,
+  };
+}
+
+export function usePayrollWorkspaceResource(
+  enabled: boolean,
+  companyId: number | null,
+  period: string
+) {
+  const queryClient = useQueryClient();
+  const [mutationError, setMutationError] = useState<string | null>(null);
+
+  const workspaceQuery = useQuery<PayrollWorkspaceData>({
+    queryKey: choQueryKeys.payrollWorkspace(companyId, period),
+    queryFn: async () => {
+      if (companyId === null) {
+        throw new Error('Perusahaan belum dipilih.');
+      }
+      const res = await fetchPayrollWorkspace(companyId, period);
+      return res.data;
+    },
+    enabled: enabled && companyId !== null && /^\d{4}-\d{2}$/.test(period),
+  });
+
+  const invalidateWorkspace = useCallback(() => {
+    void queryClient.invalidateQueries({
+      queryKey: ['cho', 'payroll', 'workspace'],
+    });
+  }, [queryClient]);
+
+  const saveRowMutation = useMutation({
+    mutationFn: async (payload: SaveEmployeePayrollPayload) => {
+      const res = await saveEmployeePayrollRow(payload);
+      return res.data;
+    },
+    onSuccess: () => {
+      invalidateWorkspace();
+    },
+  });
+
+  const finalizeRowMutation = useMutation({
+    mutationFn: async (payload: SaveEmployeePayrollPayload) => {
+      const res = await finalizeEmployeePayrollRow(payload);
+      return res.data;
+    },
+    onSuccess: () => {
+      invalidateWorkspace();
+    },
+  });
+
+  const runMutation = useCallback(
+    async <T>(fn: () => Promise<T>, fallbackError: string): Promise<T | null> => {
+      setMutationError(null);
+      try {
+        return await fn();
+      } catch (err) {
+        setMutationError(getErrorMessage(err, fallbackError));
+        return null;
+      }
+    },
+    []
+  );
+
+  const saveRow = useCallback(
+    (payload: SaveEmployeePayrollPayload) =>
+      runMutation(
+        () => saveRowMutation.mutateAsync(payload),
+        'Gagal menyimpan draf payroll karyawan.'
+      ),
+    [runMutation, saveRowMutation]
+  );
+
+  const finalizeRow = useCallback(
+    (payload: SaveEmployeePayrollPayload) =>
+      runMutation(
+        () => finalizeRowMutation.mutateAsync(payload),
+        'Gagal memfinalisasi payroll karyawan.'
+      ),
+    [finalizeRowMutation, runMutation]
+  );
+
+  const clearError = useCallback(() => setMutationError(null), []);
+
+  const loading =
+    workspaceQuery.isLoading ||
+    workspaceQuery.isFetching ||
+    saveRowMutation.isPending ||
+    finalizeRowMutation.isPending;
+
+  return {
+    workspace: workspaceQuery.data ?? null,
+    rows: workspaceQuery.data?.rows ?? [],
+    loading,
+    mutating: saveRowMutation.isPending || finalizeRowMutation.isPending,
+    error:
+      mutationError ??
+      (workspaceQuery.error
+        ? getErrorMessage(workspaceQuery.error, 'Gagal memuat data payroll.')
+        : null),
+    clearError,
+    saveRow,
+    finalizeRow,
   };
 }
