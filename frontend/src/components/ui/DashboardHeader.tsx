@@ -21,8 +21,14 @@ import {
   MenubarTrigger,
 } from './shadcn/menubar';
 import type { HorizontalMenuItem } from './HorizontalMenuCard';
-import { DEFAULT_CFO_MODULE } from '@/modules/CFO/CfoModuleCard';
-import { DEFAULT_CHO_MODULE } from '@/modules/CHO/ChoModuleCard';
+import {
+  CFO_MENU_ITEMS,
+  DEFAULT_CFO_MODULE,
+} from '@/modules/CFO/CfoModuleCard';
+import {
+  CHO_MENU_ITEMS,
+  DEFAULT_CHO_MODULE,
+} from '@/modules/CHO/ChoModuleCard';
 import { DEFAULT_CPO_MODULE } from '@/modules/CPO/CpoModuleCard';
 import { DEFAULT_CDO_MODULE } from '@/modules/CDO/CdoModuleCard';
 import { DEFAULT_CMO_MODULE } from '@/modules/CMO/CmoModuleCard';
@@ -30,7 +36,7 @@ import { DEFAULT_CMO_MODULE } from '@/modules/CMO/CmoModuleCard';
 const COMPANY_MENU_ITEMS: HorizontalMenuItem[] = [
   {
     code: 'INPUT_MODAL',
-    title: 'Input Modal',
+    title: 'Input',
     children: [
       { code: 'PERUSAHAAN', title: 'Master Modal' },
       { code: 'DAFTAR_KAPITAL_PERUSAHAAN', title: 'View Modal' },
@@ -40,16 +46,17 @@ const COMPANY_MENU_ITEMS: HorizontalMenuItem[] = [
     code: 'INPUT_OPERASIONAL',
     title: 'Input Operasional',
     children: [
-      { code: 'MASTER_OPERASIONAL', title: 'Master Modal' },
-      { code: 'VIEW_OPERASIONAL', title: 'View Modal' },
+      { code: 'MASTER_OPERASIONAL', title: 'Master Operasional' },
+      { code: 'ITEM_OPERASIONAL', title: 'Item Operasional' },
+      { code: 'VIEW_OPERASIONAL', title: 'View Operasional' },
     ],
   },
   {
     code: 'INPUT_ASET',
     title: 'Input Aset',
     children: [
-      { code: 'MASTER_ASET', title: 'Master Modal' },
-      { code: 'VIEW_ASET', title: 'View Modal' },
+      { code: 'MASTER_ASET', title: 'Master Aset' },
+      { code: 'VIEW_ASET', title: 'View Aset' },
     ],
   },
   {
@@ -70,13 +77,13 @@ const COMPANY_MENU_ITEMS: HorizontalMenuItem[] = [
   },
 ];
 
-const COMPANY_MENU_MODULES: Array<{
+export const COMPANY_MENU_MODULES: Array<{
   code: ErpModuleCode;
   fallback: ErpModuleOverview;
   items: HorizontalMenuItem[];
 }> = [
-  { code: 'CFO', fallback: DEFAULT_CFO_MODULE, items: COMPANY_MENU_ITEMS },
-  { code: 'CHO', fallback: DEFAULT_CHO_MODULE, items: COMPANY_MENU_ITEMS },
+  { code: 'CFO', fallback: DEFAULT_CFO_MODULE, items: CFO_MENU_ITEMS },
+  { code: 'CHO', fallback: DEFAULT_CHO_MODULE, items: CHO_MENU_ITEMS },
   { code: 'CPO', fallback: DEFAULT_CPO_MODULE, items: COMPANY_MENU_ITEMS },
   { code: 'CDO', fallback: DEFAULT_CDO_MODULE, items: COMPANY_MENU_ITEMS },
   { code: 'CMO', fallback: DEFAULT_CMO_MODULE, items: COMPANY_MENU_ITEMS },
@@ -97,6 +104,12 @@ export interface DashboardHeaderProps {
   onSelectModule?: (module: ErpModuleOverview) => void;
   onSelectSubMenu?: (item: HorizontalMenuItem) => void;
   onSelectChildSubMenu?: (item: HorizontalMenuItem) => void;
+  onSelectItem?: (
+    company: Company,
+    moduleCode: ErpModuleCode,
+    menuItem: HorizontalMenuItem,
+    childItem?: HorizontalMenuItem
+  ) => void;
   onLogout?: () => void | Promise<void>;
 }
 
@@ -115,6 +128,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   onSelectModule,
   onSelectSubMenu,
   onSelectChildSubMenu,
+  onSelectItem,
   onLogout,
 }) => {
   const [logoutConfirmationOpen, setLogoutConfirmationOpen] = useState(false);
@@ -280,37 +294,62 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                           </MenubarSubTrigger>
                           <MenubarSubContent>
                             {moduleConfig.items.map((menuItem) => (
-                              <MenubarSub key={menuItem.code}>
-                                <MenubarSubTrigger
+                              menuItem.children?.length ? (
+                                <MenubarSub key={menuItem.code}>
+                                  <MenubarSubTrigger
+                                    aria-current={
+                                      selectedSubMenuCode === menuItem.code
+                                        ? 'page'
+                                        : undefined
+                                    }
+                                  >
+                                    {menuItem.title}
+                                  </MenubarSubTrigger>
+                                  <MenubarSubContent>
+                                    {menuItem.children.map((childItem, index) => (
+                                      <MenubarItem
+                                        key={`${childItem.code}-${index}`}
+                                        aria-current={
+                                          selectedChildSubMenuCode === childItem.code
+                                            ? 'page'
+                                            : undefined
+                                        }
+                                        onSelect={() => {
+                                          onSelectCompany?.(company);
+                                          onSelectModule?.(module);
+                                          onSelectSubMenu?.(menuItem);
+                                          onSelectChildSubMenu?.(childItem);
+                                          onSelectItem?.(
+                                            company,
+                                            moduleConfig.code,
+                                            menuItem,
+                                            childItem
+                                          );
+                                        }}
+                                      >
+                                        {childItem.title}
+                                      </MenubarItem>
+                                    ))}
+                                  </MenubarSubContent>
+                                </MenubarSub>
+                              ) : (
+                                <MenubarItem
+                                  key={menuItem.code}
                                   aria-current={
                                     selectedSubMenuCode === menuItem.code
                                       ? 'page'
                                       : undefined
                                   }
+                                  onSelect={() => {
+                                    onSelectCompany?.(company);
+                                    onSelectModule?.(module);
+                                    onSelectSubMenu?.(menuItem);
+                                    onSelectItem?.(company, moduleConfig.code, menuItem);
+                                  }}
                                 >
                                   {menuItem.title}
-                                </MenubarSubTrigger>
-                                <MenubarSubContent>
-                                  {menuItem.children?.map((childItem, index) => (
-                                    <MenubarItem
-                                      key={`${childItem.code}-${index}`}
-                                      aria-current={
-                                        selectedChildSubMenuCode === childItem.code
-                                          ? 'page'
-                                          : undefined
-                                      }
-                                      onSelect={() => {
-                                        onSelectCompany?.(company);
-                                        onSelectModule?.(module);
-                                        onSelectSubMenu?.(menuItem);
-                                        onSelectChildSubMenu?.(childItem);
-                                      }}
-                                    >
-                                      {childItem.title}
-                                    </MenubarItem>
-                                  ))}
-                                </MenubarSubContent>
-                              </MenubarSub>
+                                </MenubarItem>
+                              )
                             ))}
                           </MenubarSubContent>
                         </MenubarSub>

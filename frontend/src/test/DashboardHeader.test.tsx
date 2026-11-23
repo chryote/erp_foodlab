@@ -69,4 +69,56 @@ describe('DashboardHeader', () => {
       title: 'Master Modal',
     });
   });
+
+  it('shows CHO-specific employee and attendance menu children', async () => {
+    const user = userEvent.setup();
+    render(
+      <DashboardHeader
+        companies={[{ id: 1, name: 'PT ABC' }]}
+        selectedCompanyId={1}
+      />
+    );
+
+    await user.click(screen.getByTestId('dashboard-company-tab-1'));
+    await user.hover(screen.getByText('CHO'));
+
+    expect(await screen.findByText('Input SDM')).toBeInTheDocument();
+    expect(screen.getByText('Input Presensi')).toBeInTheDocument();
+    expect(screen.queryByText('Input Modal')).not.toBeInTheDocument();
+  });
+
+  it('selects a module menu item directly when it has no child menu', async () => {
+    const user = userEvent.setup();
+    const onSelectCompany = vi.fn();
+    const onSelectModule = vi.fn();
+    const onSelectSubMenu = vi.fn();
+    const onSelectChildSubMenu = vi.fn();
+    render(
+      <DashboardHeader
+        companies={[{ id: 1, name: 'PT ABC' }]}
+        selectedCompanyId={1}
+        onSelectCompany={onSelectCompany}
+        onSelectModule={onSelectModule}
+        onSelectSubMenu={onSelectSubMenu}
+        onSelectChildSubMenu={onSelectChildSubMenu}
+      />
+    );
+
+    await user.click(screen.getByTestId('dashboard-company-tab-1'));
+    await user.keyboard(
+      '{ArrowDown}{ArrowRight}{ArrowDown}{ArrowDown}{ArrowDown}{Enter}'
+    );
+
+    expect(onSelectCompany).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 1, name: 'PT ABC' })
+    );
+    expect(onSelectModule).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'CFO' })
+    );
+    expect(onSelectSubMenu).toHaveBeenCalledWith({
+      code: 'ARUS_KAS',
+      title: 'Arus Kas',
+    });
+    expect(onSelectChildSubMenu).not.toHaveBeenCalled();
+  });
 });

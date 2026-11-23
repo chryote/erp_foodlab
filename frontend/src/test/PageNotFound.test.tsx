@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
-import PageNotFound from '../Pages/PageNotFound';
+import PageNotFound from '../pages/PageNotFound';
 
 describe('PageNotFound', () => {
   it('shows the invalid path and returns to the home route', async () => {

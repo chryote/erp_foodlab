@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
   fetchCurrentUser,
   syncActiveCompany,
@@ -19,15 +20,28 @@ import {
   useMasterOperasionalCrudResource,
 } from '@/lib/cfoResources';
 import { ExpenseItemCrudModal } from '@/modules/CFO/ExpenseItemCrudModal';
+import {
+  getDashboardMenuCompanyId,
+  getDashboardMenuPage,
+  getDashboardMenuRoute,
+} from '@/pages/menuPages';
 
 export interface DashboardProps {
   onLogout?: () => void | Promise<void>;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const routeCompanyId = getDashboardMenuCompanyId(location.pathname);
+  const isMenuRoute = location.pathname.startsWith('/dashboard/company/');
   const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(
-    null
+    routeCompanyId
   );
+  const [selectedSeries, setSelectedSeries] = useState<number | null>(null);
+  const [activeCompanySyncError, setActiveCompanySyncError] = useState<
+    string | null
+  >(null);
   const [selectedModule, setSelectedModule] =
     useState<ErpModuleOverview | null>(null);
   const [selectedSubMenu, setSelectedSubMenu] =
@@ -49,14 +63,35 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     error: capitalError,
   } = useCapitalOverviewResource(true);
 
+  const activeCompanyId = routeCompanyId ?? selectedCompanyId;
   const selectedCompany =
-    companies.find((company) => company.id === selectedCompanyId) ??
-    companies[0] ??
+    companies.find((company) => company.id === activeCompanyId) ??
+    (activeCompanyId === null ? companies[0] : null) ??
     null;
+
+  const syncCompany = useCallback(async (companyId: number | null) => {
+    try {
+      await syncActiveCompany(companyId);
+      setActiveCompanySyncError(null);
+    } catch (error) {
+      setActiveCompanySyncError(
+        error instanceof Error
+          ? error.message
+          : 'Gagal menyinkronkan perusahaan aktif.'
+      );
+    }
+  }, []);
 
   useEffect(() => {
     setActiveCompanyId(selectedCompany?.id ?? null);
-  }, [selectedCompany?.id]);
+    if (
+      routeCompanyId !== null &&
+      selectedCompany?.id === routeCompanyId
+    ) {
+      setSelectedSeries(selectedCompany.series ?? 1);
+      void syncCompany(routeCompanyId);
+    }
+  }, [routeCompanyId, selectedCompany?.id, selectedCompany?.series, syncCompany]);
 
   const {
     error: operationsError,
@@ -66,13 +101,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   } = useCompanyAssetCrudResource(Boolean(selectedCompany), selectedCompany);
 
   const handleSelectSeries = (series: number) => {
-    const firstCompanyInSeries = companies.find(
-      (company) => (company.series ?? 1) === series
-    );
-    const nextId = firstCompanyInSeries?.id ?? null;
-    setSelectedCompanyId(nextId);
-    setActiveCompanyId(nextId);
-    void Promise.resolve(syncActiveCompany(nextId)).catch(() => undefined);
+    setSelectedSeries(series);
   };
 
   const handleSelectCompany = (company: Company) => {
@@ -82,8 +111,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       setSelectedChildSubMenu(null);
     }
     setSelectedCompanyId(company.id);
+    setSelectedSeries(company.series ?? 1);
     setActiveCompanyId(company.id);
-    void Promise.resolve(syncActiveCompany(company.id)).catch(() => undefined);
   };
 
   const handleSelectModule = (module: ErpModuleOverview) => {
@@ -112,6 +141,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     : null;
   const errors = [
     userError,
+    activeCompanySyncError,
     modulesError,
     capitalError,
     operationsError,
@@ -124,12 +154,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     : null;
   const activeContentTitle =
     selectedChildSubMenu?.title ?? selectedSubMenu?.title ?? 'Ringkasan';
+  const MenuPage = getDashboardMenuPage(location.pathname);
+  const routeCompanyDoesNotExist =
+    routeCompanyId !== null &&
+    !capitalLoading &&
+    !companies.some((company) => company.id === routeCompanyId);
+
+  if (isMenuRoute && (!MenuPage || routeCompanyDoesNotExist)) {
+    return <Navigate to="/404" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <DashboardHeader
         companies={companies}
-        selectedSeries={selectedCompany?.series ?? 1}
+        selectedSeries={selectedSeries ?? selectedCompany?.series ?? 1}
         selectedCompanyId={selectedCompany?.id ?? null}
         user={currentUserQuery.data}
         userLoading={currentUserQuery.isLoading}
@@ -142,24 +181,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         onSelectModule={handleSelectModule}
         onSelectSubMenu={handleSelectSubMenu}
         onSelectChildSubMenu={handleSelectChildSubMenu}
+        onSelectItem={(company, moduleCode, menuItem, childItem) => {
+          navigate(
+            getDashboardMenuRoute(
+              company.id,
+              moduleCode,
+              menuItem,
+              childItem
+            )
+          );
+        }}
         onLogout={onLogout}
       />
 
       <main className="mx-auto max-w-340 px-4 py-7 sm:px-6 lg:px-8">
-        <div className="mb-6">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-primary">
-            {activeModule ? activeModule.code : 'Dashboard'}
-          </p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">
-            {activeModule ? activeContentTitle : 'PT. Slaras Nusa Foodlab'}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {selectedCompany
-              ? `Ringkasan keuangan dan operasional untuk ${selectedCompany.name}.`
-              : 'Pilih perusahaan untuk melihat ringkasan keuangan dan operasional.'}
-          </p>
-        </div>
-
         {errors.map((message) => (
           <div
             key={message}
@@ -169,12 +204,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             {message}
           </div>
         ))}
+        {MenuPage ? (
+          <MenuPage />
+        ) : (
+          <>
+            <div className="mb-6">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-primary">
+                {activeModule ? activeModule.code : 'Dashboard'}
+              </p>
+              <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+                {activeModule ? activeContentTitle : 'PT. Slaras Nusa Foodlab'}
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {selectedCompany
+                  ? `Ringkasan keuangan dan operasional untuk ${selectedCompany.name}.`
+                  : 'Pilih perusahaan untuk melihat ringkasan keuangan dan operasional.'}
+              </p>
+            </div>
 
-        {!capitalLoading && companies.length === 0 && (
-          <div className="mb-6 rounded-xl border border-dashed border-border bg-card px-5 py-6 text-sm text-muted-foreground">
-            Belum ada data perusahaan. Tambahkan perusahaan untuk mulai melihat
-            ringkasan operasional.
-          </div>
+            {!capitalLoading && companies.length === 0 && (
+              <div className="mb-6 rounded-xl border border-dashed border-border bg-card px-5 py-6 text-sm text-muted-foreground">
+                Belum ada data perusahaan. Tambahkan perusahaan untuk mulai
+                melihat ringkasan operasional.
+              </div>
+            )}
+          </>
         )}
       </main>
 

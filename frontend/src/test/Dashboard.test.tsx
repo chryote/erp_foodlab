@@ -2,10 +2,17 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import Dashboard from '../Pages/Dashboard';
+import { MemoryRouter, useLocation } from 'react-router-dom';
+import Dashboard from '../pages/Dashboard';
+import { getActiveCompanyId } from '../lib/activeCompanyStorage';
 import * as apiClient from '../api/client';
 
 vi.mock('../api/client');
+
+const CurrentPath = () => {
+  const { pathname } = useLocation();
+  return <output data-testid="current-path">{pathname}</output>;
+};
 
 describe('Dashboard', () => {
   beforeEach(() => {
@@ -50,9 +57,11 @@ describe('Dashboard', () => {
     });
 
     render(
-      <QueryClientProvider client={queryClient}>
-        <Dashboard onLogout={onLogout} />
-      </QueryClientProvider>
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <Dashboard onLogout={onLogout} />
+        </QueryClientProvider>
+      </MemoryRouter>
     );
 
     expect(await screen.findByText('ERP Administrator')).toBeInTheDocument();
@@ -75,7 +84,7 @@ describe('Dashboard', () => {
     });
   });
 
-  it('switches company series and company from the dashboard header', async () => {
+  it('changes the visible series without changing the active company', async () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
       data: [
@@ -90,15 +99,19 @@ describe('Dashboard', () => {
     });
 
     render(
-      <QueryClientProvider client={queryClient}>
-        <Dashboard />
-      </QueryClientProvider>
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <CurrentPath />
+          <Dashboard />
+        </QueryClientProvider>
+      </MemoryRouter>
     );
 
     await user.click(await screen.findByTestId('dashboard-series-tab-2'));
     expect(
       await screen.findByTestId('dashboard-company-tab-2')
-    ).toHaveAttribute('aria-selected', 'true');
+    ).toHaveAttribute('aria-selected', 'false');
+    expect(getActiveCompanyId()).toBe(1);
 
     await user.click(screen.getByTestId('dashboard-company-tab-3'));
     await user.keyboard('{ArrowDown}{ArrowRight}{ArrowRight}{Enter}');
@@ -107,8 +120,55 @@ describe('Dashboard', () => {
       'true'
     );
     expect(
-      screen.getByText('Ringkasan keuangan dan operasional untuk FoodLab Timur.')
+      await screen.findByText('Konten Master Modal akan tersedia di sini.')
     ).toBeInTheDocument();
+    expect(screen.getByTestId('current-path')).toHaveTextContent(
+      '/dashboard/company/3/menu/CFO/INPUT_MODAL/master-modal'
+    );
+    expect(getActiveCompanyId()).toBe(3);
+
+    await user.click(screen.getByTestId('dashboard-series-tab-1'));
+    expect(await screen.findByTestId('dashboard-company-tab-1')).toHaveAttribute(
+      'aria-selected',
+      'false'
+    );
+    expect(screen.getByTestId('dashboard-series-tab-1')).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(screen.getByTestId('current-path')).toHaveTextContent(
+      '/dashboard/company/3/menu/CFO/INPUT_MODAL/master-modal'
+    );
+    expect(getActiveCompanyId()).toBe(3);
+    expect(apiClient.syncActiveCompany).not.toHaveBeenCalledWith(1);
   });
 
+  it('navigates from a nested menu leaf to its placeholder page', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
+      data: [{ id: 1, name: 'FoodLab Utama', series: 1 }],
+      meta: { count: 1 },
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/dashboard']}>
+        <QueryClientProvider client={queryClient}>
+          <CurrentPath />
+          <Dashboard />
+        </QueryClientProvider>
+      </MemoryRouter>
+    );
+
+    await user.click(await screen.findByTestId('dashboard-company-tab-1'));
+    await user.keyboard('{ArrowDown}{ArrowRight}{ArrowRight}{Enter}');
+
+    expect(screen.getByTestId('current-path')).toHaveTextContent(
+      '/dashboard/company/1/menu/CFO/INPUT_MODAL/master-modal'
+    );
+    expect(await screen.findByText('Konten Master Modal akan tersedia di sini.'))
+      .toBeInTheDocument();
+  });
 });
