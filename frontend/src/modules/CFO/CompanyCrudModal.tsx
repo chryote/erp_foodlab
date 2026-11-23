@@ -102,6 +102,9 @@ export const CompanyStakeholderModal: React.FC<
       testId={
         readOnly ? 'detail-pemegang-saham-modal' : 'pemegang-saham-crud-modal'
       }
+      layout="split"
+      labelPlacement="left"
+      modalSize="expanded"
       fields={STAKEHOLDER_CRUD_FIELDS}
       computedColumns={computedColumns}
       summary={
@@ -116,7 +119,7 @@ export const CompanyStakeholderModal: React.FC<
         />
       }
       emptyMessage="Belum ada data pemegang saham untuk perusahaan ini."
-      pageSize={5}
+      pageSize={10}
       items={stakeholders}
       loading={loading}
       error={error}
@@ -173,6 +176,9 @@ export const CompanyCrudModal: React.FC<CompanyCrudModalProps> = ({
         title="Manajemen Perusahaan"
         subtitle="Kelola data perusahaan pada modul CFO (Input Modal)"
         testId="perusahaan-crud-modal"
+        layout="split"
+        labelPlacement="left"
+        modalSize="expanded"
         fields={COMPANY_CRUD_FIELDS}
         rowActions={[
           {
@@ -184,7 +190,7 @@ export const CompanyCrudModal: React.FC<CompanyCrudModalProps> = ({
           },
         ]}
         emptyMessage="Belum ada data perusahaan."
-        pageSize={5}
+        pageSize={10}
         items={companies}
         loading={loading}
         error={error}

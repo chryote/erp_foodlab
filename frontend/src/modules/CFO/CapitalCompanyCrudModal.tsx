@@ -151,6 +151,8 @@ export const CapitalCompanyCrudModal: React.FC<
         title="Daftar Kapital Perusahaan"
         subtitle="Kelola data kapital (modal) perusahaan pada modul CFO (Input Modal)"
         testId="daftar-kapital-perusahaan-crud-modal"
+        layout="split"
+        modalSize="expanded"
         fields={fields}
         rowActions={[
           {
@@ -170,7 +172,7 @@ export const CapitalCompanyCrudModal: React.FC<
           },
         ]}
         emptyMessage="Belum ada data kapital perusahaan."
-        pageSize={5}
+        pageSize={10}
         items={groupedCapitalCompanies}
         loading={loading}
         error={error}
