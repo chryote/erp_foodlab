@@ -24,13 +24,13 @@ class PayrollService
     /**
      * Monthly payroll cutoff day (22nd of the period month).
      */
-    public const CUTOFF_DAY = 22;
+    public const CUTOFF_DAY = 21;
 
     /**
      * Start day of the previous month for the cutoff window
      * (e.g. January period runs from 21 December to 22 January).
      */
-    public const PERIOD_START_DAY = 21;
+    public const PERIOD_START_DAY = 22;
 
     /**
      * Standard effective working days per period used to prorate attendance-based salary.
