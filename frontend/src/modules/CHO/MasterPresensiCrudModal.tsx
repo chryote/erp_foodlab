@@ -191,7 +191,7 @@ export const MasterPresensiCrudModal: React.FC<
         rows: 2,
         optional: true,
         hideInTable: true,
-        placeholder: 'Contoh: Jam kerja reguler analis lab',
+        placeholder: 'Contoh: Jam kerja reguler ',
       },
     ],
     [companyOptions, defaultCompanyId, renderCompanyName]
@@ -285,7 +285,7 @@ export const MasterPresensiCrudModal: React.FC<
         type: 'textarea',
         rows: 2,
         optional: true,
-        placeholder: 'Contoh: Penugasan shift reguler laboratorium',
+        placeholder: 'Contoh: Penugasan shift reguler ',
         renderValue: (row) => row.notes || '-',
       },
     ],
