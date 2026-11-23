@@ -189,6 +189,8 @@ describe('PayrollService & Input Payroll CHO workflow', function () {
         expect((float) $rows[$officeEmp->id]['bpjs_ketenagakerjaan'])->toBe(48332.0);
         expect($rows[$officeEmp->id]['payroll_group'])->toBe(PayrollGroup::OFFICE->value);
         expect($rows[$officeEmp->id]['status'])->toBe(PayrollItemStatus::DRAFT->value);
+        expect($rows[$officeEmp->id]['employee']['employment_status']['name'] ?? null)->not->toBeNull();
+        expect($rows[$officeEmp->id]['employee']['payroll_grade']['id'] ?? null)->toBe($gradeOffice->id);
 
         expect($rows[$outletEmp->id]['attendance_days'])->toBe(18);
         expect((float) $rows[$outletEmp->id]['base_salary'])->toBe(1260000.0);
@@ -242,7 +244,9 @@ describe('PayrollService & Input Payroll CHO workflow', function () {
 
         $finalizeRes->assertOk()
             ->assertJsonPath('data.status', PayrollItemStatus::FINALIZED->value)
-            ->assertJsonPath('data.finalized_by', auth()->id());
+            ->assertJsonPath('data.finalized_by', auth()->id())
+            ->assertJsonPath('data.employee.payroll_grade.id', $gradeOffice->id);
+        expect($finalizeRes->json('data.employee.employment_status.name'))->not->toBeNull();
         expect($finalizeRes->json('data.finalized_at'))->not->toBeNull();
 
         $replayFinalize = $this->postJson(

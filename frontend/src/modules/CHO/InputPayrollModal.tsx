@@ -4,7 +4,6 @@ import type {
   PayrollGroup,
   PayrollWorkspaceRow,
   SaveEmployeePayrollPayload,
-  TaxStatus,
 } from '@/api/client';
 import {
   Badge,
@@ -20,6 +19,8 @@ import {
 import { usePayrollWorkspaceResource } from '@/lib/choResources';
 import { cn } from '@/lib/utils';
 import { formatCapitalIdr } from '@/modules/CFO/CapitalCompanyCrudModal';
+import { computePph21Preview } from './payrollCalculations';
+import { PayrollDetailModal } from './PayrollDetailModal';
 
 export type InputPayrollTabKey = 'all' | PayrollGroup;
 
@@ -43,29 +44,6 @@ type PendingRowAction = {
   previewTotalNet: number;
 };
 
-const PTKP_BY_CODE: Record<string, number> = {
-  'TK/0': 54_000_000,
-  'TK/1': 58_500_000,
-  'TK/2': 63_000_000,
-  'TK/3': 67_500_000,
-  'K/0': 58_500_000,
-  'K/1': 63_000_000,
-  'K/2': 67_500_000,
-  'K/3': 72_000_000,
-  'K/I/0': 112_500_000,
-  'K/I/1': 117_000_000,
-  'K/I/2': 121_500_000,
-  'K/I/3': 126_000_000,
-};
-
-const PASAL_17_BRACKETS: Array<{ limit: number | null; rate: number }> = [
-  { limit: 60_000_000, rate: 0.05 },
-  { limit: 250_000_000, rate: 0.15 },
-  { limit: 500_000_000, rate: 0.25 },
-  { limit: 5_000_000_000, rate: 0.3 },
-  { limit: null, rate: 0.35 },
-];
-
 function getCurrentPeriodDate(): string {
   const now = new Date();
   const year = now.getFullYear();
@@ -86,102 +64,6 @@ function formatRawDecimal(value: number): string {
     return '';
   }
   return String(value);
-}
-
-function resolvePtkpPreview(taxStatus?: TaxStatus | null): number {
-  if (!taxStatus) {
-    return 54_000_000;
-  }
-  const candidates = [
-    (taxStatus.code ?? '').toUpperCase().replace(/\s+/g, ''),
-    (taxStatus.name ?? '').toUpperCase().replace(/\s+/g, ''),
-  ];
-  for (const candidate of candidates) {
-    if (!candidate) {
-      continue;
-    }
-    if (PTKP_BY_CODE[candidate]) {
-      return PTKP_BY_CODE[candidate];
-    }
-    const match = candidate.match(/(K\/I\/[0-3]|K\/[0-3]|TK\/[0-3])/);
-    if (match && PTKP_BY_CODE[match[1]]) {
-      return PTKP_BY_CODE[match[1]];
-    }
-    const compact = candidate.match(/^(TK|K)([0-3])$/);
-    if (compact) {
-      const code = `${compact[1]}/${compact[2]}`;
-      if (PTKP_BY_CODE[code]) {
-        return PTKP_BY_CODE[code];
-      }
-    }
-  }
-  const upperName = (taxStatus.name ?? '').toUpperCase();
-  const depMatch = upperName.match(/([0-3])/);
-  if (depMatch) {
-    const prefix = upperName.includes('TIDAK KAWIN')
-      ? 'TK'
-      : upperName.includes('KAWIN')
-        ? 'K'
-        : null;
-    if (prefix) {
-      const key = `${prefix}/${depMatch[1]}`;
-      if (PTKP_BY_CODE[key]) {
-        return PTKP_BY_CODE[key];
-      }
-    }
-  }
-  return 54_000_000;
-}
-
-function computePph21Preview(
-  baseSalary: number,
-  bpjsKesehatan: number,
-  bpjsKetenagakerjaan: number,
-  bonus: number,
-  overtime: number,
-  deduction: number,
-  thr: number,
-  taxStatus?: TaxStatus | null
-): number {
-  const monthlyTaxable = Math.max(
-    0,
-    baseSalary +
-      bonus +
-      overtime +
-      thr -
-      (bpjsKesehatan + bpjsKetenagakerjaan + deduction)
-  );
-  if (monthlyTaxable <= 0) {
-    return 0;
-  }
-
-  const annualGross = monthlyTaxable * 12;
-  const biayaJabatan = Math.min(6_000_000, annualGross * 0.05);
-  const annualNet = Math.max(0, annualGross - biayaJabatan);
-  const ptkp = resolvePtkpPreview(taxStatus);
-  const pkp = Math.max(0, Math.floor((annualNet - ptkp) / 1000) * 1000);
-  if (pkp <= 0) {
-    return 0;
-  }
-
-  let annualTax = 0;
-  let previousLimit = 0;
-  for (const bracket of PASAL_17_BRACKETS) {
-    if (bracket.limit === null) {
-      annualTax += Math.max(0, pkp - previousLimit) * bracket.rate;
-      break;
-    }
-    if (pkp <= previousLimit) {
-      break;
-    }
-    const slice = Math.min(pkp, bracket.limit) - previousLimit;
-    if (slice > 0) {
-      annualTax += slice * bracket.rate;
-    }
-    previousLimit = bracket.limit;
-  }
-
-  return Math.round(annualTax / 12);
 }
 
 export interface InputPayrollModalProps {
@@ -217,6 +99,7 @@ export const InputPayrollModal: React.FC<InputPayrollModalProps> = ({
   const [pendingAction, setPendingAction] = useState<PendingRowAction | null>(
     null
   );
+  const [detailRow, setDetailRow] = useState<PayrollWorkspaceRow | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -227,6 +110,7 @@ export const InputPayrollModal: React.FC<InputPayrollModalProps> = ({
       setCurrentPage(1);
     } else {
       setPendingAction(null);
+      setDetailRow(null);
       setDrafts({});
     }
   }, [isOpen, company, availableCompanies]);
@@ -412,11 +296,59 @@ export const InputPayrollModal: React.FC<InputPayrollModalProps> = ({
     setPendingAction(null);
 
     if (action.mode === 'finalize') {
-      await finalizeRow(action.payload);
+      const savedItem = await finalizeRow(action.payload);
+      if (savedItem) {
+        setDetailRow({
+          ...action.row,
+          employee: savedItem.employee
+            ? { ...action.row.employee, ...savedItem.employee }
+            : action.row.employee,
+          payroll_item_id: savedItem.id,
+          payroll_run_id: savedItem.payroll_run_id,
+          payroll_group: savedItem.payroll_group,
+          attendance_days: savedItem.attendance_days,
+          bank_account_number:
+            savedItem.bank_account_number ?? action.row.bank_account_number,
+          base_salary: savedItem.base_salary,
+          bpjs_kesehatan: savedItem.bpjs_kesehatan,
+          bpjs_ketenagakerjaan: savedItem.bpjs_ketenagakerjaan,
+          bonus: savedItem.bonus,
+          overtime: savedItem.overtime,
+          deduction: savedItem.deduction,
+          thr: savedItem.thr,
+          pph21: savedItem.pph21,
+          total_net: savedItem.total_net,
+          status: 'finalized',
+          notes: savedItem.notes ?? action.row.notes,
+          finalized_by: savedItem.finalized_by ?? null,
+          finalized_at: savedItem.finalized_at ?? null,
+        });
+      }
     } else {
       await saveRow(action.payload);
     }
   };
+
+  const activeDetailRow = useMemo(() => {
+    if (!detailRow) {
+      return null;
+    }
+    return (
+      rows.find(
+        (r) =>
+          r.employee_id === detailRow.employee_id && r.status === 'finalized'
+      ) ?? detailRow
+    );
+  }, [detailRow, rows]);
+
+  const activeCompanyObj = useMemo(
+    () =>
+      workspace?.company ??
+      availableCompanies.find((c) => c.id === effectiveCompanyId) ??
+      company ??
+      null,
+    [workspace, availableCompanies, effectiveCompanyId, company]
+  );
 
   const tabsBar = (
     <div
@@ -486,6 +418,7 @@ export const InputPayrollModal: React.FC<InputPayrollModalProps> = ({
             value={selectedCompanyId}
             onChange={(e) => {
               clearError();
+              setDetailRow(null);
               setSelectedCompanyId(e.target.value);
               setCurrentPage(1);
             }}
@@ -522,6 +455,7 @@ export const InputPayrollModal: React.FC<InputPayrollModalProps> = ({
                 return;
               }
               clearError();
+              setDetailRow(null);
               setPeriodDate(e.target.value);
               setCurrentPage(1);
             }}
@@ -754,12 +688,23 @@ export const InputPayrollModal: React.FC<InputPayrollModalProps> = ({
                           </td>
                           <td className="px-3 py-2.5 align-middle">
                             {amounts.isFinalized ? (
-                              <span
-                                data-testid={`finalized-badge-row-${row.employee_id}`}
-                                className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400"
-                              >
-                                Sudah Final
-                              </span>
+                              <div className="flex flex-nowrap items-center gap-2 whitespace-nowrap">
+                                <span
+                                  data-testid={`finalized-badge-row-${row.employee_id}`}
+                                  className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400"
+                                >
+                                  Sudah Final
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  className="h-7 px-2.5 py-1 text-xs"
+                                  data-testid={`detail-payroll-row-${row.employee_id}`}
+                                  onClick={() => setDetailRow(row)}
+                                >
+                                  Detail
+                                </Button>
+                              </div>
                             ) : (
                               <div className="flex flex-nowrap items-center gap-1.5 whitespace-nowrap">
                                 <Button
@@ -839,6 +784,16 @@ export const InputPayrollModal: React.FC<InputPayrollModalProps> = ({
         testId="input-payroll-confirm-dialog"
         onConfirm={handleConfirmPendingAction}
         onCancel={() => setPendingAction(null)}
+      />
+
+      <PayrollDetailModal
+        isOpen={isOpen && activeDetailRow !== null}
+        row={activeDetailRow}
+        company={activeCompanyObj}
+        period={workspace?.period ?? period}
+        cutoffStartDate={workspace?.cutoff_start_date}
+        cutoffEndDate={workspace?.cutoff_end_date}
+        onClose={() => setDetailRow(null)}
       />
     </>
   );

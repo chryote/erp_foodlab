@@ -105,7 +105,37 @@ describe('CHO Input Penggajian flow: Input Payroll', () => {
             id: 101,
             company_id: 1,
             name: 'Harno Fiqriandi',
+            email: 'harno@foodlab.id',
+            phone: '081234567890',
+            nik_ktp: '3372013112900001',
+            birth_place: 'Surakarta',
+            birth_date: '1990-12-31',
+            employee_attendance_code: 'HarnoSPV101',
+            bpjs_kesehatan: '0001697587918',
+            bpjs_ketenagakerjaan: '22066430764',
+            npwp_number: '844315150526000',
             employee_position: { id: 1, company_id: 1, name: 'SPV' },
+            employment_status: {
+              id: 1,
+              company_id: 1,
+              name: 'Karyawan Tetap',
+            },
+            payroll_grade: {
+              id: 1,
+              company_id: 1,
+              grade: 2,
+              sub_grade: 'A',
+              level_label: 'Supervisor',
+              base_salary: 2400000,
+              position_allowance: 16600,
+              total_gross: 2416600,
+              bpjs_kesehatan_company: 96664,
+              bpjs_kesehatan_employee: 24166,
+              bpjs_ketenagakerjaan_company: 95214,
+              bpjs_ketenagakerjaan_employee: 48332,
+              net_employee_received: 2344102,
+              total_company_cost: 2608478,
+            },
             tax_status: { id: 1, company_id: 1, code: 'TK/0', name: 'TK/0' },
           },
           payroll_item_id: null,
@@ -113,15 +143,16 @@ describe('CHO Input Penggajian flow: Input Payroll', () => {
           payroll_group: 'office',
           attendance_days: 25,
           effective_work_days: 25,
+          bank_account_number: '1380017389045',
           base_salary: 2416600,
           bpjs_kesehatan: 24166,
           bpjs_ketenagakerjaan: 48332,
-          bonus: 0,
-          overtime: 0,
-          deduction: 0,
-          thr: 0,
-          pph21: 0,
-          total_net: 2344102,
+          bonus: finalizedItems[101]?.bonus ?? 0,
+          overtime: finalizedItems[101]?.overtime ?? 0,
+          deduction: finalizedItems[101]?.deduction ?? 0,
+          thr: finalizedItems[101]?.thr ?? 0,
+          pph21: finalizedItems[101]?.pph21 ?? 0,
+          total_net: finalizedItems[101]?.total_net ?? 2344102,
           status: statusMap[101] ?? 'draft',
         },
         {
@@ -153,6 +184,17 @@ describe('CHO Input Penggajian flow: Input Payroll', () => {
     };
 
     const statusStore: Record<number, apiClient.PayrollItemStatus> = {};
+    const finalizedItems: Record<
+      number,
+      {
+        bonus: number;
+        overtime: number;
+        deduction: number;
+        thr: number;
+        pph21: number;
+        total_net: number;
+      }
+    > = {};
 
     vi.mocked(apiClient.fetchPayrollWorkspace).mockImplementation(
       async (companyId, period) => ({
@@ -175,6 +217,14 @@ describe('CHO Input Penggajian flow: Input Payroll', () => {
     vi.mocked(apiClient.finalizeEmployeePayrollRow).mockImplementation(
       async (payload) => {
         statusStore[payload.employee_id] = 'finalized';
+        finalizedItems[payload.employee_id] = {
+          bonus: payload.bonus,
+          overtime: payload.overtime,
+          deduction: payload.deduction,
+          thr: payload.thr,
+          pph21: 31325,
+          total_net: 5365075,
+        };
         return {
           data: {
             id: 900 + payload.employee_id,
@@ -309,7 +359,45 @@ describe('CHO Input Penggajian flow: Input Payroll', () => {
       expect(
         within(modal).getByTestId('finalized-badge-row-101')
       ).toHaveTextContent('Sudah Final');
+      expect(
+        within(modal).getByTestId('detail-payroll-row-101')
+      ).toBeInTheDocument();
     });
+
+    // Payroll detail modal opens automatically after finalization
+    const detailModal = await screen.findByTestId('payroll-detail-modal');
+    expect(detailModal).toHaveTextContent('Harno Fiqriandi');
+    expect(detailModal).toHaveTextContent('3372013112900001');
+    expect(detailModal).toHaveTextContent('Karyawan Tetap');
+    expect(detailModal).toHaveTextContent('Grade 2A (Supervisor)');
+    expect(detailModal).toHaveTextContent('1380017389045');
+    expect(detailModal).toHaveTextContent('2.400.000');
+    expect(detailModal).toHaveTextContent('16.600');
+    expect(detailModal).toHaveTextContent('96.664');
+    expect(detailModal).toHaveTextContent('95.214');
+    expect(detailModal).toHaveTextContent('Kantor mengeluarkan');
+    expect(detailModal).toHaveTextContent('Gaji yang diterima');
+    expect(detailModal).toHaveTextContent('SLIP GAJI');
+    expect(detailModal).toHaveTextContent('JANUARI 2026');
+    expect(
+      within(detailModal).getByTestId('payroll-detail-net-received')
+    ).toHaveTextContent('5.365.075');
+
+    // Close detail modal and reopen via Detail button on finalized row
+    fireEvent.click(within(detailModal).getByTestId('payroll-detail-close-btn'));
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId('payroll-detail-modal')
+      ).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(within(modal).getByTestId('detail-payroll-row-101'));
+    expect(await screen.findByTestId('payroll-detail-modal')).toBeInTheDocument();
+    fireEvent.click(
+      within(screen.getByTestId('payroll-detail-modal')).getByTestId(
+        'payroll-detail-close-btn'
+      )
+    );
 
     // Switch company in modal to company 2 -> fetches company 2 workspace
     fireEvent.change(companySelect, { target: { value: '2' } });

@@ -349,7 +349,7 @@ class PayrollService
             ->first();
 
         $employees = Employee::query()
-            ->with(['employeePosition', 'payrollGrade', 'taxStatus'])
+            ->with(['employeePosition', 'employmentStatus', 'payrollGrade', 'taxStatus'])
             ->whereNull('deleted_at')
             ->where('company_id', $companyId)
             ->orderBy('name')
@@ -655,7 +655,10 @@ class PayrollService
         return $payrollItem->refresh()->load([
             'company',
             'payrollRun',
-            'employee',
+            'employee.employeePosition',
+            'employee.employmentStatus',
+            'employee.payrollGrade',
+            'employee.taxStatus',
             'employeePosition',
             'finalizer',
         ]);
