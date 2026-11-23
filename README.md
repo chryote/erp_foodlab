@@ -154,6 +154,28 @@ The seeder creates a local-development administrator: **`admin@foodlab.test` / `
 docker compose up -d --build -V --wait app frontend
 ```
 
+### Restarting Backend or Frontend
+
+- **Restart without rebuilding** *(restarts PHP-FPM/Vite and triggers `docker-entrypoint.sh` to sync `composer.json` / `package.json` changes into the container volume)*:
+
+```powershell
+# Restart backend (PHP-FPM + Nginx)
+docker compose restart app nginx
+
+# Restart frontend (Vite dev server)
+docker compose restart frontend
+```
+
+- **Rebuild & recreate a single service** *(use when `Dockerfile`, PHP extensions, or entrypoint scripts change; `-V` renews the anonymous `vendor` / `node_modules` volume)*:
+
+```powershell
+# Rebuild backend
+docker compose up -d --build -V --wait app
+
+# Rebuild frontend
+docker compose up -d --build -V frontend
+```
+
 ### Resetting & Re-migrating the Database
 
 - **Reset all tables, load `backend/database/schema/mysql-schema.sql` (plus any newer migrations), and re-seed:**
