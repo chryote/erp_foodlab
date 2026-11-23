@@ -12,11 +12,11 @@ export interface ModuleLauncherCardProps {
 }
 
 const ACCENT_SELECTED_CLASSES: Record<ModuleAccent, string> = {
-  cfo: 'border-emerald-500 ring-2 ring-emerald-500/30',
-  cho: 'border-blue-500 ring-2 ring-blue-500/30',
-  cpo: 'border-amber-500 ring-2 ring-amber-500/30',
-  cdo: 'border-purple-500 ring-2 ring-purple-500/30',
-  cmo: 'border-rose-500 ring-2 ring-rose-500/30',
+  cfo: 'border-primary ring-2 ring-primary/30',
+  cho: 'border-primary ring-2 ring-primary/30',
+  cpo: 'border-primary ring-2 ring-primary/30',
+  cdo: 'border-primary ring-2 ring-primary/30',
+  cmo: 'border-primary ring-2 ring-primary/30',
 };
 
 export const ModuleLauncherCard: React.FC<ModuleLauncherCardProps> = ({

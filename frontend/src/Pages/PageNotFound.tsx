@@ -10,7 +10,7 @@ export const PageNotFound: React.FC = () => {
   return (
     <main className="relative grid min-h-screen place-items-center overflow-hidden bg-background px-4 py-10">
       <Card className="relative w-full max-w-xl overflow-hidden p-4">
-        <div className="h-1.5 bg-linear-to-r from-primary via-sky-400 to-emerald-400" />
+        <div className="h-1.5 bg-primary" />
         <div className="px-6 py-10 text-center sm:px-12 sm:py-14">
           <span className="mx-auto w-fit grid size-14 place-items-center rounded-2xl bg-primary/10 text-primary p-2">
             <Compass aria-hidden="true" className="size-7" />

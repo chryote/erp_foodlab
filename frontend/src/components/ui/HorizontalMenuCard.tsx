@@ -17,11 +17,11 @@ export interface HorizontalMenuCardProps {
 }
 
 const ACCENT_SELECTED_CLASSES: Record<ModuleAccent, string> = {
-  cfo: 'border-emerald-500 bg-emerald-500/12 ring-2 ring-emerald-500/25',
-  cho: 'border-blue-500 bg-blue-500/12 ring-2 ring-blue-500/25',
-  cpo: 'border-amber-500 bg-amber-500/12 ring-2 ring-amber-500/25',
-  cdo: 'border-purple-500 bg-purple-500/12 ring-2 ring-purple-500/25',
-  cmo: 'border-rose-500 bg-rose-500/12 ring-2 ring-rose-500/25',
+  cfo: 'border-primary bg-primary/10 ring-2 ring-primary/25',
+  cho: 'border-primary bg-primary/10 ring-2 ring-primary/25',
+  cpo: 'border-primary bg-primary/10 ring-2 ring-primary/25',
+  cdo: 'border-primary bg-primary/10 ring-2 ring-primary/25',
+  cmo: 'border-primary bg-primary/10 ring-2 ring-primary/25',
 };
 
 export const HorizontalMenuCard: React.FC<HorizontalMenuCardProps> = ({

@@ -9,7 +9,7 @@ import {
   setAuthToken,
 } from '@/lib/authStorage';
 import { createAppQueryClient } from '@/lib/cfoResources';
-import { Route, Routes, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Route, Routes, Navigate, useNavigate } from 'react-router-dom';
 import DashboardFlowSimulator from './Pages/DashboardFlowSimulator';
 import Dashboard from './Pages/Dashboard';
 import PageNotFound from './Pages/PageNotFound';
@@ -18,17 +18,6 @@ import { LoginPage } from './Pages/LoginPage';
 export interface AppProps {
   queryClient?: QueryClient;
 }
-
-const AuthenticatedLoginRedirect: React.FC = () => {
-  const location = useLocation();
-  const state = location.state as { from?: string } | null;
-  const target =
-    state?.from && state.from.startsWith('/') && state.from !== '/login'
-      ? state.from
-      : '/dashboard';
-
-  return <Navigate to={target} replace />;
-};
 
 export const App: React.FC<AppProps> = ({ queryClient: providedClient }) => {
   const [defaultClient] = useState(() => createAppQueryClient());

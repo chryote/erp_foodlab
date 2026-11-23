@@ -1,6 +1,6 @@
 import React from 'react';
 import type { ErpModuleOverview } from '../../api/client';
-import { ModuleLauncherCard } from '../../components/ui';
+import { ModuleLauncherCard } from '../../components/ui/ModuleLauncherCard';
 
 export const DEFAULT_CDO_MODULE: ErpModuleOverview = {
   code: 'CDO',

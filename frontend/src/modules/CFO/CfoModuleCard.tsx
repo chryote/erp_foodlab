@@ -3,8 +3,8 @@ import type { ErpModuleOverview } from '../../api/client';
 import {
   CascadingHorizontalMenu,
   type HorizontalMenuItem,
-  ModuleLauncherCard,
-} from '../../components/ui';
+} from '../../components/ui/HorizontalMenuCard';
+import { ModuleLauncherCard } from '../../components/ui/ModuleLauncherCard';
 
 export const CFO_INPUT_MODAL_ITEMS: HorizontalMenuItem[] = [
   { code: 'PERUSAHAAN', title: 'Master Modal' },

@@ -249,7 +249,7 @@ export const ViewOperasionalModal: React.FC<ViewOperasionalModalProps> = ({
         {error && (
           <div
             role="alert"
-            className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700"
+            className="rounded-lg border border-primary/30 bg-primary/5 px-3.5 py-2.5 text-sm text-primary"
           >
             {error}
           </div>
@@ -299,7 +299,7 @@ export const ViewOperasionalModal: React.FC<ViewOperasionalModalProps> = ({
                             setSelectedDetail({ kind: 'category', category })
                           }
                           data-testid={`view-operasional-category-amount-${category.id}`}
-                          className="cursor-pointer rounded px-1.5 py-0.5 text-right text-sm font-semibold tabular-nums text-foreground transition-colors hover:bg-emerald-500/10 hover:text-emerald-700 hover:underline"
+                          className="cursor-pointer rounded px-1.5 py-0.5 text-right text-sm font-semibold tabular-nums text-foreground transition-colors hover:bg-primary/10 hover:text-primary hover:underline"
                         >
                           {formatOperasionalNumber(categoryTotal)}
                         </button>
@@ -329,7 +329,7 @@ export const ViewOperasionalModal: React.FC<ViewOperasionalModalProps> = ({
                                     })
                                   }
                                   data-testid={`view-operasional-type-amount-${type.id}`}
-                                  className="cursor-pointer rounded px-1.5 py-0.5 text-right text-sm tabular-nums text-foreground transition-colors hover:bg-emerald-500/10 hover:text-emerald-700 hover:underline"
+                                  className="cursor-pointer rounded px-1.5 py-0.5 text-right text-sm tabular-nums text-foreground transition-colors hover:bg-primary/10 hover:text-primary hover:underline"
                                 >
                                   {formatOperasionalNumber(typeTotal)}
                                 </button>
