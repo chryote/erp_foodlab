@@ -126,6 +126,53 @@ describe('EmployeePosition CHO module', function () {
         $this->getJson("/api/v1/modules/cho/employee-positions/{$qaId}")->assertNotFound();
     });
 
+    it('allows nullable code and description on create and update without unique collision', function () {
+        $company = Company::factory()->create();
+
+        // Create with only company_id and name (code & description omitted)
+        $first = $this->postJson('/api/v1/modules/cho/employee-positions', [
+            'company_id' => $company->id,
+            'name' => 'Staff A',
+        ])->assertCreated()
+            ->assertJsonPath('data.code', null)
+            ->assertJsonPath('data.name', 'Staff A')
+            ->assertJsonPath('data.description', null);
+
+        // Create second position with empty/whitespace code & description (both normalized to null, no unique conflict)
+        $second = $this->postJson('/api/v1/modules/cho/employee-positions', [
+            'company_id' => $company->id,
+            'code' => '   ',
+            'name' => 'Staff B',
+            'description' => '',
+        ])->assertCreated()
+            ->assertJsonPath('data.code', null)
+            ->assertJsonPath('data.name', 'Staff B')
+            ->assertJsonPath('data.description', null);
+
+        expect($first->json('data.id'))->not->toBe($second->json('data.id'));
+
+        // Update to add a code, then clear it back to null
+        $secondId = $second->json('data.id');
+        $this->putJson("/api/v1/modules/cho/employee-positions/{$secondId}", [
+            'company_id' => $company->id,
+            'code' => 'POS-B',
+            'name' => 'Staff B',
+            'description' => 'Tugas B',
+        ])->assertOk()
+            ->assertJsonPath('data.code', 'POS-B')
+            ->assertJsonPath('data.description', 'Tugas B');
+
+        $this->putJson("/api/v1/modules/cho/employee-positions/{$secondId}", [
+            'company_id' => $company->id,
+            'code' => null,
+            'name' => 'Staff B Updated',
+            'description' => null,
+        ])->assertOk()
+            ->assertJsonPath('data.code', null)
+            ->assertJsonPath('data.name', 'Staff B Updated')
+            ->assertJsonPath('data.description', null);
+    });
+
     it('returns 422 on duplicate code, empty name, and soft-delete while referenced by active employees', function () {
         $company = Company::factory()->create();
 
@@ -188,5 +235,49 @@ describe('EmployeePosition CHO module', function () {
             ->assertJsonStructure(['message']);
 
         $this->assertSoftDeleted('employee_positions', ['id' => $existing->id]);
+
+        // Same code is allowed across different companies and can be reused after soft-delete
+        $otherCompany = Company::factory()->create();
+        $this->postJson('/api/v1/modules/cho/employee-positions', [
+            'company_id' => $otherCompany->id,
+            'code' => 'QC-02',
+            'name' => 'QC Supervisor Beta',
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/modules/cho/employee-positions', [
+            'company_id' => $company->id,
+            'code' => 'QC-01',
+            'name' => 'QC Inspector Reborn',
+        ])->assertCreated();
+    });
+
+    it('rejects duplicate active position names (even without code, case/whitespace variants) and allows reuse after soft-delete', function () {
+        $companyA = Company::factory()->create();
+        $companyB = Company::factory()->create();
+
+        $first = $this->postJson('/api/v1/modules/cho/employee-positions', [
+            'company_id' => $companyA->id,
+            'name' => '  Analis   Mikrobiologi  ',
+        ])->assertCreated()
+            ->assertJsonPath('data.name', 'Analis Mikrobiologi');
+
+        // Duplicate name without code (matches UI MasterKaryawan modal payload) fails with 422
+        $this->postJson('/api/v1/modules/cho/employee-positions', [
+            'company_id' => $companyA->id,
+            'name' => 'analis mikrobiologi',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
+
+        // Same name in another company is allowed
+        $this->postJson('/api/v1/modules/cho/employee-positions', [
+            'company_id' => $companyB->id,
+            'name' => 'Analis Mikrobiologi',
+        ])->assertCreated();
+
+        // Soft-delete frees the name for re-create in companyA
+        $this->deleteJson('/api/v1/modules/cho/employee-positions/'.$first->json('data.id'))->assertOk();
+        $this->postJson('/api/v1/modules/cho/employee-positions', [
+            'company_id' => $companyA->id,
+            'name' => 'Analis Mikrobiologi',
+        ])->assertCreated();
     });
 });

@@ -1,3 +1,4 @@
+import { getActiveCompanyId } from '@/lib/activeCompanyStorage';
 import { clearAuthToken, getAuthToken } from '@/lib/authStorage';
 
 export interface HealthResponse {
@@ -224,6 +225,389 @@ export interface CompanyAssetsListResponse {
   };
 }
 
+export interface EnumOption {
+  value: string;
+  nama: string;
+}
+
+export interface DocumentTypeOption extends EnumOption {
+  allowed_formats: string[];
+}
+
+export interface ChoEnums {
+  agama: EnumOption[];
+  golongan_darah: EnumOption[];
+  jenis_kelamin: EnumOption[];
+  jenis_dokumen: DocumentTypeOption[];
+}
+
+export interface EmployeePosition {
+  id: number;
+  company_id: number;
+  code?: string | null;
+  name: string;
+  description?: string | null;
+  company?: Company | null;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface EmployeePositionPayload {
+  company_id: number;
+  code?: string | null;
+  name: string;
+  description?: string | null;
+}
+
+export interface EmployeePositionsListResponse {
+  data: EmployeePosition[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
+export interface EmploymentStatus {
+  id: number;
+  company_id: number;
+  code?: string | null;
+  name: string;
+  description?: string | null;
+  company?: Company | null;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface EmploymentStatusPayload {
+  company_id: number;
+  code?: string | null;
+  name: string;
+  description?: string | null;
+}
+
+export interface EmploymentStatusesListResponse {
+  data: EmploymentStatus[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
+export interface PayrollGrade {
+  id: number;
+  company_id: number;
+  grade: number;
+  sub_grade: string;
+  level_label?: string | null;
+  base_salary: number;
+  position_allowance: number;
+  total_gross: number;
+  bpjs_kesehatan_company: number;
+  bpjs_kesehatan_employee: number;
+  bpjs_ketenagakerjaan_company: number;
+  bpjs_ketenagakerjaan_employee: number;
+  net_employee_received: number;
+  total_company_cost: number;
+  company?: Company | null;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface PayrollGradePayload {
+  company_id: number;
+  grade: number;
+  sub_grade: string;
+  level_label?: string | null;
+  base_salary: number;
+  position_allowance?: number | null;
+}
+
+export interface PayrollGradesListResponse {
+  data: PayrollGrade[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
+export interface TaxStatus {
+  id: number;
+  company_id: number;
+  code?: string | null;
+  name: string;
+  description?: string | null;
+  company?: Company | null;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface TaxStatusPayload {
+  company_id: number;
+  code?: string | null;
+  name: string;
+  description?: string | null;
+}
+
+export interface TaxStatusesListResponse {
+  data: TaxStatus[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
+export interface EmployeeDocument {
+  id: number;
+  employee_id: number;
+  document_type: string;
+  file_url: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface EmployeeDocumentInput {
+  document_type: string;
+  file_url: string;
+}
+
+export interface Employee {
+  id: number;
+  company_id: number;
+  employee_position_id?: number | null;
+  employment_status_id?: number | null;
+  payroll_grade_id?: number | null;
+  tax_status_id?: number | null;
+  employee_attendance_code?: string | null;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  photo_url?: string | null;
+  nik_ktp?: string | null;
+  nickname?: string | null;
+  birth_place?: string | null;
+  birth_date?: string | null;
+  gender?: string | null;
+  religion?: string | null;
+  blood_type?: string | null;
+  mother_name?: string | null;
+  ktp_address?: string | null;
+  domicile_address?: string | null;
+  whatsapp_number?: string | null;
+  emergency_phone_number?: string | null;
+  instagram?: string | null;
+  tiktok?: string | null;
+  bpjs_ketenagakerjaan?: string | null;
+  bpjs_kesehatan?: string | null;
+  npwp_number?: string | null;
+  company?: Company | null;
+  employee_position?: EmployeePosition | null;
+  employment_status?: EmploymentStatus | null;
+  payroll_grade?: PayrollGrade | null;
+  tax_status?: TaxStatus | null;
+  documents?: EmployeeDocument[];
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface EmployeePayload {
+  company_id: number;
+  employee_position_id?: number | null;
+  employment_status_id?: number | null;
+  payroll_grade_id?: number | null;
+  tax_status_id?: number | null;
+  employee_attendance_code?: string | null;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  photo_url?: string | null;
+  nik_ktp?: string | null;
+  nickname?: string | null;
+  birth_place?: string | null;
+  birth_date?: string | null;
+  gender?: string | null;
+  religion?: string | null;
+  blood_type?: string | null;
+  mother_name?: string | null;
+  ktp_address?: string | null;
+  domicile_address?: string | null;
+  whatsapp_number?: string | null;
+  emergency_phone_number?: string | null;
+  instagram?: string | null;
+  tiktok?: string | null;
+  bpjs_ketenagakerjaan?: string | null;
+  bpjs_kesehatan?: string | null;
+  npwp_number?: string | null;
+  documents?: EmployeeDocumentInput[];
+}
+
+export interface EmployeesListResponse {
+  data: Employee[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
+export interface UploadedDocumentResponse {
+  path: string;
+  disk: string;
+  original_name: string;
+  mime_type: string;
+  size: number;
+  url: string;
+}
+
+export interface EmployeeShift {
+  id: number;
+  company_id: number;
+  code?: string | null;
+  name: string;
+  start_time: string;
+  end_time: string;
+  break_minutes: number;
+  grace_period_minutes: number;
+  is_overnight: boolean;
+  status: string;
+  description?: string | null;
+  company?: Company | null;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface EmployeeShiftPayload {
+  company_id: number;
+  code?: string | null;
+  name: string;
+  start_time: string;
+  end_time: string;
+  break_minutes?: number | null;
+  grace_period_minutes?: number | null;
+  is_overnight?: boolean;
+  status?: string;
+  description?: string | null;
+}
+
+export interface EmployeeShiftsListResponse {
+  data: EmployeeShift[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
+export interface EmployeeShiftAssignment {
+  id: number;
+  company_id: number;
+  employee_id: number;
+  employee_shift_id: number;
+  effective_date: string;
+  end_date?: string | null;
+  notes?: string | null;
+  company?: Company | null;
+  employee?: Employee | null;
+  employee_shift?: EmployeeShift | null;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface EmployeeShiftAssignmentPayload {
+  company_id: number;
+  employee_id: number;
+  employee_shift_id: number;
+  effective_date: string;
+  end_date?: string | null;
+  notes?: string | null;
+}
+
+export interface EmployeeShiftAssignmentsListResponse {
+  data: EmployeeShiftAssignment[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
+export interface EmployeeAttendance {
+  id: number;
+  company_id: number;
+  employee_id: number;
+  employee_shift_id?: number | null;
+  attendance_date: string;
+  clock_in_at?: string | null;
+  clock_out_at?: string | null;
+  late_minutes: number;
+  overtime_minutes: number;
+  status: string;
+  notes?: string | null;
+  company?: Company | null;
+  employee?: Employee | null;
+  employee_shift?: EmployeeShift | null;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface EmployeeAttendancePayload {
+  company_id: number;
+  employee_id: number;
+  employee_shift_id?: number | null;
+  attendance_date: string;
+  clock_in_at?: string | null;
+  clock_out_at?: string | null;
+  late_minutes?: number | null;
+  overtime_minutes?: number | null;
+  status?: string;
+  notes?: string | null;
+}
+
+export interface EmployeeAttendancesListResponse {
+  data: EmployeeAttendance[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
 function resolveApiBaseUrl(): string {
   const configured = import.meta.env.VITE_API_BASE_URL?.trim();
   if (configured) {
@@ -240,6 +624,22 @@ function resolveApiBaseUrl(): string {
 
 const API_BASE_URL = resolveApiBaseUrl();
 
+export class ApiRequestError extends Error {
+  status: number;
+  errors?: Record<string, string[]>;
+
+  constructor(
+    message: string,
+    status: number,
+    errors?: Record<string, string[]>
+  ) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.status = status;
+    this.errors = errors;
+  }
+}
+
 async function requestJson<T>(
   endpoint: string,
   options: RequestInit = {},
@@ -248,11 +648,15 @@ async function requestJson<T>(
   let response: Response;
   try {
     const token = getAuthToken();
+    const activeCompanyId = getActiveCompanyId();
     response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers: {
         Accept: 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(activeCompanyId !== null
+          ? { 'X-Active-Company-Id': String(activeCompanyId) }
+          : {}),
         ...(options.headers ?? {}),
       },
     });
@@ -272,15 +676,26 @@ async function requestJson<T>(
 
   if (!response.ok) {
     let serverMessage = '';
+    let validationErrors: Record<string, string[]> | undefined;
     try {
-      const errBody = (await response.json()) as { message?: string };
+      const errBody = (await response.json()) as {
+        message?: string;
+        errors?: Record<string, string[]>;
+      };
       if (errBody?.message) {
         serverMessage = ` - ${errBody.message.split('\n')[0]}`;
+      }
+      if (errBody?.errors && typeof errBody.errors === 'object') {
+        validationErrors = errBody.errors;
       }
     } catch {
       // Ignore non-JSON error bodies
     }
-    throw new Error(`${errorPrefix}: ${response.status}${serverMessage}`);
+    throw new ApiRequestError(
+      `${errorPrefix}: ${response.status}${serverMessage}`,
+      response.status,
+      validationErrors
+    );
   }
 
   return response.json() as Promise<T>;
@@ -644,4 +1059,438 @@ export async function logout(): Promise<{ message: string }> {
 
 export async function fetchCurrentUser(): Promise<{ data: AuthUser }> {
   return requestJson<{ data: AuthUser }>('/v1/auth/me', {}, 'Gagal memuat sesi');
+}
+
+export async function fetchActiveCompany(): Promise<{ data: Company | null }> {
+  return requestJson<{ data: Company | null }>(
+    '/v1/active-company',
+    {},
+    'Failed to fetch active company'
+  );
+}
+
+export async function syncActiveCompany(
+  companyId: number | null
+): Promise<{ data: Company | null }> {
+  return requestJson<{ data: Company | null }>(
+    '/v1/active-company',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company_id: companyId }),
+    },
+    'Failed to update active company'
+  );
+}
+
+export async function fetchChoEnums(): Promise<{ data: ChoEnums }> {
+  return requestJson<{ data: ChoEnums }>(
+    '/v1/modules/cho/enums',
+    {},
+    'Failed to fetch CHO enums'
+  );
+}
+
+export async function fetchEmployeePositions(): Promise<EmployeePositionsListResponse> {
+  return requestJson<EmployeePositionsListResponse>(
+    '/v1/modules/cho/employee-positions',
+    {},
+    'Failed to fetch employee positions'
+  );
+}
+
+export async function createEmployeePosition(
+  payload: EmployeePositionPayload
+): Promise<{ data: EmployeePosition }> {
+  return requestJson<{ data: EmployeePosition }>(
+    '/v1/modules/cho/employee-positions',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create employee position'
+  );
+}
+
+export async function updateEmployeePosition(
+  id: number,
+  payload: EmployeePositionPayload
+): Promise<{ data: EmployeePosition }> {
+  return requestJson<{ data: EmployeePosition }>(
+    `/v1/modules/cho/employee-positions/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update employee position'
+  );
+}
+
+export async function deleteEmployeePosition(
+  id: number
+): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/cho/employee-positions/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete employee position'
+  );
+}
+
+export async function fetchEmploymentStatuses(): Promise<EmploymentStatusesListResponse> {
+  return requestJson<EmploymentStatusesListResponse>(
+    '/v1/modules/cho/employment-statuses',
+    {},
+    'Failed to fetch employment statuses'
+  );
+}
+
+export async function createEmploymentStatus(
+  payload: EmploymentStatusPayload
+): Promise<{ data: EmploymentStatus }> {
+  return requestJson<{ data: EmploymentStatus }>(
+    '/v1/modules/cho/employment-statuses',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create employment status'
+  );
+}
+
+export async function updateEmploymentStatus(
+  id: number,
+  payload: EmploymentStatusPayload
+): Promise<{ data: EmploymentStatus }> {
+  return requestJson<{ data: EmploymentStatus }>(
+    `/v1/modules/cho/employment-statuses/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update employment status'
+  );
+}
+
+export async function deleteEmploymentStatus(
+  id: number
+): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/cho/employment-statuses/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete employment status'
+  );
+}
+
+export async function fetchPayrollGrades(): Promise<PayrollGradesListResponse> {
+  return requestJson<PayrollGradesListResponse>(
+    '/v1/modules/cho/payroll-grades',
+    {},
+    'Failed to fetch payroll grades'
+  );
+}
+
+export async function createPayrollGrade(
+  payload: PayrollGradePayload
+): Promise<{ data: PayrollGrade }> {
+  return requestJson<{ data: PayrollGrade }>(
+    '/v1/modules/cho/payroll-grades',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create payroll grade'
+  );
+}
+
+export async function updatePayrollGrade(
+  id: number,
+  payload: PayrollGradePayload
+): Promise<{ data: PayrollGrade }> {
+  return requestJson<{ data: PayrollGrade }>(
+    `/v1/modules/cho/payroll-grades/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update payroll grade'
+  );
+}
+
+export async function deletePayrollGrade(
+  id: number
+): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/cho/payroll-grades/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete payroll grade'
+  );
+}
+
+export async function fetchTaxStatuses(): Promise<TaxStatusesListResponse> {
+  return requestJson<TaxStatusesListResponse>(
+    '/v1/modules/cho/tax-statuses',
+    {},
+    'Failed to fetch tax statuses'
+  );
+}
+
+export async function createTaxStatus(
+  payload: TaxStatusPayload
+): Promise<{ data: TaxStatus }> {
+  return requestJson<{ data: TaxStatus }>(
+    '/v1/modules/cho/tax-statuses',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create tax status'
+  );
+}
+
+export async function updateTaxStatus(
+  id: number,
+  payload: TaxStatusPayload
+): Promise<{ data: TaxStatus }> {
+  return requestJson<{ data: TaxStatus }>(
+    `/v1/modules/cho/tax-statuses/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update tax status'
+  );
+}
+
+export async function deleteTaxStatus(
+  id: number
+): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/cho/tax-statuses/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete tax status'
+  );
+}
+
+export async function fetchEmployees(): Promise<EmployeesListResponse> {
+  return requestJson<EmployeesListResponse>(
+    '/v1/modules/cho/employees',
+    {},
+    'Failed to fetch employees'
+  );
+}
+
+export async function fetchActiveCompanyEmployees(): Promise<EmployeesListResponse> {
+  return requestJson<EmployeesListResponse>(
+    '/v1/modules/cho/employees?active_company=1',
+    {},
+    'Failed to fetch active company employees'
+  );
+}
+
+export async function createEmployee(
+  payload: EmployeePayload
+): Promise<{ data: Employee }> {
+  return requestJson<{ data: Employee }>(
+    '/v1/modules/cho/employees',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create employee'
+  );
+}
+
+export async function updateEmployee(
+  id: number,
+  payload: EmployeePayload
+): Promise<{ data: Employee }> {
+  return requestJson<{ data: Employee }>(
+    `/v1/modules/cho/employees/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update employee'
+  );
+}
+
+export async function deleteEmployee(
+  id: number
+): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/cho/employees/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete employee'
+  );
+}
+
+export async function uploadEmployeeDocument(
+  file: File,
+  documentType?: string
+): Promise<UploadedDocumentResponse> {
+  const formData = new FormData();
+  formData.append('document', file);
+  if (documentType) {
+    formData.append('document_type', documentType);
+  }
+
+  return requestJson<UploadedDocumentResponse>(
+    '/v1/modules/cho/employees/upload-document',
+    {
+      method: 'POST',
+      body: formData,
+    },
+    'Failed to upload employee document'
+  );
+}
+
+export async function fetchEmployeeShifts(): Promise<EmployeeShiftsListResponse> {
+  return requestJson<EmployeeShiftsListResponse>(
+    '/v1/modules/hr/employee-shifts',
+    {},
+    'Failed to fetch employee shifts'
+  );
+}
+
+export async function createEmployeeShift(
+  payload: EmployeeShiftPayload
+): Promise<{ data: EmployeeShift }> {
+  return requestJson<{ data: EmployeeShift }>(
+    '/v1/modules/hr/employee-shifts',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create employee shift'
+  );
+}
+
+export async function updateEmployeeShift(
+  id: number,
+  payload: EmployeeShiftPayload
+): Promise<{ data: EmployeeShift }> {
+  return requestJson<{ data: EmployeeShift }>(
+    `/v1/modules/hr/employee-shifts/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update employee shift'
+  );
+}
+
+export async function deleteEmployeeShift(
+  id: number
+): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/hr/employee-shifts/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete employee shift'
+  );
+}
+
+export async function fetchEmployeeShiftAssignments(): Promise<EmployeeShiftAssignmentsListResponse> {
+  return requestJson<EmployeeShiftAssignmentsListResponse>(
+    '/v1/modules/hr/employee-shift-assignments',
+    {},
+    'Failed to fetch employee shift assignments'
+  );
+}
+
+export async function createEmployeeShiftAssignment(
+  payload: EmployeeShiftAssignmentPayload
+): Promise<{ data: EmployeeShiftAssignment }> {
+  return requestJson<{ data: EmployeeShiftAssignment }>(
+    '/v1/modules/hr/employee-shift-assignments',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create employee shift assignment'
+  );
+}
+
+export async function updateEmployeeShiftAssignment(
+  id: number,
+  payload: EmployeeShiftAssignmentPayload
+): Promise<{ data: EmployeeShiftAssignment }> {
+  return requestJson<{ data: EmployeeShiftAssignment }>(
+    `/v1/modules/hr/employee-shift-assignments/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update employee shift assignment'
+  );
+}
+
+export async function deleteEmployeeShiftAssignment(
+  id: number
+): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/hr/employee-shift-assignments/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete employee shift assignment'
+  );
+}
+
+export async function fetchEmployeeAttendances(): Promise<EmployeeAttendancesListResponse> {
+  return requestJson<EmployeeAttendancesListResponse>(
+    '/v1/modules/hr/employee-attendances',
+    {},
+    'Failed to fetch employee attendances'
+  );
+}
+
+export async function createEmployeeAttendance(
+  payload: EmployeeAttendancePayload
+): Promise<{ data: EmployeeAttendance }> {
+  return requestJson<{ data: EmployeeAttendance }>(
+    '/v1/modules/hr/employee-attendances',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create employee attendance'
+  );
+}
+
+export async function updateEmployeeAttendance(
+  id: number,
+  payload: EmployeeAttendancePayload
+): Promise<{ data: EmployeeAttendance }> {
+  return requestJson<{ data: EmployeeAttendance }>(
+    `/v1/modules/hr/employee-attendances/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update employee attendance'
+  );
+}
+
+export async function deleteEmployeeAttendance(
+  id: number
+): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/hr/employee-attendances/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete employee attendance'
+  );
 }

@@ -20,6 +20,10 @@ class ExpenseType extends Model
         'name',
     ];
 
+    protected $hidden = [
+        'active_flag',
+    ];
+
     protected $casts = [
         'expense_category_id' => 'integer',
         'company_id' => 'integer',

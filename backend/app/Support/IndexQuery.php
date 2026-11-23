@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -14,6 +15,8 @@ use Spatie\QueryBuilder\QueryBuilder;
  */
 final class IndexQuery
 {
+    public const MAX_PER_PAGE = 100;
+
     /**
      * @var array<int, string>
      */
@@ -25,6 +28,11 @@ final class IndexQuery
         'series',
         'status',
         'category',
+        'period_date',
+        'period_from',
+        'period_to',
+        'payroll_run_id',
+        'payroll_group',
     ];
 
     /**
@@ -62,6 +70,10 @@ final class IndexQuery
             return false;
         }
 
+        if ($request->boolean('active_company')) {
+            return false;
+        }
+
         if ($request->filled('filter') || $request->filled('sort') || $request->filled('include')) {
             return false;
         }
@@ -78,11 +90,48 @@ final class IndexQuery
     public static function paginate(QueryBuilder $query, Request $request): LengthAwarePaginator
     {
         return $query->paginate(
-            max(1, (int) ($request->query('per_page') ?? 10)),
+            min(self::MAX_PER_PAGE, max(1, (int) ($request->query('per_page') ?? 10))),
             ['*'],
             'page',
             max(1, (int) ($request->query('page') ?? 1))
         );
+    }
+
+    public static function escapeLike(mixed $value): ?string
+    {
+        $trimmed = trim((string) $value);
+        if ($trimmed === '') {
+            return null;
+        }
+
+        return str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $trimmed);
+    }
+
+    public static function whereLike(Builder $query, string $column, string $escapedTerm, string $boolean = 'and'): Builder
+    {
+        $wrapped = $query->getGrammar()->wrap($column);
+
+        return $query->whereRaw("{$wrapped} LIKE ? ESCAPE '!'", ['%'.$escapedTerm.'%'], $boolean);
+    }
+
+    public static function orWhereLike(Builder $query, string $column, string $escapedTerm): Builder
+    {
+        return self::whereLike($query, $column, $escapedTerm, 'or');
+    }
+
+    public static function applyActiveCompanyFilter(Builder $query, Request $request, string $column = 'company_id'): Builder
+    {
+        if (! $request->boolean('active_company')) {
+            return $query;
+        }
+
+        $activeCompanyId = active_company_id();
+
+        if ($activeCompanyId !== null) {
+            return $query->where($column, $activeCompanyId);
+        }
+
+        return $query->whereRaw('1 = 0');
     }
 
     /**

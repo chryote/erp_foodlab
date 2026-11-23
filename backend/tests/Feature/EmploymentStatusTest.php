@@ -127,6 +127,53 @@ describe('EmploymentStatus CHO module', function () {
         $this->getJson("/api/v1/modules/cho/employment-statuses/{$pkwttId}")->assertNotFound();
     });
 
+    it('allows nullable code and description on create and update without unique collision', function () {
+        $company = Company::factory()->create();
+
+        // Create with only company_id and name (code & description omitted)
+        $first = $this->postJson('/api/v1/modules/cho/employment-statuses', [
+            'company_id' => $company->id,
+            'name' => 'Karyawan Tetap',
+        ])->assertCreated()
+            ->assertJsonPath('data.code', null)
+            ->assertJsonPath('data.name', 'Karyawan Tetap')
+            ->assertJsonPath('data.description', null);
+
+        // Create second status with empty/whitespace code & description (both normalized to null, no unique conflict)
+        $second = $this->postJson('/api/v1/modules/cho/employment-statuses', [
+            'company_id' => $company->id,
+            'code' => '   ',
+            'name' => 'Karyawan Kontrak',
+            'description' => '',
+        ])->assertCreated()
+            ->assertJsonPath('data.code', null)
+            ->assertJsonPath('data.name', 'Karyawan Kontrak')
+            ->assertJsonPath('data.description', null);
+
+        expect($first->json('data.id'))->not->toBe($second->json('data.id'));
+
+        // Update to add a code & description, then clear them back to null
+        $secondId = $second->json('data.id');
+        $this->putJson("/api/v1/modules/cho/employment-statuses/{$secondId}", [
+            'company_id' => $company->id,
+            'code' => 'PKWT',
+            'name' => 'Karyawan Kontrak',
+            'description' => 'Perjanjian Kerja Waktu Tertentu',
+        ])->assertOk()
+            ->assertJsonPath('data.code', 'PKWT')
+            ->assertJsonPath('data.description', 'Perjanjian Kerja Waktu Tertentu');
+
+        $this->putJson("/api/v1/modules/cho/employment-statuses/{$secondId}", [
+            'company_id' => $company->id,
+            'code' => null,
+            'name' => 'Karyawan Kontrak Updated',
+            'description' => null,
+        ])->assertOk()
+            ->assertJsonPath('data.code', null)
+            ->assertJsonPath('data.name', 'Karyawan Kontrak Updated')
+            ->assertJsonPath('data.description', null);
+    });
+
     it('returns 422 on duplicate code, empty name, and soft-delete while referenced by active employees', function () {
         $company = Company::factory()->create();
 
@@ -189,5 +236,46 @@ describe('EmploymentStatus CHO module', function () {
             ->assertJsonStructure(['message']);
 
         $this->assertSoftDeleted('employment_statuses', ['id' => $existing->id]);
+
+        // Same code is allowed across different companies and can be reused after soft-delete
+        $otherCompany = Company::factory()->create();
+        $this->postJson('/api/v1/modules/cho/employment-statuses', [
+            'company_id' => $otherCompany->id,
+            'code' => $other->code,
+            'name' => 'Status Beta',
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/modules/cho/employment-statuses', [
+            'company_id' => $company->id,
+            'code' => $existing->code,
+            'name' => 'Status Reborn',
+        ])->assertCreated();
+    });
+
+    it('rejects duplicate active status names (even without code, case/whitespace variants) and allows reuse after soft-delete', function () {
+        $companyA = Company::factory()->create();
+        $companyB = Company::factory()->create();
+
+        $first = $this->postJson('/api/v1/modules/cho/employment-statuses', [
+            'company_id' => $companyA->id,
+            'name' => '  Karyawan   Tetap ',
+        ])->assertCreated()
+            ->assertJsonPath('data.name', 'Karyawan Tetap');
+
+        $this->postJson('/api/v1/modules/cho/employment-statuses', [
+            'company_id' => $companyA->id,
+            'name' => 'karyawan tetap',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
+
+        $this->postJson('/api/v1/modules/cho/employment-statuses', [
+            'company_id' => $companyB->id,
+            'name' => 'Karyawan Tetap',
+        ])->assertCreated();
+
+        $this->deleteJson('/api/v1/modules/cho/employment-statuses/'.$first->json('data.id'))->assertOk();
+        $this->postJson('/api/v1/modules/cho/employment-statuses', [
+            'company_id' => $companyA->id,
+            'name' => 'Karyawan Tetap',
+        ])->assertCreated();
     });
 });

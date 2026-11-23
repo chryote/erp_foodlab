@@ -13,11 +13,13 @@ class ExpenseCategoryFactory extends Factory
 {
     protected $model = ExpenseCategory::class;
 
+    private static int $sequence = 1;
+
     public function definition(): array
     {
         return [
             'company_id' => Company::factory(),
-            'name' => $this->faker->words(2, true),
+            'name' => $this->faker->words(2, true).' #'.self::$sequence++,
         ];
     }
 }

@@ -2,8 +2,11 @@
 
 namespace App\Modules\CHO\Services;
 
+use App\Models\Company;
 use App\Models\TaxStatus;
 use App\Support\IndexQuery;
+use App\Support\InputNormalizer;
+use App\Support\WriteGuard;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -30,6 +33,8 @@ class TaxStatusService
     {
         $query = IndexQuery::withDefaultRelations($this->query($request), $request, self::RELATIONS);
 
+        IndexQuery::applyActiveCompanyFilter($query->getEloquentBuilder(), $request);
+
         if (IndexQuery::isPaginated($request)) {
             return IndexQuery::paginate($query, $request);
         }
@@ -46,9 +51,20 @@ class TaxStatusService
      */
     public function createTaxStatus(array $attributes): TaxStatus
     {
-        $taxStatus = DB::transaction(
-            fn (): TaxStatus => TaxStatus::query()->create($attributes)
-        );
+        $attributes['name'] = InputNormalizer::text((string) $attributes['name']) ?? '';
+        if (array_key_exists('code', $attributes)) {
+            $attributes['code'] = $attributes['code'] !== null ? InputNormalizer::nullableText((string) $attributes['code']) : null;
+        }
+
+        $taxStatus = DB::transaction(function () use ($attributes): TaxStatus {
+            $this->assertWriteConstraints(
+                (int) $attributes['company_id'],
+                $attributes['code'] ?? null,
+                $attributes['name']
+            );
+
+            return TaxStatus::query()->create($attributes);
+        });
 
         Cache::forget(self::CACHE_KEY_LIST);
 
@@ -60,14 +76,36 @@ class TaxStatusService
      */
     public function updateTaxStatus(TaxStatus $taxStatus, array $attributes): TaxStatus
     {
+        if (array_key_exists('name', $attributes)) {
+            $attributes['name'] = InputNormalizer::text((string) $attributes['name']) ?? '';
+        }
+        if (array_key_exists('code', $attributes)) {
+            $attributes['code'] = $attributes['code'] !== null ? InputNormalizer::nullableText((string) $attributes['code']) : null;
+        }
+
         $updated = DB::transaction(function () use ($taxStatus, $attributes): TaxStatus {
             $locked = TaxStatus::query()->lockForUpdate()->findOrFail($taxStatus->getKey());
+
+            $targetCompanyId = (int) ($attributes['company_id'] ?? $locked->company_id);
+            if ($targetCompanyId !== (int) $locked->company_id && $locked->employees()->exists()) {
+                throw ValidationException::withMessages([
+                    'company_id' => [
+                        'Cannot change company for a tax status that is still referenced by active employees.',
+                    ],
+                ]);
+            }
+
+            $targetCode = array_key_exists('code', $attributes) ? $attributes['code'] : $locked->code;
+            $targetName = (string) ($attributes['name'] ?? $locked->name);
+            $this->assertWriteConstraints($targetCompanyId, $targetCode, $targetName, $locked);
+
             $locked->update($attributes);
 
             return $locked;
         });
 
         Cache::forget(self::CACHE_KEY_LIST);
+        Cache::forget(EmployeeService::CACHE_KEY_LIST);
 
         return $updated->refresh()->load(self::RELATIONS);
     }
@@ -97,17 +135,43 @@ class TaxStatusService
             ->allowedFilters([
                 AllowedFilter::exact('company_id'),
                 AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
-                    $term = '%'.trim((string) $value).'%';
+                    $escaped = IndexQuery::escapeLike($value);
+                    if ($escaped === null) {
+                        return;
+                    }
 
-                    $query->where(function (Builder $searchQuery) use ($term): void {
-                        $searchQuery
-                            ->where('code', 'like', $term)
-                            ->orWhere('name', 'like', $term);
+                    $query->where(function (Builder $searchQuery) use ($escaped): void {
+                        IndexQuery::whereLike($searchQuery, 'code', $escaped);
+                        IndexQuery::orWhereLike($searchQuery, 'name', $escaped);
                     });
                 }),
             ])
             ->allowedSorts(['id', 'code', 'name', 'created_at'])
             ->allowedIncludes(['employees', 'company'])
             ->defaultSort('code', 'id');
+    }
+
+    private function assertWriteConstraints(int $companyId, mixed $code, string $name, ?TaxStatus $existing = null): void
+    {
+        $companyExists = Company::query()
+            ->whereNull('deleted_at')
+            ->sharedLock()
+            ->whereKey($companyId)
+            ->exists();
+
+        if (! $companyExists) {
+            throw ValidationException::withMessages([
+                'company_id' => ['The selected company is invalid or has been deleted.'],
+            ]);
+        }
+
+        WriteGuard::assertCompanyCodeAndNameUnique(
+            TaxStatus::class,
+            $companyId,
+            $code !== null ? (string) $code : null,
+            $name,
+            'Status pajak dengan nama yang sama sudah terdaftar pada perusahaan ini.',
+            $existing?->getKey()
+        );
     }
 }

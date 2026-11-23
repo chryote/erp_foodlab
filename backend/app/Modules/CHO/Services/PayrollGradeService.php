@@ -2,8 +2,11 @@
 
 namespace App\Modules\CHO\Services;
 
+use App\Models\Company;
 use App\Models\PayrollGrade;
 use App\Support\IndexQuery;
+use App\Support\InputNormalizer;
+use App\Support\WriteGuard;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -18,6 +21,8 @@ class PayrollGradeService
 {
     public const CACHE_KEY_LIST = 'erp_foodlab:cho:payroll_grades:list';
 
+    private const MAX_DECIMAL_18_2 = 9999999999999999.99;
+
     /**
      * @var array<int, string>
      */
@@ -29,6 +34,8 @@ class PayrollGradeService
     public function list(Request $request): LengthAwarePaginator|Collection
     {
         $query = IndexQuery::withDefaultRelations($this->query($request), $request, self::RELATIONS);
+
+        IndexQuery::applyActiveCompanyFilter($query->getEloquentBuilder(), $request);
 
         if (IndexQuery::isPaginated($request)) {
             return IndexQuery::paginate($query, $request);
@@ -46,9 +53,22 @@ class PayrollGradeService
      */
     public function createPayrollGrade(array $attributes): PayrollGrade
     {
-        $payrollGrade = DB::transaction(
-            fn (): PayrollGrade => PayrollGrade::query()->create($this->withComputedPayroll($attributes))
-        );
+        $attributes['sub_grade'] = InputNormalizer::text((string) $attributes['sub_grade']) ?? '';
+        if (array_key_exists('level_label', $attributes)) {
+            $attributes['level_label'] = $attributes['level_label'] !== null
+                ? InputNormalizer::nullableText((string) $attributes['level_label'])
+                : null;
+        }
+
+        $payrollGrade = DB::transaction(function () use ($attributes): PayrollGrade {
+            $this->assertWriteConstraints(
+                (int) $attributes['company_id'],
+                (int) $attributes['grade'],
+                (string) $attributes['sub_grade']
+            );
+
+            return PayrollGrade::query()->create($this->withComputedPayroll($attributes));
+        });
 
         Cache::forget(self::CACHE_KEY_LIST);
 
@@ -60,14 +80,38 @@ class PayrollGradeService
      */
     public function updatePayrollGrade(PayrollGrade $payrollGrade, array $attributes): PayrollGrade
     {
+        if (array_key_exists('sub_grade', $attributes)) {
+            $attributes['sub_grade'] = InputNormalizer::text((string) $attributes['sub_grade']) ?? '';
+        }
+        if (array_key_exists('level_label', $attributes)) {
+            $attributes['level_label'] = $attributes['level_label'] !== null
+                ? InputNormalizer::nullableText((string) $attributes['level_label'])
+                : null;
+        }
+
         $updated = DB::transaction(function () use ($payrollGrade, $attributes): PayrollGrade {
             $locked = PayrollGrade::query()->lockForUpdate()->findOrFail($payrollGrade->getKey());
+
+            $targetCompanyId = (int) ($attributes['company_id'] ?? $locked->company_id);
+            if ($targetCompanyId !== (int) $locked->company_id && $locked->employees()->exists()) {
+                throw ValidationException::withMessages([
+                    'company_id' => [
+                        'Cannot change company for a payroll grade that is still referenced by active employees.',
+                    ],
+                ]);
+            }
+
+            $targetGrade = (int) ($attributes['grade'] ?? $locked->grade);
+            $targetSubGrade = (string) ($attributes['sub_grade'] ?? $locked->sub_grade);
+            $this->assertWriteConstraints($targetCompanyId, $targetGrade, $targetSubGrade, $locked);
+
             $locked->update($this->withComputedPayroll($attributes, $locked));
 
             return $locked;
         });
 
         Cache::forget(self::CACHE_KEY_LIST);
+        Cache::forget(EmployeeService::CACHE_KEY_LIST);
 
         return $updated->refresh()->load(self::RELATIONS);
     }
@@ -99,13 +143,20 @@ class PayrollGradeService
                 AllowedFilter::exact('grade'),
                 AllowedFilter::exact('sub_grade'),
                 AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
-                    $term = '%'.trim((string) $value).'%';
+                    $escaped = IndexQuery::escapeLike($value);
+                    if ($escaped === null) {
+                        return;
+                    }
 
-                    $query->where(function (Builder $searchQuery) use ($term): void {
-                        $searchQuery
-                            ->where('level_label', 'like', $term)
-                            ->orWhere('grade', 'like', $term)
-                            ->orWhere('sub_grade', 'like', $term);
+                    $raw = trim((string) $value);
+
+                    $query->where(function (Builder $searchQuery) use ($escaped, $raw): void {
+                        IndexQuery::whereLike($searchQuery, 'level_label', $escaped);
+                        IndexQuery::orWhereLike($searchQuery, 'sub_grade', $escaped);
+
+                        if (ctype_digit($raw)) {
+                            $searchQuery->orWhere('grade', '=', (int) $raw);
+                        }
                     });
                 }),
             ])
@@ -133,18 +184,26 @@ class PayrollGradeService
     private function withComputedPayroll(array $attributes, ?PayrollGrade $existing = null): array
     {
         $baseSalary = array_key_exists('base_salary', $attributes)
-            ? (float) $attributes['base_salary']
-            : (float) ($existing?->base_salary ?? 0);
+            ? round((float) $attributes['base_salary'], 2)
+            : round((float) ($existing?->base_salary ?? 0), 2);
 
         $positionAllowance = array_key_exists('position_allowance', $attributes)
-            ? (float) ($attributes['position_allowance'] ?? 0)
-            : (float) ($existing?->position_allowance ?? 0);
+            ? round((float) ($attributes['position_allowance'] ?? 0), 2)
+            : round((float) ($existing?->position_allowance ?? 0), 2);
 
-        $totalGross = $baseSalary + $positionAllowance;
+        $totalGross = round($baseSalary + $positionAllowance, 2);
         $bpjsKesehatanCompany = (float) round($totalGross * 0.04);
         $bpjsKesehatanEmployee = (float) round($totalGross * 0.01);
         $bpjsKetenagakerjaanCompany = (float) round($totalGross * 0.0394);
         $bpjsKetenagakerjaanEmployee = (float) round($totalGross * 0.02);
+        $netEmployeeReceived = round($totalGross - $bpjsKesehatanEmployee - $bpjsKetenagakerjaanEmployee, 2);
+        $totalCompanyCost = round($totalGross + $bpjsKesehatanCompany + $bpjsKetenagakerjaanCompany, 2);
+
+        if ($totalCompanyCost > self::MAX_DECIMAL_18_2) {
+            throw ValidationException::withMessages([
+                'base_salary' => ['The computed total company cost exceeds the maximum supported decimal(18,2) amount.'],
+            ]);
+        }
 
         $attributes['base_salary'] = $baseSalary;
         $attributes['position_allowance'] = $positionAllowance;
@@ -153,9 +212,37 @@ class PayrollGradeService
         $attributes['bpjs_kesehatan_employee'] = $bpjsKesehatanEmployee;
         $attributes['bpjs_ketenagakerjaan_company'] = $bpjsKetenagakerjaanCompany;
         $attributes['bpjs_ketenagakerjaan_employee'] = $bpjsKetenagakerjaanEmployee;
-        $attributes['net_employee_received'] = $totalGross - $bpjsKesehatanEmployee - $bpjsKetenagakerjaanEmployee;
-        $attributes['total_company_cost'] = $totalGross + $bpjsKesehatanCompany + $bpjsKetenagakerjaanCompany;
+        $attributes['net_employee_received'] = $netEmployeeReceived;
+        $attributes['total_company_cost'] = $totalCompanyCost;
 
         return $attributes;
+    }
+
+    private function assertWriteConstraints(int $companyId, int $grade, string $subGrade, ?PayrollGrade $existing = null): void
+    {
+        $companyExists = Company::query()
+            ->whereNull('deleted_at')
+            ->sharedLock()
+            ->whereKey($companyId)
+            ->exists();
+
+        if (! $companyExists) {
+            throw ValidationException::withMessages([
+                'company_id' => ['The selected company is invalid or has been deleted.'],
+            ]);
+        }
+
+        WriteGuard::assertUniqueActive(
+            PayrollGrade::query(),
+            'sub_grade',
+            $subGrade,
+            [
+                'company_id' => $companyId,
+                'grade' => $grade,
+            ],
+            'sub_grade',
+            'The combination of grade and sub grade has already been taken.',
+            $existing?->getKey()
+        );
     }
 }

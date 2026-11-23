@@ -23,6 +23,7 @@ return [
         'Authorization',
         'Content-Type',
         'Origin',
+        'X-Active-Company-Id',
         'X-Requested-With',
     ],
     'exposed_headers' => [],

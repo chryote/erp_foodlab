@@ -126,6 +126,53 @@ describe('TaxStatus CHO module', function () {
         $this->getJson("/api/v1/modules/cho/tax-statuses/{$tk0Id}")->assertNotFound();
     });
 
+    it('allows nullable code and description on create and update without unique collision', function () {
+        $company = Company::factory()->create();
+
+        // Create with only company_id and name (code & description omitted)
+        $first = $this->postJson('/api/v1/modules/cho/tax-statuses', [
+            'company_id' => $company->id,
+            'name' => 'Tidak Kawin 0',
+        ])->assertCreated()
+            ->assertJsonPath('data.code', null)
+            ->assertJsonPath('data.name', 'Tidak Kawin 0')
+            ->assertJsonPath('data.description', null);
+
+        // Create second tax status with empty/whitespace code & description (both normalized to null, no unique conflict)
+        $second = $this->postJson('/api/v1/modules/cho/tax-statuses', [
+            'company_id' => $company->id,
+            'code' => '   ',
+            'name' => 'Kawin 1',
+            'description' => '',
+        ])->assertCreated()
+            ->assertJsonPath('data.code', null)
+            ->assertJsonPath('data.name', 'Kawin 1')
+            ->assertJsonPath('data.description', null);
+
+        expect($first->json('data.id'))->not->toBe($second->json('data.id'));
+
+        // Update to add a code & description, then clear them back to null
+        $secondId = $second->json('data.id');
+        $this->putJson("/api/v1/modules/cho/tax-statuses/{$secondId}", [
+            'company_id' => $company->id,
+            'code' => 'K/1',
+            'name' => 'Kawin 1',
+            'description' => 'PTKP Kawin 1 Tanggungan',
+        ])->assertOk()
+            ->assertJsonPath('data.code', 'K/1')
+            ->assertJsonPath('data.description', 'PTKP Kawin 1 Tanggungan');
+
+        $this->putJson("/api/v1/modules/cho/tax-statuses/{$secondId}", [
+            'company_id' => $company->id,
+            'code' => null,
+            'name' => 'Kawin 1 Updated',
+            'description' => null,
+        ])->assertOk()
+            ->assertJsonPath('data.code', null)
+            ->assertJsonPath('data.name', 'Kawin 1 Updated')
+            ->assertJsonPath('data.description', null);
+    });
+
     it('returns 422 on duplicate code, empty name, and soft-delete while referenced by active employees', function () {
         $company = Company::factory()->create();
 
@@ -188,5 +235,46 @@ describe('TaxStatus CHO module', function () {
             ->assertJsonStructure(['message']);
 
         $this->assertSoftDeleted('tax_statuses', ['id' => $existing->id]);
+
+        // Same code is allowed across different companies and can be reused after soft-delete
+        $otherCompany = Company::factory()->create();
+        $this->postJson('/api/v1/modules/cho/tax-statuses', [
+            'company_id' => $otherCompany->id,
+            'code' => $other->code,
+            'name' => 'Tax Beta',
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/modules/cho/tax-statuses', [
+            'company_id' => $company->id,
+            'code' => $existing->code,
+            'name' => 'Tax Reborn',
+        ])->assertCreated();
+    });
+
+    it('rejects duplicate active tax status names (even without code, case/whitespace variants) and allows reuse after soft-delete', function () {
+        $companyA = Company::factory()->create();
+        $companyB = Company::factory()->create();
+
+        $first = $this->postJson('/api/v1/modules/cho/tax-statuses', [
+            'company_id' => $companyA->id,
+            'name' => '  Tidak   Kawin / 0 Tanggungan ',
+        ])->assertCreated()
+            ->assertJsonPath('data.name', 'Tidak Kawin / 0 Tanggungan');
+
+        $this->postJson('/api/v1/modules/cho/tax-statuses', [
+            'company_id' => $companyA->id,
+            'name' => 'tidak kawin / 0 tanggungan',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
+
+        $this->postJson('/api/v1/modules/cho/tax-statuses', [
+            'company_id' => $companyB->id,
+            'name' => 'Tidak Kawin / 0 Tanggungan',
+        ])->assertCreated();
+
+        $this->deleteJson('/api/v1/modules/cho/tax-statuses/'.$first->json('data.id'))->assertOk();
+        $this->postJson('/api/v1/modules/cho/tax-statuses', [
+            'company_id' => $companyA->id,
+            'name' => 'Tidak Kawin / 0 Tanggungan',
+        ])->assertCreated();
     });
 });

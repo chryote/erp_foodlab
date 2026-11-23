@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Enums\LabSampleStatus;
 use App\Models\LabSample;
 use App\Support\IndexQuery;
+use App\Support\InputNormalizer;
+use App\Support\WriteGuard;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -71,7 +73,20 @@ class LabSampleService
      */
     public function createSample(array $attributes): LabSample
     {
+        $attributes['batch_code'] = InputNormalizer::text((string) $attributes['batch_code']) ?? '';
+        $attributes['product_name'] = InputNormalizer::text((string) $attributes['product_name']) ?? '';
+        $attributes['category'] = InputNormalizer::text((string) $attributes['category']) ?? '';
+
         $sample = DB::transaction(function () use ($attributes) {
+            WriteGuard::assertUniqueActive(
+                LabSample::query(),
+                'batch_code',
+                (string) $attributes['batch_code'],
+                [],
+                'batch_code',
+                'The batch code has already been taken.'
+            );
+
             return LabSample::query()->create([
                 ...$attributes,
                 'status' => $attributes['status'] ?? LabSampleStatus::PENDING->value,

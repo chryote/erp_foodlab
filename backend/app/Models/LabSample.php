@@ -20,6 +20,10 @@ class LabSample extends Model
         'status',
     ];
 
+    protected $hidden = [
+        'active_flag',
+    ];
+
     protected function casts(): array
     {
         return [

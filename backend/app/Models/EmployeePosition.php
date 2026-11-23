@@ -21,9 +21,30 @@ class EmployeePosition extends Model
         'description',
     ];
 
+    protected $hidden = [
+        'active_flag',
+    ];
+
     protected $casts = [
         'company_id' => 'integer',
     ];
+
+    protected static function booted(): void
+    {
+        static::updated(function (EmployeePosition $position): void {
+            if (! $position->wasChanged('name')) {
+                return;
+            }
+
+            $position->employees()
+                ->withTrashed()
+                ->select(['id', 'name', 'employee_position_id', 'employee_attendance_code'])
+                ->each(function (Employee $employee) use ($position): void {
+                    $employee->setRelation('employeePosition', $position);
+                    $employee->syncAttendanceCode();
+                });
+        });
+    }
 
     public function company(): BelongsTo
     {
@@ -33,5 +54,10 @@ class EmployeePosition extends Model
     public function employees(): HasMany
     {
         return $this->hasMany(Employee::class);
+    }
+
+    public function payrollItems(): HasMany
+    {
+        return $this->hasMany(PayrollItem::class);
     }
 }

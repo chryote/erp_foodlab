@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -43,6 +44,8 @@ class EmployeeService
     {
         $query = IndexQuery::withDefaultRelations($this->query($request), $request, self::RELATIONS);
 
+        IndexQuery::applyActiveCompanyFilter($query->getEloquentBuilder(), $request);
+
         if (IndexQuery::isPaginated($request)) {
             return IndexQuery::paginate($query, $request);
         }
@@ -61,7 +64,7 @@ class EmployeeService
     {
         $employee = $this->createEmployeeAction->execute($attributes);
 
-        Cache::forget(self::CACHE_KEY_LIST);
+        $this->forgetCaches();
 
         return $employee->load(self::RELATIONS);
     }
@@ -73,7 +76,7 @@ class EmployeeService
     {
         $updated = $this->updateEmployeeAction->execute($employee, $attributes);
 
-        Cache::forget(self::CACHE_KEY_LIST);
+        $this->forgetCaches();
 
         return $updated->refresh()->load(self::RELATIONS);
     }
@@ -82,11 +85,25 @@ class EmployeeService
     {
         DB::transaction(function () use ($employee): void {
             $locked = Employee::query()->lockForUpdate()->findOrFail($employee->getKey());
+
+            if (
+                $locked->employeeAttendances()->exists()
+                || $locked->employeeShiftAssignments()->exists()
+                || $locked->expenseItems()->exists()
+                || $locked->payrollItems()->exists()
+            ) {
+                throw ValidationException::withMessages([
+                    'employee' => [
+                        'This employee is still referenced by active attendances, shift assignments, expense items, or payroll items.',
+                    ],
+                ]);
+            }
+
             $locked->documents()->delete();
             $locked->delete();
         });
 
-        Cache::forget(self::CACHE_KEY_LIST);
+        $this->forgetCaches();
     }
 
     private function query(Request $request): QueryBuilder
@@ -98,24 +115,36 @@ class EmployeeService
                 AllowedFilter::exact('employment_status_id'),
                 AllowedFilter::exact('payroll_grade_id'),
                 AllowedFilter::exact('tax_status_id'),
+                AllowedFilter::exact('employee_attendance_code'),
                 AllowedFilter::exact('gender'),
                 AllowedFilter::exact('religion'),
                 AllowedFilter::exact('blood_type'),
                 AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
-                    $term = '%'.trim((string) $value).'%';
+                    $escaped = IndexQuery::escapeLike($value);
+                    if ($escaped === null) {
+                        return;
+                    }
 
-                    $query->where(function (Builder $searchQuery) use ($term): void {
-                        $searchQuery
-                            ->where('name', 'like', $term)
-                            ->orWhere('nickname', 'like', $term)
-                            ->orWhere('nik_ktp', 'like', $term)
-                            ->orWhere('email', 'like', $term)
-                            ->orWhere('phone', 'like', $term);
+                    $query->where(function (Builder $searchQuery) use ($escaped): void {
+                        IndexQuery::whereLike($searchQuery, 'name', $escaped);
+                        IndexQuery::orWhereLike($searchQuery, 'nickname', $escaped);
+                        IndexQuery::orWhereLike($searchQuery, 'nik_ktp', $escaped);
+                        IndexQuery::orWhereLike($searchQuery, 'employee_attendance_code', $escaped);
+                        IndexQuery::orWhereLike($searchQuery, 'email', $escaped);
+                        IndexQuery::orWhereLike($searchQuery, 'phone', $escaped);
                     });
                 }),
             ])
-            ->allowedSorts(['id', 'name', 'nik_ktp', 'birth_date', 'created_at'])
+            ->allowedSorts(['id', 'name', 'nik_ktp', 'employee_attendance_code', 'birth_date', 'created_at'])
             ->allowedIncludes(self::RELATIONS)
             ->defaultSort('name', '-id');
+    }
+
+    private function forgetCaches(): void
+    {
+        Cache::forget(self::CACHE_KEY_LIST);
+        Cache::forget(PayrollItemService::CACHE_KEY_LIST);
+        Cache::forget('erp_foodlab:hr:employee_attendances:list');
+        Cache::forget('erp_foodlab:hr:employee_shift_assignments:list');
     }
 }

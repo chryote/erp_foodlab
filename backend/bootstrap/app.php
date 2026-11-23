@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Middleware\EnforceIdempotencyKey;
 use App\Http\Middleware\RecordPrometheusMetrics;
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -21,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->api(append: [
             RecordPrometheusMetrics::class,
+            EnforceIdempotencyKey::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
@@ -29,6 +32,17 @@ return Application::configure(basePath: dirname(__DIR__))
                 return response()->json([
                     'message' => 'Unauthenticated.',
                 ], 401);
+            }
+        });
+
+        $exceptions->render(function (UniqueConstraintViolationException $exception, Request $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'message' => 'A duplicate active record already exists.',
+                    'errors' => [
+                        'duplicate' => ['A duplicate active record already exists.'],
+                    ],
+                ], 422);
             }
         });
     })->create();

@@ -490,4 +490,50 @@ describe('Reusable UI Components (src/components/ui)', () => {
       series: 2,
     });
   });
+
+  it('renders CrudModal in split vertical layout with expanded modal size', async () => {
+    const onCreate = vi.fn();
+
+    render(
+      <CrudModal
+        isOpen={true}
+        title="Split Layout CRUD"
+        testId="split-crud-modal"
+        layout="split"
+        labelPlacement="left"
+        modalSize="expanded"
+        fields={[{ key: 'name', label: 'Nama Item' }]}
+        items={[{ id: 1, name: 'Item Pertama' }]}
+        onClose={vi.fn()}
+        onCreate={onCreate}
+      />
+    );
+
+    const dialog = screen.getByTestId('split-crud-modal');
+    expect(dialog).toHaveClass('max-w-[95vw]', 'h-[92vh]', 'max-h-[92vh]');
+
+    const splitLayout = screen.getByTestId('split-crud-modal-split-layout');
+    const formPanel = screen.getByTestId('split-crud-modal-form-panel');
+    const tablePanel = screen.getByTestId('split-crud-modal-table-panel');
+    const form = screen.getByTestId('split-crud-modal-form');
+
+    expect(splitLayout).toContainElement(formPanel);
+    expect(splitLayout).toContainElement(tablePanel);
+    expect(formPanel).toContainElement(form);
+    expect(form).toHaveClass('flex-col');
+    expect(
+      screen.getByTestId('split-crud-modal-name-input-field')
+    ).toHaveClass('sm:grid-cols-[140px_minmax(0,1fr)]');
+    expect(tablePanel).toHaveTextContent('Item Pertama');
+
+    fireEvent.change(screen.getByLabelText('Nama Item'), {
+      target: { value: 'Item Kedua' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    await waitFor(() => {
+      expect(onCreate).toHaveBeenCalledWith({ name: 'Item Kedua' });
+    });
+  });
 });

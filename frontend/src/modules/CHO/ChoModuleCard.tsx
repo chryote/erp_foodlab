@@ -1,6 +1,34 @@
 import React from 'react';
 import type { ErpModuleOverview } from '../../api/client';
-import { ModuleLauncherCard } from '../../components/ui';
+import {
+  CascadingHorizontalMenu,
+  type HorizontalMenuItem,
+  ModuleLauncherCard,
+} from '../../components/ui';
+
+export const CHO_INPUT_SDM_ITEMS: HorizontalMenuItem[] = [
+  { code: 'MASTER_KARYAWAN', title: 'Master Karyawan' },
+  { code: 'INPUT_KARYAWAN', title: 'Input Karyawan' },
+  { code: 'VIEW_KARYAWAN', title: 'View Karyawan' },
+];
+
+export const CHO_INPUT_PRESENSI_ITEMS: HorizontalMenuItem[] = [
+  { code: 'MASTER_PRESENSI', title: 'Master Presensi' },
+  { code: 'INPUT_ABSENSI', title: 'Input Absensi' },
+];
+
+export const CHO_MENU_ITEMS: HorizontalMenuItem[] = [
+  {
+    code: 'INPUT_SDM',
+    title: 'Input SDM',
+    children: CHO_INPUT_SDM_ITEMS,
+  },
+  {
+    code: 'INPUT_PRESENSI',
+    title: 'Input Presensi',
+    children: CHO_INPUT_PRESENSI_ITEMS,
+  },
+];
 
 export const DEFAULT_CHO_MODULE: ErpModuleOverview = {
   code: 'CHO',
@@ -41,6 +69,33 @@ export const ChoModuleCard: React.FC<ChoModuleCardProps> = ({
       accent="cho"
       isSelected={isSelected}
       onClick={() => onSelect?.(data)}
+    />
+  );
+};
+
+interface ChoHorizontalMenuProps {
+  selectedCode?: string | null;
+  selectedChildCode?: string | null;
+  onSelect?: (item: HorizontalMenuItem) => void;
+  onSelectChild?: (item: HorizontalMenuItem) => void;
+}
+
+export const ChoHorizontalMenu: React.FC<ChoHorizontalMenuProps> = ({
+  selectedCode,
+  selectedChildCode,
+  onSelect,
+  onSelectChild,
+}) => {
+  return (
+    <CascadingHorizontalMenu
+      items={CHO_MENU_ITEMS}
+      accent="cho"
+      selectedCode={selectedCode}
+      selectedChildCode={selectedChildCode}
+      ariaLabel="CHO Submenu"
+      testId="cho-horizontal-menu"
+      onSelect={onSelect}
+      onSelectChild={onSelectChild}
     />
   );
 };

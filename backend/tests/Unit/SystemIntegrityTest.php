@@ -33,7 +33,7 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
         }
     });
 
-    it('ensures docker-entrypoint.sh enforces storage permissions and runs migrations on startup', function () {
+    it('ensures docker-entrypoint.sh enforces storage permissions and hands off to php-fpm entrypoint', function () {
         $entrypointPath = base_path('docker-entrypoint.sh');
         expect(file_exists($entrypointPath))->toBeTrue();
 
@@ -41,7 +41,7 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
         expect($contents)
             ->toContain('chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache')
             ->toContain('chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache')
-            ->toContain('php artisan migrate --force');
+            ->toContain('exec docker-php-entrypoint "$@"');
     });
 
     it('discovers all Eloquent models and verifies their database tables and fillable columns exist', function () {
@@ -94,6 +94,11 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
             'tax_statuses' => \App\Models\TaxStatus::query()->count(),
             'employees' => \App\Models\Employee::query()->count(),
             'employee_documents' => \App\Models\EmployeeDocument::query()->count(),
+            'employee_shifts' => \App\Models\EmployeeShift::query()->count(),
+            'employee_shift_assignments' => \App\Models\EmployeeShiftAssignment::query()->count(),
+            'employee_attendances' => \App\Models\EmployeeAttendance::query()->count(),
+            'payroll_runs' => \App\Models\PayrollRun::query()->count(),
+            'payroll_items' => \App\Models\PayrollItem::query()->count(),
             'lab_samples' => \App\Models\LabSample::query()->count(),
         ];
 
@@ -106,7 +111,18 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
 
         expect(\App\Models\Company::query()->count())->toBe($firstCounts['companies']);
         expect(\App\Models\Employee::query()->count())->toBe($firstCounts['employees']);
+        expect(\App\Models\EmployeeShift::query()->count())->toBe($firstCounts['employee_shifts']);
+        expect(\App\Models\EmployeeShiftAssignment::query()->count())->toBe($firstCounts['employee_shift_assignments']);
+        expect(\App\Models\EmployeeAttendance::query()->count())->toBe($firstCounts['employee_attendances']);
+        expect(\App\Models\PayrollRun::query()->count())->toBe($firstCounts['payroll_runs']);
+        expect(\App\Models\PayrollItem::query()->count())->toBe($firstCounts['payroll_items']);
         expect(\App\Models\LabSample::query()->count())->toBe($firstCounts['lab_samples']);
+
+        $nadia = \App\Models\Employee::query()->with('employeePosition')->where('nik_ktp', '3273011504960001')->firstOrFail();
+        $budi = \App\Models\Employee::query()->with('employeePosition')->where('nik_ktp', '3273012208920002')->firstOrFail();
+
+        expect($nadia->employee_attendance_code)->toBe('NadiaSTAFFA'.$nadia->id);
+        expect($budi->employee_attendance_code)->toBe('BudiSTAFFB'.$budi->id);
     });
 
     it('verifies all registered GET API endpoints return 200 OK with CORS headers after seeding', function () {

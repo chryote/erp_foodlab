@@ -23,6 +23,7 @@ class EmployeeResource extends JsonResource
             'employment_status_id' => $this->employment_status_id !== null ? (int) $this->employment_status_id : null,
             'payroll_grade_id' => $this->payroll_grade_id !== null ? (int) $this->payroll_grade_id : null,
             'tax_status_id' => $this->tax_status_id !== null ? (int) $this->tax_status_id : null,
+            'employee_attendance_code' => $this->employee_attendance_code,
             'name' => $this->name,
             'email' => $this->email,
             'phone' => $this->phone,

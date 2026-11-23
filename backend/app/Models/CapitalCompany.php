@@ -19,6 +19,10 @@ class CapitalCompany extends Model
         'capital',
     ];
 
+    protected $hidden = [
+        'active_flag',
+    ];
+
     protected $casts = [
         'company_id' => 'integer',
         'capital' => 'float',
