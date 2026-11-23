@@ -23,9 +23,9 @@ describe('PayrollItem CHO module', function () {
         $companyA = Company::factory()->create(['name' => 'CV Area 31']);
         $companyB = Company::factory()->create(['name' => 'PT. Foodlab Beta']);
 
-        $posArea = EmployeePosition::factory()->create(['company_id' => $companyA->id, 'name' => 'Kepala Area']);
-        $posOutlet = EmployeePosition::factory()->create(['company_id' => $companyA->id, 'name' => 'Outlet']);
-        $posB = EmployeePosition::factory()->create(['company_id' => $companyB->id, 'name' => 'SPV']);
+        $posArea = EmployeePosition::factory()->create(['name' => 'Kepala Area']);
+        $posOutlet = EmployeePosition::factory()->create(['name' => 'Outlet']);
+        $posB = EmployeePosition::factory()->create(['name' => 'SPV']);
 
         $runA1 = PayrollRun::factory()->create([
             'company_id' => $companyA->id,
@@ -296,8 +296,10 @@ describe('PayrollItem CHO module', function () {
         $companyA = Company::factory()->create();
         $companyB = Company::factory()->create();
 
-        $posA = EmployeePosition::factory()->create(['company_id' => $companyA->id]);
-        $posB = EmployeePosition::factory()->create(['company_id' => $companyB->id]);
+        $posA = EmployeePosition::factory()->create();
+        $posB = EmployeePosition::factory()->create();
+        $deletedPos = EmployeePosition::factory()->create();
+        $deletedPos->delete();
 
         $empA1 = Employee::factory()->create(['company_id' => $companyA->id, 'employee_position_id' => $posA->id]);
         $empA2 = Employee::factory()->create(['company_id' => $companyA->id, 'employee_position_id' => $posA->id]);
@@ -355,12 +357,12 @@ describe('PayrollItem CHO module', function () {
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['total_net']);
 
-        // 2. Cross-company FK mismatches fail with 422
+        // 2. Cross-company FK mismatches & soft-deleted position fail with 422
         $this->postJson('/api/v1/modules/cho/payroll-items', [
             'company_id' => $companyA->id,
             'payroll_run_id' => $draftRunB->id,
             'employee_id' => $empB->id,
-            'employee_position_id' => $posB->id,
+            'employee_position_id' => $deletedPos->id,
             'base_salary' => 5000000,
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['payroll_run_id', 'employee_id', 'employee_position_id']);
@@ -414,11 +416,11 @@ describe('PayrollItem CHO module', function () {
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['employee_id']);
 
-        // Partial PATCH changing company_id without updating FKs fails with 422
+        // Partial PATCH changing company_id without updating company-scoped FKs fails with 422
         $this->patchJson("/api/v1/modules/cho/payroll-items/{$secondId}", [
             'company_id' => $companyB->id,
         ])->assertUnprocessable()
-            ->assertJsonValidationErrors(['payroll_run_id', 'employee_id', 'employee_position_id']);
+            ->assertJsonValidationErrors(['payroll_run_id', 'employee_id']);
 
         // 5. Mutating/deleting items after parent run is approved is rejected with 422
         $firstId = $first->json('data.id');

@@ -2,7 +2,6 @@
 
 namespace App\Modules\CHO\Services;
 
-use App\Models\Company;
 use App\Models\TaxStatus;
 use App\Support\IndexQuery;
 use App\Support\InputNormalizer;
@@ -22,18 +21,11 @@ class TaxStatusService
     public const CACHE_KEY_LIST = 'erp_foodlab:cho:tax_statuses:list';
 
     /**
-     * @var array<int, string>
-     */
-    private const RELATIONS = ['company'];
-
-    /**
      * @return LengthAwarePaginator|Collection<int, TaxStatus>
      */
     public function list(Request $request): LengthAwarePaginator|Collection
     {
-        $query = IndexQuery::withDefaultRelations($this->query($request), $request, self::RELATIONS);
-
-        IndexQuery::applyActiveCompanyFilter($query->getEloquentBuilder(), $request);
+        $query = $this->query($request);
 
         if (IndexQuery::isPaginated($request)) {
             return IndexQuery::paginate($query, $request);
@@ -58,7 +50,6 @@ class TaxStatusService
 
         $taxStatus = DB::transaction(function () use ($attributes): TaxStatus {
             $this->assertWriteConstraints(
-                (int) $attributes['company_id'],
                 $attributes['code'] ?? null,
                 $attributes['name']
             );
@@ -68,7 +59,7 @@ class TaxStatusService
 
         Cache::forget(self::CACHE_KEY_LIST);
 
-        return $taxStatus->load(self::RELATIONS);
+        return $taxStatus;
     }
 
     /**
@@ -86,18 +77,9 @@ class TaxStatusService
         $updated = DB::transaction(function () use ($taxStatus, $attributes): TaxStatus {
             $locked = TaxStatus::query()->lockForUpdate()->findOrFail($taxStatus->getKey());
 
-            $targetCompanyId = (int) ($attributes['company_id'] ?? $locked->company_id);
-            if ($targetCompanyId !== (int) $locked->company_id && $locked->employees()->exists()) {
-                throw ValidationException::withMessages([
-                    'company_id' => [
-                        'Cannot change company for a tax status that is still referenced by active employees.',
-                    ],
-                ]);
-            }
-
             $targetCode = array_key_exists('code', $attributes) ? $attributes['code'] : $locked->code;
             $targetName = (string) ($attributes['name'] ?? $locked->name);
-            $this->assertWriteConstraints($targetCompanyId, $targetCode, $targetName, $locked);
+            $this->assertWriteConstraints($targetCode, $targetName, $locked);
 
             $locked->update($attributes);
 
@@ -107,7 +89,7 @@ class TaxStatusService
         Cache::forget(self::CACHE_KEY_LIST);
         Cache::forget(EmployeeService::CACHE_KEY_LIST);
 
-        return $updated->refresh()->load(self::RELATIONS);
+        return $updated->refresh();
     }
 
     public function deleteTaxStatus(TaxStatus $taxStatus): void
@@ -133,7 +115,6 @@ class TaxStatusService
     {
         return IndexQuery::make(TaxStatus::class, $request)
             ->allowedFilters([
-                AllowedFilter::exact('company_id'),
                 AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
                     $escaped = IndexQuery::escapeLike($value);
                     if ($escaped === null) {
@@ -147,30 +128,18 @@ class TaxStatusService
                 }),
             ])
             ->allowedSorts(['id', 'code', 'name', 'created_at'])
-            ->allowedIncludes(['employees', 'company'])
+            ->allowedIncludes(['employees'])
             ->defaultSort('code', 'id');
     }
 
-    private function assertWriteConstraints(int $companyId, mixed $code, string $name, ?TaxStatus $existing = null): void
+    private function assertWriteConstraints(mixed $code, string $name, ?TaxStatus $existing = null): void
     {
-        $companyExists = Company::query()
-            ->whereNull('deleted_at')
-            ->sharedLock()
-            ->whereKey($companyId)
-            ->exists();
-
-        if (! $companyExists) {
-            throw ValidationException::withMessages([
-                'company_id' => ['The selected company is invalid or has been deleted.'],
-            ]);
-        }
-
-        WriteGuard::assertCompanyCodeAndNameUnique(
+        WriteGuard::assertCodeAndNameUnique(
             TaxStatus::class,
-            $companyId,
             $code !== null ? (string) $code : null,
             $name,
-            'Status pajak dengan nama yang sama sudah terdaftar pada perusahaan ini.',
+            'Status pajak dengan nama yang sama sudah terdaftar.',
+            [],
             $existing?->getKey()
         );
     }

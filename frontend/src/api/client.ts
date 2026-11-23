@@ -243,18 +243,15 @@ export interface ChoEnums {
 
 export interface EmployeePosition {
   id: number;
-  company_id: number;
   code?: string | null;
   name: string;
   description?: string | null;
-  company?: Company | null;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
 }
 
 export interface EmployeePositionPayload {
-  company_id: number;
   code?: string | null;
   name: string;
   description?: string | null;
@@ -274,18 +271,15 @@ export interface EmployeePositionsListResponse {
 
 export interface EmploymentStatus {
   id: number;
-  company_id: number;
   code?: string | null;
   name: string;
   description?: string | null;
-  company?: Company | null;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
 }
 
 export interface EmploymentStatusPayload {
-  company_id: number;
   code?: string | null;
   name: string;
   description?: string | null;
@@ -305,7 +299,6 @@ export interface EmploymentStatusesListResponse {
 
 export interface PayrollGrade {
   id: number;
-  company_id: number;
   grade: number;
   sub_grade: string;
   level_label?: string | null;
@@ -318,14 +311,12 @@ export interface PayrollGrade {
   bpjs_ketenagakerjaan_employee: number;
   net_employee_received: number;
   total_company_cost: number;
-  company?: Company | null;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
 }
 
 export interface PayrollGradePayload {
-  company_id: number;
   grade: number;
   sub_grade: string;
   level_label?: string | null;
@@ -347,18 +338,15 @@ export interface PayrollGradesListResponse {
 
 export interface TaxStatus {
   id: number;
-  company_id: number;
   code?: string | null;
   name: string;
   description?: string | null;
-  company?: Company | null;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
 }
 
 export interface TaxStatusPayload {
-  company_id: number;
   code?: string | null;
   name: string;
   description?: string | null;
@@ -481,6 +469,112 @@ export interface UploadedDocumentResponse {
   mime_type: string;
   size: number;
   url: string;
+}
+
+export type PayrollGroup = 'office' | 'outlet';
+
+export type PayrollItemStatus = 'draft' | 'finalized';
+
+export interface PayrollRun {
+  id: number;
+  company_id: number;
+  code?: string | null;
+  name: string;
+  period_date: string;
+  status: 'draft' | 'pending' | 'approved' | 'void';
+  total_base_salary: number;
+  total_bpjs_kesehatan: number;
+  total_bpjs_ketenagakerjaan: number;
+  total_bonus: number;
+  total_overtime: number;
+  total_deduction: number;
+  total_thr: number;
+  total_pph21: number;
+  total_net: number;
+  notes?: string | null;
+  approved_by?: number | null;
+  approved_at?: string | null;
+}
+
+export interface PayrollItem {
+  id: number;
+  company_id: number;
+  payroll_run_id: number;
+  employee_id: number;
+  employee_position_id?: number | null;
+  payroll_group: PayrollGroup;
+  attendance_days: number;
+  bank_account_number?: string | null;
+  base_salary: number;
+  bpjs_kesehatan: number;
+  bpjs_ketenagakerjaan: number;
+  bonus: number;
+  overtime: number;
+  deduction: number;
+  thr: number;
+  pph21: number;
+  total_net: number;
+  status: PayrollItemStatus;
+  notes?: string | null;
+  finalized_by?: number | null;
+  finalized_at?: string | null;
+  company?: Company | null;
+  payroll_run?: PayrollRun | null;
+  employee?: Employee | null;
+  employee_position?: EmployeePosition | null;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface PayrollWorkspaceRow {
+  employee_id: number;
+  employee: Employee;
+  payroll_item_id: number | null;
+  payroll_run_id: number | null;
+  payroll_group: PayrollGroup;
+  attendance_days: number;
+  effective_work_days: number;
+  bank_account_number?: string | null;
+  base_salary: number;
+  bpjs_kesehatan: number;
+  bpjs_ketenagakerjaan: number;
+  bonus: number;
+  overtime: number;
+  deduction: number;
+  thr: number;
+  pph21: number;
+  total_net: number;
+  status: PayrollItemStatus;
+  notes?: string | null;
+  finalized_by?: number | null;
+  finalized_at?: string | null;
+}
+
+export interface PayrollWorkspaceData {
+  period: string;
+  period_date: string;
+  cutoff_start_date: string;
+  cutoff_end_date: string;
+  cutoff_day: number;
+  period_start_day: number;
+  effective_work_days: number;
+  company: Company;
+  payroll_run: PayrollRun | null;
+  rows: PayrollWorkspaceRow[];
+}
+
+export interface SaveEmployeePayrollPayload {
+  company_id: number;
+  employee_id: number;
+  period: string;
+  payroll_group?: PayrollGroup;
+  bank_account_number?: string | null;
+  bonus: number;
+  overtime: number;
+  deduction: number;
+  thr: number;
+  notes?: string | null;
 }
 
 export interface EmployeeShift {
@@ -1492,5 +1586,48 @@ export async function deleteEmployeeAttendance(
     `/v1/modules/hr/employee-attendances/${id}`,
     { method: 'DELETE' },
     'Failed to delete employee attendance'
+  );
+}
+
+export async function fetchPayrollWorkspace(
+  companyId: number,
+  period: string
+): Promise<{ data: PayrollWorkspaceData }> {
+  const params = new URLSearchParams({
+    company_id: String(companyId),
+    period,
+  });
+  return requestJson<{ data: PayrollWorkspaceData }>(
+    `/v1/modules/cho/payroll/workspace?${params.toString()}`,
+    {},
+    'Failed to fetch payroll workspace'
+  );
+}
+
+export async function saveEmployeePayrollRow(
+  payload: SaveEmployeePayrollPayload
+): Promise<{ data: PayrollItem }> {
+  return requestJson<{ data: PayrollItem }>(
+    '/v1/modules/cho/payroll/save-row',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to save payroll row'
+  );
+}
+
+export async function finalizeEmployeePayrollRow(
+  payload: SaveEmployeePayrollPayload
+): Promise<{ data: PayrollItem }> {
+  return requestJson<{ data: PayrollItem }>(
+    '/v1/modules/cho/payroll/finalize-row',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to finalize payroll row'
   );
 }

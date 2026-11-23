@@ -14,10 +14,10 @@ describe('EmployeePosition CHO module', function () {
 
     it('supports CRUD, QueryBuilder filtering/sorting/includes, caching, and JsonResource structure', function () {
         $company = Company::factory()->create(['name' => 'PT. Foodlab Nusantara']);
+        $otherCompany = Company::factory()->create(['name' => 'PT. Foodlab Cabang']);
 
-        // Create via FormRequest + DB::transaction
+        // Create via FormRequest + DB::transaction (company-agnostic)
         $createRes = $this->postJson('/api/v1/modules/cho/employee-positions', [
-            'company_id' => $company->id,
             'code' => 'QA-LEAD',
             'name' => 'Quality Assurance Lead',
             'description' => 'Memimpin tim QA laboratorium pangan.',
@@ -27,18 +27,17 @@ describe('EmployeePosition CHO module', function () {
             ->assertJsonStructure([
                 'data' => [
                     'id',
-                    'company_id',
                     'code',
                     'name',
                     'description',
-                    'company',
                     'created_at',
                     'updated_at',
                     'deleted_at',
                 ],
             ])
+            ->assertJsonMissingPath('data.company_id')
+            ->assertJsonMissingPath('data.company')
             ->assertJsonMissingPath('data.employees')
-            ->assertJsonPath('data.company_id', $company->id)
             ->assertJsonPath('data.code', 'QA-LEAD')
             ->assertJsonPath('data.name', 'Quality Assurance Lead')
             ->assertJsonPath('data.description', 'Memimpin tim QA laboratorium pangan.');
@@ -46,16 +45,21 @@ describe('EmployeePosition CHO module', function () {
         $qaId = $createRes->json('data.id');
 
         $analyst = EmployeePosition::factory()->create([
-            'company_id' => $company->id,
             'code' => 'LAB-ANL',
             'name' => 'Analis Mikrobiologi',
             'description' => null,
         ]);
 
+        // Available across all companies
         $microEmployee = Employee::factory()->create([
             'company_id' => $company->id,
             'employee_position_id' => $analyst->id,
             'name' => 'Siti Aminah',
+        ]);
+        Employee::factory()->create([
+            'company_id' => $otherCompany->id,
+            'employee_position_id' => $analyst->id,
+            'name' => 'Budi Cabang',
         ]);
 
         // Unfiltered list uses defaultSort('name', 'id') and populates cache
@@ -88,19 +92,16 @@ describe('EmployeePosition CHO module', function () {
             ->assertJsonCount(2, 'data')
             ->assertJsonPath('data.0.id', $qaId)
             ->assertJsonPath('data.1.id', $analyst->id)
-            ->assertJsonPath('data.1.employees.0.id', $microEmployee->id)
-            ->assertJsonPath('data.1.employees.0.name', 'Siti Aminah');
+            ->assertJsonCount(2, 'data.1.employees');
 
         // Show single item
         $this->getJson("/api/v1/modules/cho/employee-positions/{$qaId}")
             ->assertOk()
             ->assertJsonPath('data.id', $qaId)
-            ->assertJsonPath('data.code', 'QA-LEAD')
-            ->assertJsonPath('data.company.name', 'PT. Foodlab Nusantara');
+            ->assertJsonPath('data.code', 'QA-LEAD');
 
         // Update (PUT) keeping same code works and forgets cache
         $this->putJson("/api/v1/modules/cho/employee-positions/{$qaId}", [
-            'company_id' => $company->id,
             'code' => 'QA-LEAD',
             'name' => 'Head of Quality Assurance',
             'description' => 'Updated description',
@@ -127,11 +128,8 @@ describe('EmployeePosition CHO module', function () {
     });
 
     it('allows nullable code and description on create and update without unique collision', function () {
-        $company = Company::factory()->create();
-
-        // Create with only company_id and name (code & description omitted)
+        // Create with only name (code & description omitted)
         $first = $this->postJson('/api/v1/modules/cho/employee-positions', [
-            'company_id' => $company->id,
             'name' => 'Staff A',
         ])->assertCreated()
             ->assertJsonPath('data.code', null)
@@ -140,7 +138,6 @@ describe('EmployeePosition CHO module', function () {
 
         // Create second position with empty/whitespace code & description (both normalized to null, no unique conflict)
         $second = $this->postJson('/api/v1/modules/cho/employee-positions', [
-            'company_id' => $company->id,
             'code' => '   ',
             'name' => 'Staff B',
             'description' => '',
@@ -154,7 +151,6 @@ describe('EmployeePosition CHO module', function () {
         // Update to add a code, then clear it back to null
         $secondId = $second->json('data.id');
         $this->putJson("/api/v1/modules/cho/employee-positions/{$secondId}", [
-            'company_id' => $company->id,
             'code' => 'POS-B',
             'name' => 'Staff B',
             'description' => 'Tugas B',
@@ -163,7 +159,6 @@ describe('EmployeePosition CHO module', function () {
             ->assertJsonPath('data.description', 'Tugas B');
 
         $this->putJson("/api/v1/modules/cho/employee-positions/{$secondId}", [
-            'company_id' => $company->id,
             'code' => null,
             'name' => 'Staff B Updated',
             'description' => null,
@@ -177,20 +172,17 @@ describe('EmployeePosition CHO module', function () {
         $company = Company::factory()->create();
 
         $existing = EmployeePosition::factory()->create([
-            'company_id' => $company->id,
             'code' => 'QC-01',
             'name' => 'QC Inspector',
         ]);
 
         $other = EmployeePosition::factory()->create([
-            'company_id' => $company->id,
             'code' => 'QC-02',
             'name' => 'QC Supervisor',
         ]);
 
         // Duplicate code & empty name on store
         $this->postJson('/api/v1/modules/cho/employee-positions', [
-            'company_id' => $company->id,
             'code' => 'QC-01',
             'name' => '',
         ])->assertUnprocessable()
@@ -198,22 +190,17 @@ describe('EmployeePosition CHO module', function () {
 
         // Duplicate code on update to another position's code
         $this->putJson("/api/v1/modules/cho/employee-positions/{$other->id}", [
-            'company_id' => $company->id,
             'code' => 'QC-01',
             'name' => 'QC Supervisor Updated',
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['code']);
 
-        // Soft-deleted company is rejected
-        $deletedCompany = Company::factory()->create();
-        $deletedCompany->delete();
-
+        // Max length validation
         $this->postJson('/api/v1/modules/cho/employee-positions', [
-            'company_id' => $deletedCompany->id,
             'code' => str_repeat('A', 51),
             'name' => str_repeat('B', 151),
         ])->assertUnprocessable()
-            ->assertJsonValidationErrors(['company_id', 'code', 'name']);
+            ->assertJsonValidationErrors(['code', 'name']);
 
         // Block soft delete (422) if referenced by active employees
         $employee = Employee::factory()->create([
@@ -236,47 +223,27 @@ describe('EmployeePosition CHO module', function () {
 
         $this->assertSoftDeleted('employee_positions', ['id' => $existing->id]);
 
-        // Same code is allowed across different companies and can be reused after soft-delete
-        $otherCompany = Company::factory()->create();
+        // Code can be reused globally after soft-delete
         $this->postJson('/api/v1/modules/cho/employee-positions', [
-            'company_id' => $otherCompany->id,
-            'code' => 'QC-02',
-            'name' => 'QC Supervisor Beta',
-        ])->assertCreated();
-
-        $this->postJson('/api/v1/modules/cho/employee-positions', [
-            'company_id' => $company->id,
             'code' => 'QC-01',
             'name' => 'QC Inspector Reborn',
         ])->assertCreated();
     });
 
     it('rejects duplicate active position names (even without code, case/whitespace variants) and allows reuse after soft-delete', function () {
-        $companyA = Company::factory()->create();
-        $companyB = Company::factory()->create();
-
         $first = $this->postJson('/api/v1/modules/cho/employee-positions', [
-            'company_id' => $companyA->id,
             'name' => '  Analis   Mikrobiologi  ',
         ])->assertCreated()
             ->assertJsonPath('data.name', 'Analis Mikrobiologi');
 
         // Duplicate name without code (matches UI MasterKaryawan modal payload) fails with 422
         $this->postJson('/api/v1/modules/cho/employee-positions', [
-            'company_id' => $companyA->id,
             'name' => 'analis mikrobiologi',
         ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
 
-        // Same name in another company is allowed
-        $this->postJson('/api/v1/modules/cho/employee-positions', [
-            'company_id' => $companyB->id,
-            'name' => 'Analis Mikrobiologi',
-        ])->assertCreated();
-
-        // Soft-delete frees the name for re-create in companyA
+        // Soft-delete frees the name for re-create globally
         $this->deleteJson('/api/v1/modules/cho/employee-positions/'.$first->json('data.id'))->assertOk();
         $this->postJson('/api/v1/modules/cho/employee-positions', [
-            'company_id' => $companyA->id,
             'name' => 'Analis Mikrobiologi',
         ])->assertCreated();
     });

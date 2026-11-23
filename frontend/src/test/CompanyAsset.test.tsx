@@ -146,16 +146,28 @@ describe('CFO CompanyAsset (Input Aset)', () => {
     const masterModal = await screen.findByTestId('company-asset-crud-modal');
     expect(masterModal).toBeInTheDocument();
 
-    // Master Aset keeps every CRUD input (and the submit button) on one row.
-    expect(masterModal).toHaveClass('max-w-7xl');
+    // Master Aset uses CHO-style split layout (form left, DataTable right).
+    expect(masterModal).toHaveClass('max-w-[95vw]', 'h-[92vh]', 'max-h-[92vh]');
+    const splitLayout = screen.getByTestId(
+      'company-asset-crud-modal-split-layout'
+    );
+    const formPanel = screen.getByTestId('company-asset-crud-modal-form-panel');
+    const tablePanel = screen.getByTestId(
+      'company-asset-crud-modal-table-panel'
+    );
     const masterAssetForm = screen.getByTestId(
       'company-asset-crud-modal-form'
     );
-    expect(masterAssetForm).toHaveClass('flex', 'flex-wrap', 'items-end');
-    expect(masterAssetForm).not.toHaveClass('grid');
+    expect(splitLayout).toContainElement(formPanel);
+    expect(splitLayout).toContainElement(tablePanel);
+    expect(formPanel).toContainElement(masterAssetForm);
+    expect(masterAssetForm).toHaveClass('flex', 'flex-col');
     expect(
-      masterAssetForm.querySelectorAll(':scope > div.flex-1')
-    ).toHaveLength(5);
+      screen.getByTestId('company-asset-crud-modal-company_id-input-field')
+    ).toHaveClass('sm:grid-cols-[140px_minmax(0,1fr)]');
+    expect(tablePanel).toContainElement(
+      screen.getByTestId('company-asset-crud-modal-pagination')
+    );
 
     await waitFor(() => {
       expect(apiClient.fetchCompanyAssets).toHaveBeenCalled();
@@ -256,6 +268,10 @@ describe('CFO CompanyAsset (Input Aset)', () => {
     fireEvent.click(screen.getByTestId('horizontal-menu-card-VIEW_ASET'));
     const viewModal = await screen.findByTestId('view-aset-modal');
     expect(viewModal).toBeInTheDocument();
+    expect(viewModal).toHaveClass('max-w-[95vw]', 'h-[92vh]', 'max-h-[92vh]');
+    expect(
+      screen.getByTestId('view-aset-modal-table-panel')
+    ).toBeInTheDocument();
 
     await waitFor(() => {
       expect(

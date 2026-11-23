@@ -17,6 +17,10 @@ export const CHO_INPUT_PRESENSI_ITEMS: HorizontalMenuItem[] = [
   { code: 'INPUT_ABSENSI', title: 'Input Absensi' },
 ];
 
+export const CHO_INPUT_PENGGAJIAN_ITEMS: HorizontalMenuItem[] = [
+  { code: 'INPUT_PAYROLL', title: 'Input Payroll' },
+];
+
 export const CHO_MENU_ITEMS: HorizontalMenuItem[] = [
   {
     code: 'INPUT_SDM',
@@ -27,6 +31,11 @@ export const CHO_MENU_ITEMS: HorizontalMenuItem[] = [
     code: 'INPUT_PRESENSI',
     title: 'Input Presensi',
     children: CHO_INPUT_PRESENSI_ITEMS,
+  },
+  {
+    code: 'INPUT_PENGGAJIAN',
+    title: 'Input Penggajian',
+    children: CHO_INPUT_PENGGAJIAN_ITEMS,
   },
 ];
 

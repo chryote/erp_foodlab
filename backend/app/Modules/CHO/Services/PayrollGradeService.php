@@ -2,7 +2,6 @@
 
 namespace App\Modules\CHO\Services;
 
-use App\Models\Company;
 use App\Models\PayrollGrade;
 use App\Support\IndexQuery;
 use App\Support\InputNormalizer;
@@ -24,18 +23,11 @@ class PayrollGradeService
     private const MAX_DECIMAL_18_2 = 9999999999999999.99;
 
     /**
-     * @var array<int, string>
-     */
-    private const RELATIONS = ['company'];
-
-    /**
      * @return LengthAwarePaginator|Collection<int, PayrollGrade>
      */
     public function list(Request $request): LengthAwarePaginator|Collection
     {
-        $query = IndexQuery::withDefaultRelations($this->query($request), $request, self::RELATIONS);
-
-        IndexQuery::applyActiveCompanyFilter($query->getEloquentBuilder(), $request);
+        $query = $this->query($request);
 
         if (IndexQuery::isPaginated($request)) {
             return IndexQuery::paginate($query, $request);
@@ -62,7 +54,6 @@ class PayrollGradeService
 
         $payrollGrade = DB::transaction(function () use ($attributes): PayrollGrade {
             $this->assertWriteConstraints(
-                (int) $attributes['company_id'],
                 (int) $attributes['grade'],
                 (string) $attributes['sub_grade']
             );
@@ -72,7 +63,7 @@ class PayrollGradeService
 
         Cache::forget(self::CACHE_KEY_LIST);
 
-        return $payrollGrade->load(self::RELATIONS);
+        return $payrollGrade;
     }
 
     /**
@@ -92,18 +83,9 @@ class PayrollGradeService
         $updated = DB::transaction(function () use ($payrollGrade, $attributes): PayrollGrade {
             $locked = PayrollGrade::query()->lockForUpdate()->findOrFail($payrollGrade->getKey());
 
-            $targetCompanyId = (int) ($attributes['company_id'] ?? $locked->company_id);
-            if ($targetCompanyId !== (int) $locked->company_id && $locked->employees()->exists()) {
-                throw ValidationException::withMessages([
-                    'company_id' => [
-                        'Cannot change company for a payroll grade that is still referenced by active employees.',
-                    ],
-                ]);
-            }
-
             $targetGrade = (int) ($attributes['grade'] ?? $locked->grade);
             $targetSubGrade = (string) ($attributes['sub_grade'] ?? $locked->sub_grade);
-            $this->assertWriteConstraints($targetCompanyId, $targetGrade, $targetSubGrade, $locked);
+            $this->assertWriteConstraints($targetGrade, $targetSubGrade, $locked);
 
             $locked->update($this->withComputedPayroll($attributes, $locked));
 
@@ -113,7 +95,7 @@ class PayrollGradeService
         Cache::forget(self::CACHE_KEY_LIST);
         Cache::forget(EmployeeService::CACHE_KEY_LIST);
 
-        return $updated->refresh()->load(self::RELATIONS);
+        return $updated->refresh();
     }
 
     public function deletePayrollGrade(PayrollGrade $payrollGrade): void
@@ -139,7 +121,6 @@ class PayrollGradeService
     {
         return IndexQuery::make(PayrollGrade::class, $request)
             ->allowedFilters([
-                AllowedFilter::exact('company_id'),
                 AllowedFilter::exact('grade'),
                 AllowedFilter::exact('sub_grade'),
                 AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
@@ -171,7 +152,7 @@ class PayrollGradeService
                 'total_company_cost',
                 'created_at',
             ])
-            ->allowedIncludes(['employees', 'company'])
+            ->allowedIncludes(['employees'])
             ->defaultSort('grade', 'sub_grade');
     }
 
@@ -218,26 +199,13 @@ class PayrollGradeService
         return $attributes;
     }
 
-    private function assertWriteConstraints(int $companyId, int $grade, string $subGrade, ?PayrollGrade $existing = null): void
+    private function assertWriteConstraints(int $grade, string $subGrade, ?PayrollGrade $existing = null): void
     {
-        $companyExists = Company::query()
-            ->whereNull('deleted_at')
-            ->sharedLock()
-            ->whereKey($companyId)
-            ->exists();
-
-        if (! $companyExists) {
-            throw ValidationException::withMessages([
-                'company_id' => ['The selected company is invalid or has been deleted.'],
-            ]);
-        }
-
         WriteGuard::assertUniqueActive(
             PayrollGrade::query(),
             'sub_grade',
             $subGrade,
             [
-                'company_id' => $companyId,
                 'grade' => $grade,
             ],
             'sub_grade',

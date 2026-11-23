@@ -331,7 +331,6 @@ describe('EmployeeAttendance HR module', function () {
         $companyB = Company::factory()->create(['name' => 'PT. Foodlab Scan B']);
 
         $position = EmployeePosition::factory()->create([
-            'company_id' => $companyA->id,
             'name' => 'Analis QC',
         ]);
         $employeeA = Employee::factory()->create([

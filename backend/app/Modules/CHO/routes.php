@@ -5,6 +5,7 @@ use App\Modules\CHO\Controllers\EmployeeController;
 use App\Modules\CHO\Controllers\EmployeePositionController;
 use App\Modules\CHO\Controllers\EmploymentStatusController;
 use App\Modules\CHO\Controllers\PayrollGradeController;
+use App\Modules\CHO\Controllers\PayrollController;
 use App\Modules\CHO\Controllers\PayrollItemController;
 use App\Modules\CHO\Controllers\PayrollRunController;
 use App\Modules\CHO\Controllers\TaxStatusController;
@@ -63,4 +64,8 @@ Route::prefix('cho')->group(function () {
     Route::put('/payroll-items/{payrollItem}', [PayrollItemController::class, 'update'])->name('api.modules.cho.payroll-items.update');
     Route::patch('/payroll-items/{payrollItem}', [PayrollItemController::class, 'update'])->name('api.modules.cho.payroll-items.patch');
     Route::delete('/payroll-items/{payrollItem}', [PayrollItemController::class, 'destroy'])->name('api.modules.cho.payroll-items.destroy');
+
+    Route::get('/payroll/workspace', [PayrollController::class, 'workspace'])->name('api.modules.cho.payroll.workspace');
+    Route::post('/payroll/save-row', [PayrollController::class, 'saveRow'])->name('api.modules.cho.payroll.save-row');
+    Route::post('/payroll/finalize-row', [PayrollController::class, 'finalizeRow'])->name('api.modules.cho.payroll.finalize-row');
 });

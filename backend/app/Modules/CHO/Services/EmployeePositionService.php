@@ -2,7 +2,6 @@
 
 namespace App\Modules\CHO\Services;
 
-use App\Models\Company;
 use App\Models\EmployeePosition;
 use App\Support\IndexQuery;
 use App\Support\InputNormalizer;
@@ -22,18 +21,11 @@ class EmployeePositionService
     public const CACHE_KEY_LIST = 'erp_foodlab:cho:employee_positions:list';
 
     /**
-     * @var array<int, string>
-     */
-    private const RELATIONS = ['company'];
-
-    /**
      * @return LengthAwarePaginator|Collection<int, EmployeePosition>
      */
     public function list(Request $request): LengthAwarePaginator|Collection
     {
-        $query = IndexQuery::withDefaultRelations($this->query($request), $request, self::RELATIONS);
-
-        IndexQuery::applyActiveCompanyFilter($query->getEloquentBuilder(), $request);
+        $query = $this->query($request);
 
         if (IndexQuery::isPaginated($request)) {
             return IndexQuery::paginate($query, $request);
@@ -58,7 +50,6 @@ class EmployeePositionService
 
         $employeePosition = DB::transaction(function () use ($attributes): EmployeePosition {
             $this->assertWriteConstraints(
-                (int) $attributes['company_id'],
                 $attributes['code'] ?? null,
                 $attributes['name']
             );
@@ -68,7 +59,7 @@ class EmployeePositionService
 
         Cache::forget(self::CACHE_KEY_LIST);
 
-        return $employeePosition->load(self::RELATIONS);
+        return $employeePosition;
     }
 
     /**
@@ -86,18 +77,9 @@ class EmployeePositionService
         $updated = DB::transaction(function () use ($employeePosition, $attributes): EmployeePosition {
             $locked = EmployeePosition::query()->lockForUpdate()->findOrFail($employeePosition->getKey());
 
-            $targetCompanyId = (int) ($attributes['company_id'] ?? $locked->company_id);
-            if ($targetCompanyId !== (int) $locked->company_id && ($locked->employees()->exists() || $locked->payrollItems()->exists())) {
-                throw ValidationException::withMessages([
-                    'company_id' => [
-                        'Cannot change company for an employee position that is still referenced by active employees or payroll items.',
-                    ],
-                ]);
-            }
-
             $targetCode = array_key_exists('code', $attributes) ? $attributes['code'] : $locked->code;
             $targetName = (string) ($attributes['name'] ?? $locked->name);
-            $this->assertWriteConstraints($targetCompanyId, $targetCode, $targetName, $locked);
+            $this->assertWriteConstraints($targetCode, $targetName, $locked);
 
             $locked->update($attributes);
 
@@ -108,7 +90,7 @@ class EmployeePositionService
         Cache::forget(EmployeeService::CACHE_KEY_LIST);
         Cache::forget(PayrollItemService::CACHE_KEY_LIST);
 
-        return $updated->refresh()->load(self::RELATIONS);
+        return $updated->refresh();
     }
 
     public function deleteEmployeePosition(EmployeePosition $employeePosition): void
@@ -135,7 +117,6 @@ class EmployeePositionService
     {
         return IndexQuery::make(EmployeePosition::class, $request)
             ->allowedFilters([
-                AllowedFilter::exact('company_id'),
                 AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
                     $escaped = IndexQuery::escapeLike($value);
                     if ($escaped === null) {
@@ -149,30 +130,18 @@ class EmployeePositionService
                 }),
             ])
             ->allowedSorts(['id', 'code', 'name', 'created_at'])
-            ->allowedIncludes(['employees', 'company'])
+            ->allowedIncludes(['employees'])
             ->defaultSort('name', 'id');
     }
 
-    private function assertWriteConstraints(int $companyId, mixed $code, string $name, ?EmployeePosition $existing = null): void
+    private function assertWriteConstraints(mixed $code, string $name, ?EmployeePosition $existing = null): void
     {
-        $companyExists = Company::query()
-            ->whereNull('deleted_at')
-            ->sharedLock()
-            ->whereKey($companyId)
-            ->exists();
-
-        if (! $companyExists) {
-            throw ValidationException::withMessages([
-                'company_id' => ['The selected company is invalid or has been deleted.'],
-            ]);
-        }
-
-        WriteGuard::assertCompanyCodeAndNameUnique(
+        WriteGuard::assertCodeAndNameUnique(
             EmployeePosition::class,
-            $companyId,
             $code !== null ? (string) $code : null,
             $name,
-            'Jabatan dengan nama yang sama sudah terdaftar pada perusahaan ini.',
+            'Jabatan dengan nama yang sama sudah terdaftar.',
+            [],
             $existing?->getKey()
         );
     }

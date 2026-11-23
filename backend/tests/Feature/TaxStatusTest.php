@@ -14,10 +14,10 @@ describe('TaxStatus CHO module', function () {
 
     it('supports CRUD, QueryBuilder filtering/sorting/includes, caching, and JsonResource structure', function () {
         $company = Company::factory()->create(['name' => 'PT. Foodlab Nusantara']);
+        $otherCompany = Company::factory()->create(['name' => 'PT. Foodlab Cabang']);
 
-        // Create via FormRequest + DB::transaction
+        // Create via FormRequest + DB::transaction (company-agnostic)
         $createRes = $this->postJson('/api/v1/modules/cho/tax-statuses', [
-            'company_id' => $company->id,
             'code' => 'TK/0',
             'name' => 'Tidak Kawin Tanpa Tanggungan',
             'description' => 'Wajib pajak tidak kawin tanpa tanggungan.',
@@ -27,18 +27,17 @@ describe('TaxStatus CHO module', function () {
             ->assertJsonStructure([
                 'data' => [
                     'id',
-                    'company_id',
                     'code',
                     'name',
                     'description',
-                    'company',
                     'created_at',
                     'updated_at',
                     'deleted_at',
                 ],
             ])
+            ->assertJsonMissingPath('data.company_id')
+            ->assertJsonMissingPath('data.company')
             ->assertJsonMissingPath('data.employees')
-            ->assertJsonPath('data.company_id', $company->id)
             ->assertJsonPath('data.code', 'TK/0')
             ->assertJsonPath('data.name', 'Tidak Kawin Tanpa Tanggungan')
             ->assertJsonPath('data.description', 'Wajib pajak tidak kawin tanpa tanggungan.');
@@ -46,16 +45,21 @@ describe('TaxStatus CHO module', function () {
         $tk0Id = $createRes->json('data.id');
 
         $k1 = TaxStatus::factory()->create([
-            'company_id' => $company->id,
             'code' => 'K/1',
             'name' => 'Kawin 1 Tanggungan',
             'description' => null,
         ]);
 
-        $k1Employee = Employee::factory()->create([
+        // Available across all companies
+        Employee::factory()->create([
             'company_id' => $company->id,
             'tax_status_id' => $k1->id,
             'name' => 'Dewi Lestari',
+        ]);
+        Employee::factory()->create([
+            'company_id' => $otherCompany->id,
+            'tax_status_id' => $k1->id,
+            'name' => 'Andi Cabang',
         ]);
 
         // Unfiltered list uses defaultSort('code', 'id') and populates cache
@@ -87,20 +91,16 @@ describe('TaxStatus CHO module', function () {
             ->assertJsonCount(2, 'data')
             ->assertJsonPath('data.0.id', $tk0Id)
             ->assertJsonPath('data.1.id', $k1->id)
-            ->assertJsonPath('data.1.employees.0.id', $k1Employee->id)
-            ->assertJsonPath('data.1.employees.0.tax_status_id', $k1->id)
-            ->assertJsonPath('data.1.employees.0.name', 'Dewi Lestari');
+            ->assertJsonCount(2, 'data.1.employees');
 
         // Show single item
         $this->getJson("/api/v1/modules/cho/tax-statuses/{$tk0Id}")
             ->assertOk()
             ->assertJsonPath('data.id', $tk0Id)
-            ->assertJsonPath('data.code', 'TK/0')
-            ->assertJsonPath('data.company.name', 'PT. Foodlab Nusantara');
+            ->assertJsonPath('data.code', 'TK/0');
 
         // Update (PUT) keeping same code works and forgets cache
         $this->putJson("/api/v1/modules/cho/tax-statuses/{$tk0Id}", [
-            'company_id' => $company->id,
             'code' => 'TK/0',
             'name' => 'TK/0 Standar',
             'description' => 'Updated description',
@@ -127,11 +127,8 @@ describe('TaxStatus CHO module', function () {
     });
 
     it('allows nullable code and description on create and update without unique collision', function () {
-        $company = Company::factory()->create();
-
-        // Create with only company_id and name (code & description omitted)
+        // Create with only name (code & description omitted)
         $first = $this->postJson('/api/v1/modules/cho/tax-statuses', [
-            'company_id' => $company->id,
             'name' => 'Tidak Kawin 0',
         ])->assertCreated()
             ->assertJsonPath('data.code', null)
@@ -140,7 +137,6 @@ describe('TaxStatus CHO module', function () {
 
         // Create second tax status with empty/whitespace code & description (both normalized to null, no unique conflict)
         $second = $this->postJson('/api/v1/modules/cho/tax-statuses', [
-            'company_id' => $company->id,
             'code' => '   ',
             'name' => 'Kawin 1',
             'description' => '',
@@ -154,7 +150,6 @@ describe('TaxStatus CHO module', function () {
         // Update to add a code & description, then clear them back to null
         $secondId = $second->json('data.id');
         $this->putJson("/api/v1/modules/cho/tax-statuses/{$secondId}", [
-            'company_id' => $company->id,
             'code' => 'K/1',
             'name' => 'Kawin 1',
             'description' => 'PTKP Kawin 1 Tanggungan',
@@ -163,7 +158,6 @@ describe('TaxStatus CHO module', function () {
             ->assertJsonPath('data.description', 'PTKP Kawin 1 Tanggungan');
 
         $this->putJson("/api/v1/modules/cho/tax-statuses/{$secondId}", [
-            'company_id' => $company->id,
             'code' => null,
             'name' => 'Kawin 1 Updated',
             'description' => null,
@@ -177,20 +171,17 @@ describe('TaxStatus CHO module', function () {
         $company = Company::factory()->create();
 
         $existing = TaxStatus::factory()->create([
-            'company_id' => $company->id,
             'code' => 'K/0',
             'name' => 'Kawin Tanpa Tanggungan',
         ]);
 
         $other = TaxStatus::factory()->create([
-            'company_id' => $company->id,
             'code' => 'K/2',
             'name' => 'Kawin 2 Tanggungan',
         ]);
 
         // Duplicate code & empty name on store
         $this->postJson('/api/v1/modules/cho/tax-statuses', [
-            'company_id' => $company->id,
             'code' => 'K/0',
             'name' => '',
         ])->assertUnprocessable()
@@ -198,22 +189,17 @@ describe('TaxStatus CHO module', function () {
 
         // Duplicate code on update to another tax status's code
         $this->putJson("/api/v1/modules/cho/tax-statuses/{$other->id}", [
-            'company_id' => $company->id,
             'code' => 'K/0',
             'name' => 'Kawin 2 Tanggungan Updated',
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['code']);
 
-        // Soft-deleted company & max length validation (code > 20, name > 100)
-        $deletedCompany = Company::factory()->create();
-        $deletedCompany->delete();
-
+        // Max length validation (code > 20, name > 100)
         $this->postJson('/api/v1/modules/cho/tax-statuses', [
-            'company_id' => $deletedCompany->id,
             'code' => str_repeat('A', 21),
             'name' => str_repeat('B', 101),
         ])->assertUnprocessable()
-            ->assertJsonValidationErrors(['company_id', 'code', 'name']);
+            ->assertJsonValidationErrors(['code', 'name']);
 
         // Block soft delete (422) if referenced by active employees
         $employee = Employee::factory()->create([
@@ -236,44 +222,25 @@ describe('TaxStatus CHO module', function () {
 
         $this->assertSoftDeleted('tax_statuses', ['id' => $existing->id]);
 
-        // Same code is allowed across different companies and can be reused after soft-delete
-        $otherCompany = Company::factory()->create();
+        // Code can be reused globally after soft-delete
         $this->postJson('/api/v1/modules/cho/tax-statuses', [
-            'company_id' => $otherCompany->id,
-            'code' => $other->code,
-            'name' => 'Tax Beta',
-        ])->assertCreated();
-
-        $this->postJson('/api/v1/modules/cho/tax-statuses', [
-            'company_id' => $company->id,
             'code' => $existing->code,
             'name' => 'Tax Reborn',
         ])->assertCreated();
     });
 
     it('rejects duplicate active tax status names (even without code, case/whitespace variants) and allows reuse after soft-delete', function () {
-        $companyA = Company::factory()->create();
-        $companyB = Company::factory()->create();
-
         $first = $this->postJson('/api/v1/modules/cho/tax-statuses', [
-            'company_id' => $companyA->id,
             'name' => '  Tidak   Kawin / 0 Tanggungan ',
         ])->assertCreated()
             ->assertJsonPath('data.name', 'Tidak Kawin / 0 Tanggungan');
 
         $this->postJson('/api/v1/modules/cho/tax-statuses', [
-            'company_id' => $companyA->id,
             'name' => 'tidak kawin / 0 tanggungan',
         ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
 
-        $this->postJson('/api/v1/modules/cho/tax-statuses', [
-            'company_id' => $companyB->id,
-            'name' => 'Tidak Kawin / 0 Tanggungan',
-        ])->assertCreated();
-
         $this->deleteJson('/api/v1/modules/cho/tax-statuses/'.$first->json('data.id'))->assertOk();
         $this->postJson('/api/v1/modules/cho/tax-statuses', [
-            'company_id' => $companyA->id,
             'name' => 'Tidak Kawin / 0 Tanggungan',
         ])->assertCreated();
     });

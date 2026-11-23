@@ -39,7 +39,7 @@ class PayrollGradeController extends Controller
 
     public function show(PayrollGrade $payrollGrade): JsonResponse
     {
-        return (new PayrollGradeResource($payrollGrade->load('company')))->response();
+        return (new PayrollGradeResource($payrollGrade))->response();
     }
 
     public function update(SavePayrollGradeRequest $request, PayrollGrade $payrollGrade): JsonResponse

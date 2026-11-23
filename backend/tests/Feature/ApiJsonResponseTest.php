@@ -73,12 +73,17 @@ describe('API JSON response enforcement', function () {
             $notFound->assertJsonStructure(['message']);
         }
 
-        // 405 Method Not Allowed
-        $methodNotAllowed = $this->withHeaders(['Accept' => 'text/html'])
-            ->post('/api/health');
-        $methodNotAllowed->assertStatus(405);
-        expect($methodNotAllowed->headers->get('Content-Type'))->toContain('application/json');
-        $methodNotAllowed->assertJsonStructure(['message']);
+        // 405 Method Not Allowed (including POST-only /api/v1/documents)
+        foreach (['/api/health', '/api/v1/documents'] as $uri) {
+            $methodNotAllowed = $this->withHeaders(['Accept' => 'text/html'])
+                ->get($uri === '/api/health' ? '/api/health' : $uri);
+            if ($uri === '/api/health') {
+                $methodNotAllowed = $this->withHeaders(['Accept' => 'text/html'])->post($uri);
+            }
+            $methodNotAllowed->assertStatus(405);
+            expect($methodNotAllowed->headers->get('Content-Type'))->toContain('application/json');
+            $methodNotAllowed->assertJsonStructure(['message']);
+        }
 
         // 429 Rate Limit on /api/v1/auth/login (throttle:5,1; 1 request already made above)
         for ($i = 0; $i < 4; $i++) {
@@ -104,6 +109,12 @@ describe('API JSON response enforcement', function () {
         $companyValidation->assertUnprocessable();
         expect($companyValidation->headers->get('Content-Type'))->toContain('application/json');
         $companyValidation->assertJsonStructure(['message', 'errors' => ['name']]);
+
+        $documentValidation = $this->withHeaders(['Accept' => 'text/html'])
+            ->post('/api/v1/documents', []);
+        $documentValidation->assertUnprocessable();
+        expect($documentValidation->headers->get('Content-Type'))->toContain('application/json');
+        $documentValidation->assertJsonStructure(['message', 'errors' => ['document']]);
 
         // 500 Unhandled Server Error
         Route::get('/api/_test-server-error', function () {

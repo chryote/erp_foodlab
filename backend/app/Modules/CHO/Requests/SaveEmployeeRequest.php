@@ -108,29 +108,25 @@ class SaveEmployeeRequest extends FormRequest
                 ...$presence,
                 'integer',
                 Rule::exists('employee_positions', 'id')
-                    ->whereNull('deleted_at')
-                    ->where('company_id', $companyId),
+                    ->whereNull('deleted_at'),
             ],
             'employment_status_id' => [
                 ...$presence,
                 'integer',
                 Rule::exists('employment_statuses', 'id')
-                    ->whereNull('deleted_at')
-                    ->where('company_id', $companyId),
+                    ->whereNull('deleted_at'),
             ],
             'payroll_grade_id' => [
                 ...$presence,
                 'integer',
                 Rule::exists('payroll_grades', 'id')
-                    ->whereNull('deleted_at')
-                    ->where('company_id', $companyId),
+                    ->whereNull('deleted_at'),
             ],
             'tax_status_id' => [
                 ...$presence,
                 'integer',
                 Rule::exists('tax_statuses', 'id')
-                    ->whereNull('deleted_at')
-                    ->where('company_id', $companyId),
+                    ->whereNull('deleted_at'),
             ],
             'name' => [...$presence, 'string', 'max:150'],
             'email' => [...$presence, 'email', 'max:150'],

@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\Company;
 use App\Models\EmploymentStatus;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -20,7 +19,6 @@ class EmploymentStatusFactory extends Factory
         $seq = self::$sequence++;
 
         return [
-            'company_id' => Company::factory(),
             'code' => strtoupper($this->faker->unique()->bothify('STS-###??')).'-'.$seq,
             'name' => $this->faker->words(2, true).' #'.$seq,
             'description' => $this->faker->sentence(),

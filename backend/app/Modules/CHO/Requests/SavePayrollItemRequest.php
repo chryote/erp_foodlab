@@ -3,6 +3,7 @@
 namespace App\Modules\CHO\Requests;
 
 use App\Enums\PayrollGroup;
+use App\Enums\PayrollItemStatus;
 use App\Enums\PayrollRunStatus;
 use App\Models\Employee;
 use App\Models\EmployeePosition;
@@ -90,8 +91,7 @@ class SavePayrollItemRequest extends FormRequest
                 'nullable',
                 'integer',
                 Rule::exists('employee_positions', 'id')
-                    ->whereNull('deleted_at')
-                    ->where('company_id', $companyId),
+                    ->whereNull('deleted_at'),
             ],
             'payroll_group' => ['sometimes', 'required', 'string', Rule::enum(PayrollGroup::class)],
             'bank_account_number' => ['sometimes', 'nullable', 'string', 'max:50'],
@@ -168,6 +168,13 @@ class SavePayrollItemRequest extends FormRequest
                     ? ($this->input('employee_position_id') !== null ? (int) $this->input('employee_position_id') : null)
                     : $routeItem?->employee_position_id;
 
+                if ($routeItem instanceof PayrollItem && $routeItem->status === PayrollItemStatus::FINALIZED) {
+                    $validator->errors()->add(
+                        'payroll_item',
+                        'Cannot modify a payroll item that has already been finalized.'
+                    );
+                }
+
                 if ($routeItem instanceof PayrollItem && ! $validator->errors()->has('payroll_run_id')) {
                     $existingRun = PayrollRun::query()
                         ->whereNull('deleted_at')
@@ -217,14 +224,13 @@ class SavePayrollItemRequest extends FormRequest
                 if (! $validator->errors()->has('employee_position_id') && $effectivePositionId !== null) {
                     $positionValid = EmployeePosition::query()
                         ->whereNull('deleted_at')
-                        ->where('company_id', $effectiveCompanyId)
                         ->whereKey((int) $effectivePositionId)
                         ->exists();
 
                     if (! $positionValid) {
                         $validator->errors()->add(
                             'employee_position_id',
-                            'The selected employee position does not belong to the specified company.'
+                            'The selected employee position is invalid or has been deleted.'
                         );
                     }
                 }

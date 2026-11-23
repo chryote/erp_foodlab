@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\Company;
 use App\Models\EmployeePosition;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -20,7 +19,6 @@ class EmployeePositionFactory extends Factory
         $seq = self::$sequence++;
 
         return [
-            'company_id' => Company::factory(),
             'code' => strtoupper($this->faker->unique()->bothify('POS-###??')).'-'.$seq,
             'name' => $this->faker->jobTitle().' #'.$seq,
             'description' => $this->faker->sentence(),

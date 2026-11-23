@@ -352,6 +352,8 @@ export const ViewOperasionalModal: React.FC<ViewOperasionalModalProps> = ({
         title="Detail Item Operasional"
         subtitle={detailSubtitle}
         testId="view-operasional-detail-modal"
+        layout="split"
+        modalSize="expanded"
         fields={detailFields}
         summary={
           <SummaryBanner
@@ -361,7 +363,7 @@ export const ViewOperasionalModal: React.FC<ViewOperasionalModalProps> = ({
           />
         }
         emptyMessage="Belum ada item operasional pada periode ini."
-        pageSize={5}
+        pageSize={10}
         items={detailItems}
         readOnly={true}
         onClose={() => setSelectedDetail(null)}

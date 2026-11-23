@@ -3,6 +3,7 @@
 namespace App\Modules\CHO\Services;
 
 use App\Enums\PayrollGroup;
+use App\Enums\PayrollItemStatus;
 use App\Enums\PayrollRunStatus;
 use App\Models\Company;
 use App\Models\Employee;
@@ -83,7 +84,7 @@ class PayrollItemService
             $this->assertActiveCompany($companyId);
             $payrollRun = $this->lockAndAssertMutablePayrollRun($payrollRunId, $companyId);
             $this->assertActiveEmployee($employeeId, $companyId);
-            $this->assertActivePosition($positionId, $companyId);
+            $this->assertActivePosition($positionId);
 
             WriteGuard::assertUniqueActive(
                 PayrollItem::query(),
@@ -121,6 +122,12 @@ class PayrollItemService
 
         $updated = DB::transaction(function () use ($payrollItem, $attributes): PayrollItem {
             $locked = PayrollItem::query()->lockForUpdate()->findOrFail($payrollItem->getKey());
+
+            if ($this->isItemFinalized($locked)) {
+                throw ValidationException::withMessages([
+                    'payroll_item' => ['Cannot modify a payroll item that has already been finalized.'],
+                ]);
+            }
 
             $oldRunId = (int) $locked->payroll_run_id;
             $targetCompanyId = (int) ($attributes['company_id'] ?? $locked->company_id);
@@ -163,7 +170,7 @@ class PayrollItemService
 
             $this->assertActiveCompany($targetCompanyId);
             $this->assertActiveEmployee($targetEmployeeId, $targetCompanyId);
-            $this->assertActivePosition($targetPositionId !== null ? (int) $targetPositionId : null, $targetCompanyId);
+            $this->assertActivePosition($targetPositionId !== null ? (int) $targetPositionId : null);
 
             WriteGuard::assertUniqueActive(
                 PayrollItem::query(),
@@ -199,6 +206,12 @@ class PayrollItemService
     {
         DB::transaction(function () use ($payrollItem): void {
             $locked = PayrollItem::query()->lockForUpdate()->findOrFail($payrollItem->getKey());
+
+            if ($this->isItemFinalized($locked)) {
+                throw ValidationException::withMessages([
+                    'payroll_item' => ['Cannot delete a payroll item that has already been finalized.'],
+                ]);
+            }
 
             $payrollRun = PayrollRun::query()
                 ->whereNull('deleted_at')
@@ -287,7 +300,7 @@ class PayrollItemService
      */
     private function sanitizeAttributes(array $attributes, bool $forUpdate = false): array
     {
-        unset($attributes['total_net']);
+        unset($attributes['total_net'], $attributes['status'], $attributes['finalized_by'], $attributes['finalized_at']);
 
         foreach (['bank_account_number', 'notes'] as $textField) {
             if (array_key_exists($textField, $attributes)) {
@@ -403,7 +416,7 @@ class PayrollItemService
         }
     }
 
-    private function assertActivePosition(?int $positionId, int $companyId): void
+    private function assertActivePosition(?int $positionId): void
     {
         if ($positionId === null) {
             return;
@@ -411,14 +424,13 @@ class PayrollItemService
 
         $exists = EmployeePosition::query()
             ->whereNull('deleted_at')
-            ->where('company_id', $companyId)
             ->sharedLock()
             ->whereKey($positionId)
             ->exists();
 
         if (! $exists) {
             throw ValidationException::withMessages([
-                'employee_position_id' => ['The selected employee position does not belong to the specified company.'],
+                'employee_position_id' => ['The selected employee position is invalid or has been deleted.'],
             ]);
         }
     }
@@ -432,10 +444,24 @@ class PayrollItemService
         return in_array($status, [PayrollRunStatus::APPROVED, PayrollRunStatus::VOID], true);
     }
 
-    private function forgetCaches(): void
+    private function isItemFinalized(PayrollItem $payrollItem): bool
+    {
+        $status = $payrollItem->status instanceof PayrollItemStatus
+            ? $payrollItem->status
+            : PayrollItemStatus::tryFrom((string) $payrollItem->status);
+
+        return $status === PayrollItemStatus::FINALIZED;
+    }
+
+    public static function forgetListCache(): void
     {
         Cache::forget(self::CACHE_KEY_LIST);
-        Cache::forget(PayrollRunService::CACHE_KEY_LIST);
+    }
+
+    private function forgetCaches(): void
+    {
+        self::forgetListCache();
+        PayrollRunService::forgetListCache();
         Cache::forget(ChoService::CACHE_KEY);
     }
 }

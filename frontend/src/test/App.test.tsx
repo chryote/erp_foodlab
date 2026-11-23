@@ -331,6 +331,19 @@ describe('App ERP Main Menu integration', () => {
 
     const modal = await screen.findByTestId('perusahaan-crud-modal');
     expect(modal).toBeInTheDocument();
+    expect(modal).toHaveClass('max-w-[95vw]', 'h-[92vh]', 'max-h-[92vh]');
+    expect(
+      screen.getByTestId('perusahaan-crud-modal-split-layout')
+    ).toContainElement(screen.getByTestId('perusahaan-crud-modal-form-panel'));
+    expect(
+      screen.getByTestId('perusahaan-crud-modal-split-layout')
+    ).toContainElement(screen.getByTestId('perusahaan-crud-modal-table-panel'));
+    expect(screen.getByTestId('perusahaan-crud-modal-form')).toHaveClass(
+      'flex-col'
+    );
+    expect(
+      screen.getByTestId('perusahaan-crud-modal-name-input-field')
+    ).toHaveClass('sm:grid-cols-[140px_minmax(0,1fr)]');
     await waitFor(() => {
       expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(1);
     });
@@ -398,6 +411,24 @@ describe('App ERP Main Menu integration', () => {
       'pemegang-saham-crud-modal'
     );
     expect(stakeholderModal).toBeInTheDocument();
+    expect(stakeholderModal).toHaveClass(
+      'max-w-[95vw]',
+      'h-[92vh]',
+      'max-h-[92vh]'
+    );
+    expect(
+      screen.getByTestId('pemegang-saham-crud-modal-split-layout')
+    ).toContainElement(
+      screen.getByTestId('pemegang-saham-crud-modal-form-panel')
+    );
+    expect(
+      screen.getByTestId('pemegang-saham-crud-modal-split-layout')
+    ).toContainElement(
+      screen.getByTestId('pemegang-saham-crud-modal-table-panel')
+    );
+    expect(screen.getByTestId('pemegang-saham-crud-modal-form')).toHaveClass(
+      'flex-col'
+    );
 
     await waitFor(() => {
       expect(apiClient.fetchCapitalCompanies).toHaveBeenCalledTimes(1);
@@ -523,6 +554,10 @@ describe('App ERP Main Menu integration', () => {
       'daftar-kapital-perusahaan-crud-modal'
     );
     expect(modal).toBeInTheDocument();
+    expect(modal).toHaveClass('max-w-[95vw]', 'h-[92vh]', 'max-h-[92vh]');
+    expect(
+      screen.getByTestId('daftar-kapital-perusahaan-crud-modal-table-panel')
+    ).toBeInTheDocument();
 
     await waitFor(() => {
       expect(apiClient.fetchCapitalCompanies).toHaveBeenCalledTimes(1);
@@ -562,6 +597,10 @@ describe('App ERP Main Menu integration', () => {
       'detail-pemegang-saham-modal'
     );
     expect(detailModal).toBeInTheDocument();
+    expect(detailModal).toHaveClass('max-w-[95vw]', 'h-[92vh]', 'max-h-[92vh]');
+    expect(
+      screen.getByTestId('detail-pemegang-saham-modal-table-panel')
+    ).toBeInTheDocument();
     expect(screen.getByText('Detail Pemegang Saham')).toBeInTheDocument();
 
     await waitFor(() => {
@@ -817,6 +856,23 @@ describe('App ERP Main Menu integration', () => {
 
     const modal = await screen.findByTestId('master-operasional-crud-modal');
     expect(modal).toBeInTheDocument();
+    expect(modal).toHaveClass('max-w-[95vw]', 'h-[92vh]', 'max-h-[92vh]');
+    expect(
+      screen.getByTestId('master-operasional-crud-modal-split-layout')
+    ).toContainElement(
+      screen.getByTestId('master-operasional-crud-modal-form-panel')
+    );
+    expect(
+      screen.getByTestId('master-operasional-crud-modal-split-layout')
+    ).toContainElement(
+      screen.getByTestId('master-operasional-crud-modal-table-panel')
+    );
+    expect(screen.getByTestId('master-operasional-crud-modal-form')).toHaveClass(
+      'flex-col'
+    );
+    expect(
+      screen.getByTestId('master-operasional-crud-modal-company_id-input-field')
+    ).toHaveClass('sm:grid-cols-[140px_minmax(0,1fr)]');
 
     // 2 primary tabs: Kategori, Tipe (Item tab removed)
     const tabKategori = screen.getByTestId('master-operasional-tab-kategori');
@@ -947,10 +1003,19 @@ describe('App ERP Main Menu integration', () => {
     );
     const itemModal = await screen.findByTestId('expense-item-crud-modal');
     expect(itemModal).toBeInTheDocument();
-    expect(itemModal).toHaveClass('max-w-5xl');
+    expect(itemModal).toHaveClass('max-w-[95vw]', 'h-[92vh]', 'max-h-[92vh]');
     expect(
-      screen.getByTestId('expense-item-crud-modal-form')
-    ).toHaveClass('grid', 'items-start', 'md:grid-cols-4');
+      screen.getByTestId('expense-item-crud-modal-split-layout')
+    ).toContainElement(screen.getByTestId('expense-item-crud-modal-form-panel'));
+    expect(
+      screen.getByTestId('expense-item-crud-modal-split-layout')
+    ).toContainElement(screen.getByTestId('expense-item-crud-modal-table-panel'));
+    expect(screen.getByTestId('expense-item-crud-modal-form')).toHaveClass(
+      'flex-col'
+    );
+    expect(
+      screen.getByTestId('expense-item-crud-modal-company_id-input-field')
+    ).toHaveClass('sm:grid-cols-[140px_minmax(0,1fr)]');
     expect(
       screen.queryByRole('columnheader', { name: 'Pilih Perusahaan' })
     ).not.toBeInTheDocument();
@@ -1237,6 +1302,10 @@ describe('App ERP Main Menu integration', () => {
       'view-operasional-detail-modal'
     );
     expect(detailModal).toBeInTheDocument();
+    expect(detailModal).toHaveClass('max-w-[95vw]', 'h-[92vh]', 'max-h-[92vh]');
+    expect(
+      screen.getByTestId('view-operasional-detail-modal-table-panel')
+    ).toBeInTheDocument();
     expect(screen.getByText('Susu Segar')).toBeInTheDocument();
     expect(screen.getByText('Mentega')).toBeInTheDocument();
     expect(screen.getByText('Botol Kaca')).toBeInTheDocument();

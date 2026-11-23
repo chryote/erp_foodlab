@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\PayrollGroup;
+use App\Enums\PayrollItemStatus;
 use App\Models\Company;
 use App\Models\Employee;
 use App\Models\PayrollItem;
@@ -28,6 +29,7 @@ class PayrollItemFactory extends Factory
             ])->id,
             'employee_position_id' => null,
             'payroll_group' => PayrollGroup::OFFICE,
+            'attendance_days' => 25,
             'bank_account_number' => null,
             'base_salary' => 5000000.00,
             'bpjs_kesehatan' => 50000.00,
@@ -49,7 +51,10 @@ class PayrollItemFactory extends Factory
 
                 return round($earnings - $deductions, 2);
             },
+            'status' => PayrollItemStatus::DRAFT,
             'notes' => null,
+            'finalized_by' => null,
+            'finalized_at' => null,
         ];
     }
 }

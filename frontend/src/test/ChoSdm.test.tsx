@@ -76,27 +76,22 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
     let positionsStore: apiClient.EmployeePosition[] = [
       {
         id: 10,
-        company_id: 1,
         code: 'POS-LAB-01',
         name: 'Analis Kimia',
         description: 'Uji kimia',
-        company: companiesStore[0],
       },
     ];
     let statusesStore: apiClient.EmploymentStatus[] = [
       {
         id: 20,
-        company_id: 1,
         code: 'PKWTT',
         name: 'Karyawan Tetap',
         description: 'Tetap',
-        company: companiesStore[0],
       },
     ];
     let gradesStore: apiClient.PayrollGrade[] = [
       {
         id: 30,
-        company_id: 1,
         grade: 1,
         sub_grade: 'A',
         level_label: 'Staff',
@@ -109,17 +104,14 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
         bpjs_ketenagakerjaan_employee: 110000,
         net_employee_received: 5335000,
         total_company_cost: 5936700,
-        company: companiesStore[0],
       },
     ];
     let taxStatusesStore: apiClient.TaxStatus[] = [
       {
         id: 40,
-        company_id: 1,
         code: 'TK/0',
         name: 'Tidak Kawin 0',
         description: 'PTKP TK/0',
-        company: companiesStore[0],
       },
     ];
 
@@ -173,7 +165,6 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
       const created: apiClient.EmployeePosition = {
         id: 10 + positionsStore.length,
         ...payload,
-        company: companiesStore.find((c) => c.id === payload.company_id) ?? null,
       };
       positionsStore = [created, ...positionsStore];
       return { data: created };
@@ -182,7 +173,6 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
       const updated: apiClient.EmployeePosition = {
         id,
         ...payload,
-        company: companiesStore.find((c) => c.id === payload.company_id) ?? null,
       };
       positionsStore = positionsStore.map((p) => (p.id === id ? updated : p));
       return { data: updated };
@@ -200,7 +190,6 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
       const created: apiClient.EmploymentStatus = {
         id: 21,
         ...payload,
-        company: companiesStore.find((c) => c.id === payload.company_id) ?? null,
       };
       statusesStore = [created, ...statusesStore];
       return { data: created };
@@ -214,7 +203,6 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
       const gross = payload.base_salary + (payload.position_allowance ?? 0);
       const created: apiClient.PayrollGrade = {
         id: 31,
-        company_id: payload.company_id,
         grade: payload.grade,
         sub_grade: payload.sub_grade,
         level_label: payload.level_label,
@@ -227,7 +215,6 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
         bpjs_ketenagakerjaan_employee: Math.round(gross * 0.02),
         net_employee_received: gross - Math.round(gross * 0.01) - Math.round(gross * 0.02),
         total_company_cost: gross + Math.round(gross * 0.04) + Math.round(gross * 0.0394),
-        company: companiesStore.find((c) => c.id === payload.company_id) ?? null,
       };
       gradesStore = [created, ...gradesStore];
       return { data: created };
@@ -241,7 +228,6 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
       const created: apiClient.TaxStatus = {
         id: 41,
         ...payload,
-        company: companiesStore.find((c) => c.id === payload.company_id) ?? null,
       };
       taxStatusesStore = [created, ...taxStatusesStore];
       return { data: created };
@@ -360,7 +346,7 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
     expect(masterModal).toBeInTheDocument();
     expect(masterModal).toHaveClass('max-w-[95vw]', 'h-[92vh]', 'max-h-[92vh]');
 
-    const assertVerticalSplitLayout = () => {
+    const assertVerticalSplitLayout = (firstFieldTestId: string) => {
       const splitLayout = screen.getByTestId(
         'master-karyawan-crud-modal-split-layout'
       );
@@ -376,20 +362,28 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
       expect(formPanel).toContainElement(formEl);
       expect(formEl).toHaveClass('flex-col');
       expect(
-        screen.getByTestId('master-karyawan-crud-modal-company_id-input-field')
+        screen.getByTestId(firstFieldTestId)
       ).toHaveClass('sm:grid-cols-[140px_minmax(0,1fr)]');
+      expect(
+        within(masterModal).queryByLabelText('Pilih Perusahaan')
+      ).not.toBeInTheDocument();
+      expect(
+        within(masterModal).queryByRole('columnheader', {
+          name: 'Pilih Perusahaan',
+        })
+      ).not.toBeInTheDocument();
       expect(tablePanel).toContainElement(
         screen.getByTestId('master-karyawan-crud-modal-pagination')
       );
     };
 
-    assertVerticalSplitLayout();
+    assertVerticalSplitLayout('master-karyawan-crud-modal-name-input-field');
 
     expect(
       await within(masterModal).findByText('Analis Kimia')
     ).toBeInTheDocument();
 
-    // Jabatan tab only renders Pilih Perusahaan & Nama Jabatan (no Kode Jabatan or Deskripsi)
+    // Jabatan tab only renders Nama Jabatan (no Pilih Perusahaan, Kode Jabatan, or Deskripsi)
     expect(within(masterModal).queryByLabelText('Kode Jabatan')).not.toBeInTheDocument();
     expect(within(masterModal).queryByLabelText('Deskripsi')).not.toBeInTheDocument();
     expect(
@@ -399,7 +393,7 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
       within(masterModal).queryByRole('columnheader', { name: 'Deskripsi' })
     ).not.toBeInTheDocument();
 
-    // Create Position with only Pilih Perusahaan & Nama Jabatan
+    // Create Position with only Nama Jabatan
     fireEvent.change(within(masterModal).getByLabelText('Nama Jabatan'), {
       target: { value: 'Supervisor QA' },
     });
@@ -408,7 +402,6 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
 
     await waitFor(() => {
       expect(apiClient.createEmployeePosition).toHaveBeenCalledWith({
-        company_id: 1,
         name: 'Supervisor QA',
       });
       expect(within(masterModal).getByText('Supervisor QA')).toBeInTheDocument();
@@ -416,12 +409,12 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
 
     // Switch to Status Karyawan tab & create
     fireEvent.click(screen.getByTestId('master-karyawan-tab-status'));
-    assertVerticalSplitLayout();
+    assertVerticalSplitLayout('master-karyawan-crud-modal-name-input-field');
     expect(
       await within(masterModal).findByText('Karyawan Tetap')
     ).toBeInTheDocument();
 
-    // Status Karyawan tab only renders Pilih Perusahaan & Nama Status (no Kode Status or Deskripsi)
+    // Status Karyawan tab only renders Nama Status (no Pilih Perusahaan, Kode Status, or Deskripsi)
     expect(within(masterModal).queryByLabelText('Kode Status')).not.toBeInTheDocument();
     expect(within(masterModal).queryByLabelText('Deskripsi')).not.toBeInTheDocument();
     expect(
@@ -438,14 +431,13 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
     fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
     await waitFor(() => {
       expect(apiClient.createEmploymentStatus).toHaveBeenCalledWith({
-        company_id: 1,
         name: 'Karyawan Kontrak',
       });
     });
 
     // Switch to Payroll Grade tab & create
     fireEvent.click(screen.getByTestId('master-karyawan-tab-grade'));
-    assertVerticalSplitLayout();
+    assertVerticalSplitLayout('master-karyawan-crud-modal-grade-input-field');
     expect(await within(masterModal).findByText('Staff')).toBeInTheDocument();
     fireEvent.change(within(masterModal).getByLabelText('Grade'), {
       target: { value: '2' },
@@ -463,7 +455,6 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
     fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
     await waitFor(() => {
       expect(apiClient.createPayrollGrade).toHaveBeenCalledWith({
-        company_id: 1,
         grade: 2,
         sub_grade: 'B',
         level_label: 'Supervisor',
@@ -474,12 +465,12 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
 
     // Switch to Status Pajak tab & create
     fireEvent.click(screen.getByTestId('master-karyawan-tab-pajak'));
-    assertVerticalSplitLayout();
+    assertVerticalSplitLayout('master-karyawan-crud-modal-name-input-field');
     expect(
       await within(masterModal).findByText('Tidak Kawin 0')
     ).toBeInTheDocument();
 
-    // Status Pajak tab only renders Pilih Perusahaan & Nama Status Pajak (no Kode Pajak or Deskripsi)
+    // Status Pajak tab only renders Nama Status Pajak (no Pilih Perusahaan, Kode Pajak, or Deskripsi)
     expect(within(masterModal).queryByLabelText('Kode Pajak')).not.toBeInTheDocument();
     expect(within(masterModal).queryByLabelText('Deskripsi')).not.toBeInTheDocument();
     expect(
@@ -496,7 +487,6 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
     fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
     await waitFor(() => {
       expect(apiClient.createTaxStatus).toHaveBeenCalledWith({
-        company_id: 1,
         name: 'Kawin 1',
       });
       expect(within(masterModal).getByText('Kawin 1')).toBeInTheDocument();
@@ -807,18 +797,17 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
       data: DEFAULT_CHO_ENUMS,
     });
     vi.mocked(apiClient.fetchEmployeePositions).mockResolvedValue({
-      data: [{ id: 10, company_id: 1, code: 'POS-01', name: 'Analis' }],
+      data: [{ id: 10, code: 'POS-01', name: 'Analis' }],
       meta: { count: 1 },
     });
     vi.mocked(apiClient.fetchEmploymentStatuses).mockResolvedValue({
-      data: [{ id: 20, company_id: 1, code: 'PKWTT', name: 'Tetap' }],
+      data: [{ id: 20, code: 'PKWTT', name: 'Tetap' }],
       meta: { count: 1 },
     });
     vi.mocked(apiClient.fetchPayrollGrades).mockResolvedValue({
       data: [
         {
           id: 30,
-          company_id: 1,
           grade: 1,
           sub_grade: 'A',
           level_label: 'Staff',
@@ -836,7 +825,7 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
       meta: { count: 1 },
     });
     vi.mocked(apiClient.fetchTaxStatuses).mockResolvedValue({
-      data: [{ id: 40, company_id: 1, code: 'TK/0', name: 'TK/0' }],
+      data: [{ id: 40, code: 'TK/0', name: 'TK/0' }],
       meta: { count: 1 },
     });
     vi.mocked(apiClient.fetchEmployees).mockResolvedValue({

@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -15,7 +14,6 @@ class EmploymentStatus extends Model
     protected $table = 'employment_statuses';
 
     protected $fillable = [
-        'company_id',
         'code',
         'name',
         'description',
@@ -24,15 +22,6 @@ class EmploymentStatus extends Model
     protected $hidden = [
         'active_flag',
     ];
-
-    protected $casts = [
-        'company_id' => 'integer',
-    ];
-
-    public function company(): BelongsTo
-    {
-        return $this->belongsTo(Company::class);
-    }
 
     public function employees(): HasMany
     {

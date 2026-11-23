@@ -442,8 +442,6 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [errorInfo, isOpen]);
 
-  const selectedCompanyId = parseInt(form.company_id, 10);
-
   const companyOptions = useMemo(
     () =>
       availableCompanies.map((c) => ({
@@ -455,62 +453,38 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
 
   const positionOptions = useMemo(
     () =>
-      allPositions
-        .filter(
-          (p) =>
-            !Number.isFinite(selectedCompanyId) ||
-            Number(p.company_id) === selectedCompanyId
-        )
-        .map((p) => ({
-          value: String(p.id),
-          label: p.code ? `${p.code} - ${p.name}` : p.name,
-        })),
-    [allPositions, selectedCompanyId]
+      allPositions.map((p) => ({
+        value: String(p.id),
+        label: p.code ? `${p.code} - ${p.name}` : p.name,
+      })),
+    [allPositions]
   );
 
   const statusOptions = useMemo(
     () =>
-      allStatuses
-        .filter(
-          (s) =>
-            !Number.isFinite(selectedCompanyId) ||
-            Number(s.company_id) === selectedCompanyId
-        )
-        .map((s) => ({
-          value: String(s.id),
-          label: s.code ? `${s.code} - ${s.name}` : s.name,
-        })),
-    [allStatuses, selectedCompanyId]
+      allStatuses.map((s) => ({
+        value: String(s.id),
+        label: s.code ? `${s.code} - ${s.name}` : s.name,
+      })),
+    [allStatuses]
   );
 
   const gradeOptions = useMemo(
     () =>
-      allGrades
-        .filter(
-          (g) =>
-            !Number.isFinite(selectedCompanyId) ||
-            Number(g.company_id) === selectedCompanyId
-        )
-        .map((g) => ({
-          value: String(g.id),
-          label: `Grade ${g.grade}${g.sub_grade}${g.level_label ? ` (${g.level_label})` : ''}`,
-        })),
-    [allGrades, selectedCompanyId]
+      allGrades.map((g) => ({
+        value: String(g.id),
+        label: `Grade ${g.grade}${g.sub_grade}${g.level_label ? ` (${g.level_label})` : ''}`,
+      })),
+    [allGrades]
   );
 
   const taxStatusOptions = useMemo(
     () =>
-      allTaxStatuses
-        .filter(
-          (t) =>
-            !Number.isFinite(selectedCompanyId) ||
-            Number(t.company_id) === selectedCompanyId
-        )
-        .map((t) => ({
-          value: String(t.id),
-          label: t.code ? `${t.code} - ${t.name}` : t.name,
-        })),
-    [allTaxStatuses, selectedCompanyId]
+      allTaxStatuses.map((t) => ({
+        value: String(t.id),
+        label: t.code ? `${t.code} - ${t.name}` : t.name,
+      })),
+    [allTaxStatuses]
   );
 
   const religionLabelByValue = useMemo(
@@ -560,19 +534,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
 
   const handleFieldChange = (key: keyof EmployeeFormState, value: string) => {
     clearFieldError([key]);
-    setForm((prev) => {
-      if (key === 'company_id' && prev.company_id !== value) {
-        return {
-          ...prev,
-          company_id: value,
-          employee_position_id: '',
-          employment_status_id: '',
-          payroll_grade_id: '',
-          tax_status_id: '',
-        };
-      }
-      return { ...prev, [key]: value };
-    });
+    setForm((prev) => ({ ...prev, [key]: value }));
   };
 
   const handlePhotoFileChange = async (
@@ -1011,7 +973,6 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   labelPlacement="left"
                   placeholder="Pilih jabatan..."
                   options={positionOptions}
-                  disabled={!form.company_id}
                   value={form.employee_position_id}
                   error={fieldErrors.employee_position_id}
                   onChange={(e) =>
@@ -1024,7 +985,6 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   labelPlacement="left"
                   placeholder="Pilih status..."
                   options={statusOptions}
-                  disabled={!form.company_id}
                   value={form.employment_status_id}
                   error={fieldErrors.employment_status_id}
                   onChange={(e) =>
@@ -1037,7 +997,6 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   labelPlacement="left"
                   placeholder="Pilih payroll grade..."
                   options={gradeOptions}
-                  disabled={!form.company_id}
                   value={form.payroll_grade_id}
                   error={fieldErrors.payroll_grade_id}
                   onChange={(e) =>
@@ -1050,7 +1009,6 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
                   labelPlacement="left"
                   placeholder="Pilih status pajak..."
                   options={taxStatusOptions}
-                  disabled={!form.company_id}
                   value={form.tax_status_id}
                   error={fieldErrors.tax_status_id}
                   onChange={(e) =>

@@ -24,10 +24,10 @@ describe('Employee CHO module', function () {
         $company = Company::factory()->create(['name' => 'PT. Foodlab Nusantara']);
         $otherCompany = Company::factory()->create(['name' => 'PT. Foodlab Cabang']);
 
-        $position = EmployeePosition::factory()->create(['company_id' => $company->id, 'name' => 'Analis Kimia']);
-        $status = EmploymentStatus::factory()->create(['company_id' => $company->id, 'name' => 'Karyawan Tetap']);
-        $grade = PayrollGrade::factory()->create(['company_id' => $company->id, 'grade' => 3, 'sub_grade' => 'A']);
-        $taxStatus = TaxStatus::factory()->create(['company_id' => $company->id, 'code' => 'TK/0', 'name' => 'Tidak Kawin 0']);
+        $position = EmployeePosition::factory()->create(['name' => 'Analis Kimia']);
+        $status = EmploymentStatus::factory()->create(['name' => 'Karyawan Tetap']);
+        $grade = PayrollGrade::factory()->create(['grade' => 3, 'sub_grade' => 'A']);
+        $taxStatus = TaxStatus::factory()->create(['code' => 'TK/0', 'name' => 'Tidak Kawin 0']);
 
         // Create via FormRequest + CreateEmployeeAction + DB::transaction
         $createRes = $this->postJson('/api/v1/modules/cho/employees', [
@@ -317,16 +317,16 @@ describe('Employee CHO module', function () {
         $deletedCompany = Company::factory()->create();
         $deletedCompany->delete();
 
-        $deletedPosition = EmployeePosition::factory()->create(['company_id' => $company->id]);
+        $deletedPosition = EmployeePosition::factory()->create();
         $deletedPosition->delete();
 
-        $deletedStatus = EmploymentStatus::factory()->create(['company_id' => $company->id]);
+        $deletedStatus = EmploymentStatus::factory()->create();
         $deletedStatus->delete();
 
-        $deletedGrade = PayrollGrade::factory()->create(['company_id' => $company->id]);
+        $deletedGrade = PayrollGrade::factory()->create();
         $deletedGrade->delete();
 
-        $deletedTaxStatus = TaxStatus::factory()->create(['company_id' => $company->id]);
+        $deletedTaxStatus = TaxStatus::factory()->create();
         $deletedTaxStatus->delete();
 
         $existing = Employee::factory()->create([
@@ -418,12 +418,13 @@ describe('Employee CHO module', function () {
         $company = Company::factory()->create();
         $otherCompany = Company::factory()->create();
 
-        $position = EmployeePosition::factory()->create(['company_id' => $company->id]);
-        $status = EmploymentStatus::factory()->create(['company_id' => $company->id]);
-        $grade = PayrollGrade::factory()->create(['company_id' => $company->id]);
-        $taxStatus = TaxStatus::factory()->create(['company_id' => $company->id]);
+        $position = EmployeePosition::factory()->create();
+        $status = EmploymentStatus::factory()->create();
+        $grade = PayrollGrade::factory()->create();
+        $taxStatus = TaxStatus::factory()->create();
 
-        $otherPosition = EmployeePosition::factory()->create(['company_id' => $otherCompany->id]);
+        $deletedPosition = EmployeePosition::factory()->create();
+        $deletedPosition->delete();
 
         $allRequiredFields = [
             'company_id',
@@ -509,10 +510,10 @@ describe('Employee CHO module', function () {
                 'documents',
             ]);
 
-        // Document entry with whitespace-only file_url and cross-company position return 422
+        // Document entry with whitespace-only file_url and soft-deleted position return 422
         $this->postJson('/api/v1/modules/cho/employees', [
             'company_id' => $company->id,
-            'employee_position_id' => $otherPosition->id,
+            'employee_position_id' => $deletedPosition->id,
             'employment_status_id' => $status->id,
             'payroll_grade_id' => $grade->id,
             'tax_status_id' => $taxStatus->id,
@@ -603,15 +604,15 @@ describe('Employee CHO module', function () {
         $companyA = Company::factory()->create();
         $companyB = Company::factory()->create();
 
-        $posA = EmployeePosition::factory()->create(['company_id' => $companyA->id]);
-        $statusA = EmploymentStatus::factory()->create(['company_id' => $companyA->id]);
-        $gradeA = PayrollGrade::factory()->create(['company_id' => $companyA->id]);
-        $taxA = TaxStatus::factory()->create(['company_id' => $companyA->id]);
+        $posA = EmployeePosition::factory()->create();
+        $statusA = EmploymentStatus::factory()->create();
+        $gradeA = PayrollGrade::factory()->create();
+        $taxA = TaxStatus::factory()->create();
 
-        $posB = EmployeePosition::factory()->create(['company_id' => $companyB->id]);
-        $statusB = EmploymentStatus::factory()->create(['company_id' => $companyB->id]);
-        $gradeB = PayrollGrade::factory()->create(['company_id' => $companyB->id]);
-        $taxB = TaxStatus::factory()->create(['company_id' => $companyB->id]);
+        $posB = EmployeePosition::factory()->create();
+        $statusB = EmploymentStatus::factory()->create();
+        $gradeB = PayrollGrade::factory()->create();
+        $taxB = TaxStatus::factory()->create();
 
         $nik = '3201010101907777';
 
@@ -697,16 +698,14 @@ describe('Employee CHO module', function () {
     it('auto-generates and updates employee_attendance_code barcode payload across create, update, and position rename', function () {
         $company = Company::factory()->create();
         $positionA = EmployeePosition::factory()->create([
-            'company_id' => $company->id,
             'name' => 'QA / QC - Lab #1',
         ]);
         $positionB = EmployeePosition::factory()->create([
-            'company_id' => $company->id,
             'name' => 'R&D (Senior)',
         ]);
-        $status = EmploymentStatus::factory()->create(['company_id' => $company->id]);
-        $grade = PayrollGrade::factory()->create(['company_id' => $company->id]);
-        $taxStatus = TaxStatus::factory()->create(['company_id' => $company->id]);
+        $status = EmploymentStatus::factory()->create();
+        $grade = PayrollGrade::factory()->create();
+        $taxStatus = TaxStatus::factory()->create();
 
         // Create via API with hyphenated/symbol first token and symbol-heavy position name
         $createRes = $this->postJson('/api/v1/modules/cho/employees', [
@@ -762,7 +761,6 @@ describe('Employee CHO module', function () {
 
         // Renaming EmployeePosition updates linked employees' employee_attendance_code
         $this->putJson("/api/v1/modules/cho/employee-positions/{$positionB->id}", [
-            'company_id' => $company->id,
             'name' => 'Lead Chem!',
         ])->assertOk();
 
