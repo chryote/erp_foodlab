@@ -7,6 +7,8 @@ use App\Enums\AttendanceStatusEnum;
 use App\Enums\GolonganDarah;
 use App\Enums\JenisDokumen;
 use App\Enums\JenisKelamin;
+use App\Enums\PayrollGroup;
+use App\Enums\PayrollRunStatus;
 use App\Enums\ShiftStatusEnum;
 use App\Models\CapitalCompany;
 use App\Models\Company;
@@ -23,8 +25,11 @@ use App\Models\ExpenseItem;
 use App\Models\ExpenseType;
 use App\Models\LabSample;
 use App\Models\PayrollGrade;
+use App\Models\PayrollItem;
+use App\Models\PayrollRun;
 use App\Models\TaxStatus;
 use App\Models\User;
+use App\Modules\CHO\Services\PayrollItemService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -43,6 +48,8 @@ class DatabaseSeeder extends Seeder
             $this->seedCfoOperations($company);
             $this->seedCfoAssets($company);
             $this->seedChoModule($company);
+            $this->seedPayrollRuns($company);
+            $this->seedPayrollItems($company);
             $this->seedEmployeeShifts();
             $this->seedEmployeeShiftAssignments();
             $this->seedEmployeeAttendances();
@@ -560,5 +567,194 @@ class DatabaseSeeder extends Seeder
                 $attendance->save();
             }
         }
+    }
+
+    private function seedPayrollRuns(Company $company): void
+    {
+        $adminId = User::query()->where('email', 'admin@foodlab.test')->value('id');
+        $periodDate = '2025-12-01';
+
+        $payrollRun = PayrollRun::query()
+            ->withTrashed()
+            ->where('company_id', $company->id)
+            ->whereDate('period_date', $periodDate)
+            ->orderByRaw('deleted_at IS NOT NULL')
+            ->first() ?? new PayrollRun();
+
+        $payrollRun->company_id = $company->id;
+        $payrollRun->code = 'PR-2025-12';
+        $payrollRun->name = 'Payroll Desember 2025';
+        $payrollRun->period_date = $periodDate;
+        $payrollRun->status = PayrollRunStatus::APPROVED;
+        $payrollRun->notes = 'Payroll periode Desember 2025';
+        $payrollRun->approved_by ??= $adminId;
+        $payrollRun->approved_at ??= now();
+        $payrollRun->deleted_at = null;
+        $payrollRun->save();
+    }
+
+    private function seedPayrollItems(Company $company): void
+    {
+        $positions = [];
+        foreach ([
+            ['code' => 'KPA', 'name' => 'Kepala Area', 'description' => 'Kepala Area Operasional'],
+            ['code' => 'SPV', 'name' => 'SPV', 'description' => 'Supervisor Operasional'],
+            ['code' => 'LKS', 'name' => 'Lokasi', 'description' => 'Koordinator Lokasi'],
+            ['code' => 'OTL', 'name' => 'Outlet', 'description' => 'Staf Outlet'],
+        ] as $posData) {
+            $position = EmployeePosition::query()
+                ->withTrashed()
+                ->where('company_id', $company->id)
+                ->where('name', $posData['name'])
+                ->orderByRaw('deleted_at IS NOT NULL')
+                ->first() ?? new EmployeePosition();
+            $position->fill($posData);
+            $position->company_id = $company->id;
+            $position->deleted_at = null;
+            $position->save();
+
+            $positions[$posData['name']] = $position;
+        }
+
+        $payrollRun = PayrollRun::query()
+            ->where('company_id', $company->id)
+            ->whereDate('period_date', '2025-12-01')
+            ->firstOrFail();
+
+        $sampleRows = [
+            [
+                'nik_ktp' => '3273021001900001',
+                'name' => 'Raka Pratama',
+                'position' => 'Kepala Area',
+                'payroll_group' => PayrollGroup::OFFICE,
+                'bank_account_number' => '1310004500112',
+                'base_salary' => 7500000.00,
+                'bpjs_kesehatan' => 75000.00,
+                'bpjs_ketenagakerjaan' => 150000.00,
+                'bonus' => 1000000.00,
+                'overtime' => 0.00,
+                'deduction' => 200000.00,
+                'thr' => 0.00,
+                'pph21' => 325000.00,
+                'notes' => 'Office Kepala Area (KS, KT, Bonus, Potongan, PPH 21)',
+            ],
+            [
+                'nik_ktp' => '3273021001900002',
+                'name' => 'Sinta Dewi',
+                'position' => 'SPV',
+                'payroll_group' => PayrollGroup::OFFICE,
+                'bank_account_number' => '1310004500223',
+                'base_salary' => 5500000.00,
+                'bpjs_kesehatan' => 55000.00,
+                'bpjs_ketenagakerjaan' => 110000.00,
+                'bonus' => 500000.00,
+                'overtime' => 0.00,
+                'deduction' => 100000.00,
+                'thr' => 0.00,
+                'pph21' => 150000.00,
+                'notes' => 'Office SPV (KS, KT, Bonus, Potongan, PPH 21)',
+            ],
+            [
+                'nik_ktp' => '3273021001900003',
+                'name' => 'Dimas Nugroho',
+                'position' => 'Lokasi',
+                'payroll_group' => PayrollGroup::OFFICE,
+                'bank_account_number' => '1310004500334',
+                'base_salary' => 4500000.00,
+                'bpjs_kesehatan' => 45000.00,
+                'bpjs_ketenagakerjaan' => 90000.00,
+                'bonus' => 250000.00,
+                'overtime' => 0.00,
+                'deduction' => 50000.00,
+                'thr' => 0.00,
+                'pph21' => 75000.00,
+                'notes' => 'Office Lokasi (KS, KT, Bonus, Potongan, PPH 21)',
+            ],
+            [
+                'nik_ktp' => '3273021001900004',
+                'name' => 'Larasati Wulandari',
+                'position' => 'Outlet',
+                'payroll_group' => PayrollGroup::OUTLET,
+                'bank_account_number' => '1310004500445',
+                'base_salary' => 3200000.00,
+                'bpjs_kesehatan' => 0.00,
+                'bpjs_ketenagakerjaan' => 0.00,
+                'bonus' => 0.00,
+                'overtime' => 0.00,
+                'deduction' => 0.00,
+                'thr' => 0.00,
+                'pph21' => 0.00,
+                'notes' => 'Outlet gaji pokok saja',
+            ],
+            [
+                'nik_ktp' => '3273021001900005',
+                'name' => 'Bagus Setiawan',
+                'position' => 'Outlet',
+                'payroll_group' => PayrollGroup::OUTLET,
+                'bank_account_number' => null,
+                'base_salary' => 3000000.00,
+                'bpjs_kesehatan' => 0.00,
+                'bpjs_ketenagakerjaan' => 0.00,
+                'bonus' => 0.00,
+                'overtime' => 0.00,
+                'deduction' => 0.00,
+                'thr' => 0.00,
+                'pph21' => 0.00,
+                'notes' => 'Outlet gaji pokok saja (rekening ???)',
+            ],
+        ];
+
+        foreach ($sampleRows as $row) {
+            $position = $positions[$row['position']];
+
+            $employee = Employee::query()
+                ->withTrashed()
+                ->where('company_id', $company->id)
+                ->where('nik_ktp', $row['nik_ktp'])
+                ->orderByRaw('deleted_at IS NOT NULL')
+                ->first() ?? new Employee();
+            $employee->company_id = $company->id;
+            $employee->employee_position_id = $position->id;
+            $employee->name = $row['name'];
+            $employee->nik_ktp = $row['nik_ktp'];
+            $employee->deleted_at = null;
+            $employee->save();
+            $employee->syncAttendanceCode();
+
+            $totalNet = round(
+                ($row['base_salary'] + $row['bonus'] + $row['overtime'] + $row['thr'])
+                - ($row['bpjs_kesehatan'] + $row['bpjs_ketenagakerjaan'] + $row['deduction'] + $row['pph21']),
+                2
+            );
+
+            $item = PayrollItem::query()
+                ->withTrashed()
+                ->where('company_id', $company->id)
+                ->where('payroll_run_id', $payrollRun->id)
+                ->where('employee_id', $employee->id)
+                ->orderByRaw('deleted_at IS NOT NULL')
+                ->first() ?? new PayrollItem();
+
+            $item->company_id = $company->id;
+            $item->payroll_run_id = $payrollRun->id;
+            $item->employee_id = $employee->id;
+            $item->employee_position_id = $position->id;
+            $item->payroll_group = $row['payroll_group'];
+            $item->bank_account_number = $row['bank_account_number'];
+            $item->base_salary = $row['base_salary'];
+            $item->bpjs_kesehatan = $row['bpjs_kesehatan'];
+            $item->bpjs_ketenagakerjaan = $row['bpjs_ketenagakerjaan'];
+            $item->bonus = $row['bonus'];
+            $item->overtime = $row['overtime'];
+            $item->deduction = $row['deduction'];
+            $item->thr = $row['thr'];
+            $item->pph21 = $row['pph21'];
+            $item->total_net = $totalNet;
+            $item->notes = $row['notes'];
+            $item->deleted_at = null;
+            $item->save();
+        }
+
+        PayrollItemService::syncPayrollRunTotals($payrollRun);
     }
 }

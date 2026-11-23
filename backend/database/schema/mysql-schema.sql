@@ -418,6 +418,83 @@ CREATE TABLE `payroll_grades` (
   CONSTRAINT `payroll_grades_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `payroll_items`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `payroll_items` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `company_id` bigint unsigned NOT NULL,
+  `payroll_run_id` bigint unsigned NOT NULL,
+  `employee_id` bigint unsigned NOT NULL,
+  `employee_position_id` bigint unsigned DEFAULT NULL,
+  `payroll_group` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'office',
+  `bank_account_number` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `base_salary` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `bpjs_kesehatan` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `bpjs_ketenagakerjaan` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `bonus` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `overtime` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `deduction` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `thr` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `pph21` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `total_net` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `notes` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `payroll_items_comp_run_emp_active_unique` (`company_id`,`payroll_run_id`,`employee_id`,`active_flag`),
+  KEY `payroll_items_employee_id_foreign` (`employee_id`),
+  KEY `payroll_items_comp_del_run_id_idx` (`company_id`,`deleted_at`,`payroll_run_id`,`id`),
+  KEY `payroll_items_employee_position_id_foreign` (`employee_position_id`),
+  KEY `payroll_items_run_del_group_id_idx` (`payroll_run_id`,`deleted_at`,`payroll_group`,`id`),
+  KEY `payroll_items_comp_del_emp_idx` (`company_id`,`deleted_at`,`employee_id`),
+  KEY `payroll_items_deleted_id_idx` (`deleted_at`,`id`),
+  CONSTRAINT `payroll_items_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `payroll_items_employee_id_foreign` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `payroll_items_employee_position_id_foreign` FOREIGN KEY (`employee_position_id`) REFERENCES `employee_positions` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `payroll_items_payroll_run_id_foreign` FOREIGN KEY (`payroll_run_id`) REFERENCES `payroll_runs` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `payroll_runs`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `payroll_runs` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `company_id` bigint unsigned NOT NULL,
+  `code` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `period_date` date NOT NULL,
+  `status` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+  `total_base_salary` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `total_bpjs_kesehatan` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `total_bpjs_ketenagakerjaan` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `total_bonus` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `total_overtime` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `total_deduction` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `total_thr` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `total_pph21` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `total_net` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `notes` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `approved_by` bigint unsigned DEFAULT NULL,
+  `approved_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `payroll_runs_company_period_active_unique` (`company_id`,`period_date`,`active_flag`),
+  UNIQUE KEY `payroll_runs_company_code_active_unique` (`company_id`,`code`,`active_flag`),
+  UNIQUE KEY `payroll_runs_company_name_active_unique` (`company_id`,`name`,`active_flag`),
+  KEY `payroll_runs_approved_by_foreign` (`approved_by`),
+  KEY `payroll_runs_comp_del_period_id_idx` (`company_id`,`deleted_at`,`period_date`,`id`),
+  KEY `payroll_runs_del_period_id_idx` (`deleted_at`,`period_date`,`id`),
+  KEY `payroll_runs_comp_del_status_idx` (`company_id`,`deleted_at`,`status`),
+  CONSTRAINT `payroll_runs_approved_by_foreign` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `payroll_runs_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `personal_access_tokens`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -522,5 +599,8 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (39,'2026_11_21_170
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (40,'2026_11_21_180000_cho_query_indexes',26);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (41,'2026_11_21_170000_enforce_cfo_and_lab_active_uniqueness',27);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (42,'2026_11_21_173000_enforce_cho_name_active_uniqueness',28);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (43,'2026_11_23_100000_create_payroll_runs_table',29);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (44,'2026_11_23_100100_create_payroll_items_table',29);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (45,'2026_11_23_110000_update_payroll_items_table_for_spec',30);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;

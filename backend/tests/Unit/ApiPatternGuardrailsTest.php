@@ -16,10 +16,14 @@ use App\Models\ExpenseItem;
 use App\Models\ExpenseType;
 use App\Models\LabSample;
 use App\Models\PayrollGrade;
+use App\Models\PayrollItem;
+use App\Models\PayrollRun;
 use App\Models\TaxStatus;
 use App\Modules\CFO\Services\CompanyAssetService;
 use App\Modules\CFO\Services\CompanyService;
 use App\Modules\CHO\Services\EmployeeService;
+use App\Modules\CHO\Services\PayrollItemService;
+use App\Modules\CHO\Services\PayrollRunService;
 use App\Modules\HR\Actions\RecordAttendanceAction;
 use App\Modules\HR\Services\EmployeeShiftService;
 use App\Support\ActiveCompany;
@@ -101,7 +105,7 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             expect($contents)
                 ->toContain('IndexQuery::applyActiveCompanyFilter(')
                 ->toContain('IndexQuery::escapeLike(')
-                ->not->toMatch('/->(?:or)?[wW]here\(\s*[\'"](?:capital|amount|price_per_unit|total_price|grade|base_salary|position_allowance|total_gross|total_company_cost|net_employee_received)[\'"]\s*,\s*[\'"]like[\'"]/');
+                ->not->toMatch('/->(?:or)?[wW]here\(\s*[\'"](?:capital|amount|price_per_unit|total_price|grade|base_salary|position_allowance|total_gross|total_company_cost|net_employee_received|bpjs_kesehatan|bpjs_ketenagakerjaan|bonus|overtime|deduction|thr|pph21|total_net)[\'"]\s*,\s*[\'"]like[\'"]/');
         }
 
         $companyService = File::get(app_path('Modules/CFO/Services/CompanyService.php'));
@@ -119,6 +123,7 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'Modules/CFO/Requests/SaveCompanyAssetRequest.php',
             'Modules/CFO/Requests/SaveExpenseItemRequest.php',
             'Modules/CHO/Requests/SavePayrollGradeRequest.php',
+            'Modules/CHO/Requests/SavePayrollItemRequest.php',
         ] as $requestPath) {
             $requestCode = File::get(app_path($requestPath));
             expect($requestCode)
@@ -139,6 +144,8 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'payroll_grades',
             'tax_statuses',
             'employees',
+            'payroll_runs',
+            'payroll_items',
         ] as $table) {
             preg_match("/CREATE TABLE `{$table}` \\((.*?)\\) ENGINE=/s", $schemaSql, $matches);
             expect($matches)->toHaveCount(2, "Table {$table} missing from mysql-schema.sql");
@@ -386,12 +393,14 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
         // Warm cache hits execute 0 SQL queries
         $this->getJson('/api/v1/modules/cho/payroll-grades')->assertOk();
         $this->getJson('/api/v1/modules/cho/employee-positions')->assertOk();
+        $this->getJson('/api/v1/modules/cho/payroll-runs')->assertOk();
 
         DB::flushQueryLog();
         DB::enableQueryLog();
         $this->getJson('/api/v1/modules/cho/employees')->assertOk();
         $this->getJson('/api/v1/modules/cho/payroll-grades')->assertOk();
         $this->getJson('/api/v1/modules/cho/employee-positions')->assertOk();
+        $this->getJson('/api/v1/modules/cho/payroll-runs')->assertOk();
         $warmQueries = DB::getQueryLog();
         DB::disableQueryLog();
 
@@ -478,6 +487,60 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
         $this->getJson('/api/v1/modules/cho/employee-positions?filter[search]=%20%20%20')
             ->assertOk()
             ->assertJsonCount(2, 'data');
+
+        // 9. PayrollRun pagination cap & zero-N+1 cold-cache query bound
+        PayrollRun::factory()->count(5)->create(['company_id' => $companyA->id]);
+        Cache::flush();
+
+        $this->getJson('/api/v1/modules/cho/payroll-runs?page=1&per_page=99999')
+            ->assertOk()
+            ->assertJsonPath('meta.per_page', IndexQuery::MAX_PER_PAGE);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->getJson('/api/v1/modules/cho/payroll-runs')->assertOk()->assertJsonCount(5, 'data');
+        $payrollRunColdQueries = collect(DB::getQueryLog())
+            ->reject(fn ($q) => str_contains($q['query'], 'personal_access_tokens'));
+        DB::disableQueryLog();
+
+        expect($payrollRunColdQueries->count())->toBeLessThanOrEqual(3);
+        expect($payrollRunColdQueries->contains(fn ($q) => str_contains(strtoupper($q['query']), 'SUM(')))->toBeFalse();
+
+        // 10. PayrollItem pagination cap, warm cache 0-query hit, and zero-N+1 cold-cache query bound
+        $runForItems = PayrollRun::query()->where('company_id', $companyA->id)->firstOrFail();
+        foreach ($employees as $emp) {
+            PayrollItem::factory()->create([
+                'company_id' => $companyA->id,
+                'payroll_run_id' => $runForItems->id,
+                'employee_id' => $emp->id,
+                'employee_position_id' => $positionA->id,
+            ]);
+        }
+
+        $this->getJson('/api/v1/modules/cho/payroll-items?page=1&per_page=99999')
+            ->assertOk()
+            ->assertJsonPath('meta.per_page', IndexQuery::MAX_PER_PAGE);
+
+        Cache::flush();
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->getJson('/api/v1/modules/cho/payroll-items')->assertOk()->assertJsonCount(5, 'data');
+        $payrollItemColdQueries = collect(DB::getQueryLog())
+            ->reject(fn ($q) => str_contains($q['query'], 'personal_access_tokens'));
+        DB::disableQueryLog();
+
+        // 1 payroll_items + 4 eager loads (company, payrollRun, employee, employeePosition) <= 6 queries, no SUM()
+        expect($payrollItemColdQueries->count())->toBeLessThanOrEqual(6);
+        expect($payrollItemColdQueries->contains(fn ($q) => str_contains(strtoupper($q['query']), 'SUM(')))->toBeFalse();
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->getJson('/api/v1/modules/cho/payroll-items')->assertOk()->assertJsonCount(5, 'data');
+        $payrollItemWarmQueries = DB::getQueryLog();
+        DB::disableQueryLog();
+
+        expect($payrollItemWarmQueries)->toHaveCount(0);
     });
 
     it('enforces system-wide anti-duplication guardrails across schema, models, requests, services, and idempotency middleware', function () {
@@ -518,6 +581,8 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'employee_shifts' => EmployeeShift::class,
             'employee_shift_assignments' => EmployeeShiftAssignment::class,
             'employee_attendances' => EmployeeAttendance::class,
+            'payroll_runs' => PayrollRun::class,
+            'payroll_items' => PayrollItem::class,
         ];
 
         foreach ($uniqueEntityMap as $table => $modelClass) {
@@ -546,6 +611,8 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'Modules/CHO/Requests/SavePayrollGradeRequest.php',
             'Modules/CHO/Requests/SaveTaxStatusRequest.php',
             'Modules/CHO/Requests/SaveEmployeeRequest.php',
+            'Modules/CHO/Requests/SavePayrollRunRequest.php',
+            'Modules/CHO/Requests/SavePayrollItemRequest.php',
             'Modules/HR/Requests/SaveEmployeeShiftRequest.php',
             'Modules/HR/Requests/SaveEmployeeAttendanceRequest.php',
         ];
@@ -571,6 +638,8 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'Modules/CHO/Services/EmploymentStatusService.php',
             'Modules/CHO/Services/PayrollGradeService.php',
             'Modules/CHO/Services/TaxStatusService.php',
+            'Modules/CHO/Services/PayrollRunService.php',
+            'Modules/CHO/Services/PayrollItemService.php',
             'Modules/CHO/Actions/AssertEmployeeContextAction.php',
             'Modules/HR/Services/EmployeeShiftService.php',
             'Modules/HR/Actions/RecordAttendanceAction.php',
@@ -739,6 +808,58 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'company_id' => $companyId,
             'code' => 'UNIQUE-CODE-X',
             'name' => 'Analis Kimia',
+        ]))->toThrow(QueryException::class);
+
+        // 8. PayrollRun Idempotency-Key & service-level sharedLock guard
+        $prHeaders = ['Idempotency-Key' => 'idem-payroll-run-001'];
+        $prPayload = [
+            'company_id' => $companyId,
+            'code' => 'PR-GUARD-01',
+            'name' => 'Payroll Guardrail 01',
+            'period_date' => '2026-08-01',
+        ];
+        $firstPr = $this->postJson('/api/v1/modules/cho/payroll-runs', $prPayload, $prHeaders)->assertCreated();
+        $replayPr = $this->postJson('/api/v1/modules/cho/payroll-runs', $prPayload, $prHeaders)->assertCreated();
+        expect($replayPr->headers->get('X-Idempotency-Replayed'))->toBe('true');
+        expect($replayPr->json('data.id'))->toBe($firstPr->json('data.id'));
+
+        expect(fn () => app(PayrollRunService::class)->createPayrollRun([
+            'company_id' => $companyId,
+            'code' => 'pr-guard-01',
+            'name' => 'Payroll Guardrail 02',
+            'period_date' => '2026-09-01',
+        ]))->toThrow(ValidationException::class);
+
+        // 9. PayrollItem Idempotency-Key, service-level sharedLock guard, and DB active_flag unique key
+        $draftRunId = $firstPr->json('data.id');
+        $piHeaders = ['Idempotency-Key' => 'idem-payroll-item-001'];
+        $piPayload = [
+            'company_id' => $companyId,
+            'payroll_run_id' => $draftRunId,
+            'employee_id' => $employee->id,
+            'base_salary' => 5000000,
+        ];
+        $firstPi = $this->postJson('/api/v1/modules/cho/payroll-items', $piPayload, $piHeaders)->assertCreated();
+        $replayPi = $this->postJson('/api/v1/modules/cho/payroll-items', $piPayload, $piHeaders)->assertCreated();
+        expect($replayPi->headers->get('X-Idempotency-Replayed'))->toBe('true');
+        expect($replayPi->json('data.id'))->toBe($firstPi->json('data.id'));
+
+        $this->postJson('/api/v1/modules/cho/payroll-items', [
+            ...$piPayload,
+            'base_salary' => 6000000,
+        ], $piHeaders)->assertUnprocessable()->assertJsonValidationErrors(['idempotency_key']);
+
+        expect(fn () => app(PayrollItemService::class)->createPayrollItem([
+            'company_id' => $companyId,
+            'payroll_run_id' => $draftRunId,
+            'employee_id' => $employee->id,
+            'base_salary' => 5000000,
+        ]))->toThrow(ValidationException::class);
+
+        expect(fn () => PayrollItem::factory()->create([
+            'company_id' => $companyId,
+            'payroll_run_id' => $draftRunId,
+            'employee_id' => $employee->id,
         ]))->toThrow(QueryException::class);
     });
 });

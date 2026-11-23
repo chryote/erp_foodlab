@@ -97,6 +97,8 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
             'employee_shifts' => \App\Models\EmployeeShift::query()->count(),
             'employee_shift_assignments' => \App\Models\EmployeeShiftAssignment::query()->count(),
             'employee_attendances' => \App\Models\EmployeeAttendance::query()->count(),
+            'payroll_runs' => \App\Models\PayrollRun::query()->count(),
+            'payroll_items' => \App\Models\PayrollItem::query()->count(),
             'lab_samples' => \App\Models\LabSample::query()->count(),
         ];
 
@@ -112,6 +114,8 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
         expect(\App\Models\EmployeeShift::query()->count())->toBe($firstCounts['employee_shifts']);
         expect(\App\Models\EmployeeShiftAssignment::query()->count())->toBe($firstCounts['employee_shift_assignments']);
         expect(\App\Models\EmployeeAttendance::query()->count())->toBe($firstCounts['employee_attendances']);
+        expect(\App\Models\PayrollRun::query()->count())->toBe($firstCounts['payroll_runs']);
+        expect(\App\Models\PayrollItem::query()->count())->toBe($firstCounts['payroll_items']);
         expect(\App\Models\LabSample::query()->count())->toBe($firstCounts['lab_samples']);
 
         $nadia = \App\Models\Employee::query()->with('employeePosition')->where('nik_ktp', '3273011504960001')->firstOrFail();

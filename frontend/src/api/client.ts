@@ -483,6 +483,131 @@ export interface UploadedDocumentResponse {
   url: string;
 }
 
+export interface EmployeeShift {
+  id: number;
+  company_id: number;
+  code?: string | null;
+  name: string;
+  start_time: string;
+  end_time: string;
+  break_minutes: number;
+  grace_period_minutes: number;
+  is_overnight: boolean;
+  status: string;
+  description?: string | null;
+  company?: Company | null;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface EmployeeShiftPayload {
+  company_id: number;
+  code?: string | null;
+  name: string;
+  start_time: string;
+  end_time: string;
+  break_minutes?: number | null;
+  grace_period_minutes?: number | null;
+  is_overnight?: boolean;
+  status?: string;
+  description?: string | null;
+}
+
+export interface EmployeeShiftsListResponse {
+  data: EmployeeShift[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
+export interface EmployeeShiftAssignment {
+  id: number;
+  company_id: number;
+  employee_id: number;
+  employee_shift_id: number;
+  effective_date: string;
+  end_date?: string | null;
+  notes?: string | null;
+  company?: Company | null;
+  employee?: Employee | null;
+  employee_shift?: EmployeeShift | null;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface EmployeeShiftAssignmentPayload {
+  company_id: number;
+  employee_id: number;
+  employee_shift_id: number;
+  effective_date: string;
+  end_date?: string | null;
+  notes?: string | null;
+}
+
+export interface EmployeeShiftAssignmentsListResponse {
+  data: EmployeeShiftAssignment[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
+export interface EmployeeAttendance {
+  id: number;
+  company_id: number;
+  employee_id: number;
+  employee_shift_id?: number | null;
+  attendance_date: string;
+  clock_in_at?: string | null;
+  clock_out_at?: string | null;
+  late_minutes: number;
+  overtime_minutes: number;
+  status: string;
+  notes?: string | null;
+  company?: Company | null;
+  employee?: Employee | null;
+  employee_shift?: EmployeeShift | null;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface EmployeeAttendancePayload {
+  company_id: number;
+  employee_id: number;
+  employee_shift_id?: number | null;
+  attendance_date: string;
+  clock_in_at?: string | null;
+  clock_out_at?: string | null;
+  late_minutes?: number | null;
+  overtime_minutes?: number | null;
+  status?: string;
+  notes?: string | null;
+}
+
+export interface EmployeeAttendancesListResponse {
+  data: EmployeeAttendance[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
 function resolveApiBaseUrl(): string {
   const configured = import.meta.env.VITE_API_BASE_URL?.trim();
   if (configured) {
@@ -1226,5 +1351,146 @@ export async function uploadEmployeeDocument(
       body: formData,
     },
     'Failed to upload employee document'
+  );
+}
+
+export async function fetchEmployeeShifts(): Promise<EmployeeShiftsListResponse> {
+  return requestJson<EmployeeShiftsListResponse>(
+    '/v1/modules/hr/employee-shifts',
+    {},
+    'Failed to fetch employee shifts'
+  );
+}
+
+export async function createEmployeeShift(
+  payload: EmployeeShiftPayload
+): Promise<{ data: EmployeeShift }> {
+  return requestJson<{ data: EmployeeShift }>(
+    '/v1/modules/hr/employee-shifts',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create employee shift'
+  );
+}
+
+export async function updateEmployeeShift(
+  id: number,
+  payload: EmployeeShiftPayload
+): Promise<{ data: EmployeeShift }> {
+  return requestJson<{ data: EmployeeShift }>(
+    `/v1/modules/hr/employee-shifts/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update employee shift'
+  );
+}
+
+export async function deleteEmployeeShift(
+  id: number
+): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/hr/employee-shifts/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete employee shift'
+  );
+}
+
+export async function fetchEmployeeShiftAssignments(): Promise<EmployeeShiftAssignmentsListResponse> {
+  return requestJson<EmployeeShiftAssignmentsListResponse>(
+    '/v1/modules/hr/employee-shift-assignments',
+    {},
+    'Failed to fetch employee shift assignments'
+  );
+}
+
+export async function createEmployeeShiftAssignment(
+  payload: EmployeeShiftAssignmentPayload
+): Promise<{ data: EmployeeShiftAssignment }> {
+  return requestJson<{ data: EmployeeShiftAssignment }>(
+    '/v1/modules/hr/employee-shift-assignments',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create employee shift assignment'
+  );
+}
+
+export async function updateEmployeeShiftAssignment(
+  id: number,
+  payload: EmployeeShiftAssignmentPayload
+): Promise<{ data: EmployeeShiftAssignment }> {
+  return requestJson<{ data: EmployeeShiftAssignment }>(
+    `/v1/modules/hr/employee-shift-assignments/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update employee shift assignment'
+  );
+}
+
+export async function deleteEmployeeShiftAssignment(
+  id: number
+): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/hr/employee-shift-assignments/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete employee shift assignment'
+  );
+}
+
+export async function fetchEmployeeAttendances(): Promise<EmployeeAttendancesListResponse> {
+  return requestJson<EmployeeAttendancesListResponse>(
+    '/v1/modules/hr/employee-attendances',
+    {},
+    'Failed to fetch employee attendances'
+  );
+}
+
+export async function createEmployeeAttendance(
+  payload: EmployeeAttendancePayload
+): Promise<{ data: EmployeeAttendance }> {
+  return requestJson<{ data: EmployeeAttendance }>(
+    '/v1/modules/hr/employee-attendances',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create employee attendance'
+  );
+}
+
+export async function updateEmployeeAttendance(
+  id: number,
+  payload: EmployeeAttendancePayload
+): Promise<{ data: EmployeeAttendance }> {
+  return requestJson<{ data: EmployeeAttendance }>(
+    `/v1/modules/hr/employee-attendances/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update employee attendance'
+  );
+}
+
+export async function deleteEmployeeAttendance(
+  id: number
+): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/hr/employee-attendances/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete employee attendance'
   );
 }

@@ -5,9 +5,15 @@ import {
   type ChoEnums,
   type Company,
   type Employee,
+  type EmployeeAttendance,
+  type EmployeeAttendancePayload,
   type EmployeePayload,
   type EmployeePosition,
   type EmployeePositionPayload,
+  type EmployeeShift,
+  type EmployeeShiftAssignment,
+  type EmployeeShiftAssignmentPayload,
+  type EmployeeShiftPayload,
   type EmploymentStatus,
   type EmploymentStatusPayload,
   type PayrollGrade,
@@ -15,24 +21,36 @@ import {
   type TaxStatus,
   type TaxStatusPayload,
   createEmployee,
+  createEmployeeAttendance,
   createEmployeePosition,
+  createEmployeeShift,
+  createEmployeeShiftAssignment,
   createEmploymentStatus,
   createPayrollGrade,
   createTaxStatus,
   deleteEmployee,
+  deleteEmployeeAttendance,
   deleteEmployeePosition,
+  deleteEmployeeShift,
+  deleteEmployeeShiftAssignment,
   deleteEmploymentStatus,
   deletePayrollGrade,
   deleteTaxStatus,
   fetchActiveCompanyEmployees,
   fetchChoEnums,
+  fetchEmployeeAttendances,
   fetchEmployeePositions,
+  fetchEmployeeShiftAssignments,
+  fetchEmployeeShifts,
   fetchEmployees,
   fetchEmploymentStatuses,
   fetchPayrollGrades,
   fetchTaxStatuses,
   updateEmployee,
+  updateEmployeeAttendance,
   updateEmployeePosition,
+  updateEmployeeShift,
+  updateEmployeeShiftAssignment,
   updateEmploymentStatus,
   updatePayrollGrade,
   updateTaxStatus,
@@ -84,6 +102,9 @@ export const choQueryKeys = {
   employees: ['cho', 'employees'] as const,
   activeCompanyEmployees: (companyId: number | null) =>
     ['cho', 'employees', 'active-company', companyId] as const,
+  employeeShifts: ['cho', 'hr', 'employee-shifts'] as const,
+  employeeShiftAssignments: ['cho', 'hr', 'employee-shift-assignments'] as const,
+  employeeAttendances: ['cho', 'hr', 'employee-attendances'] as const,
 };
 
 export interface ApiErrorInfo {
@@ -834,5 +855,441 @@ export function useActiveCompanyEmployeesResource(
       activeEmployeesQuery.error,
       'Gagal memuat daftar karyawan perusahaan aktif.'
     ),
+  };
+}
+
+export function useMasterPresensiCrudResource(
+  enabled: boolean,
+  company: Company | null
+) {
+  const queryClient = useQueryClient();
+  const [mutationError, setMutationError] = useState<string | null>(null);
+
+  const shiftsQuery = useQuery<EmployeeShift[]>({
+    queryKey: choQueryKeys.employeeShifts,
+    queryFn: async () => {
+      const res = await fetchEmployeeShifts();
+      return res?.data ?? [];
+    },
+    enabled,
+  });
+
+  const assignmentsQuery = useQuery<EmployeeShiftAssignment[]>({
+    queryKey: choQueryKeys.employeeShiftAssignments,
+    queryFn: async () => {
+      const res = await fetchEmployeeShiftAssignments();
+      return res?.data ?? [];
+    },
+    enabled,
+  });
+
+  const employeesQuery = useQuery<Employee[]>({
+    queryKey: choQueryKeys.employees,
+    queryFn: async () => {
+      const res = await fetchEmployees();
+      return res?.data ?? [];
+    },
+    enabled,
+  });
+
+  const allShifts = shiftsQuery.data ?? [];
+  const allAssignments = assignmentsQuery.data ?? [];
+  const allEmployees = employeesQuery.data ?? [];
+
+  const shifts = useMemo(
+    () =>
+      company
+        ? allShifts.filter((s) => Number(s.company_id) === company.id)
+        : allShifts,
+    [allShifts, company]
+  );
+
+  const assignments = useMemo(
+    () =>
+      company
+        ? allAssignments.filter((a) => Number(a.company_id) === company.id)
+        : allAssignments,
+    [allAssignments, company]
+  );
+
+  const invalidateShiftRefs = useCallback(() => {
+    void queryClient.invalidateQueries({
+      queryKey: choQueryKeys.employeeShiftAssignments,
+    });
+    void queryClient.invalidateQueries({
+      queryKey: choQueryKeys.employeeAttendances,
+    });
+  }, [queryClient]);
+
+  const createShiftMutation = useMutation({
+    mutationFn: async (payload: EmployeeShiftPayload) => {
+      const res = await createEmployeeShift(payload);
+      return res.data;
+    },
+    onSuccess: (created) => {
+      queryClient.setQueryData<EmployeeShift[]>(
+        choQueryKeys.employeeShifts,
+        (prev = []) => [created, ...prev]
+      );
+      void queryClient.invalidateQueries({
+        queryKey: choQueryKeys.employeeShifts,
+      });
+    },
+  });
+
+  const updateShiftMutation = useMutation({
+    mutationFn: async (input: { id: number; payload: EmployeeShiftPayload }) => {
+      const res = await updateEmployeeShift(input.id, input.payload);
+      return res.data;
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData<EmployeeShift[]>(
+        choQueryKeys.employeeShifts,
+        (prev = []) =>
+          prev.map((item) => (item.id === updated.id ? updated : item))
+      );
+      void queryClient.invalidateQueries({
+        queryKey: choQueryKeys.employeeShifts,
+      });
+      invalidateShiftRefs();
+    },
+  });
+
+  const deleteShiftMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await deleteEmployeeShift(id);
+      return id;
+    },
+    onSuccess: (deletedId) => {
+      queryClient.setQueryData<EmployeeShift[]>(
+        choQueryKeys.employeeShifts,
+        (prev = []) => prev.filter((item) => item.id !== deletedId)
+      );
+      void queryClient.invalidateQueries({
+        queryKey: choQueryKeys.employeeShifts,
+      });
+      invalidateShiftRefs();
+    },
+  });
+
+  const createAssignmentMutation = useMutation({
+    mutationFn: async (payload: EmployeeShiftAssignmentPayload) => {
+      const res = await createEmployeeShiftAssignment(payload);
+      return res.data;
+    },
+    onSuccess: (created) => {
+      queryClient.setQueryData<EmployeeShiftAssignment[]>(
+        choQueryKeys.employeeShiftAssignments,
+        (prev = []) => [created, ...prev]
+      );
+      void queryClient.invalidateQueries({
+        queryKey: choQueryKeys.employeeShiftAssignments,
+      });
+    },
+  });
+
+  const updateAssignmentMutation = useMutation({
+    mutationFn: async (input: {
+      id: number;
+      payload: EmployeeShiftAssignmentPayload;
+    }) => {
+      const res = await updateEmployeeShiftAssignment(input.id, input.payload);
+      return res.data;
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData<EmployeeShiftAssignment[]>(
+        choQueryKeys.employeeShiftAssignments,
+        (prev = []) =>
+          prev.map((item) => (item.id === updated.id ? updated : item))
+      );
+      void queryClient.invalidateQueries({
+        queryKey: choQueryKeys.employeeShiftAssignments,
+      });
+    },
+  });
+
+  const deleteAssignmentMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await deleteEmployeeShiftAssignment(id);
+      return id;
+    },
+    onSuccess: (deletedId) => {
+      queryClient.setQueryData<EmployeeShiftAssignment[]>(
+        choQueryKeys.employeeShiftAssignments,
+        (prev = []) => prev.filter((item) => item.id !== deletedId)
+      );
+      void queryClient.invalidateQueries({
+        queryKey: choQueryKeys.employeeShiftAssignments,
+      });
+    },
+  });
+
+  const runMutation = useCallback(
+    async <T>(fn: () => Promise<T>, fallbackError: string): Promise<T | null> => {
+      setMutationError(null);
+      try {
+        return await fn();
+      } catch (err) {
+        setMutationError(getErrorMessage(err, fallbackError));
+        return null;
+      }
+    },
+    []
+  );
+
+  const createShift = useCallback(
+    (payload: EmployeeShiftPayload) =>
+      runMutation(
+        () => createShiftMutation.mutateAsync(payload),
+        'Gagal menambahkan shift kerja.'
+      ),
+    [createShiftMutation, runMutation]
+  );
+
+  const updateShift = useCallback(
+    (id: number, payload: EmployeeShiftPayload) =>
+      runMutation(
+        () => updateShiftMutation.mutateAsync({ id, payload }),
+        'Gagal memperbarui shift kerja.'
+      ),
+    [updateShiftMutation, runMutation]
+  );
+
+  const removeShift = useCallback(
+    async (id: number) =>
+      (await runMutation(
+        () => deleteShiftMutation.mutateAsync(id),
+        'Gagal menghapus shift kerja.'
+      )) !== null,
+    [deleteShiftMutation, runMutation]
+  );
+
+  const createAssignment = useCallback(
+    (payload: EmployeeShiftAssignmentPayload) =>
+      runMutation(
+        () => createAssignmentMutation.mutateAsync(payload),
+        'Gagal menambahkan penugasan shift.'
+      ),
+    [createAssignmentMutation, runMutation]
+  );
+
+  const updateAssignment = useCallback(
+    (id: number, payload: EmployeeShiftAssignmentPayload) =>
+      runMutation(
+        () => updateAssignmentMutation.mutateAsync({ id, payload }),
+        'Gagal memperbarui penugasan shift.'
+      ),
+    [updateAssignmentMutation, runMutation]
+  );
+
+  const removeAssignment = useCallback(
+    async (id: number) =>
+      (await runMutation(
+        () => deleteAssignmentMutation.mutateAsync(id),
+        'Gagal menghapus penugasan shift.'
+      )) !== null,
+    [deleteAssignmentMutation, runMutation]
+  );
+
+  const clearError = useCallback(() => setMutationError(null), []);
+
+  const loading =
+    shiftsQuery.isLoading ||
+    assignmentsQuery.isLoading ||
+    employeesQuery.isLoading ||
+    createShiftMutation.isPending ||
+    updateShiftMutation.isPending ||
+    deleteShiftMutation.isPending ||
+    createAssignmentMutation.isPending ||
+    updateAssignmentMutation.isPending ||
+    deleteAssignmentMutation.isPending;
+
+  const queryError =
+    shiftsQuery.error ?? assignmentsQuery.error ?? employeesQuery.error;
+
+  return {
+    allShifts,
+    allAssignments,
+    allEmployees,
+    shifts,
+    assignments,
+    loading,
+    error:
+      mutationError ??
+      getErrorMessage(queryError, 'Gagal memuat data master presensi.'),
+    clearError,
+    createShift,
+    updateShift,
+    removeShift,
+    createAssignment,
+    updateAssignment,
+    removeAssignment,
+  };
+}
+
+export function useEmployeeAttendanceCrudResource(
+  enabled: boolean,
+  company: Company | null
+) {
+  const queryClient = useQueryClient();
+  const [mutationError, setMutationError] = useState<string | null>(null);
+
+  const attendancesQuery = useQuery<EmployeeAttendance[]>({
+    queryKey: choQueryKeys.employeeAttendances,
+    queryFn: async () => {
+      const res = await fetchEmployeeAttendances();
+      return res?.data ?? [];
+    },
+    enabled,
+  });
+
+  const shiftsQuery = useQuery<EmployeeShift[]>({
+    queryKey: choQueryKeys.employeeShifts,
+    queryFn: async () => {
+      const res = await fetchEmployeeShifts();
+      return res?.data ?? [];
+    },
+    enabled,
+  });
+
+  const employeesQuery = useQuery<Employee[]>({
+    queryKey: choQueryKeys.employees,
+    queryFn: async () => {
+      const res = await fetchEmployees();
+      return res?.data ?? [];
+    },
+    enabled,
+  });
+
+  const allAttendances = attendancesQuery.data ?? [];
+  const allShifts = shiftsQuery.data ?? [];
+  const allEmployees = employeesQuery.data ?? [];
+
+  const attendances = useMemo(
+    () =>
+      company
+        ? allAttendances.filter((a) => Number(a.company_id) === company.id)
+        : allAttendances,
+    [allAttendances, company]
+  );
+
+  const createAttendanceMutation = useMutation({
+    mutationFn: async (payload: EmployeeAttendancePayload) => {
+      const res = await createEmployeeAttendance(payload);
+      return res.data;
+    },
+    onSuccess: (created) => {
+      queryClient.setQueryData<EmployeeAttendance[]>(
+        choQueryKeys.employeeAttendances,
+        (prev = []) => [created, ...prev]
+      );
+      void queryClient.invalidateQueries({
+        queryKey: choQueryKeys.employeeAttendances,
+      });
+    },
+  });
+
+  const updateAttendanceMutation = useMutation({
+    mutationFn: async (input: {
+      id: number;
+      payload: EmployeeAttendancePayload;
+    }) => {
+      const res = await updateEmployeeAttendance(input.id, input.payload);
+      return res.data;
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData<EmployeeAttendance[]>(
+        choQueryKeys.employeeAttendances,
+        (prev = []) =>
+          prev.map((item) => (item.id === updated.id ? updated : item))
+      );
+      void queryClient.invalidateQueries({
+        queryKey: choQueryKeys.employeeAttendances,
+      });
+    },
+  });
+
+  const deleteAttendanceMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await deleteEmployeeAttendance(id);
+      return id;
+    },
+    onSuccess: (deletedId) => {
+      queryClient.setQueryData<EmployeeAttendance[]>(
+        choQueryKeys.employeeAttendances,
+        (prev = []) => prev.filter((item) => item.id !== deletedId)
+      );
+      void queryClient.invalidateQueries({
+        queryKey: choQueryKeys.employeeAttendances,
+      });
+    },
+  });
+
+  const runMutation = useCallback(
+    async <T>(fn: () => Promise<T>, fallbackError: string): Promise<T | null> => {
+      setMutationError(null);
+      try {
+        return await fn();
+      } catch (err) {
+        setMutationError(getErrorMessage(err, fallbackError));
+        return null;
+      }
+    },
+    []
+  );
+
+  const createAttendance = useCallback(
+    (payload: EmployeeAttendancePayload) =>
+      runMutation(
+        () => createAttendanceMutation.mutateAsync(payload),
+        'Gagal menambahkan data absensi.'
+      ),
+    [createAttendanceMutation, runMutation]
+  );
+
+  const updateAttendance = useCallback(
+    (id: number, payload: EmployeeAttendancePayload) =>
+      runMutation(
+        () => updateAttendanceMutation.mutateAsync({ id, payload }),
+        'Gagal memperbarui data absensi.'
+      ),
+    [updateAttendanceMutation, runMutation]
+  );
+
+  const removeAttendance = useCallback(
+    async (id: number) =>
+      (await runMutation(
+        () => deleteAttendanceMutation.mutateAsync(id),
+        'Gagal menghapus data absensi.'
+      )) !== null,
+    [deleteAttendanceMutation, runMutation]
+  );
+
+  const clearError = useCallback(() => setMutationError(null), []);
+
+  const loading =
+    attendancesQuery.isLoading ||
+    shiftsQuery.isLoading ||
+    employeesQuery.isLoading ||
+    createAttendanceMutation.isPending ||
+    updateAttendanceMutation.isPending ||
+    deleteAttendanceMutation.isPending;
+
+  const queryError =
+    attendancesQuery.error ?? shiftsQuery.error ?? employeesQuery.error;
+
+  return {
+    allAttendances,
+    allShifts,
+    allEmployees,
+    attendances,
+    loading,
+    error:
+      mutationError ??
+      getErrorMessage(queryError, 'Gagal memuat data absensi karyawan.'),
+    clearError,
+    createAttendance,
+    updateAttendance,
+    removeAttendance,
   };
 }

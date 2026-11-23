@@ -87,10 +87,10 @@ class EmployeePositionService
             $locked = EmployeePosition::query()->lockForUpdate()->findOrFail($employeePosition->getKey());
 
             $targetCompanyId = (int) ($attributes['company_id'] ?? $locked->company_id);
-            if ($targetCompanyId !== (int) $locked->company_id && $locked->employees()->exists()) {
+            if ($targetCompanyId !== (int) $locked->company_id && ($locked->employees()->exists() || $locked->payrollItems()->exists())) {
                 throw ValidationException::withMessages([
                     'company_id' => [
-                        'Cannot change company for an employee position that is still referenced by active employees.',
+                        'Cannot change company for an employee position that is still referenced by active employees or payroll items.',
                     ],
                 ]);
             }
@@ -106,6 +106,7 @@ class EmployeePositionService
 
         Cache::forget(self::CACHE_KEY_LIST);
         Cache::forget(EmployeeService::CACHE_KEY_LIST);
+        Cache::forget(PayrollItemService::CACHE_KEY_LIST);
 
         return $updated->refresh()->load(self::RELATIONS);
     }
@@ -115,10 +116,10 @@ class EmployeePositionService
         DB::transaction(function () use ($employeePosition): void {
             $locked = EmployeePosition::query()->lockForUpdate()->findOrFail($employeePosition->getKey());
 
-            if ($locked->employees()->exists()) {
+            if ($locked->employees()->exists() || $locked->payrollItems()->exists()) {
                 throw ValidationException::withMessages([
                     'employee_position' => [
-                        'This employee position is still referenced by active employees.',
+                        'This employee position is still referenced by active employees or payroll items.',
                     ],
                 ]);
             }
@@ -127,6 +128,7 @@ class EmployeePositionService
         });
 
         Cache::forget(self::CACHE_KEY_LIST);
+        Cache::forget(PayrollItemService::CACHE_KEY_LIST);
     }
 
     private function query(Request $request): QueryBuilder

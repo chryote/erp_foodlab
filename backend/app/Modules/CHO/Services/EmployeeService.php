@@ -90,10 +90,11 @@ class EmployeeService
                 $locked->employeeAttendances()->exists()
                 || $locked->employeeShiftAssignments()->exists()
                 || $locked->expenseItems()->exists()
+                || $locked->payrollItems()->exists()
             ) {
                 throw ValidationException::withMessages([
                     'employee' => [
-                        'This employee is still referenced by active attendances, shift assignments, or expense items.',
+                        'This employee is still referenced by active attendances, shift assignments, expense items, or payroll items.',
                     ],
                 ]);
             }
@@ -142,6 +143,7 @@ class EmployeeService
     private function forgetCaches(): void
     {
         Cache::forget(self::CACHE_KEY_LIST);
+        Cache::forget(PayrollItemService::CACHE_KEY_LIST);
         Cache::forget('erp_foodlab:hr:employee_attendances:list');
         Cache::forget('erp_foodlab:hr:employee_shift_assignments:list');
     }

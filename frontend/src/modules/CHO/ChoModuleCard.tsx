@@ -12,11 +12,21 @@ export const CHO_INPUT_SDM_ITEMS: HorizontalMenuItem[] = [
   { code: 'VIEW_KARYAWAN', title: 'View Karyawan' },
 ];
 
+export const CHO_INPUT_PRESENSI_ITEMS: HorizontalMenuItem[] = [
+  { code: 'MASTER_PRESENSI', title: 'Master Presensi' },
+  { code: 'INPUT_ABSENSI', title: 'Input Absensi' },
+];
+
 export const CHO_MENU_ITEMS: HorizontalMenuItem[] = [
   {
     code: 'INPUT_SDM',
     title: 'Input SDM',
     children: CHO_INPUT_SDM_ITEMS,
+  },
+  {
+    code: 'INPUT_PRESENSI',
+    title: 'Input Presensi',
+    children: CHO_INPUT_PRESENSI_ITEMS,
   },
 ];
 

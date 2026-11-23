@@ -5,6 +5,8 @@ use App\Modules\CHO\Controllers\EmployeeController;
 use App\Modules\CHO\Controllers\EmployeePositionController;
 use App\Modules\CHO\Controllers\EmploymentStatusController;
 use App\Modules\CHO\Controllers\PayrollGradeController;
+use App\Modules\CHO\Controllers\PayrollItemController;
+use App\Modules\CHO\Controllers\PayrollRunController;
 use App\Modules\CHO\Controllers\TaxStatusController;
 use Illuminate\Support\Facades\Route;
 
@@ -47,4 +49,18 @@ Route::prefix('cho')->group(function () {
     Route::put('/employees/{employee}', [EmployeeController::class, 'update'])->name('api.modules.cho.employees.update');
     Route::patch('/employees/{employee}', [EmployeeController::class, 'update'])->name('api.modules.cho.employees.patch');
     Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy'])->name('api.modules.cho.employees.destroy');
+
+    Route::get('/payroll-runs', [PayrollRunController::class, 'index'])->name('api.modules.cho.payroll-runs.index');
+    Route::post('/payroll-runs', [PayrollRunController::class, 'store'])->name('api.modules.cho.payroll-runs.store');
+    Route::get('/payroll-runs/{payrollRun}', [PayrollRunController::class, 'show'])->name('api.modules.cho.payroll-runs.show');
+    Route::put('/payroll-runs/{payrollRun}', [PayrollRunController::class, 'update'])->name('api.modules.cho.payroll-runs.update');
+    Route::patch('/payroll-runs/{payrollRun}', [PayrollRunController::class, 'update'])->name('api.modules.cho.payroll-runs.patch');
+    Route::delete('/payroll-runs/{payrollRun}', [PayrollRunController::class, 'destroy'])->name('api.modules.cho.payroll-runs.destroy');
+
+    Route::get('/payroll-items', [PayrollItemController::class, 'index'])->name('api.modules.cho.payroll-items.index');
+    Route::post('/payroll-items', [PayrollItemController::class, 'store'])->name('api.modules.cho.payroll-items.store');
+    Route::get('/payroll-items/{payrollItem}', [PayrollItemController::class, 'show'])->name('api.modules.cho.payroll-items.show');
+    Route::put('/payroll-items/{payrollItem}', [PayrollItemController::class, 'update'])->name('api.modules.cho.payroll-items.update');
+    Route::patch('/payroll-items/{payrollItem}', [PayrollItemController::class, 'update'])->name('api.modules.cho.payroll-items.patch');
+    Route::delete('/payroll-items/{payrollItem}', [PayrollItemController::class, 'destroy'])->name('api.modules.cho.payroll-items.destroy');
 });

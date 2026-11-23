@@ -93,4 +93,14 @@ class Company extends Model
     {
         return $this->hasMany(EmployeeShiftAssignment::class);
     }
+
+    public function payrollRuns(): HasMany
+    {
+        return $this->hasMany(PayrollRun::class);
+    }
+
+    public function payrollItems(): HasMany
+    {
+        return $this->hasMany(PayrollItem::class);
+    }
 }

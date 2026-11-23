@@ -3,6 +3,8 @@
 namespace App\Modules\CFO\Services;
 
 use App\Models\Company;
+use App\Modules\CHO\Services\PayrollItemService;
+use App\Modules\CHO\Services\PayrollRunService;
 use App\Support\ActiveCompany;
 use App\Support\IndexQuery;
 use App\Support\InputNormalizer;
@@ -119,6 +121,8 @@ class CompanyService
             $locked->companyAssets()->delete();
 
             // Soft-delete CHO/HR dependent records so none remain orphaned.
+            $locked->payrollItems()->delete();
+            $locked->payrollRuns()->delete();
             $locked->employeeAttendances()->delete();
             $locked->employeeShiftAssignments()->delete();
             $locked->employeeShifts()->delete();
@@ -179,6 +183,8 @@ class CompanyService
             'erp_foodlab:cho:employment_statuses:list',
             'erp_foodlab:cho:payroll_grades:list',
             'erp_foodlab:cho:tax_statuses:list',
+            PayrollRunService::CACHE_KEY_LIST,
+            PayrollItemService::CACHE_KEY_LIST,
             'erp_foodlab:hr:employee_shifts:list',
             'erp_foodlab:hr:employee_shift_assignments:list',
             'erp_foodlab:hr:employee_attendances:list',

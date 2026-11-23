@@ -557,7 +557,15 @@ export interface CrudFieldConfig<T> {
   label: string;
   placeholder?: string;
   defaultValue?: string;
-  type?: 'text' | 'number' | 'decimal' | 'select' | 'date' | 'textarea';
+  type?:
+    | 'text'
+    | 'number'
+    | 'decimal'
+    | 'select'
+    | 'date'
+    | 'time'
+    | 'datetime-local'
+    | 'textarea';
   rows?: number;
   pickerOnly?: boolean;
   optional?: boolean;
@@ -825,7 +833,13 @@ export function CrudModal<T extends CrudEntity>({
       if (raw !== null && raw !== undefined) {
         const stringified = String(raw);
         nextValues[field.key] =
-          field.type === 'date' ? stringified.slice(0, 10) : stringified;
+          field.type === 'date'
+            ? stringified.slice(0, 10)
+            : field.type === 'time'
+              ? stringified.slice(0, 5)
+              : field.type === 'datetime-local'
+                ? stringified.slice(0, 16).replace(' ', 'T')
+                : stringified;
       } else {
         nextValues[field.key] = field.defaultValue ?? '';
       }

@@ -26,8 +26,10 @@ import {
   ChoHorizontalMenu,
   ChoModuleCard,
 } from '@/modules/CHO/ChoModuleCard';
+import { InputAbsensiCrudModal } from '@/modules/CHO/InputAbsensiCrudModal';
 import { InputKaryawanCrudModal } from '@/modules/CHO/InputKaryawanCrudModal';
 import { MasterKaryawanCrudModal } from '@/modules/CHO/MasterKaryawanCrudModal';
+import { MasterPresensiCrudModal } from '@/modules/CHO/MasterPresensiCrudModal';
 import { ViewKaryawanModal } from '@/modules/CHO/ViewKaryawanModal';
 import { CmoModuleCard } from '@/modules/CMO/CmoModuleCard';
 import { CpoModuleCard } from '@/modules/CPO/CpoModuleCard';
@@ -254,6 +256,20 @@ export const DashboardFlowSimulator: React.FC<DashboardProps> = ({ onLogout }) =
             <ViewKaryawanModal
               isOpen={selectedChildSubMenu?.code === 'VIEW_KARYAWAN'}
               company={selectedCompany}
+              onClose={() => setSelectedChildSubMenu(null)}
+            />
+
+            <MasterPresensiCrudModal
+              isOpen={selectedChildSubMenu?.code === 'MASTER_PRESENSI'}
+              company={selectedCompany}
+              companies={companyResource.companies}
+              onClose={() => setSelectedChildSubMenu(null)}
+            />
+
+            <InputAbsensiCrudModal
+              isOpen={selectedChildSubMenu?.code === 'INPUT_ABSENSI'}
+              company={selectedCompany}
+              companies={companyResource.companies}
               onClose={() => setSelectedChildSubMenu(null)}
             />
           </>

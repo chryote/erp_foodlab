@@ -28,6 +28,11 @@ final class IndexQuery
         'series',
         'status',
         'category',
+        'period_date',
+        'period_from',
+        'period_to',
+        'payroll_run_id',
+        'payroll_group',
     ];
 
     /**
