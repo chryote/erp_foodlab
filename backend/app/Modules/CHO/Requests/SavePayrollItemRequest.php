@@ -3,6 +3,7 @@
 namespace App\Modules\CHO\Requests;
 
 use App\Enums\PayrollGroup;
+use App\Enums\PayrollItemStatus;
 use App\Enums\PayrollRunStatus;
 use App\Models\Employee;
 use App\Models\EmployeePosition;
@@ -167,6 +168,13 @@ class SavePayrollItemRequest extends FormRequest
                 $effectivePositionId = $this->has('employee_position_id')
                     ? ($this->input('employee_position_id') !== null ? (int) $this->input('employee_position_id') : null)
                     : $routeItem?->employee_position_id;
+
+                if ($routeItem instanceof PayrollItem && $routeItem->status === PayrollItemStatus::FINALIZED) {
+                    $validator->errors()->add(
+                        'payroll_item',
+                        'Cannot modify a payroll item that has already been finalized.'
+                    );
+                }
 
                 if ($routeItem instanceof PayrollItem && ! $validator->errors()->has('payroll_run_id')) {
                     $existingRun = PayrollRun::query()

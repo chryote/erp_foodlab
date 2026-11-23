@@ -427,8 +427,9 @@ CREATE TABLE `payroll_items` (
   `payroll_run_id` bigint unsigned NOT NULL,
   `employee_id` bigint unsigned NOT NULL,
   `employee_position_id` bigint unsigned DEFAULT NULL,
-  `payroll_group` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'office',
-  `bank_account_number` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `payroll_group` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'office',
+  `attendance_days` smallint unsigned NOT NULL DEFAULT '0',
+  `bank_account_number` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `base_salary` decimal(18,2) NOT NULL DEFAULT '0.00',
   `bpjs_kesehatan` decimal(18,2) NOT NULL DEFAULT '0.00',
   `bpjs_ketenagakerjaan` decimal(18,2) NOT NULL DEFAULT '0.00',
@@ -438,7 +439,10 @@ CREATE TABLE `payroll_items` (
   `thr` decimal(18,2) NOT NULL DEFAULT '0.00',
   `pph21` decimal(18,2) NOT NULL DEFAULT '0.00',
   `total_net` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `status` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
   `notes` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `finalized_by` bigint unsigned DEFAULT NULL,
+  `finalized_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
@@ -451,9 +455,12 @@ CREATE TABLE `payroll_items` (
   KEY `payroll_items_run_del_group_id_idx` (`payroll_run_id`,`deleted_at`,`payroll_group`,`id`),
   KEY `payroll_items_comp_del_emp_idx` (`company_id`,`deleted_at`,`employee_id`),
   KEY `payroll_items_deleted_id_idx` (`deleted_at`,`id`),
+  KEY `payroll_items_finalized_by_foreign` (`finalized_by`),
+  KEY `payroll_items_run_del_status_idx` (`payroll_run_id`,`deleted_at`,`status`),
   CONSTRAINT `payroll_items_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `payroll_items_employee_id_foreign` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `payroll_items_employee_position_id_foreign` FOREIGN KEY (`employee_position_id`) REFERENCES `employee_positions` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `payroll_items_finalized_by_foreign` FOREIGN KEY (`finalized_by`) REFERENCES `users` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `payroll_items_payroll_run_id_foreign` FOREIGN KEY (`payroll_run_id`) REFERENCES `payroll_runs` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -602,5 +609,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (42,'2026_11_21_173
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (43,'2026_11_23_100000_create_payroll_runs_table',29);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (44,'2026_11_23_100100_create_payroll_items_table',29);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (45,'2026_11_23_110000_update_payroll_items_table_for_spec',30);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (46,'2026_11_23_120000_add_finalization_fields_to_payroll_items_table',31);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;

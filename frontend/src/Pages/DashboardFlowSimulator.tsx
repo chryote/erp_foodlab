@@ -33,6 +33,7 @@ import {
 } from '@/modules/CHO/ChoModuleCard';
 import { InputAbsensiCrudModal } from '@/modules/CHO/InputAbsensiCrudModal';
 import { InputKaryawanCrudModal } from '@/modules/CHO/InputKaryawanCrudModal';
+import { InputPayrollModal } from '@/modules/CHO/InputPayrollModal';
 import { MasterKaryawanCrudModal } from '@/modules/CHO/MasterKaryawanCrudModal';
 import { MasterPresensiCrudModal } from '@/modules/CHO/MasterPresensiCrudModal';
 import { ViewKaryawanModal } from '@/modules/CHO/ViewKaryawanModal';
@@ -280,6 +281,13 @@ export const DashboardFlowSimulator: React.FC<DashboardProps> = ({ onLogout }) =
 
             <InputAbsensiCrudModal
               isOpen={selectedChildSubMenu?.code === 'INPUT_ABSENSI'}
+              company={selectedCompany}
+              companies={companyResource.companies}
+              onClose={() => setSelectedChildSubMenu(null)}
+            />
+
+            <InputPayrollModal
+              isOpen={selectedChildSubMenu?.code === 'INPUT_PAYROLL'}
               company={selectedCompany}
               companies={companyResource.companies}
               onClose={() => setSelectedChildSubMenu(null)}

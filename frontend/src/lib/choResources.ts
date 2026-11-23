@@ -18,6 +18,8 @@ import {
   type EmploymentStatusPayload,
   type PayrollGrade,
   type PayrollGradePayload,
+  type PayrollWorkspaceData,
+  type SaveEmployeePayrollPayload,
   type TaxStatus,
   type TaxStatusPayload,
   createEmployee,
@@ -45,7 +47,10 @@ import {
   fetchEmployees,
   fetchEmploymentStatuses,
   fetchPayrollGrades,
+  fetchPayrollWorkspace,
   fetchTaxStatuses,
+  finalizeEmployeePayrollRow,
+  saveEmployeePayrollRow,
   updateEmployee,
   updateEmployeeAttendance,
   updateEmployeePosition,
@@ -105,6 +110,8 @@ export const choQueryKeys = {
   employeeShifts: ['cho', 'hr', 'employee-shifts'] as const,
   employeeShiftAssignments: ['cho', 'hr', 'employee-shift-assignments'] as const,
   employeeAttendances: ['cho', 'hr', 'employee-attendances'] as const,
+  payrollWorkspace: (companyId: number | null, period: string) =>
+    ['cho', 'payroll', 'workspace', companyId, period] as const,
 };
 
 export interface ApiErrorInfo {
@@ -1291,5 +1298,106 @@ export function useEmployeeAttendanceCrudResource(
     createAttendance,
     updateAttendance,
     removeAttendance,
+  };
+}
+
+export function usePayrollWorkspaceResource(
+  enabled: boolean,
+  companyId: number | null,
+  period: string
+) {
+  const queryClient = useQueryClient();
+  const [mutationError, setMutationError] = useState<string | null>(null);
+
+  const workspaceQuery = useQuery<PayrollWorkspaceData>({
+    queryKey: choQueryKeys.payrollWorkspace(companyId, period),
+    queryFn: async () => {
+      if (companyId === null) {
+        throw new Error('Perusahaan belum dipilih.');
+      }
+      const res = await fetchPayrollWorkspace(companyId, period);
+      return res.data;
+    },
+    enabled: enabled && companyId !== null && /^\d{4}-\d{2}$/.test(period),
+  });
+
+  const invalidateWorkspace = useCallback(() => {
+    void queryClient.invalidateQueries({
+      queryKey: ['cho', 'payroll', 'workspace'],
+    });
+  }, [queryClient]);
+
+  const saveRowMutation = useMutation({
+    mutationFn: async (payload: SaveEmployeePayrollPayload) => {
+      const res = await saveEmployeePayrollRow(payload);
+      return res.data;
+    },
+    onSuccess: () => {
+      invalidateWorkspace();
+    },
+  });
+
+  const finalizeRowMutation = useMutation({
+    mutationFn: async (payload: SaveEmployeePayrollPayload) => {
+      const res = await finalizeEmployeePayrollRow(payload);
+      return res.data;
+    },
+    onSuccess: () => {
+      invalidateWorkspace();
+    },
+  });
+
+  const runMutation = useCallback(
+    async <T>(fn: () => Promise<T>, fallbackError: string): Promise<T | null> => {
+      setMutationError(null);
+      try {
+        return await fn();
+      } catch (err) {
+        setMutationError(getErrorMessage(err, fallbackError));
+        return null;
+      }
+    },
+    []
+  );
+
+  const saveRow = useCallback(
+    (payload: SaveEmployeePayrollPayload) =>
+      runMutation(
+        () => saveRowMutation.mutateAsync(payload),
+        'Gagal menyimpan draf payroll karyawan.'
+      ),
+    [runMutation, saveRowMutation]
+  );
+
+  const finalizeRow = useCallback(
+    (payload: SaveEmployeePayrollPayload) =>
+      runMutation(
+        () => finalizeRowMutation.mutateAsync(payload),
+        'Gagal memfinalisasi payroll karyawan.'
+      ),
+    [finalizeRowMutation, runMutation]
+  );
+
+  const clearError = useCallback(() => setMutationError(null), []);
+
+  const loading =
+    workspaceQuery.isLoading ||
+    workspaceQuery.isFetching ||
+    saveRowMutation.isPending ||
+    finalizeRowMutation.isPending;
+
+  return {
+    workspace: workspaceQuery.data ?? null,
+    rows: workspaceQuery.data?.rows ?? [],
+    loading,
+    mutating: saveRowMutation.isPending || finalizeRowMutation.isPending,
+    error:
+      mutationError ??
+      (workspaceQuery.error
+        ? getErrorMessage(workspaceQuery.error, 'Gagal memuat data payroll.')
+        : null),
+    clearError,
+    saveRow,
+    finalizeRow,
   };
 }
