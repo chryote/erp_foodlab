@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import {
   Badge,
@@ -13,6 +13,7 @@ import {
   ModuleLauncherCard,
   PageHeader,
   SummaryBanner,
+  ThemeToggle,
 } from '../components/ui';
 import { initializeTheme } from '../lib/theme';
 
@@ -450,6 +451,45 @@ describe('Reusable UI Components (src/components/ui)', () => {
     fireEvent.click(toggle);
     expect(document.documentElement).toHaveAttribute('data-theme', 'light');
     expect(window.localStorage.getItem('erp_foodlab.theme')).toBe('light');
+  });
+
+  it('synchronizes all theme toggles through shared global state', () => {
+    window.localStorage.clear();
+    document.documentElement.removeAttribute('data-theme');
+    render(
+      <>
+        <ThemeToggle />
+        <ThemeToggle />
+      </>
+    );
+
+    const toggles = screen.getAllByTestId('theme-toggle');
+    fireEvent.click(toggles[0]);
+
+    toggles.forEach((toggle) => {
+      expect(toggle).toHaveAttribute('aria-label', 'Switch to light mode');
+      expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    fireEvent.click(toggles[1]);
+    toggles.forEach((toggle) => {
+      expect(toggle).toHaveAttribute('aria-label', 'Switch to dark mode');
+      expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    act(() => {
+      window.localStorage.setItem('erp_foodlab.theme', 'dark');
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: 'erp_foodlab.theme',
+          newValue: 'dark',
+        })
+      );
+    });
+    toggles.forEach((toggle) => {
+      expect(toggle).toHaveAttribute('aria-label', 'Switch to light mode');
+      expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    });
   });
 
   it('keeps secondary company tabs unselected when selectedCompanyId is null', () => {
