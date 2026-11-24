@@ -371,4 +371,72 @@ describe('CFO master modal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Urutkan Kapital' }));
     expect(getStakeholderNames()).toEqual(['Owner Z', 'Owner B', 'Owner A']);
   });
+
+  it('shows each stakeholder capital share and uses a 40/60 desktop split', async () => {
+    vi.mocked(apiClient.fetchCapitalCompanies).mockResolvedValue({
+      data: [
+        {
+          id: 31,
+          company_id: 21,
+          stakeholder_name: 'Quarter Owner',
+          capital: 250000,
+        },
+        {
+          id: 32,
+          company_id: 21,
+          stakeholder_name: 'Majority Owner',
+          capital: 750000,
+        },
+      ],
+      meta: { count: 2 },
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CfoMasterModalPage />
+      </QueryClientProvider>
+    );
+
+    const companySection = screen.getByTestId('perusahaan-crud-page');
+    expect(companySection.parentElement).toHaveClass(
+      'grid-cols-1',
+      'lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]'
+    );
+    fireEvent.click(await screen.findByTestId('stakeholder-row-21'));
+
+    expect(await screen.findByText('25,00%')).toBeInTheDocument();
+    expect(screen.getByText('25,00%').parentElement).toHaveClass(
+      'whitespace-nowrap'
+    );
+    expect(screen.getByText('75,00%')).toBeInTheDocument();
+  });
+
+  it('shows a zero capital share when the company has no capital total', async () => {
+    vi.mocked(apiClient.fetchCapitalCompanies).mockResolvedValue({
+      data: [
+        {
+          id: 31,
+          company_id: 21,
+          stakeholder_name: 'No Capital Owner',
+          capital: 0,
+        },
+      ],
+      meta: { count: 1 },
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CfoMasterModalPage />
+      </QueryClientProvider>
+    );
+
+    fireEvent.click(await screen.findByTestId('stakeholder-row-21'));
+    expect(await screen.findByText('0,00%')).toBeInTheDocument();
+  });
 });

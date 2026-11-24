@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Eye, Pencil, Trash2, X } from 'lucide-react';
 import type { CapitalCompany, Company } from '@/api/client';
 import {
+  Badge,
   Button,
   CardHeader,
   ConfirmDialog,
@@ -363,6 +364,25 @@ export default function CfoMasterModalPage() {
         render: (row) => formatCapitalIdr(Number(row.capital)),
       },
       {
+        key: 'capital_share_percentage',
+        header: 'Porsi Kapital (%)',
+        render: (row) => {
+          const share =
+            totalCapital > 0
+              ? ((Number(row.capital) || 0) / totalCapital) * 100
+              : 0;
+          return (
+            <Badge className="whitespace-nowrap">
+              {share.toLocaleString('id-ID', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+              %
+            </Badge>
+          );
+        },
+      },
+      {
         key: 'actions',
         header: 'Aksi',
         sticky: true,
@@ -404,7 +424,7 @@ export default function CfoMasterModalPage() {
         ),
       },
     ],
-    []
+    [totalCapital]
   );
 
   const companyConfirmMessage =
@@ -463,7 +483,7 @@ export default function CfoMasterModalPage() {
           />
         )}
 
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(420px,0.95fr)_minmax(0,1.05fr)] lg:items-start">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start">
           <section
             className="min-w-0 border-b border-border lg:flex lg:h-[calc(100dvh-12rem)] lg:flex-col lg:overflow-y-auto lg:border-b-0 lg:px-1"
             data-testid="perusahaan-crud-page"
@@ -480,7 +500,7 @@ export default function CfoMasterModalPage() {
                 </p>
               )}
               <form
-                className="mb-6 grid gap-3 md:grid-cols-[minmax(0,1fr)_160px_auto] md:items-end"
+                className="grid gap-3 md:grid-cols-[minmax(0,1fr)_160px_auto] md:items-end"
                 onSubmit={(event) => {
                   event.preventDefault();
                   submitCompany();
@@ -620,7 +640,7 @@ export default function CfoMasterModalPage() {
                     </p>
                   )}
                   <form
-                    className="mb-6 grid gap-3 xl:grid-cols-[minmax(0,1fr)_240px_auto] xl:items-end"
+                    className="grid gap-3 md:grid-cols-[minmax(0,1fr)_240px_auto] md:items-end"
                     onSubmit={(event) => {
                       event.preventDefault();
                       submitStakeholder();
