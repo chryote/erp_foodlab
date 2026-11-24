@@ -21,6 +21,10 @@ class SaveItemRequest extends FormRequest
     {
         $normalized = [];
 
+        if ($this->has('code') && is_string($this->input('code'))) {
+            $normalized['code'] = InputNormalizer::nullableText($this->input('code'));
+        }
+
         foreach (['company_id', 'name', 'type'] as $field) {
             if ($this->has($field) && is_string($this->input($field))) {
                 $normalized[$field] = InputNormalizer::text($this->input($field));
@@ -38,6 +42,7 @@ class SaveItemRequest extends FormRequest
     public function rules(): array
     {
         $presence = $this->isMethod('PATCH') ? ['sometimes', 'required'] : ['required'];
+        $codePresence = $this->isMethod('PATCH') ? ['sometimes'] : [];
 
         return [
             'company_id' => [
@@ -45,6 +50,7 @@ class SaveItemRequest extends FormRequest
                 'integer',
                 Rule::exists('companies', 'id')->whereNull('deleted_at'),
             ],
+            'code' => [...$codePresence, 'nullable', 'string', 'max:50'],
             'name' => [...$presence, 'string', 'max:150'],
             'type' => ['sometimes', 'required', 'string', Rule::enum(ItemType::class)],
         ];
@@ -73,7 +79,7 @@ class SaveItemRequest extends FormRequest
                     );
                 }
 
-                if ($validator->errors()->hasAny(['company_id', 'name'])) {
+                if ($validator->errors()->has('company_id')) {
                     return;
                 }
 
@@ -85,18 +91,38 @@ class SaveItemRequest extends FormRequest
                     return;
                 }
 
-                $effectiveName = $this->has('name')
-                    ? InputNormalizer::text((string) $this->input('name'))
-                    : $item?->name;
+                if (! $validator->errors()->has('code')) {
+                    $effectiveCode = $this->has('code')
+                        ? ($this->input('code') !== null && is_string($this->input('code'))
+                            ? InputNormalizer::nullableText($this->input('code'))
+                            : null)
+                        : $item?->code;
 
-                if ($effectiveName !== null && $effectiveName !== '' && WriteGuard::existsCaseInsensitive(
-                    Item::query(),
-                    'name',
-                    $effectiveName,
-                    ['company_id' => $effectiveCompanyId],
-                    $item?->getKey()
-                )) {
-                    $validator->errors()->add('name', 'Item dengan nama yang sama sudah terdaftar pada perusahaan ini.');
+                    if ($effectiveCode !== null && $effectiveCode !== '' && WriteGuard::existsCaseInsensitive(
+                        Item::query(),
+                        'code',
+                        $effectiveCode,
+                        ['company_id' => $effectiveCompanyId],
+                        $item?->getKey()
+                    )) {
+                        $validator->errors()->add('code', 'Item dengan kode yang sama sudah terdaftar pada perusahaan ini.');
+                    }
+                }
+
+                if (! $validator->errors()->has('name')) {
+                    $effectiveName = $this->has('name')
+                        ? InputNormalizer::text((string) $this->input('name'))
+                        : $item?->name;
+
+                    if ($effectiveName !== null && $effectiveName !== '' && WriteGuard::existsCaseInsensitive(
+                        Item::query(),
+                        'name',
+                        $effectiveName,
+                        ['company_id' => $effectiveCompanyId],
+                        $item?->getKey()
+                    )) {
+                        $validator->errors()->add('name', 'Item dengan nama yang sama sudah terdaftar pada perusahaan ini.');
+                    }
                 }
             },
         ];
@@ -114,6 +140,12 @@ class SaveItemRequest extends FormRequest
 
         if (array_key_exists('company_id', $validated)) {
             $validated['company_id'] = (int) $validated['company_id'];
+        }
+
+        if (array_key_exists('code', $validated)) {
+            $validated['code'] = $validated['code'] !== null
+                ? InputNormalizer::nullableText((string) $validated['code'])
+                : null;
         }
 
         if (array_key_exists('name', $validated)) {

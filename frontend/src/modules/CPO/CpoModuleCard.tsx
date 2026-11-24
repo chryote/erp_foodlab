@@ -1,6 +1,22 @@
 import React from 'react';
 import type { ErpModuleOverview } from '../../api/client';
+import {
+  CascadingHorizontalMenu,
+  type HorizontalMenuItem,
+} from '../../components/ui/HorizontalMenuCard';
 import { ModuleLauncherCard } from '../../components/ui/ModuleLauncherCard';
+
+export const CPO_INPUT_PACKING_ITEMS: HorizontalMenuItem[] = [
+  { code: 'MASTER_PACKING', title: 'Master Packing' },
+];
+
+export const CPO_MENU_ITEMS: HorizontalMenuItem[] = [
+  {
+    code: 'INPUT_PACKING',
+    title: 'Input Packing',
+    children: CPO_INPUT_PACKING_ITEMS,
+  },
+];
 
 export const DEFAULT_CPO_MODULE: ErpModuleOverview = {
   code: 'CPO',
@@ -41,6 +57,33 @@ export const CpoModuleCard: React.FC<CpoModuleCardProps> = ({
       accent="cpo"
       isSelected={isSelected}
       onClick={() => onSelect?.(data)}
+    />
+  );
+};
+
+interface CpoHorizontalMenuProps {
+  selectedCode?: string | null;
+  selectedChildCode?: string | null;
+  onSelect?: (item: HorizontalMenuItem) => void;
+  onSelectChild?: (item: HorizontalMenuItem) => void;
+}
+
+export const CpoHorizontalMenu: React.FC<CpoHorizontalMenuProps> = ({
+  selectedCode,
+  selectedChildCode,
+  onSelect,
+  onSelectChild,
+}) => {
+  return (
+    <CascadingHorizontalMenu
+      items={CPO_MENU_ITEMS}
+      accent="cpo"
+      selectedCode={selectedCode}
+      selectedChildCode={selectedChildCode}
+      ariaLabel="CPO Submenu"
+      testId="cpo-horizontal-menu"
+      onSelect={onSelect}
+      onSelectChild={onSelectChild}
     />
   );
 };

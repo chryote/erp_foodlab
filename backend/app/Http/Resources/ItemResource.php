@@ -24,6 +24,7 @@ class ItemResource extends JsonResource
         return [
             'id' => (int) $this->id,
             'company_id' => (int) $this->company_id,
+            'code' => $this->code,
             'name' => $this->name,
             'type' => $type,
             'company' => $this->whenLoaded('company', fn ($company) => $company !== null ? new CompanyResource($company) : null),

@@ -38,7 +38,11 @@ import { MasterKaryawanCrudModal } from '@/modules/CHO/MasterKaryawanCrudModal';
 import { MasterPresensiCrudModal } from '@/modules/CHO/MasterPresensiCrudModal';
 import { ViewKaryawanModal } from '@/modules/CHO/ViewKaryawanModal';
 import { CmoModuleCard } from '@/modules/CMO/CmoModuleCard';
-import { CpoModuleCard } from '@/modules/CPO/CpoModuleCard';
+import {
+  CpoHorizontalMenu,
+  CpoModuleCard,
+} from '@/modules/CPO/CpoModuleCard';
+import { MasterPackingCrudModal } from '@/modules/CPO/MasterPackingCrudModal';
 
 export interface DashboardProps {
   onLogout?: () => void | Promise<void>;
@@ -206,6 +210,17 @@ export const DashboardFlowSimulator: React.FC<DashboardProps> = ({ onLogout }) =
               </section>
             )}
 
+            {selectedModule?.code === 'CPO' && (
+              <section aria-label="CPO Module Navigation">
+                <CpoHorizontalMenu
+                  selectedCode={selectedSubMenu?.code ?? null}
+                  selectedChildCode={selectedChildSubMenu?.code ?? null}
+                  onSelect={handleSelectSubMenu}
+                  onSelectChild={setSelectedChildSubMenu}
+                />
+              </section>
+            )}
+
             <CompanyCrudModal
               isOpen={selectedChildSubMenu?.code === 'PERUSAHAAN'}
               companyResource={companyResource}
@@ -286,6 +301,13 @@ export const DashboardFlowSimulator: React.FC<DashboardProps> = ({ onLogout }) =
 
             <InputPayrollModal
               isOpen={selectedChildSubMenu?.code === 'INPUT_PAYROLL'}
+              company={selectedCompany}
+              companies={companyResource.companies}
+              onClose={() => setSelectedChildSubMenu(null)}
+            />
+
+            <MasterPackingCrudModal
+              isOpen={selectedChildSubMenu?.code === 'MASTER_PACKING'}
               company={selectedCompany}
               companies={companyResource.companies}
               onClose={() => setSelectedChildSubMenu(null)}

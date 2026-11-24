@@ -702,6 +702,96 @@ export interface EmployeeAttendancesListResponse {
   };
 }
 
+export type ItemType = 'Bahan' | 'Peralatan';
+
+export interface Item {
+  id: number;
+  company_id: number;
+  code?: string | null;
+  name: string;
+  type: ItemType;
+  company?: Company | null;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface ItemPayload {
+  company_id: number;
+  code?: string | null;
+  name: string;
+  type: ItemType;
+}
+
+export interface ItemsListResponse {
+  data: Item[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
+export interface Packet {
+  id: number;
+  name: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface PacketPayload {
+  name: string;
+}
+
+export interface PacketsListResponse {
+  data: Packet[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
+export interface ItemPacket {
+  id: number;
+  company_id: number;
+  packet_id: number;
+  item_id: number;
+  quantity: number;
+  company?: Company | null;
+  packet?: Packet | null;
+  item?: Item | null;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface ItemPacketPayload {
+  company_id: number;
+  packet_id: number;
+  item_id: number;
+  quantity: number;
+}
+
+export interface ItemPacketsListResponse {
+  data: ItemPacket[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
 function resolveApiBaseUrl(): string {
   const configured = import.meta.env.VITE_API_BASE_URL?.trim();
   if (configured) {
@@ -1629,5 +1719,142 @@ export async function finalizeEmployeePayrollRow(
       body: JSON.stringify(payload),
     },
     'Failed to finalize payroll row'
+  );
+}
+
+export async function fetchItems(): Promise<ItemsListResponse> {
+  return requestJson<ItemsListResponse>(
+    '/v1/modules/cpo/items',
+    {},
+    'Failed to fetch items'
+  );
+}
+
+export async function createItem(
+  payload: ItemPayload
+): Promise<{ data: Item }> {
+  return requestJson<{ data: Item }>(
+    '/v1/modules/cpo/items',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create item'
+  );
+}
+
+export async function updateItem(
+  id: number,
+  payload: ItemPayload
+): Promise<{ data: Item }> {
+  return requestJson<{ data: Item }>(
+    `/v1/modules/cpo/items/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update item'
+  );
+}
+
+export async function deleteItem(id: number): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/cpo/items/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete item'
+  );
+}
+
+export async function fetchPackets(): Promise<PacketsListResponse> {
+  return requestJson<PacketsListResponse>(
+    '/v1/modules/cpo/packets',
+    {},
+    'Failed to fetch packets'
+  );
+}
+
+export async function createPacket(
+  payload: PacketPayload
+): Promise<{ data: Packet }> {
+  return requestJson<{ data: Packet }>(
+    '/v1/modules/cpo/packets',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create packet'
+  );
+}
+
+export async function updatePacket(
+  id: number,
+  payload: PacketPayload
+): Promise<{ data: Packet }> {
+  return requestJson<{ data: Packet }>(
+    `/v1/modules/cpo/packets/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update packet'
+  );
+}
+
+export async function deletePacket(id: number): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/cpo/packets/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete packet'
+  );
+}
+
+export async function fetchItemPackets(): Promise<ItemPacketsListResponse> {
+  return requestJson<ItemPacketsListResponse>(
+    '/v1/modules/cpo/item-packets',
+    {},
+    'Failed to fetch item packets'
+  );
+}
+
+export async function createItemPacket(
+  payload: ItemPacketPayload
+): Promise<{ data: ItemPacket }> {
+  return requestJson<{ data: ItemPacket }>(
+    '/v1/modules/cpo/item-packets',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create item packet'
+  );
+}
+
+export async function updateItemPacket(
+  id: number,
+  payload: ItemPacketPayload
+): Promise<{ data: ItemPacket }> {
+  return requestJson<{ data: ItemPacket }>(
+    `/v1/modules/cpo/item-packets/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update item packet'
+  );
+}
+
+export async function deleteItemPacket(
+  id: number
+): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/cpo/item-packets/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete item packet'
   );
 }

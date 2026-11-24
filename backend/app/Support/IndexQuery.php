@@ -37,6 +37,7 @@ final class IndexQuery
         'item_id',
         'type',
         'item_type',
+        'code',
         'quantity_min',
         'quantity_max',
     ];
