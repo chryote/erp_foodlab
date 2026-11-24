@@ -45,7 +45,7 @@ use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
-    public const MIN_SEED_ROWS = 100;
+    public const MIN_SEED_ROWS = 5;
 
     public function run(): void
     {
