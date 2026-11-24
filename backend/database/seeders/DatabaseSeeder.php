@@ -25,6 +25,7 @@ use App\Models\ExpenseItem;
 use App\Models\ExpenseType;
 use App\Models\Item;
 use App\Models\LabSample;
+use App\Models\Packet;
 use App\Models\PayrollGrade;
 use App\Models\PayrollItem;
 use App\Models\PayrollRun;
@@ -55,6 +56,7 @@ class DatabaseSeeder extends Seeder
             $this->seedEmployeeShiftAssignments();
             $this->seedEmployeeAttendances();
             $this->seedCpoItems();
+            $this->seedCpoPackets();
         });
 
         Cache::flush();
@@ -762,6 +764,21 @@ class DatabaseSeeder extends Seeder
             $item->name = $name;
             $item->deleted_at = null;
             $item->save();
+        }
+    }
+
+    private function seedCpoPackets(): void
+    {
+        foreach (['Paket A', 'Paket B'] as $name) {
+            $packet = Packet::query()
+                ->withTrashed()
+                ->where('name', $name)
+                ->orderByRaw('deleted_at IS NOT NULL')
+                ->first() ?? new Packet();
+
+            $packet->name = $name;
+            $packet->deleted_at = null;
+            $packet->save();
         }
     }
 }
