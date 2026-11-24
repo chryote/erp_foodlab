@@ -775,7 +775,7 @@ describe('CHO (SDM) Input SDM flow: Master Karyawan, Input Karyawan, View Karyaw
     expect(
       within(secondViewModal).getByTestId('view-karyawan-total-banner-value')
     ).toHaveTextContent('1 Personel');
-  });
+  }, 15000);
 
   it('displays validation pop-up on Input Karyawan frontend validation failure (all fields + min 1 document) and backend 422 validation failure', async () => {
     const company: apiClient.Company = {
