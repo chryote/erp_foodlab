@@ -187,17 +187,20 @@ class DatabaseSeeder extends Seeder
             ->keyBy(fn (CapitalCompany $row): string => $row->company_id.'|'.$row->stakeholder_name);
 
         foreach ($companies as $index => $company) {
-            $stakeholderName = $index === 0 ? 'Rian' : sprintf('Pemegang Saham %03d', $index + 1);
-            $capital = $index === 0 ? 250000000.0 : 100000000.0 + (($index + 1) * 2500000.0);
+            foreach (range(0, self::MIN_SEED_ROWS) as $i) {
+                $stakeholderName = $i === 0 ? 'Rian' : sprintf('Pemegang Saham %03d', $i + 1);
+                $capital = $index === 0 ? 250000000.0 : 100000000.0 + (($i + 1) * 2500000.0);
 
-            /** @var CapitalCompany $record */
-            $record = $existingByKey->get($company->id.'|'.$stakeholderName) ?? new CapitalCompany([
-                'company_id' => $company->id,
-                'stakeholder_name' => $stakeholderName,
-            ]);
-            $record->capital = $capital;
-            $record->deleted_at = null;
-            $record->save();
+                /** @var CapitalCompany $record */
+                $record = $existingByKey->get($company->id.'|'.$stakeholderName) ?? new CapitalCompany([
+                    'company_id' => $company->id,
+                    'stakeholder_name' => $stakeholderName,
+                ]);
+                $record->capital = $capital;
+                $record->deleted_at = null;
+                $record->save();
+            }
+
         }
     }
 
