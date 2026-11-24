@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Enums\ItemType;
 use App\Models\Item;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -16,9 +17,16 @@ class ItemResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $type = $this->type instanceof ItemType
+            ? $this->type->value
+            : ($this->type ?? ItemType::Bahan->value);
+
         return [
             'id' => (int) $this->id,
+            'company_id' => (int) $this->company_id,
             'name' => $this->name,
+            'type' => $type,
+            'company' => $this->whenLoaded('company', fn ($company) => $company !== null ? new CompanyResource($company) : null),
             'item_packets' => ItemPacketResource::collection($this->whenLoaded('itemPackets')),
             'packets' => PacketResource::collection($this->whenLoaded('packets')),
             'created_at' => $this->created_at?->toISOString(),

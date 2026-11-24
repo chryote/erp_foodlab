@@ -2,10 +2,12 @@
 
 namespace App\Modules\CPO\Requests;
 
+use App\Enums\ItemType;
 use App\Models\Item;
 use App\Support\InputNormalizer;
 use App\Support\WriteGuard;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class SaveItemRequest extends FormRequest
@@ -17,10 +19,16 @@ class SaveItemRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        if ($this->has('name') && is_string($this->input('name'))) {
-            $this->merge([
-                'name' => InputNormalizer::text($this->input('name')),
-            ]);
+        $normalized = [];
+
+        foreach (['company_id', 'name', 'type'] as $field) {
+            if ($this->has($field) && is_string($this->input($field))) {
+                $normalized[$field] = InputNormalizer::text($this->input($field));
+            }
+        }
+
+        if ($normalized !== []) {
+            $this->merge($normalized);
         }
     }
 
@@ -32,7 +40,13 @@ class SaveItemRequest extends FormRequest
         $presence = $this->isMethod('PATCH') ? ['sometimes', 'required'] : ['required'];
 
         return [
+            'company_id' => [
+                ...$presence,
+                'integer',
+                Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
             'name' => [...$presence, 'string', 'max:150'],
+            'type' => ['sometimes', 'required', 'string', Rule::enum(ItemType::class)],
         ];
     }
 
@@ -43,12 +57,33 @@ class SaveItemRequest extends FormRequest
     {
         return [
             function (Validator $validator): void {
-                if ($validator->errors()->has('name')) {
+                /** @var Item|null $item */
+                $item = $this->route('item');
+
+                if (
+                    $item instanceof Item
+                    && $this->filled('company_id')
+                    && ! $validator->errors()->has('company_id')
+                    && (int) $this->input('company_id') !== (int) $item->company_id
+                    && $item->itemPackets()->exists()
+                ) {
+                    $validator->errors()->add(
+                        'company_id',
+                        'Tidak dapat mengubah perusahaan karena item masih terhubung dengan paket aktif.'
+                    );
+                }
+
+                if ($validator->errors()->hasAny(['company_id', 'name'])) {
                     return;
                 }
 
-                /** @var Item|null $item */
-                $item = $this->route('item');
+                $effectiveCompanyId = $this->filled('company_id')
+                    ? (int) $this->input('company_id')
+                    : (int) ($item?->company_id ?? 0);
+
+                if ($effectiveCompanyId <= 0) {
+                    return;
+                }
 
                 $effectiveName = $this->has('name')
                     ? InputNormalizer::text((string) $this->input('name'))
@@ -58,10 +93,10 @@ class SaveItemRequest extends FormRequest
                     Item::query(),
                     'name',
                     $effectiveName,
-                    [],
+                    ['company_id' => $effectiveCompanyId],
                     $item?->getKey()
                 )) {
-                    $validator->errors()->add('name', 'Item dengan nama yang sama sudah terdaftar.');
+                    $validator->errors()->add('name', 'Item dengan nama yang sama sudah terdaftar pada perusahaan ini.');
                 }
             },
         ];
@@ -73,9 +108,20 @@ class SaveItemRequest extends FormRequest
     public function payload(): array
     {
         $validated = $this->validated();
+        $isPatch = $this->isMethod('PATCH');
+        /** @var Item|null $routeItem */
+        $routeItem = $this->route('item');
+
+        if (array_key_exists('company_id', $validated)) {
+            $validated['company_id'] = (int) $validated['company_id'];
+        }
 
         if (array_key_exists('name', $validated)) {
             $validated['name'] = InputNormalizer::text((string) $validated['name']) ?? '';
+        }
+
+        if (! array_key_exists('type', $validated) && ! $isPatch && ! ($routeItem instanceof Item)) {
+            $validated['type'] = ItemType::Bahan->value;
         }
 
         return $validated;

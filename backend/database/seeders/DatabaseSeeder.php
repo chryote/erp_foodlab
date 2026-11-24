@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Enums\Agama;
 use App\Enums\AttendanceStatusEnum;
 use App\Enums\GolonganDarah;
+use App\Enums\ItemType;
 use App\Enums\JenisDokumen;
 use App\Enums\JenisKelamin;
 use App\Enums\PayrollGroup;
@@ -56,9 +57,9 @@ class DatabaseSeeder extends Seeder
             $this->seedEmployeeShifts();
             $this->seedEmployeeShiftAssignments();
             $this->seedEmployeeAttendances();
-            $this->seedCpoItems();
+            $this->seedCpoItems($company);
             $this->seedCpoPackets();
-            $this->seedCpoItemPackets();
+            $this->seedCpoItemPackets($company);
         });
 
         Cache::flush();
@@ -754,16 +755,28 @@ class DatabaseSeeder extends Seeder
         PayrollItemService::syncPayrollRunTotals($payrollRun);
     }
 
-    private function seedCpoItems(): void
+    private function seedCpoItems(Company $company): void
     {
-        foreach (['Apple', 'Banana', 'Orange', 'Jackfruit'] as $name) {
+        $items = [
+            ['name' => 'Apple', 'type' => ItemType::Bahan],
+            ['name' => 'Banana', 'type' => ItemType::Bahan],
+            ['name' => 'Orange', 'type' => ItemType::Bahan],
+            ['name' => 'Jackfruit', 'type' => ItemType::Bahan],
+            ['name' => 'Blender Lab', 'type' => ItemType::Peralatan],
+            ['name' => 'Timbangan Digital', 'type' => ItemType::Peralatan],
+        ];
+
+        foreach ($items as $entry) {
             $item = Item::query()
                 ->withTrashed()
-                ->where('name', $name)
+                ->where('company_id', $company->id)
+                ->where('name', $entry['name'])
                 ->orderByRaw('deleted_at IS NOT NULL')
                 ->first() ?? new Item();
 
-            $item->name = $name;
+            $item->company_id = $company->id;
+            $item->name = $entry['name'];
+            $item->type = $entry['type'];
             $item->deleted_at = null;
             $item->save();
         }
@@ -784,7 +797,7 @@ class DatabaseSeeder extends Seeder
         }
     }
 
-    private function seedCpoItemPackets(): void
+    private function seedCpoItemPackets(Company $company): void
     {
         $packets = Packet::query()
             ->whereIn('name', ['Paket A', 'Paket B'])
@@ -792,7 +805,8 @@ class DatabaseSeeder extends Seeder
             ->keyBy('name');
 
         $items = Item::query()
-            ->whereIn('name', ['Apple', 'Banana', 'Orange', 'Jackfruit'])
+            ->where('company_id', $company->id)
+            ->whereIn('name', ['Apple', 'Banana', 'Orange', 'Jackfruit', 'Blender Lab'])
             ->get()
             ->keyBy('name');
 
@@ -805,6 +819,7 @@ class DatabaseSeeder extends Seeder
             'Paket B' => [
                 ['item' => 'Apple', 'quantity' => 1],
                 ['item' => 'Jackfruit', 'quantity' => 1],
+                ['item' => 'Blender Lab', 'quantity' => 1],
             ],
         ];
 
@@ -822,11 +837,13 @@ class DatabaseSeeder extends Seeder
 
                 $itemPacket = ItemPacket::query()
                     ->withTrashed()
+                    ->where('company_id', $company->id)
                     ->where('packet_id', $packet->id)
                     ->where('item_id', $item->id)
                     ->orderByRaw('deleted_at IS NOT NULL')
                     ->first() ?? new ItemPacket();
 
+                $itemPacket->company_id = $company->id;
                 $itemPacket->packet_id = $packet->id;
                 $itemPacket->item_id = $item->id;
                 $itemPacket->quantity = $entry['quantity'];

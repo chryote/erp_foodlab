@@ -2,6 +2,7 @@
 
 namespace App\Modules\CPO\Services;
 
+use App\Models\Company;
 use App\Models\Item;
 use App\Models\ItemPacket;
 use App\Models\Packet;
@@ -24,7 +25,7 @@ class ItemPacketService
     /**
      * @var array<int, string>
      */
-    private const RELATIONS = ['packet', 'item'];
+    private const RELATIONS = ['company', 'packet', 'item'];
 
     /**
      * @return LengthAwarePaginator|Collection<int, ItemPacket>
@@ -32,6 +33,8 @@ class ItemPacketService
     public function list(Request $request): LengthAwarePaginator|Collection
     {
         $query = IndexQuery::withDefaultRelations($this->query($request), $request, self::RELATIONS);
+
+        IndexQuery::applyActiveCompanyFilter($query->getEloquentBuilder(), $request);
 
         if (IndexQuery::isPaginated($request)) {
             return IndexQuery::paginate($query, $request);
@@ -49,14 +52,16 @@ class ItemPacketService
      */
     public function createItemPacket(array $attributes): ItemPacket
     {
+        $attributes['company_id'] = (int) $attributes['company_id'];
         $attributes['quantity'] = (int) ($attributes['quantity'] ?? 1);
 
         $itemPacket = DB::transaction(function () use ($attributes): ItemPacket {
+            $companyId = (int) $attributes['company_id'];
             $packetId = (int) $attributes['packet_id'];
             $itemId = (int) $attributes['item_id'];
 
-            $this->assertActiveParents($packetId, $itemId);
-            $this->assertPairUnique($packetId, $itemId);
+            $this->assertActiveParents($companyId, $packetId, $itemId);
+            $this->assertPairUnique($companyId, $packetId, $itemId);
 
             return ItemPacket::query()->create($attributes);
         });
@@ -71,14 +76,19 @@ class ItemPacketService
      */
     public function updateItemPacket(ItemPacket $itemPacket, array $attributes): ItemPacket
     {
+        if (array_key_exists('company_id', $attributes)) {
+            $attributes['company_id'] = (int) $attributes['company_id'];
+        }
+
         $updated = DB::transaction(function () use ($itemPacket, $attributes): ItemPacket {
             $locked = ItemPacket::query()->lockForUpdate()->findOrFail($itemPacket->getKey());
 
+            $targetCompanyId = (int) ($attributes['company_id'] ?? $locked->company_id);
             $targetPacketId = (int) ($attributes['packet_id'] ?? $locked->packet_id);
             $targetItemId = (int) ($attributes['item_id'] ?? $locked->item_id);
 
-            $this->assertActiveParents($targetPacketId, $targetItemId);
-            $this->assertPairUnique($targetPacketId, $targetItemId, $locked->getKey());
+            $this->assertActiveParents($targetCompanyId, $targetPacketId, $targetItemId);
+            $this->assertPairUnique($targetCompanyId, $targetPacketId, $targetItemId, $locked->getKey());
 
             $locked->update($attributes);
 
@@ -104,8 +114,38 @@ class ItemPacketService
     {
         return IndexQuery::make(ItemPacket::class, $request)
             ->allowedFilters([
+                AllowedFilter::exact('company_id'),
                 AllowedFilter::exact('packet_id'),
                 AllowedFilter::exact('item_id'),
+                AllowedFilter::callback('item_type', function (Builder $query, mixed $value): void {
+                    if (is_array($value)) {
+                        return;
+                    }
+
+                    $trimmed = trim((string) $value);
+                    if ($trimmed === '') {
+                        return;
+                    }
+
+                    $query->whereHas('item', fn (Builder $itemQuery) => $itemQuery->where('type', $trimmed));
+                }),
+                AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
+                    $escaped = IndexQuery::escapeLike($value);
+                    if ($escaped === null) {
+                        return;
+                    }
+
+                    $query->where(function (Builder $searchQuery) use ($escaped): void {
+                        $searchQuery->whereHas(
+                            'item',
+                            fn (Builder $itemQuery) => IndexQuery::whereLike($itemQuery, 'name', $escaped)
+                        );
+                        $searchQuery->orWhereHas(
+                            'packet',
+                            fn (Builder $packetQuery) => IndexQuery::whereLike($packetQuery, 'name', $escaped)
+                        );
+                    });
+                }),
                 AllowedFilter::callback('quantity_min', function (Builder $query, mixed $value): void {
                     if (is_array($value)) {
                         return;
@@ -131,13 +171,25 @@ class ItemPacketService
                     $query->where('quantity', '<=', (int) $trimmed);
                 }),
             ])
-            ->allowedSorts(['id', 'packet_id', 'item_id', 'quantity', 'created_at', 'updated_at'])
+            ->allowedSorts(['id', 'company_id', 'packet_id', 'item_id', 'quantity', 'created_at', 'updated_at'])
             ->allowedIncludes(self::RELATIONS)
             ->defaultSort('id');
     }
 
-    private function assertActiveParents(int $packetId, int $itemId): void
+    private function assertActiveParents(int $companyId, int $packetId, int $itemId): void
     {
+        $companyExists = Company::query()
+            ->whereNull('deleted_at')
+            ->sharedLock()
+            ->whereKey($companyId)
+            ->exists();
+
+        if (! $companyExists) {
+            throw ValidationException::withMessages([
+                'company_id' => ['The selected company is invalid or has been deleted.'],
+            ]);
+        }
+
         $packetExists = Packet::query()
             ->whereNull('deleted_at')
             ->sharedLock()
@@ -150,28 +202,36 @@ class ItemPacketService
             ]);
         }
 
-        $itemExists = Item::query()
+        $item = Item::query()
             ->whereNull('deleted_at')
             ->sharedLock()
-            ->whereKey($itemId)
-            ->exists();
+            ->find($itemId);
 
-        if (! $itemExists) {
+        if ($item === null) {
             throw ValidationException::withMessages([
                 'item_id' => ['The selected item is invalid or has been deleted.'],
             ]);
         }
+
+        if ((int) $item->company_id !== $companyId) {
+            throw ValidationException::withMessages([
+                'item_id' => ['The selected item does not belong to the selected company.'],
+            ]);
+        }
     }
 
-    private function assertPairUnique(int $packetId, int $itemId, mixed $ignoreKey = null): void
+    private function assertPairUnique(int $companyId, int $packetId, int $itemId, mixed $ignoreKey = null): void
     {
         WriteGuard::assertUniqueActive(
             ItemPacket::query(),
             'item_id',
             (string) $itemId,
-            ['packet_id' => $packetId],
+            [
+                'company_id' => $companyId,
+                'packet_id' => $packetId,
+            ],
             'item_id',
-            'Item sudah terdaftar pada paket ini.',
+            'Item sudah terdaftar pada paket ini untuk perusahaan ini.',
             $ignoreKey,
             true
         );

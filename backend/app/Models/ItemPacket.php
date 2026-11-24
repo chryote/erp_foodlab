@@ -14,6 +14,7 @@ class ItemPacket extends Model
     protected $table = 'item_packet';
 
     protected $fillable = [
+        'company_id',
         'packet_id',
         'item_id',
         'quantity',
@@ -23,11 +24,20 @@ class ItemPacket extends Model
         'active_flag',
     ];
 
-    protected $casts = [
-        'packet_id' => 'integer',
-        'item_id' => 'integer',
-        'quantity' => 'integer',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'company_id' => 'integer',
+            'packet_id' => 'integer',
+            'item_id' => 'integer',
+            'quantity' => 'integer',
+        ];
+    }
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
+    }
 
     public function packet(): BelongsTo
     {

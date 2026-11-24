@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ItemType;
 use App\Http\Resources\ItemPacketResource;
 use App\Models\Company;
 use App\Models\Item;
@@ -25,9 +26,21 @@ describe('ItemPacket CPO module', function () {
 
         $packetA = Packet::factory()->create(['name' => 'Paket Alpha']);
         $packetB = Packet::factory()->create(['name' => 'Paket Beta']);
-        $apple = Item::factory()->create(['name' => 'Apple']);
-        $banana = Item::factory()->create(['name' => 'Banana']);
-        $orange = Item::factory()->create(['name' => 'Orange']);
+        $apple = Item::factory()->create([
+            'company_id' => $companyA->id,
+            'name' => 'Apple 100%',
+            'type' => ItemType::Bahan,
+        ]);
+        $banana = Item::factory()->create([
+            'company_id' => $companyA->id,
+            'name' => 'Banana',
+            'type' => ItemType::Bahan,
+        ]);
+        $mixer = Item::factory()->create([
+            'company_id' => $companyB->id,
+            'name' => 'Mixer Lab',
+            'type' => ItemType::Peralatan,
+        ]);
 
         // Warm dependent caches to verify writes invalidate CPO overview, Packets, and Items caches
         $this->getJson('/api/v1/modules/cpo')->assertOk();
@@ -39,6 +52,7 @@ describe('ItemPacket CPO module', function () {
 
         // Create via SaveItemPacketRequest + DB::transaction (default quantity = 1 when omitted)
         $createDefaultRes = $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'company_id' => $companyA->id,
             'packet_id' => $packetA->id,
             'item_id' => $apple->id,
         ]);
@@ -47,23 +61,26 @@ describe('ItemPacket CPO module', function () {
             ->assertJsonStructure([
                 'data' => [
                     'id',
+                    'company_id',
                     'packet_id',
                     'item_id',
                     'quantity',
+                    'company' => ['id', 'name'],
                     'packet' => ['id', 'name'],
-                    'item' => ['id', 'name'],
+                    'item' => ['id', 'company_id', 'name', 'type'],
                     'created_at',
                     'updated_at',
                     'deleted_at',
                 ],
             ])
             ->assertJsonMissingPath('data.active_flag')
-            ->assertJsonMissingPath('data.company_id')
+            ->assertJsonPath('data.company_id', $companyA->id)
             ->assertJsonPath('data.packet_id', $packetA->id)
             ->assertJsonPath('data.item_id', $apple->id)
             ->assertJsonPath('data.quantity', 1)
+            ->assertJsonPath('data.company.name', 'PT. Foodlab Alpha')
             ->assertJsonPath('data.packet.name', 'Paket Alpha')
-            ->assertJsonPath('data.item.name', 'Apple');
+            ->assertJsonPath('data.item.name', 'Apple 100%');
 
         expect(Cache::has(CpoService::CACHE_KEY))->toBeFalse();
         expect(Cache::has(PacketService::CACHE_KEY_LIST))->toBeFalse();
@@ -71,16 +88,18 @@ describe('ItemPacket CPO module', function () {
 
         $firstId = $createDefaultRes->json('data.id');
 
-        // Create additional records with explicit quantities
+        // Create additional records with explicit quantities across companies
         $second = $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'company_id' => $companyA->id,
             'packet_id' => $packetA->id,
             'item_id' => $banana->id,
             'quantity' => 5,
         ])->assertCreated()->assertJsonPath('data.quantity', 5);
 
         $third = $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'company_id' => $companyB->id,
             'packet_id' => $packetB->id,
-            'item_id' => $orange->id,
+            'item_id' => $mixer->id,
             'quantity' => 10,
         ])->assertCreated()->assertJsonPath('data.quantity', 10);
 
@@ -100,24 +119,45 @@ describe('ItemPacket CPO module', function () {
 
         expect(Cache::has(ItemPacketService::CACHE_KEY_LIST))->toBeTrue();
 
-        // Company-agnostic: ?active_company=1 does not filter item-packets out
+        // Tenant-scoped ?active_company=1 filters item-packets to the active company
         $this->getJson('/api/v1/modules/cpo/item-packets?active_company=1', [
             'X-Active-Company-Id' => (string) $companyA->id,
-        ])->assertOk()->assertJsonCount(3, 'data');
+        ])->assertOk()->assertJsonCount(2, 'data');
 
         $this->getJson('/api/v1/modules/cpo/item-packets?active_company=1', [
             'X-Active-Company-Id' => (string) $companyB->id,
-        ])->assertOk()->assertJsonCount(3, 'data');
+        ])->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $thirdId);
 
-        // Filters: packet_id, item_id, quantity_min, quantity_max
+        // Filters: company_id, packet_id, item_id, item_type, search, quantity_min, quantity_max
+        $this->getJson("/api/v1/modules/cpo/item-packets?filter[company_id]={$companyB->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $thirdId);
+
         $this->getJson("/api/v1/modules/cpo/item-packets?filter[packet_id]={$packetA->id}")
             ->assertOk()
             ->assertJsonCount(2, 'data');
 
-        $this->getJson("/api/v1/modules/cpo/item-packets?filter[item_id]={$orange->id}")
+        $this->getJson("/api/v1/modules/cpo/item-packets?filter[item_id]={$mixer->id}")
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', $thirdId);
+
+        $this->getJson('/api/v1/modules/cpo/item-packets?filter[item_type]=Peralatan')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $thirdId);
+
+        $this->getJson('/api/v1/modules/cpo/item-packets?filter[search]='.urlencode('100%'))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $firstId);
+
+        $this->getJson('/api/v1/modules/cpo/item-packets?filter[search]=%20%20%20')
+            ->assertOk()
+            ->assertJsonCount(3, 'data');
 
         $this->getJson('/api/v1/modules/cpo/item-packets?filter[quantity_min]=5&filter[quantity_max]=10')
             ->assertOk()
@@ -154,10 +194,12 @@ describe('ItemPacket CPO module', function () {
             ->assertOk()
             ->assertJsonCount(3, 'data')
             ->assertJsonPath('data.0.packet.id', $packetA->id)
-            ->assertJsonMissingPath('data.0.item');
+            ->assertJsonMissingPath('data.0.item')
+            ->assertJsonMissingPath('data.0.company');
 
-        $this->getJson('/api/v1/modules/cpo/item-packets?include=packet,item')
+        $this->getJson('/api/v1/modules/cpo/item-packets?include=company,packet,item')
             ->assertOk()
+            ->assertJsonPath('data.0.company.id', $companyA->id)
             ->assertJsonPath('data.0.packet.id', $packetA->id)
             ->assertJsonPath('data.0.item.id', $apple->id);
 
@@ -165,11 +207,13 @@ describe('ItemPacket CPO module', function () {
         $this->getJson("/api/v1/modules/cpo/item-packets/{$firstId}")
             ->assertOk()
             ->assertJsonPath('data.id', $firstId)
+            ->assertJsonPath('data.company.name', 'PT. Foodlab Alpha')
             ->assertJsonPath('data.packet.name', 'Paket Alpha')
-            ->assertJsonPath('data.item.name', 'Apple');
+            ->assertJsonPath('data.item.name', 'Apple 100%');
 
-        // PUT update keeping same (packet_id, item_id) and updating quantity
+        // PUT update keeping same (company_id, packet_id, item_id) and updating quantity
         $this->putJson("/api/v1/modules/cpo/item-packets/{$firstId}", [
+            'company_id' => $companyA->id,
             'packet_id' => $packetA->id,
             'item_id' => $apple->id,
             'quantity' => 3,
@@ -181,22 +225,25 @@ describe('ItemPacket CPO module', function () {
         // Partial PATCH with empty payload keeps existing values
         $this->patchJson("/api/v1/modules/cpo/item-packets/{$firstId}", [])
             ->assertOk()
+            ->assertJsonPath('data.company_id', $companyA->id)
             ->assertJsonPath('data.packet_id', $packetA->id)
             ->assertJsonPath('data.item_id', $apple->id)
             ->assertJsonPath('data.quantity', 3);
 
-        // Partial PATCH updating only quantity preserves packet_id and item_id
+        // Partial PATCH updating only quantity preserves company_id, packet_id, and item_id
         $this->patchJson("/api/v1/modules/cpo/item-packets/{$firstId}", [
             'quantity' => 7,
         ])->assertOk()
+            ->assertJsonPath('data.company_id', $companyA->id)
             ->assertJsonPath('data.packet_id', $packetA->id)
             ->assertJsonPath('data.item_id', $apple->id)
             ->assertJsonPath('data.quantity', 7);
 
-        // Partial PATCH updating only packet_id preserves item_id and quantity
+        // Partial PATCH updating only packet_id preserves company_id, item_id, and quantity
         $this->patchJson("/api/v1/modules/cpo/item-packets/{$firstId}", [
             'packet_id' => $packetB->id,
         ])->assertOk()
+            ->assertJsonPath('data.company_id', $companyA->id)
             ->assertJsonPath('data.packet_id', $packetB->id)
             ->assertJsonPath('data.item_id', $apple->id)
             ->assertJsonPath('data.quantity', 7);
@@ -220,26 +267,33 @@ describe('ItemPacket CPO module', function () {
         $this->getJson("/api/v1/modules/cpo/item-packets/{$firstId}")->assertNotFound();
     });
 
-    it('enforces quantity bounds, soft-deleted parent rejection, active-duplicate rejection, and reuse after soft delete', function () {
+    it('enforces quantity bounds, cross-company item rejection, soft-deleted parent rejection, active-duplicate rejection, and reuse after soft delete', function () {
+        $companyA = Company::factory()->create(['name' => 'PT. Pivot Alpha']);
+        $companyB = Company::factory()->create(['name' => 'PT. Pivot Beta']);
+
         $packetA = Packet::factory()->create(['name' => 'Paket Satu']);
         $packetB = Packet::factory()->create(['name' => 'Paket Dua']);
-        $itemA = Item::factory()->create(['name' => 'Item Satu']);
-        $itemB = Item::factory()->create(['name' => 'Item Dua']);
+        $itemA = Item::factory()->create(['company_id' => $companyA->id, 'name' => 'Item Satu']);
+        $itemB = Item::factory()->create(['company_id' => $companyA->id, 'name' => 'Item Dua']);
+        $itemOtherCompany = Item::factory()->create(['company_id' => $companyB->id, 'name' => 'Item Beta']);
 
-        // Quantity bounds: 0, negative, non-integer, and > 4294967295 fail with 422
+        // Quantity bounds: 0, negative, and > 4294967295 fail with 422
         $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'company_id' => $companyA->id,
             'packet_id' => $packetA->id,
             'item_id' => $itemA->id,
             'quantity' => 0,
         ])->assertUnprocessable()->assertJsonValidationErrors(['quantity']);
 
         $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'company_id' => $companyA->id,
             'packet_id' => $packetA->id,
             'item_id' => $itemA->id,
             'quantity' => -5,
         ])->assertUnprocessable()->assertJsonValidationErrors(['quantity']);
 
         $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'company_id' => $companyA->id,
             'packet_id' => $packetA->id,
             'item_id' => $itemA->id,
             'quantity' => 4294967296,
@@ -247,6 +301,7 @@ describe('ItemPacket CPO module', function () {
 
         // Boundary 4294967295 is valid
         $maxRes = $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'company_id' => $companyA->id,
             'packet_id' => $packetB->id,
             'item_id' => $itemB->id,
             'quantity' => 4294967295,
@@ -254,34 +309,55 @@ describe('ItemPacket CPO module', function () {
         expect($maxRes->json('data.quantity'))->toBe(4294967295);
         $this->deleteJson('/api/v1/modules/cpo/item-packets/'.$maxRes->json('data.id'))->assertOk();
 
+        // Cross-company item_id is rejected with 422
+        $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'company_id' => $companyA->id,
+            'packet_id' => $packetA->id,
+            'item_id' => $itemOtherCompany->id,
+            'quantity' => 2,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['item_id']);
+
         // Soft-deleted parent rejection
+        $deletedCompany = Company::factory()->create(['name' => 'PT. Terhapus']);
+        $deletedCompany->delete();
         $deletedPacket = Packet::factory()->create(['name' => 'Paket Terhapus']);
         $deletedPacket->delete();
-        $deletedItem = Item::factory()->create(['name' => 'Item Terhapus']);
+        $deletedItem = Item::factory()->create(['company_id' => $companyA->id, 'name' => 'Item Terhapus']);
         $deletedItem->delete();
 
         $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'company_id' => $deletedCompany->id,
+            'packet_id' => $packetA->id,
+            'item_id' => $itemA->id,
+            'quantity' => 1,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['company_id']);
+
+        $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'company_id' => $companyA->id,
             'packet_id' => $deletedPacket->id,
             'item_id' => $itemA->id,
             'quantity' => 1,
         ])->assertUnprocessable()->assertJsonValidationErrors(['packet_id']);
 
         $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'company_id' => $companyA->id,
             'packet_id' => $packetA->id,
             'item_id' => $deletedItem->id,
             'quantity' => 1,
         ])->assertUnprocessable()->assertJsonValidationErrors(['item_id']);
 
-        // Create active pair (packetA, itemA)
+        // Create active tuple (companyA, packetA, itemA)
         $first = $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'company_id' => $companyA->id,
             'packet_id' => $packetA->id,
             'item_id' => $itemA->id,
             'quantity' => 2,
         ])->assertCreated();
         $firstId = $first->json('data.id');
 
-        // Duplicate (packetA, itemA) fails with 422
+        // Duplicate (companyA, packetA, itemA) fails with 422
         $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'company_id' => $companyA->id,
             'packet_id' => $packetA->id,
             'item_id' => $itemA->id,
             'quantity' => 4,
@@ -289,14 +365,24 @@ describe('ItemPacket CPO module', function () {
 
         // Same item in different packet succeeds
         $second = $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'company_id' => $companyA->id,
             'packet_id' => $packetB->id,
             'item_id' => $itemA->id,
             'quantity' => 3,
         ])->assertCreated();
         $secondId = $second->json('data.id');
 
-        // Updating via PUT or partial PATCH into colliding (packetA, itemA) fails with 422
+        // Same packet in a different company (with that company's own item) succeeds
+        $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'company_id' => $companyB->id,
+            'packet_id' => $packetA->id,
+            'item_id' => $itemOtherCompany->id,
+            'quantity' => 3,
+        ])->assertCreated();
+
+        // Updating via PUT or partial PATCH into colliding (companyA, packetA, itemA) fails with 422
         $this->putJson("/api/v1/modules/cpo/item-packets/{$secondId}", [
+            'company_id' => $companyA->id,
             'packet_id' => $packetA->id,
             'item_id' => $itemA->id,
             'quantity' => 3,
@@ -306,10 +392,16 @@ describe('ItemPacket CPO module', function () {
             'packet_id' => $packetA->id,
         ])->assertUnprocessable()->assertJsonValidationErrors(['item_id']);
 
-        // Soft-deleting (packetA, itemA) frees the pair for re-creation
+        // Partial PATCH changing company_id to companyB without matching item fails cross-company check
+        $this->patchJson("/api/v1/modules/cpo/item-packets/{$secondId}", [
+            'company_id' => $companyB->id,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['item_id']);
+
+        // Soft-deleting (companyA, packetA, itemA) frees the tuple for re-creation
         $this->deleteJson("/api/v1/modules/cpo/item-packets/{$firstId}")->assertOk();
 
         $recreated = $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'company_id' => $companyA->id,
             'packet_id' => $packetA->id,
             'item_id' => $itemA->id,
             'quantity' => 9,
@@ -318,17 +410,21 @@ describe('ItemPacket CPO module', function () {
         expect($recreated->json('data.id'))->not->toBe($firstId);
     });
 
-    it('cascades parent packet or item soft-delete to item_packet rows and clears caches', function () {
+    it('cascades parent packet, item, or company soft-delete to dependent CPO rows and clears caches', function () {
+        $company = Company::factory()->create(['name' => 'PT. Cascade']);
         $packet = Packet::factory()->create(['name' => 'Paket Cascade']);
-        $item = Item::factory()->create(['name' => 'Item Cascade']);
-        $item2 = Item::factory()->create(['name' => 'Item Cascade 2']);
+        $item = Item::factory()->create(['company_id' => $company->id, 'name' => 'Item Cascade']);
+        $item2 = Item::factory()->create(['company_id' => $company->id, 'name' => 'Item Cascade 2']);
+        $item3 = Item::factory()->create(['company_id' => $company->id, 'name' => 'Item Cascade 3']);
 
         $pivot1 = ItemPacket::factory()->create([
+            'company_id' => $company->id,
             'packet_id' => $packet->id,
             'item_id' => $item->id,
             'quantity' => 2,
         ]);
         $pivot2 = ItemPacket::factory()->create([
+            'company_id' => $company->id,
             'packet_id' => $packet->id,
             'item_id' => $item2->id,
             'quantity' => 4,
@@ -347,12 +443,36 @@ describe('ItemPacket CPO module', function () {
         $this->deleteJson("/api/v1/modules/cpo/packets/{$packet->id}")->assertOk();
         $this->assertSoftDeleted('item_packet', ['id' => $pivot2->id]);
         expect(Cache::has(ItemPacketService::CACHE_KEY_LIST))->toBeFalse();
+
+        // Deleting company soft-deletes remaining items and item_packets and clears CPO caches
+        $packet2 = Packet::factory()->create(['name' => 'Paket Company Cascade']);
+        $pivot3 = ItemPacket::factory()->create([
+            'company_id' => $company->id,
+            'packet_id' => $packet2->id,
+            'item_id' => $item3->id,
+            'quantity' => 5,
+        ]);
+
+        $this->getJson('/api/v1/modules/cpo/items')->assertOk();
+        $this->getJson('/api/v1/modules/cpo/item-packets')->assertOk();
+        expect(Cache::has(ItemService::CACHE_KEY_LIST))->toBeTrue();
+        expect(Cache::has(ItemPacketService::CACHE_KEY_LIST))->toBeTrue();
+
+        $this->deleteJson("/api/v1/modules/cfo/companies/{$company->id}")->assertOk();
+
+        $this->assertSoftDeleted('items', ['id' => $item2->id]);
+        $this->assertSoftDeleted('items', ['id' => $item3->id]);
+        $this->assertSoftDeleted('item_packet', ['id' => $pivot3->id]);
+        expect(Cache::has(ItemService::CACHE_KEY_LIST))->toBeFalse();
+        expect(Cache::has(ItemPacketService::CACHE_KEY_LIST))->toBeFalse();
     });
 
     it('renders ItemPacketResource conditional relations cleanly and serves OpenAPI docs', function () {
+        $company = Company::factory()->create(['name' => 'PT. Resource']);
         $packet = Packet::factory()->create(['name' => 'Paket Resource']);
-        $item = Item::factory()->create(['name' => 'Item Resource']);
+        $item = Item::factory()->create(['company_id' => $company->id, 'name' => 'Item Resource']);
         $itemPacket = ItemPacket::factory()->create([
+            'company_id' => $company->id,
             'packet_id' => $packet->id,
             'item_id' => $item->id,
             'quantity' => 3,
@@ -360,12 +480,14 @@ describe('ItemPacket CPO module', function () {
 
         $unloaded = (new ItemPacketResource($itemPacket))->resolve(Request::create('/'));
         expect($unloaded)
-            ->toHaveKeys(['id', 'packet_id', 'item_id', 'quantity', 'created_at', 'updated_at', 'deleted_at'])
+            ->toHaveKeys(['id', 'company_id', 'packet_id', 'item_id', 'quantity', 'created_at', 'updated_at', 'deleted_at'])
+            ->not->toHaveKey('company')
             ->not->toHaveKey('packet')
             ->not->toHaveKey('item');
 
-        $itemPacket->load(['packet', 'item']);
+        $itemPacket->load(['company', 'packet', 'item']);
         $loaded = (new ItemPacketResource($itemPacket))->resolve(Request::create('/'));
+        expect($loaded['company']['name'])->toBe('PT. Resource');
         expect($loaded['packet']['name'])->toBe('Paket Resource');
         expect($loaded['item']['name'])->toBe('Item Resource');
 

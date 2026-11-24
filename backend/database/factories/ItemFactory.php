@@ -2,6 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Enums\ItemType;
+use App\Models\Company;
 use App\Models\Item;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -19,7 +21,9 @@ class ItemFactory extends Factory
         $seq = self::$sequence++;
 
         return [
+            'company_id' => Company::factory(),
             'name' => ucfirst($this->faker->unique()->words(2, true)).' #'.$seq,
+            'type' => ItemType::Bahan,
         ];
     }
 }

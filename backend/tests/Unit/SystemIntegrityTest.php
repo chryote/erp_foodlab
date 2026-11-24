@@ -129,6 +129,23 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
 
         expect($nadia->employee_attendance_code)->toBe('NadiaSTAFFA'.$nadia->id);
         expect($budi->employee_attendance_code)->toBe('BudiSTAFFB'.$budi->id);
+
+        $seededItems = \App\Models\Item::query()->get();
+        $companyIds = \App\Models\Company::query()->pluck('id')->all();
+        expect($seededItems)->not->toBeEmpty();
+        expect($seededItems->pluck('type')->contains(\App\Enums\ItemType::Bahan))->toBeTrue();
+        expect($seededItems->pluck('type')->contains(\App\Enums\ItemType::Peralatan))->toBeTrue();
+        foreach ($seededItems as $seededItem) {
+            expect($companyIds)->toContain($seededItem->company_id);
+            expect($seededItem->type)->toBeInstanceOf(\App\Enums\ItemType::class);
+        }
+
+        $seededItemPackets = \App\Models\ItemPacket::query()->with('item')->get();
+        expect($seededItemPackets)->not->toBeEmpty();
+        foreach ($seededItemPackets as $seededItemPacket) {
+            expect($companyIds)->toContain($seededItemPacket->company_id);
+            expect($seededItemPacket->company_id)->toBe($seededItemPacket->item?->company_id);
+        }
     });
 
     it('verifies all registered GET API endpoints return 200 OK with CORS headers after seeding', function () {

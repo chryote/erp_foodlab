@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Company;
 use App\Models\Item;
 use App\Models\ItemPacket;
 use App\Models\Packet;
@@ -17,8 +18,11 @@ class ItemPacketFactory extends Factory
     public function definition(): array
     {
         return [
+            'company_id' => Company::factory(),
             'packet_id' => Packet::factory(),
-            'item_id' => Item::factory(),
+            'item_id' => fn (array $attributes): mixed => Item::factory()->create([
+                'company_id' => $attributes['company_id'],
+            ])->id,
             'quantity' => 1,
         ];
     }

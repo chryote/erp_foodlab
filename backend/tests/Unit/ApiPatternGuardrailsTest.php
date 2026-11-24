@@ -129,7 +129,9 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
         $companyService = File::get(app_path('Modules/CFO/Services/CompanyService.php'));
         expect($companyService)
             ->toContain('companyAssets()->delete()')
-            ->toContain('CompanyAssetService::CACHE_KEY_LIST');
+            ->toContain('CompanyAssetService::CACHE_KEY_LIST')
+            ->toContain('items()->delete()')
+            ->toContain('itemPackets()->delete()');
 
         foreach (['EmploymentStatusService.php', 'PayrollGradeService.php', 'TaxStatusService.php', 'EmployeePositionService.php'] as $choMasterService) {
             $masterCode = File::get(app_path('Modules/CHO/Services/'.$choMasterService));
@@ -891,8 +893,12 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
         $companyA = Company::factory()->create(['name' => 'PT. CPO Alpha']);
         $companyB = Company::factory()->create(['name' => 'PT. CPO Beta']);
 
-        Item::factory()->count(4)->create();
-        $specialItem = Item::factory()->create(['name' => 'Gula 100% Murni']);
+        Item::factory()->count(4)->create(['company_id' => $companyA->id]);
+        $specialItem = Item::factory()->create([
+            'company_id' => $companyA->id,
+            'name' => 'Gula 100% Murni',
+            'type' => 'Bahan',
+        ]);
 
         // 1. Pagination cap prevents unbounded ?per_page=99999 dumps
         $this->getJson('/api/v1/modules/cpo/items?page=1&per_page=99999')
@@ -909,6 +915,7 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             ->reject(fn ($q) => str_contains($q['query'], 'personal_access_tokens'));
         DB::disableQueryLog();
 
+        // 1 items select + 1 companies eager load = <= 2 queries
         expect($coldQueries->count())->toBeLessThanOrEqual(2);
         expect($coldQueries->contains(fn ($q) => str_contains(strtoupper($q['query']), 'SUM(')))->toBeFalse();
 
@@ -921,14 +928,14 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
 
         expect($warmQueries)->toHaveCount(0);
 
-        // 4. Company-agnostic ?active_company=1 returns all items regardless of active company header
+        // 4. Tenant-scoped ?active_company=1 filters items to the active company
         $this->getJson('/api/v1/modules/cpo/items?active_company=1', [
             'X-Active-Company-Id' => (string) $companyA->id,
         ])->assertOk()->assertJsonCount(5, 'data');
 
         $this->getJson('/api/v1/modules/cpo/items?active_company=1', [
             'X-Active-Company-Id' => (string) $companyB->id,
-        ])->assertOk()->assertJsonCount(5, 'data');
+        ])->assertOk()->assertJsonCount(0, 'data');
 
         // 5. LIKE wildcard escaping & whitespace-only search
         $this->getJson('/api/v1/modules/cpo/items?filter[search]='.urlencode('100%'))
@@ -940,9 +947,13 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             ->assertOk()
             ->assertJsonCount(5, 'data');
 
-        // 6. Direct DB bypass hits items_name_active_unique, service sharedLock throws ValidationException, and Idempotency-Key deduplicates POSTs
+        // 6. Direct DB bypass hits items_company_name_active_unique, service sharedLock throws ValidationException, and Idempotency-Key deduplicates POSTs
         $idemHeaders = ['Idempotency-Key' => 'idem-cpo-item-001'];
-        $itemPayload = ['name' => '  Tepung   Tapioka  '];
+        $itemPayload = [
+            'company_id' => $companyA->id,
+            'name' => '  Tepung   Tapioka  ',
+            'type' => 'Bahan',
+        ];
 
         $firstPost = $this->postJson('/api/v1/modules/cpo/items', $itemPayload, $idemHeaders)
             ->assertCreated()
@@ -954,17 +965,21 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
 
         expect($replayPost->headers->get('X-Idempotency-Replayed'))->toBe('true');
         expect($replayPost->json('data.id'))->toBe($firstPost->json('data.id'));
-        expect(Item::query()->where('name', 'Tepung Tapioka')->count())->toBe(1);
+        expect(Item::query()->where('company_id', $companyA->id)->where('name', 'Tepung Tapioka')->count())->toBe(1);
 
         $this->postJson('/api/v1/modules/cpo/items', [
+            'company_id' => $companyA->id,
             'name' => 'Tepung Maizena',
+            'type' => 'Bahan',
         ], $idemHeaders)->assertUnprocessable()->assertJsonValidationErrors(['idempotency_key']);
 
         expect(fn () => Item::factory()->create([
+            'company_id' => $companyA->id,
             'name' => 'Tepung Tapioka',
         ]))->toThrow(QueryException::class);
 
         expect(fn () => app(ItemService::class)->createItem([
+            'company_id' => $companyA->id,
             'name' => 'tepung tapioka',
         ]))->toThrow(ValidationException::class);
     });
@@ -1057,10 +1072,11 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
 
         $packetA = Packet::factory()->create(['name' => 'Paket Pivot A']);
         $packetB = Packet::factory()->create(['name' => 'Paket Pivot B']);
-        $items = Item::factory()->count(5)->create();
+        $items = Item::factory()->count(5)->create(['company_id' => $companyA->id]);
 
         foreach ($items as $index => $item) {
             ItemPacket::factory()->create([
+                'company_id' => $companyA->id,
                 'packet_id' => $index < 3 ? $packetA->id : $packetB->id,
                 'item_id' => $item->id,
                 'quantity' => $index + 1,
@@ -1082,8 +1098,8 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             ->reject(fn ($q) => str_contains($q['query'], 'personal_access_tokens'));
         DB::disableQueryLog();
 
-        // 1 item_packet select + 2 eager loads (packet, item) = <= 3 queries
-        expect($coldQueries->count())->toBeLessThanOrEqual(3);
+        // 1 item_packet select + 3 eager loads (company, packet, item) = <= 4 queries
+        expect($coldQueries->count())->toBeLessThanOrEqual(4);
         expect($coldQueries->contains(fn ($q) => str_contains(strtoupper($q['query']), 'SUM(')))->toBeFalse();
 
         // 3. Warm cache hit executes 0 SQL queries
@@ -1095,14 +1111,14 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
 
         expect($warmQueries)->toHaveCount(0);
 
-        // 4. Company-agnostic ?active_company=1 returns all item_packet rows regardless of active company header
+        // 4. Tenant-scoped ?active_company=1 filters item_packet rows to the active company
         $this->getJson('/api/v1/modules/cpo/item-packets?active_company=1', [
             'X-Active-Company-Id' => (string) $companyA->id,
         ])->assertOk()->assertJsonCount(5, 'data');
 
         $this->getJson('/api/v1/modules/cpo/item-packets?active_company=1', [
             'X-Active-Company-Id' => (string) $companyB->id,
-        ])->assertOk()->assertJsonCount(5, 'data');
+        ])->assertOk()->assertJsonCount(0, 'data');
 
         // 5. Numeric range & exact filters work without LIKE
         $this->getJson('/api/v1/modules/cpo/item-packets?filter[quantity_min]=4&filter[quantity_max]=5')
@@ -1113,10 +1129,11 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             ->assertOk()
             ->assertJsonCount(3, 'data');
 
-        // 6. Direct DB bypass hits item_packet_packet_item_active_unique, service sharedLock throws ValidationException, and Idempotency-Key deduplicates POSTs
-        $newItem = Item::factory()->create(['name' => 'Garam Dapur']);
+        // 6. Direct DB bypass hits item_packet_comp_packet_item_active_unique, service sharedLock throws ValidationException, and Idempotency-Key deduplicates POSTs
+        $newItem = Item::factory()->create(['company_id' => $companyA->id, 'name' => 'Garam Dapur']);
         $idemHeaders = ['Idempotency-Key' => 'idem-cpo-item-packet-001'];
         $pivotPayload = [
+            'company_id' => $companyA->id,
             'packet_id' => $packetA->id,
             'item_id' => $newItem->id,
             'quantity' => 3,
@@ -1132,7 +1149,11 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
 
         expect($replayPost->headers->get('X-Idempotency-Replayed'))->toBe('true');
         expect($replayPost->json('data.id'))->toBe($firstPost->json('data.id'));
-        expect(ItemPacket::query()->where('packet_id', $packetA->id)->where('item_id', $newItem->id)->count())->toBe(1);
+        expect(ItemPacket::query()
+            ->where('company_id', $companyA->id)
+            ->where('packet_id', $packetA->id)
+            ->where('item_id', $newItem->id)
+            ->count())->toBe(1);
 
         $this->postJson('/api/v1/modules/cpo/item-packets', [
             ...$pivotPayload,
@@ -1140,12 +1161,14 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
         ], $idemHeaders)->assertUnprocessable()->assertJsonValidationErrors(['idempotency_key']);
 
         expect(fn () => ItemPacket::factory()->create([
+            'company_id' => $companyA->id,
             'packet_id' => $packetA->id,
             'item_id' => $newItem->id,
             'quantity' => 1,
         ]))->toThrow(QueryException::class);
 
         expect(fn () => app(ItemPacketService::class)->createItemPacket([
+            'company_id' => $companyA->id,
             'packet_id' => $packetA->id,
             'item_id' => $newItem->id,
             'quantity' => 2,

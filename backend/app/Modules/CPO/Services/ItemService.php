@@ -2,6 +2,8 @@
 
 namespace App\Modules\CPO\Services;
 
+use App\Enums\ItemType;
+use App\Models\Company;
 use App\Models\Item;
 use App\Support\IndexQuery;
 use App\Support\InputNormalizer;
@@ -13,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -27,7 +30,7 @@ class ItemService
     /**
      * @var array<int, string>
      */
-    private const RELATIONS = [];
+    private const RELATIONS = ['company'];
 
     /**
      * @return LengthAwarePaginator|Collection<int, Item>
@@ -35,6 +38,8 @@ class ItemService
     public function list(Request $request): LengthAwarePaginator|Collection
     {
         $query = IndexQuery::withDefaultRelations($this->query($request), $request, self::RELATIONS);
+
+        IndexQuery::applyActiveCompanyFilter($query->getEloquentBuilder(), $request);
 
         if (IndexQuery::isPaginated($request)) {
             return IndexQuery::paginate($query, $request);
@@ -52,17 +57,31 @@ class ItemService
      */
     public function createItem(array $attributes): Item
     {
+        $attributes['company_id'] = (int) $attributes['company_id'];
         $attributes['name'] = InputNormalizer::text((string) $attributes['name']) ?? '';
+        $rawType = $attributes['type'] ?? null;
+        $typeValue = $rawType instanceof ItemType
+            ? $rawType->value
+            : (string) ($rawType ?? ItemType::Bahan->value);
+
+        if (ItemType::tryFrom($typeValue) === null) {
+            throw ValidationException::withMessages([
+                'type' => ['The selected type is invalid.'],
+            ]);
+        }
+
+        $attributes['type'] = $typeValue;
 
         $item = DB::transaction(function () use ($attributes): Item {
-            $this->assertNameUnique($attributes['name']);
+            $this->assertActiveCompany($attributes['company_id']);
+            $this->assertNameUnique($attributes['company_id'], $attributes['name']);
 
             return Item::query()->create($attributes);
         });
 
         $this->forgetDependentCaches();
 
-        return $item;
+        return $item->load(self::RELATIONS);
     }
 
     /**
@@ -70,15 +89,42 @@ class ItemService
      */
     public function updateItem(Item $item, array $attributes): Item
     {
+        if (array_key_exists('company_id', $attributes)) {
+            $attributes['company_id'] = (int) $attributes['company_id'];
+        }
+
         if (array_key_exists('name', $attributes)) {
             $attributes['name'] = InputNormalizer::text((string) $attributes['name']) ?? '';
+        }
+
+        if (array_key_exists('type', $attributes)) {
+            $rawType = $attributes['type'];
+            $typeValue = $rawType instanceof ItemType ? $rawType->value : (string) $rawType;
+
+            if (ItemType::tryFrom($typeValue) === null) {
+                throw ValidationException::withMessages([
+                    'type' => ['The selected type is invalid.'],
+                ]);
+            }
+
+            $attributes['type'] = $typeValue;
         }
 
         $updated = DB::transaction(function () use ($item, $attributes): Item {
             $locked = Item::query()->lockForUpdate()->findOrFail($item->getKey());
 
+            $targetCompanyId = (int) ($attributes['company_id'] ?? $locked->company_id);
+
+            if ($targetCompanyId !== (int) $locked->company_id && $locked->itemPackets()->lockForUpdate()->exists()) {
+                throw ValidationException::withMessages([
+                    'company_id' => ['Tidak dapat mengubah perusahaan karena item masih terhubung dengan paket aktif.'],
+                ]);
+            }
+
+            $this->assertActiveCompany($targetCompanyId);
+
             $targetName = (string) ($attributes['name'] ?? $locked->name);
-            $this->assertNameUnique($targetName, $locked->getKey());
+            $this->assertNameUnique($targetCompanyId, $targetName, $locked->getKey());
 
             $locked->update($attributes);
 
@@ -87,7 +133,7 @@ class ItemService
 
         $this->forgetDependentCaches();
 
-        return $updated->refresh();
+        return $updated->refresh()->load(self::RELATIONS);
     }
 
     public function deleteItem(Item $item): void
@@ -95,7 +141,6 @@ class ItemService
         DB::transaction(function () use ($item): void {
             $locked = Item::query()->lockForUpdate()->findOrFail($item->getKey());
 
-            // Deferred until ItemPacket & Packet models/tables are created.
             if (
                 class_exists('App\\Models\\ItemPacket')
                 && Schema::hasTable('item_packet')
@@ -114,6 +159,8 @@ class ItemService
     {
         $query = IndexQuery::make(Item::class, $request)
             ->allowedFilters([
+                AllowedFilter::exact('company_id'),
+                AllowedFilter::exact('type'),
                 AllowedFilter::callback('name', function (Builder $query, mixed $value): void {
                     $escaped = IndexQuery::escapeLike($value);
                     if ($escaped === null) {
@@ -131,10 +178,11 @@ class ItemService
                     IndexQuery::whereLike($query, 'name', $escaped);
                 }),
             ])
-            ->allowedSorts(['id', 'name', 'created_at', 'updated_at'])
+            ->allowedSorts(['id', 'name', 'type', 'company_id', 'created_at', 'updated_at'])
             ->defaultSort('name', 'id');
 
         $availableIncludes = array_values(array_filter([
+            'company',
             class_exists('App\\Models\\ItemPacket') ? 'itemPackets' : null,
             class_exists('App\\Models\\Packet') ? 'packets' : null,
         ]));
@@ -146,15 +194,30 @@ class ItemService
         return $query;
     }
 
-    private function assertNameUnique(string $name, mixed $ignoreKey = null): void
+    private function assertActiveCompany(int $companyId): void
+    {
+        $companyExists = Company::query()
+            ->whereNull('deleted_at')
+            ->sharedLock()
+            ->whereKey($companyId)
+            ->exists();
+
+        if (! $companyExists) {
+            throw ValidationException::withMessages([
+                'company_id' => ['The selected company is invalid or has been deleted.'],
+            ]);
+        }
+    }
+
+    private function assertNameUnique(int $companyId, string $name, mixed $ignoreKey = null): void
     {
         WriteGuard::assertUniqueActive(
             Item::query(),
             'name',
             $name,
-            [],
+            ['company_id' => $companyId],
             'name',
-            'Item dengan nama yang sama sudah terdaftar.',
+            'Item dengan nama yang sama sudah terdaftar pada perusahaan ini.',
             $ignoreKey,
             true
         );
