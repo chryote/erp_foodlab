@@ -99,6 +99,8 @@ class PacketService
                 && Schema::hasTable('item_packet')
                 && method_exists($locked, 'itemPackets')
             ) {
+                $itemPacketIds = $locked->itemPackets()->lockForUpdate()->pluck('id')->all();
+                DefaultPackageService::softDeleteForItemPacketIds(array_map('intval', $itemPacketIds));
                 $locked->itemPackets()->delete();
             }
 
@@ -164,5 +166,7 @@ class PacketService
         Cache::forget(CpoService::CACHE_KEY);
         Cache::forget(self::CACHE_KEY_ITEM_PACKETS_LIST);
         Cache::forget(ItemService::CACHE_KEY_LIST);
+        Cache::forget(DefaultPackageService::CACHE_KEY_LIST);
+        Cache::forget('erp_foodlab:cpo:ingredients:list');
     }
 }

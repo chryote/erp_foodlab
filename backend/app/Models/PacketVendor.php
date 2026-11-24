@@ -21,10 +21,7 @@ class PacketVendor extends Model
         'active_flag',
     ];
 
-    /**
-     * @return HasMany
-     */
-    public function defaultPackages()
+    public function defaultPackages(): HasMany
     {
         return $this->hasMany(DefaultPackage::class);
     }

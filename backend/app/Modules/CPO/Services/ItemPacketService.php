@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -104,6 +105,7 @@ class ItemPacketService
     {
         DB::transaction(function () use ($itemPacket): void {
             $locked = ItemPacket::query()->lockForUpdate()->findOrFail($itemPacket->getKey());
+            DefaultPackageService::softDeleteForItemPacketIds([(int) $locked->getKey()]);
             $locked->delete();
         });
 
@@ -172,7 +174,7 @@ class ItemPacketService
                 }),
             ])
             ->allowedSorts(['id', 'company_id', 'packet_id', 'item_id', 'quantity', 'created_at', 'updated_at'])
-            ->allowedIncludes(self::RELATIONS)
+            ->allowedIncludes([...self::RELATIONS, ...(class_exists('App\\Models\\DefaultPackage') ? ['defaultPackages'] : [])])
             ->defaultSort('id');
     }
 
@@ -242,6 +244,8 @@ class ItemPacketService
         Cache::forget(self::CACHE_KEY_LIST);
         Cache::forget(PacketService::CACHE_KEY_LIST);
         Cache::forget(ItemService::CACHE_KEY_LIST);
+        Cache::forget(DefaultPackageService::CACHE_KEY_LIST);
+        Cache::forget('erp_foodlab:cpo:ingredients:list');
         Cache::forget(CpoService::CACHE_KEY);
     }
 }

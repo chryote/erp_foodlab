@@ -313,9 +313,11 @@ describe('Automated Seeded Relationships & Multi-Row Integrity Strategy', functi
             '/api/v1/modules/hr/employee-attendances',
             '/api/v1/modules/cpo/items',
             '/api/v1/modules/cpo/packets',
+            '/api/v1/modules/cpo/packet-categories',
             '/api/v1/modules/cpo/packet-names',
             '/api/v1/modules/cpo/packet-vendors',
             '/api/v1/modules/cpo/item-packets',
+            '/api/v1/modules/cpo/default-packages',
             '/api/v1/samples',
         ];
 
@@ -359,6 +361,10 @@ describe('Automated Seeded Relationships & Multi-Row Integrity Strategy', functi
         $this->getJson('/api/v1/modules/cpo/packets?include=items&page=1&per_page=10')
             ->assertOk()
             ->assertJsonStructure(['data' => [['id', 'name', 'items']]]);
+
+        $this->getJson('/api/v1/modules/cpo/default-packages?include=packetName,packetVendor,packetCategory,itemPacket&page=1&per_page=10')
+            ->assertOk()
+            ->assertJsonStructure(['data' => [['id', 'brand_name', 'packet_name', 'packet_vendor', 'packet_category', 'item_packet']]]);
 
         // Verify ?active_company=1 isolates seeded relationships to the requested active company
         $primaryCompany = Company::query()->where('name', 'PT. Slaras Nusa Foodlab')->firstOrFail();

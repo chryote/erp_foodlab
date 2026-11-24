@@ -16,6 +16,7 @@ use App\Enums\ShiftStatusEnum;
 use App\Models\CapitalCompany;
 use App\Models\Company;
 use App\Models\CompanyAsset;
+use App\Models\DefaultPackage;
 use App\Models\Employee;
 use App\Models\EmployeeAttendance;
 use App\Models\EmployeeDocument;
@@ -30,6 +31,7 @@ use App\Models\Item;
 use App\Models\ItemPacket;
 use App\Models\LabSample;
 use App\Models\Packet;
+use App\Models\PacketCategory;
 use App\Models\PacketName;
 use App\Models\PacketVendor;
 use App\Models\PayrollGrade;
@@ -74,9 +76,11 @@ class DatabaseSeeder extends Seeder
 
             $items = $this->seedCpoItems($companies);
             $packets = $this->seedCpoPackets();
-            $this->seedCpoPacketNames();
-            $this->seedCpoPacketVendors();
-            $this->seedCpoItemPackets($primaryCompany, $items, $packets);
+            $packetNames = $this->seedCpoPacketNames();
+            $packetVendors = $this->seedCpoPacketVendors();
+            $packetCategories = $this->seedCpoPacketCategories();
+            $itemPackets = $this->seedCpoItemPackets($primaryCompany, $items, $packets);
+            $this->seedCpoDefaultPackages($primaryCompany, $packetNames, $packetVendors, $packetCategories, $itemPackets);
         });
 
         Cache::flush();
@@ -1579,14 +1583,40 @@ class DatabaseSeeder extends Seeder
     }
 
     /**
+     * @return EloquentCollection<int, PacketCategory>
+     */
+    private function seedCpoPacketCategories(): EloquentCollection
+    {
+        $existingByName = PacketCategory::query()->withTrashed()->get()->keyBy('name');
+
+        $names = ['Kategori A', 'Kategori B'];
+        for ($i = 1; $i <= self::MIN_SEED_ROWS; $i++) {
+            $names[] = sprintf('Kategori Paket %03d', $i);
+        }
+
+        $packetCategories = new EloquentCollection;
+        foreach ($names as $name) {
+            /** @var PacketCategory $packetCategory */
+            $packetCategory = $existingByName->get($name) ?? new PacketCategory;
+            $packetCategory->name = $name;
+            $packetCategory->deleted_at = null;
+            $packetCategory->save();
+            $packetCategories->push($packetCategory);
+        }
+
+        return $packetCategories;
+    }
+
+    /**
      * @param  EloquentCollection<int, Item>  $items
      * @param  EloquentCollection<int, Packet>  $packets
+     * @return EloquentCollection<int, ItemPacket>
      */
     private function seedCpoItemPackets(
         Company $primaryCompany,
         EloquentCollection $items,
         EloquentCollection $packets
-    ): void {
+    ): EloquentCollection {
         $packetsByName = $packets->keyBy('name');
         $primaryItemsByName = $items
             ->where('company_id', $primaryCompany->id)
@@ -1596,6 +1626,8 @@ class DatabaseSeeder extends Seeder
             ->withTrashed()
             ->get()
             ->keyBy(fn (ItemPacket $ip): string => $ip->company_id.'|'.$ip->packet_id.'|'.$ip->item_id);
+
+        $seededItemPackets = new EloquentCollection;
 
         $canonicalMappings = [
             'Paket A' => [
@@ -1622,7 +1654,7 @@ class DatabaseSeeder extends Seeder
                     continue;
                 }
 
-                $this->upsertItemPacket($existingByKey, $primaryCompany->id, $packet->id, $item->id, $entry['quantity']);
+                $seededItemPackets->push($this->upsertItemPacket($existingByKey, $primaryCompany->id, $packet->id, $item->id, $entry['quantity']));
             }
         }
 
@@ -1640,15 +1672,17 @@ class DatabaseSeeder extends Seeder
 
             /** @var Packet $packet */
             $packet = $generatedPackets[$generatedIndex % $generatedPackets->count()];
-            $this->upsertItemPacket(
+            $seededItemPackets->push($this->upsertItemPacket(
                 $existingByKey,
                 $item->company_id,
                 $packet->id,
                 $item->id,
                 ($generatedIndex % 5) + 1
-            );
+            ));
             $generatedIndex++;
         }
+
+        return $seededItemPackets;
     }
 
     /**
@@ -1660,7 +1694,7 @@ class DatabaseSeeder extends Seeder
         int $packetId,
         int $itemId,
         int $quantity
-    ): void {
+    ): ItemPacket {
         $key = $companyId.'|'.$packetId.'|'.$itemId;
         /** @var ItemPacket $itemPacket */
         $itemPacket = $existingByKey->get($key) ?? new ItemPacket;
@@ -1671,5 +1705,109 @@ class DatabaseSeeder extends Seeder
         $itemPacket->deleted_at = null;
         $itemPacket->save();
         $existingByKey->put($key, $itemPacket);
+
+        return $itemPacket;
+    }
+
+    /**
+     * @param  EloquentCollection<int, PacketName>  $packetNames
+     * @param  EloquentCollection<int, PacketVendor>  $packetVendors
+     * @param  EloquentCollection<int, PacketCategory>  $packetCategories
+     * @param  EloquentCollection<int, ItemPacket>  $itemPackets
+     */
+    private function seedCpoDefaultPackages(
+        Company $primaryCompany,
+        EloquentCollection $packetNames,
+        EloquentCollection $packetVendors,
+        EloquentCollection $packetCategories,
+        EloquentCollection $itemPackets
+    ): void {
+        $existingByKey = DefaultPackage::query()
+            ->withTrashed()
+            ->get()
+            ->keyBy(fn (DefaultPackage $dp): string => implode('|', [
+                $dp->brand_name,
+                $dp->packet_name_id,
+                $dp->packet_vendor_id,
+                $dp->packet_category_id,
+                $dp->item_packet_id,
+            ]));
+
+        $canonicalName = $packetNames->firstWhere('name', 'Paket A') ?? $packetNames->firstOrFail();
+        $canonicalVendor = $packetVendors->firstWhere('name', 'Vendor A') ?? $packetVendors->firstOrFail();
+        $canonicalCategory = $packetCategories->firstWhere('name', 'Kategori A') ?? $packetCategories->firstOrFail();
+        $canonicalItemPacket = $itemPackets
+            ->first(fn (ItemPacket $ip): bool => (int) $ip->company_id === (int) $primaryCompany->id)
+            ?? $itemPackets->firstOrFail();
+
+        $this->upsertDefaultPackage(
+            $existingByKey,
+            'Brand A',
+            $canonicalName->id,
+            $canonicalVendor->id,
+            $canonicalCategory->id,
+            $canonicalItemPacket->id,
+            15000.00
+        );
+
+        $nameList = $packetNames->values();
+        $vendorList = $packetVendors->values();
+        $categoryList = $packetCategories->values();
+        $itemPacketList = $itemPackets->values();
+
+        for ($i = 1; $i <= self::MIN_SEED_ROWS; $i++) {
+            /** @var PacketName $pktName */
+            $pktName = $nameList[($i - 1) % $nameList->count()];
+            /** @var PacketVendor $pktVendor */
+            $pktVendor = $vendorList[($i - 1) % $vendorList->count()];
+            /** @var PacketCategory $pktCategory */
+            $pktCategory = $categoryList[($i - 1) % $categoryList->count()];
+            /** @var ItemPacket $itemPacket */
+            $itemPacket = $itemPacketList[($i - 1) % $itemPacketList->count()];
+
+            $this->upsertDefaultPackage(
+                $existingByKey,
+                sprintf('Brand Paket %03d', $i),
+                $pktName->id,
+                $pktVendor->id,
+                $pktCategory->id,
+                $itemPacket->id,
+                round(10000.00 + ($i * 2500.00), 2)
+            );
+        }
+    }
+
+    /**
+     * @param  EloquentCollection<int, DefaultPackage>  $existingByKey
+     */
+    private function upsertDefaultPackage(
+        EloquentCollection $existingByKey,
+        string $brandName,
+        int $packetNameId,
+        int $packetVendorId,
+        int $packetCategoryId,
+        int $itemPacketId,
+        float $price
+    ): void {
+        $key = implode('|', [
+            $brandName,
+            $packetNameId,
+            $packetVendorId,
+            $packetCategoryId,
+            $itemPacketId,
+        ]);
+
+        /** @var DefaultPackage $defaultPackage */
+        $defaultPackage = $existingByKey->get($key) ?? new DefaultPackage([
+            'brand_name' => $brandName,
+            'packet_name_id' => $packetNameId,
+            'packet_vendor_id' => $packetVendorId,
+            'packet_category_id' => $packetCategoryId,
+            'item_packet_id' => $itemPacketId,
+        ]);
+        $defaultPackage->price = $price;
+        $defaultPackage->deleted_at = null;
+        $defaultPackage->save();
+        $existingByKey->put($key, $defaultPackage);
     }
 }

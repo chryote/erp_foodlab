@@ -40,6 +40,13 @@ final class IndexQuery
         'code',
         'quantity_min',
         'quantity_max',
+        'brand_name',
+        'packet_name_id',
+        'packet_vendor_id',
+        'packet_category_id',
+        'item_packet_id',
+        'min_price',
+        'max_price',
     ];
 
     /**

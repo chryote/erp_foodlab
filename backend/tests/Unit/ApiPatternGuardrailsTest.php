@@ -4,6 +4,7 @@ use App\Http\Controllers\Concerns\RespondsWithApiList;
 use App\Models\CapitalCompany;
 use App\Models\Company;
 use App\Models\CompanyAsset;
+use App\Models\DefaultPackage;
 use App\Models\Employee;
 use App\Models\EmployeeAttendance;
 use App\Models\EmployeeDocument;
@@ -18,6 +19,7 @@ use App\Models\Item;
 use App\Models\ItemPacket;
 use App\Models\LabSample;
 use App\Models\Packet;
+use App\Models\PacketCategory;
 use App\Models\PacketName;
 use App\Models\PacketVendor;
 use App\Models\PayrollGrade;
@@ -29,8 +31,10 @@ use App\Modules\CFO\Services\CompanyService;
 use App\Modules\CHO\Services\EmployeeService;
 use App\Modules\CHO\Services\PayrollItemService;
 use App\Modules\CHO\Services\PayrollRunService;
+use App\Modules\CPO\Services\DefaultPackageService;
 use App\Modules\CPO\Services\ItemPacketService;
 use App\Modules\CPO\Services\ItemService;
+use App\Modules\CPO\Services\PacketCategoryService;
 use App\Modules\CPO\Services\PacketNameService;
 use App\Modules\CPO\Services\PacketService;
 use App\Modules\CPO\Services\PacketVendorService;
@@ -605,9 +609,11 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'payroll_items' => PayrollItem::class,
             'items' => Item::class,
             'packets' => Packet::class,
+            'packet_categories' => PacketCategory::class,
             'packet_names' => PacketName::class,
             'packet_vendors' => PacketVendor::class,
             'item_packet' => ItemPacket::class,
+            'default_packages' => DefaultPackage::class,
         ];
 
         foreach ($uniqueEntityMap as $table => $modelClass) {
@@ -642,9 +648,11 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'Modules/HR/Requests/SaveEmployeeAttendanceRequest.php',
             'Modules/CPO/Requests/SaveItemRequest.php',
             'Modules/CPO/Requests/SavePacketRequest.php',
+            'Modules/CPO/Requests/SavePacketCategoryRequest.php',
             'Modules/CPO/Requests/SavePacketNameRequest.php',
             'Modules/CPO/Requests/SavePacketVendorRequest.php',
             'Modules/CPO/Requests/SaveItemPacketRequest.php',
+            'Modules/CPO/Requests/SaveDefaultPackageRequest.php',
         ];
 
         foreach ($uniqueRequests as $requestPath) {
@@ -675,9 +683,11 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'Modules/HR/Actions/RecordAttendanceAction.php',
             'Modules/CPO/Services/ItemService.php',
             'Modules/CPO/Services/PacketService.php',
+            'Modules/CPO/Services/PacketCategoryService.php',
             'Modules/CPO/Services/PacketNameService.php',
             'Modules/CPO/Services/PacketVendorService.php',
             'Modules/CPO/Services/ItemPacketService.php',
+            'Modules/CPO/Services/DefaultPackageService.php',
         ];
 
         foreach ($lockedWriteGuards as $guardPath) {
@@ -1370,6 +1380,204 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
 
         expect(fn () => app(PacketVendorService::class)->createPacketVendor([
             'name' => 'vendor nusantara',
+        ]))->toThrow(ValidationException::class);
+    });
+
+    it('enforces CPO PacketCategories speed, cache, pagination, and anti-duplication guardrails', function () {
+        $companyA = Company::factory()->create(['name' => 'PT. CPO PacketCategory Alpha']);
+        $companyB = Company::factory()->create(['name' => 'PT. CPO PacketCategory Beta']);
+
+        PacketCategory::factory()->count(4)->create();
+        $specialPacketCategory = PacketCategory::factory()->create(['name' => 'Kategori 100% Organik']);
+
+        // 1. Pagination cap prevents unbounded ?per_page=99999 dumps
+        $this->getJson('/api/v1/modules/cpo/packet-categories?page=1&per_page=99999')
+            ->assertOk()
+            ->assertJsonPath('meta.per_page', IndexQuery::MAX_PER_PAGE);
+
+        // 2. Cold-cache query count is bounded (no N+1, no SUM())
+        Cache::flush();
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->getJson('/api/v1/modules/cpo/packet-categories')->assertOk()->assertJsonCount(5, 'data');
+        $coldQueries = collect(DB::getQueryLog())
+            ->reject(fn ($q) => str_contains($q['query'], 'personal_access_tokens'));
+        DB::disableQueryLog();
+
+        expect($coldQueries->count())->toBeLessThanOrEqual(2);
+        expect($coldQueries->contains(fn ($q) => str_contains(strtoupper($q['query']), 'SUM(')))->toBeFalse();
+
+        // 3. Warm cache hit executes 0 SQL queries
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->getJson('/api/v1/modules/cpo/packet-categories')->assertOk()->assertJsonCount(5, 'data');
+        $warmQueries = DB::getQueryLog();
+        DB::disableQueryLog();
+
+        expect($warmQueries)->toHaveCount(0);
+
+        // 4. Company-agnostic ?active_company=1 returns all packet categories regardless of active company header
+        $this->getJson('/api/v1/modules/cpo/packet-categories?active_company=1', [
+            'X-Active-Company-Id' => (string) $companyA->id,
+        ])->assertOk()->assertJsonCount(5, 'data');
+
+        $this->getJson('/api/v1/modules/cpo/packet-categories?active_company=1', [
+            'X-Active-Company-Id' => (string) $companyB->id,
+        ])->assertOk()->assertJsonCount(5, 'data');
+
+        // 5. LIKE wildcard escaping & whitespace-only search
+        $this->getJson('/api/v1/modules/cpo/packet-categories?filter[search]='.urlencode('100%'))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $specialPacketCategory->id);
+
+        $this->getJson('/api/v1/modules/cpo/packet-categories?filter[name]=%20%20%20')
+            ->assertOk()
+            ->assertJsonCount(5, 'data');
+
+        // 6. Direct DB bypass hits packet_categories_name_active_unique, service sharedLock throws ValidationException, and Idempotency-Key deduplicates POSTs
+        $idemHeaders = ['Idempotency-Key' => 'idem-cpo-packet-category-001'];
+        $packetCategoryPayload = ['name' => '  Kategori   Nusantara  '];
+
+        $firstPost = $this->postJson('/api/v1/modules/cpo/packet-categories', $packetCategoryPayload, $idemHeaders)
+            ->assertCreated()
+            ->assertJsonPath('data.name', 'Kategori Nusantara')
+            ->assertJsonMissingPath('data.active_flag');
+
+        $replayPost = $this->postJson('/api/v1/modules/cpo/packet-categories', $packetCategoryPayload, $idemHeaders)
+            ->assertCreated();
+
+        expect($replayPost->headers->get('X-Idempotency-Replayed'))->toBe('true');
+        expect($replayPost->json('data.id'))->toBe($firstPost->json('data.id'));
+        expect(PacketCategory::query()->where('name', 'Kategori Nusantara')->count())->toBe(1);
+
+        $this->postJson('/api/v1/modules/cpo/packet-categories', [
+            'name' => 'Kategori Sejahtera',
+        ], $idemHeaders)->assertUnprocessable()->assertJsonValidationErrors(['idempotency_key']);
+
+        expect(fn () => PacketCategory::factory()->create([
+            'name' => 'Kategori Nusantara',
+        ]))->toThrow(QueryException::class);
+
+        expect(fn () => app(PacketCategoryService::class)->createPacketCategory([
+            'name' => 'kategori nusantara',
+        ]))->toThrow(ValidationException::class);
+    });
+
+    it('enforces CPO DefaultPackages speed, cache, pagination, and anti-duplication guardrails', function () {
+        $company = Company::factory()->create(['name' => 'PT. CPO DefaultPackage Alpha']);
+        $packet = Packet::factory()->create(['name' => 'Paket Base DP']);
+        $itemPacket = ItemPacket::factory()->create([
+            'company_id' => $company->id,
+            'packet_id' => $packet->id,
+        ]);
+        $packetName = PacketName::factory()->create(['name' => 'Nama Paket DP']);
+        $packetVendor = PacketVendor::factory()->create(['name' => 'Vendor Paket DP']);
+        $packetCategory = PacketCategory::factory()->create(['name' => 'Kategori Paket DP']);
+
+        DefaultPackage::factory()->count(4)->create([
+            'packet_name_id' => $packetName->id,
+            'packet_vendor_id' => $packetVendor->id,
+            'packet_category_id' => $packetCategory->id,
+            'item_packet_id' => $itemPacket->id,
+        ]);
+        $specialDefaultPackage = DefaultPackage::factory()->create([
+            'brand_name' => 'Brand 100% Murni',
+            'packet_name_id' => $packetName->id,
+            'packet_vendor_id' => $packetVendor->id,
+            'packet_category_id' => $packetCategory->id,
+            'item_packet_id' => $itemPacket->id,
+            'price' => 25000.50,
+        ]);
+
+        // 1. Pagination cap prevents unbounded ?per_page=99999 dumps
+        $this->getJson('/api/v1/modules/cpo/default-packages?page=1&per_page=99999')
+            ->assertOk()
+            ->assertJsonPath('meta.per_page', IndexQuery::MAX_PER_PAGE);
+
+        // 2. Cold-cache query count is bounded (no N+1, no SUM())
+        Cache::flush();
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->getJson('/api/v1/modules/cpo/default-packages')->assertOk()->assertJsonCount(5, 'data');
+        $coldQueries = collect(DB::getQueryLog())
+            ->reject(fn ($q) => str_contains($q['query'], 'personal_access_tokens'));
+        DB::disableQueryLog();
+
+        // 1 default_packages select + 4 eager loads (packetName, packetVendor, packetCategory, itemPacket) = <= 5 queries
+        expect($coldQueries->count())->toBeLessThanOrEqual(5);
+        expect($coldQueries->contains(fn ($q) => str_contains(strtoupper($q['query']), 'SUM(')))->toBeFalse();
+
+        // 3. Warm cache hit executes 0 SQL queries
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->getJson('/api/v1/modules/cpo/default-packages')->assertOk()->assertJsonCount(5, 'data');
+        $warmQueries = DB::getQueryLog();
+        DB::disableQueryLog();
+
+        expect($warmQueries)->toHaveCount(0);
+
+        // 4. Numeric range, LIKE wildcard escaping & whitespace-only search
+        $this->getJson('/api/v1/modules/cpo/default-packages?filter[min_price]=25000&filter[max_price]=25001')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $specialDefaultPackage->id);
+
+        $this->getJson('/api/v1/modules/cpo/default-packages?filter[brand_name]='.urlencode('100%'))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $specialDefaultPackage->id);
+
+        $this->getJson('/api/v1/modules/cpo/default-packages?filter[brand_name]=%20%20%20')
+            ->assertOk()
+            ->assertJsonCount(5, 'data');
+
+        // 5. Direct DB bypass hits default_packages_brand_pkt_vend_cat_ip_active_unique, service sharedLock throws ValidationException, and Idempotency-Key deduplicates POSTs
+        $idemHeaders = ['Idempotency-Key' => 'idem-cpo-default-package-001'];
+        $dpPayload = [
+            'brand_name' => '  Brand   Nusantara  ',
+            'packet_name_id' => $packetName->id,
+            'packet_vendor_id' => $packetVendor->id,
+            'packet_category_id' => $packetCategory->id,
+            'item_packet_id' => $itemPacket->id,
+            'price' => 15000,
+        ];
+
+        $firstPost = $this->postJson('/api/v1/modules/cpo/default-packages', $dpPayload, $idemHeaders)
+            ->assertCreated()
+            ->assertJsonPath('data.brand_name', 'Brand Nusantara')
+            ->assertJsonPath('data.price', 15000)
+            ->assertJsonMissingPath('data.active_flag');
+
+        $replayPost = $this->postJson('/api/v1/modules/cpo/default-packages', $dpPayload, $idemHeaders)
+            ->assertCreated();
+
+        expect($replayPost->headers->get('X-Idempotency-Replayed'))->toBe('true');
+        expect($replayPost->json('data.id'))->toBe($firstPost->json('data.id'));
+        expect(DefaultPackage::query()->where('brand_name', 'Brand Nusantara')->count())->toBe(1);
+
+        $this->postJson('/api/v1/modules/cpo/default-packages', [
+            ...$dpPayload,
+            'brand_name' => 'Brand Lain',
+        ], $idemHeaders)->assertUnprocessable()->assertJsonValidationErrors(['idempotency_key']);
+
+        expect(fn () => DefaultPackage::factory()->create([
+            'brand_name' => 'Brand Nusantara',
+            'packet_name_id' => $packetName->id,
+            'packet_vendor_id' => $packetVendor->id,
+            'packet_category_id' => $packetCategory->id,
+            'item_packet_id' => $itemPacket->id,
+        ]))->toThrow(QueryException::class);
+
+        expect(fn () => app(DefaultPackageService::class)->createDefaultPackage([
+            'brand_name' => 'brand nusantara',
+            'packet_name_id' => $packetName->id,
+            'packet_vendor_id' => $packetVendor->id,
+            'packet_category_id' => $packetCategory->id,
+            'item_packet_id' => $itemPacket->id,
+            'price' => 15000,
         ]))->toThrow(ValidationException::class);
     });
 });

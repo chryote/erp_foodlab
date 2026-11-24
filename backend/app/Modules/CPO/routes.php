@@ -1,8 +1,10 @@
 <?php
 
 use App\Modules\CPO\Controllers\CpoController;
+use App\Modules\CPO\Controllers\DefaultPackageController;
 use App\Modules\CPO\Controllers\ItemController;
 use App\Modules\CPO\Controllers\ItemPacketController;
+use App\Modules\CPO\Controllers\PacketCategoryController;
 use App\Modules\CPO\Controllers\PacketController;
 use App\Modules\CPO\Controllers\PacketNameController;
 use App\Modules\CPO\Controllers\PacketVendorController;
@@ -39,10 +41,24 @@ Route::prefix('cpo')->group(function () {
     Route::patch('/packet-vendors/{packetVendor}', [PacketVendorController::class, 'update'])->name('api.modules.cpo.packet-vendors.patch');
     Route::delete('/packet-vendors/{packetVendor}', [PacketVendorController::class, 'destroy'])->name('api.modules.cpo.packet-vendors.destroy');
 
+    Route::get('/packet-categories', [PacketCategoryController::class, 'index'])->name('api.modules.cpo.packet-categories.index');
+    Route::post('/packet-categories', [PacketCategoryController::class, 'store'])->name('api.modules.cpo.packet-categories.store');
+    Route::get('/packet-categories/{packetCategory}', [PacketCategoryController::class, 'show'])->name('api.modules.cpo.packet-categories.show');
+    Route::put('/packet-categories/{packetCategory}', [PacketCategoryController::class, 'update'])->name('api.modules.cpo.packet-categories.update');
+    Route::patch('/packet-categories/{packetCategory}', [PacketCategoryController::class, 'update'])->name('api.modules.cpo.packet-categories.patch');
+    Route::delete('/packet-categories/{packetCategory}', [PacketCategoryController::class, 'destroy'])->name('api.modules.cpo.packet-categories.destroy');
+
     Route::get('/item-packets', [ItemPacketController::class, 'index'])->name('api.modules.cpo.item-packets.index');
     Route::post('/item-packets', [ItemPacketController::class, 'store'])->name('api.modules.cpo.item-packets.store');
     Route::get('/item-packets/{itemPacket}', [ItemPacketController::class, 'show'])->name('api.modules.cpo.item-packets.show');
     Route::put('/item-packets/{itemPacket}', [ItemPacketController::class, 'update'])->name('api.modules.cpo.item-packets.update');
     Route::patch('/item-packets/{itemPacket}', [ItemPacketController::class, 'update'])->name('api.modules.cpo.item-packets.patch');
     Route::delete('/item-packets/{itemPacket}', [ItemPacketController::class, 'destroy'])->name('api.modules.cpo.item-packets.destroy');
+
+    Route::get('/default-packages', [DefaultPackageController::class, 'index'])->name('api.modules.cpo.default-packages.index');
+    Route::post('/default-packages', [DefaultPackageController::class, 'store'])->name('api.modules.cpo.default-packages.store');
+    Route::get('/default-packages/{defaultPackage}', [DefaultPackageController::class, 'show'])->name('api.modules.cpo.default-packages.show');
+    Route::put('/default-packages/{defaultPackage}', [DefaultPackageController::class, 'update'])->name('api.modules.cpo.default-packages.update');
+    Route::patch('/default-packages/{defaultPackage}', [DefaultPackageController::class, 'update'])->name('api.modules.cpo.default-packages.patch');
+    Route::delete('/default-packages/{defaultPackage}', [DefaultPackageController::class, 'destroy'])->name('api.modules.cpo.default-packages.destroy');
 });

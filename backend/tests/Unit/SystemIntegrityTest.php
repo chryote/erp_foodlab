@@ -4,6 +4,7 @@ use App\Enums\ItemType;
 use App\Models\CapitalCompany;
 use App\Models\Company;
 use App\Models\CompanyAsset;
+use App\Models\DefaultPackage;
 use App\Models\Employee;
 use App\Models\EmployeeAttendance;
 use App\Models\EmployeeDocument;
@@ -18,6 +19,7 @@ use App\Models\Item;
 use App\Models\ItemPacket;
 use App\Models\LabSample;
 use App\Models\Packet;
+use App\Models\PacketCategory;
 use App\Models\PacketName;
 use App\Models\PacketVendor;
 use App\Models\PayrollGrade;
@@ -126,9 +128,11 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
             'payroll_items' => PayrollItem::query()->count(),
             'items' => Item::query()->count(),
             'packets' => Packet::query()->count(),
+            'packet_categories' => PacketCategory::query()->count(),
             'packet_names' => PacketName::query()->count(),
             'packet_vendors' => PacketVendor::query()->count(),
             'item_packet' => ItemPacket::query()->count(),
+            'default_packages' => DefaultPackage::query()->count(),
             'lab_samples' => LabSample::query()->count(),
         ];
 
@@ -163,9 +167,11 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
             'payroll_items' => PayrollItem::query()->count(),
             'items' => Item::query()->count(),
             'packets' => Packet::query()->count(),
+            'packet_categories' => PacketCategory::query()->count(),
             'packet_names' => PacketName::query()->count(),
             'packet_vendors' => PacketVendor::query()->count(),
             'item_packet' => ItemPacket::query()->count(),
+            'default_packages' => DefaultPackage::query()->count(),
             'lab_samples' => LabSample::query()->count(),
         ];
 

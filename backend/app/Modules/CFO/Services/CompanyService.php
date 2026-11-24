@@ -3,6 +3,7 @@
 namespace App\Modules\CFO\Services;
 
 use App\Models\Company;
+use App\Models\DefaultPackage;
 use App\Modules\CHO\Services\PayrollItemService;
 use App\Modules\CHO\Services\PayrollRunService;
 use App\Support\ActiveCompany;
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -129,6 +131,27 @@ class CompanyService
             $locked->employees()->delete();
 
             // Soft-delete CPO dependent records so none remain orphaned.
+            $itemPacketIds = $locked->itemPackets()->lockForUpdate()->pluck('id')->all();
+            if ($itemPacketIds !== [] && Schema::hasTable('default_packages')) {
+                $defaultPackages = DefaultPackage::query()
+                    ->whereIn('item_packet_id', $itemPacketIds)
+                    ->lockForUpdate()
+                    ->get();
+
+                if ($defaultPackages->isNotEmpty()) {
+                    if (class_exists('App\\Models\\Ingredient') && Schema::hasTable('ingredients')) {
+                        foreach ($defaultPackages as $defaultPackage) {
+                            if (method_exists($defaultPackage, 'ingredients')) {
+                                $defaultPackage->ingredients()->delete();
+                            }
+                        }
+                    }
+
+                    DefaultPackage::query()
+                        ->whereIn('id', $defaultPackages->pluck('id')->all())
+                        ->delete();
+                }
+            }
             $locked->itemPackets()->delete();
             $locked->items()->delete();
 
@@ -187,6 +210,8 @@ class CompanyService
             'erp_foodlab:cpo:items:list',
             'erp_foodlab:cpo:item_packets:list',
             'erp_foodlab:cpo:packets:list',
+            'erp_foodlab:cpo:default_packages:list',
+            'erp_foodlab:cpo:ingredients:list',
             'erp_foodlab:module:cpo',
         ];
 

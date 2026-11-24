@@ -25,6 +25,7 @@ class ItemPacketResource extends JsonResource
             'company' => $this->whenLoaded('company', fn ($company) => $company !== null ? new CompanyResource($company) : null),
             'packet' => $this->whenLoaded('packet', fn ($packet) => $packet !== null ? new PacketResource($packet) : null),
             'item' => $this->whenLoaded('item', fn ($item) => $item !== null ? new ItemResource($item) : null),
+            'default_packages' => DefaultPackageResource::collection($this->whenLoaded('defaultPackages')),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
             'deleted_at' => $this->deleted_at?->toISOString(),
