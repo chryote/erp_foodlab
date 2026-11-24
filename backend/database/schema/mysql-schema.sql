@@ -352,6 +352,57 @@ CREATE TABLE `expense_types` (
   CONSTRAINT `expense_types_expense_category_id_foreign` FOREIGN KEY (`expense_category_id`) REFERENCES `expense_categories` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `item_packet`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `item_packet` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `company_id` bigint unsigned NOT NULL,
+  `packet_id` bigint unsigned NOT NULL,
+  `item_id` bigint unsigned NOT NULL,
+  `quantity` int unsigned NOT NULL DEFAULT '1',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `item_packet_comp_packet_item_active_unique` (`company_id`,`packet_id`,`item_id`,`active_flag`),
+  KEY `item_packet_item_id_foreign` (`item_id`),
+  KEY `item_packet_del_packet_id_idx` (`deleted_at`,`packet_id`,`id`),
+  KEY `item_packet_del_item_id_idx` (`deleted_at`,`item_id`,`id`),
+  KEY `item_packet_packet_id_foreign` (`packet_id`),
+  KEY `item_packet_comp_del_packet_id_idx` (`company_id`,`deleted_at`,`packet_id`,`id`),
+  KEY `item_packet_comp_del_item_id_idx` (`company_id`,`deleted_at`,`item_id`,`id`),
+  CONSTRAINT `item_packet_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `item_packet_item_id_foreign` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `item_packet_packet_id_foreign` FOREIGN KEY (`packet_id`) REFERENCES `packets` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `items`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `items` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `company_id` bigint unsigned NOT NULL,
+  `code` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Bahan',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `items_company_name_active_unique` (`company_id`,`name`,`active_flag`),
+  UNIQUE KEY `items_company_code_active_unique` (`company_id`,`code`,`active_flag`),
+  KEY `items_name_index` (`name`),
+  KEY `items_del_name_id_idx` (`deleted_at`,`name`,`id`),
+  KEY `items_comp_del_name_id_idx` (`company_id`,`deleted_at`,`name`,`id`),
+  KEY `items_comp_del_type_idx` (`company_id`,`deleted_at`,`type`),
+  KEY `items_comp_del_code_id_idx` (`company_id`,`deleted_at`,`code`,`id`),
+  KEY `items_del_code_id_idx` (`deleted_at`,`code`,`id`),
+  CONSTRAINT `items_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `lab_samples`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -381,6 +432,22 @@ CREATE TABLE `migrations` (
   `migration` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `batch` int NOT NULL,
   PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `packets`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `packets` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `packets_name_active_unique` (`name`,`active_flag`),
+  KEY `packets_name_index` (`name`),
+  KEY `packets_del_name_id_idx` (`deleted_at`,`name`,`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `payroll_grades`;
@@ -430,7 +497,7 @@ CREATE TABLE `payroll_items` (
   `thr` decimal(18,2) NOT NULL DEFAULT '0.00',
   `pph21` decimal(18,2) NOT NULL DEFAULT '0.00',
   `total_net` decimal(18,2) NOT NULL DEFAULT '0.00',
-  `status` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+  `status` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
   `notes` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `finalized_by` bigint unsigned DEFAULT NULL,
   `finalized_at` timestamp NULL DEFAULT NULL,
@@ -599,5 +666,10 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (44,'2026_11_23_100
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (45,'2026_11_23_110000_update_payroll_items_table_for_spec',30);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (46,'2026_11_23_120000_add_finalization_fields_to_payroll_items_table',31);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (47,'2026_11_23_130000_make_cho_master_tables_company_agnostic',32);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (48,'2026_11_24_100000_create_items_table',33);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (49,'2026_11_24_110000_create_packets_table',34);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (50,'2026_11_24_120000_create_item_packet_table',35);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (51,'2026_11_24_130000_scope_items_and_item_packet_to_company',36);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (52,'2026_11_24_140000_add_code_to_items_table',37);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;

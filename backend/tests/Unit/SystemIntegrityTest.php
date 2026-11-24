@@ -1,5 +1,28 @@
 <?php
 
+use App\Enums\ItemType;
+use App\Models\CapitalCompany;
+use App\Models\Company;
+use App\Models\CompanyAsset;
+use App\Models\Employee;
+use App\Models\EmployeeAttendance;
+use App\Models\EmployeeDocument;
+use App\Models\EmployeePosition;
+use App\Models\EmployeeShift;
+use App\Models\EmployeeShiftAssignment;
+use App\Models\EmploymentStatus;
+use App\Models\ExpenseCategory;
+use App\Models\ExpenseItem;
+use App\Models\ExpenseType;
+use App\Models\Item;
+use App\Models\ItemPacket;
+use App\Models\LabSample;
+use App\Models\Packet;
+use App\Models\PayrollGrade;
+use App\Models\PayrollItem;
+use App\Models\PayrollRun;
+use App\Models\TaxStatus;
+use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Artisan;
@@ -81,48 +104,91 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
             ->not->toThrow(Throwable::class);
 
         $firstCounts = [
-            'users' => \App\Models\User::query()->count(),
-            'companies' => \App\Models\Company::query()->count(),
-            'capital_companies' => \App\Models\CapitalCompany::query()->count(),
-            'expense_categories' => \App\Models\ExpenseCategory::query()->count(),
-            'expense_types' => \App\Models\ExpenseType::query()->count(),
-            'expense_items' => \App\Models\ExpenseItem::query()->count(),
-            'company_assets' => \App\Models\CompanyAsset::query()->count(),
-            'employee_positions' => \App\Models\EmployeePosition::query()->count(),
-            'employment_statuses' => \App\Models\EmploymentStatus::query()->count(),
-            'payroll_grades' => \App\Models\PayrollGrade::query()->count(),
-            'tax_statuses' => \App\Models\TaxStatus::query()->count(),
-            'employees' => \App\Models\Employee::query()->count(),
-            'employee_documents' => \App\Models\EmployeeDocument::query()->count(),
-            'employee_shifts' => \App\Models\EmployeeShift::query()->count(),
-            'employee_shift_assignments' => \App\Models\EmployeeShiftAssignment::query()->count(),
-            'employee_attendances' => \App\Models\EmployeeAttendance::query()->count(),
-            'payroll_runs' => \App\Models\PayrollRun::query()->count(),
-            'payroll_items' => \App\Models\PayrollItem::query()->count(),
-            'lab_samples' => \App\Models\LabSample::query()->count(),
+            'users' => User::query()->count(),
+            'companies' => Company::query()->count(),
+            'capital_companies' => CapitalCompany::query()->count(),
+            'expense_categories' => ExpenseCategory::query()->count(),
+            'expense_types' => ExpenseType::query()->count(),
+            'expense_items' => ExpenseItem::query()->count(),
+            'company_assets' => CompanyAsset::query()->count(),
+            'employee_positions' => EmployeePosition::query()->count(),
+            'employment_statuses' => EmploymentStatus::query()->count(),
+            'payroll_grades' => PayrollGrade::query()->count(),
+            'tax_statuses' => TaxStatus::query()->count(),
+            'employees' => Employee::query()->count(),
+            'employee_documents' => EmployeeDocument::query()->count(),
+            'employee_shifts' => EmployeeShift::query()->count(),
+            'employee_shift_assignments' => EmployeeShiftAssignment::query()->count(),
+            'employee_attendances' => EmployeeAttendance::query()->count(),
+            'payroll_runs' => PayrollRun::query()->count(),
+            'payroll_items' => PayrollItem::query()->count(),
+            'items' => Item::query()->count(),
+            'packets' => Packet::query()->count(),
+            'item_packet' => ItemPacket::query()->count(),
+            'lab_samples' => LabSample::query()->count(),
         ];
 
         foreach ($firstCounts as $table => $count) {
-            expect($count)->toBeGreaterThan(0, "Expected table '{$table}' to be populated by DatabaseSeeder.");
+            expect($count)->toBeGreaterThanOrEqual(
+                DatabaseSeeder::MIN_SEED_ROWS,
+                "Expected table '{$table}' to be populated with at least ".DatabaseSeeder::MIN_SEED_ROWS.' rows by DatabaseSeeder.'
+            );
         }
 
         expect(fn () => Artisan::call('db:seed', ['--class' => DatabaseSeeder::class]))
             ->not->toThrow(Throwable::class);
 
-        expect(\App\Models\Company::query()->count())->toBe($firstCounts['companies']);
-        expect(\App\Models\Employee::query()->count())->toBe($firstCounts['employees']);
-        expect(\App\Models\EmployeeShift::query()->count())->toBe($firstCounts['employee_shifts']);
-        expect(\App\Models\EmployeeShiftAssignment::query()->count())->toBe($firstCounts['employee_shift_assignments']);
-        expect(\App\Models\EmployeeAttendance::query()->count())->toBe($firstCounts['employee_attendances']);
-        expect(\App\Models\PayrollRun::query()->count())->toBe($firstCounts['payroll_runs']);
-        expect(\App\Models\PayrollItem::query()->count())->toBe($firstCounts['payroll_items']);
-        expect(\App\Models\LabSample::query()->count())->toBe($firstCounts['lab_samples']);
+        $secondCounts = [
+            'users' => User::query()->count(),
+            'companies' => Company::query()->count(),
+            'capital_companies' => CapitalCompany::query()->count(),
+            'expense_categories' => ExpenseCategory::query()->count(),
+            'expense_types' => ExpenseType::query()->count(),
+            'expense_items' => ExpenseItem::query()->count(),
+            'company_assets' => CompanyAsset::query()->count(),
+            'employee_positions' => EmployeePosition::query()->count(),
+            'employment_statuses' => EmploymentStatus::query()->count(),
+            'payroll_grades' => PayrollGrade::query()->count(),
+            'tax_statuses' => TaxStatus::query()->count(),
+            'employees' => Employee::query()->count(),
+            'employee_documents' => EmployeeDocument::query()->count(),
+            'employee_shifts' => EmployeeShift::query()->count(),
+            'employee_shift_assignments' => EmployeeShiftAssignment::query()->count(),
+            'employee_attendances' => EmployeeAttendance::query()->count(),
+            'payroll_runs' => PayrollRun::query()->count(),
+            'payroll_items' => PayrollItem::query()->count(),
+            'items' => Item::query()->count(),
+            'packets' => Packet::query()->count(),
+            'item_packet' => ItemPacket::query()->count(),
+            'lab_samples' => LabSample::query()->count(),
+        ];
 
-        $nadia = \App\Models\Employee::query()->with('employeePosition')->where('nik_ktp', '3273011504960001')->firstOrFail();
-        $budi = \App\Models\Employee::query()->with('employeePosition')->where('nik_ktp', '3273012208920002')->firstOrFail();
+        expect($secondCounts)->toBe($firstCounts);
+
+        $nadia = Employee::query()->with('employeePosition')->where('nik_ktp', '3273011504960001')->firstOrFail();
+        $budi = Employee::query()->with('employeePosition')->where('nik_ktp', '3273012208920002')->firstOrFail();
 
         expect($nadia->employee_attendance_code)->toBe('NadiaSTAFFA'.$nadia->id);
         expect($budi->employee_attendance_code)->toBe('BudiSTAFFB'.$budi->id);
+
+        $seededItems = Item::query()->get();
+        $companyIds = Company::query()->pluck('id')->all();
+        expect($seededItems)->not->toBeEmpty();
+        expect($seededItems->pluck('type')->contains(ItemType::Bahan))->toBeTrue();
+        expect($seededItems->pluck('type')->contains(ItemType::Peralatan))->toBeTrue();
+        foreach ($seededItems as $seededItem) {
+            expect($companyIds)->toContain($seededItem->company_id);
+            expect($seededItem->code)->not->toBeNull();
+            expect($seededItem->code)->toStartWith('ITM-');
+            expect($seededItem->type)->toBeInstanceOf(ItemType::class);
+        }
+
+        $seededItemPackets = ItemPacket::query()->with('item')->get();
+        expect($seededItemPackets)->not->toBeEmpty();
+        foreach ($seededItemPackets as $seededItemPacket) {
+            expect($companyIds)->toContain($seededItemPacket->company_id);
+            expect($seededItemPacket->company_id)->toBe($seededItemPacket->item?->company_id);
+        }
     });
 
     it('verifies all registered GET API endpoints return 200 OK with CORS headers after seeding', function () {

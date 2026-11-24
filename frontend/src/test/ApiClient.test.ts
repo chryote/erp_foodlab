@@ -7,11 +7,17 @@ import {
   createExpenseCategory,
   createExpenseItem,
   createExpenseType,
+  createItem,
+  createItemPacket,
+  createPacket,
   deleteCapitalCompany,
   deleteCompany,
   deleteExpenseCategory,
   deleteExpenseItem,
   deleteExpenseType,
+  deleteItem,
+  deleteItemPacket,
+  deletePacket,
   fetchActiveCompanyEmployees,
   fetchCapitalCompanies,
   fetchChoEnums,
@@ -21,13 +27,19 @@ import {
   fetchExpenseItems,
   fetchExpenseTypes,
   fetchHealthStatus,
+  fetchItemPackets,
+  fetchItems,
   fetchLabSamples,
+  fetchPackets,
   syncActiveCompany,
   updateCapitalCompany,
   updateCompany,
   updateExpenseCategory,
   updateExpenseItem,
   updateExpenseType,
+  updateItem,
+  updateItemPacket,
+  updatePacket,
 } from '../api/client';
 import {
   clearActiveCompanyId,
@@ -231,5 +243,37 @@ describe('General API Client Contract & Error Handling', () => {
     }
     expect(String(calls[1][0])).toContain('/v1/modules/cho/employees?active_company=1');
     expect(String(calls[2][0])).toContain('/v1/active-company');
+  });
+
+  it('calls CPO packing endpoints for items, packets, and item-packets', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: [] }),
+    } as Response);
+
+    await fetchItems();
+    await createItem({ company_id: 1, code: 'ITM-001', name: 'Kardus', type: 'Bahan' });
+    await updateItem(5, { company_id: 1, code: null, name: 'Kardus Baru', type: 'Peralatan' });
+    await deleteItem(5);
+
+    await fetchPackets();
+    await createPacket({ name: 'Paket A' });
+    await updatePacket(6, { name: 'Paket B' });
+    await deletePacket(6);
+
+    await fetchItemPackets();
+    await createItemPacket({ company_id: 1, packet_id: 6, item_id: 5, quantity: 3 });
+    await updateItemPacket(7, { company_id: 1, packet_id: 6, item_id: 5, quantity: 4 });
+    await deleteItemPacket(7);
+
+    const calls = vi.mocked(globalThis.fetch).mock.calls;
+    expect(calls).toHaveLength(12);
+    expect(String(calls[0][0])).toContain('/v1/modules/cpo/items');
+    expect(String(calls[2][0])).toContain('/v1/modules/cpo/items/5');
+    expect(String(calls[4][0])).toContain('/v1/modules/cpo/packets');
+    expect(String(calls[6][0])).toContain('/v1/modules/cpo/packets/6');
+    expect(String(calls[8][0])).toContain('/v1/modules/cpo/item-packets');
+    expect(String(calls[10][0])).toContain('/v1/modules/cpo/item-packets/7');
   });
 });
