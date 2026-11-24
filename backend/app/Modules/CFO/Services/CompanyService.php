@@ -128,6 +128,10 @@ class CompanyService
             $locked->employeeShifts()->delete();
             $locked->employees()->delete();
 
+            // Soft-delete CPO dependent records so none remain orphaned.
+            $locked->itemPackets()->delete();
+            $locked->items()->delete();
+
             $locked->delete();
         });
 
@@ -180,6 +184,10 @@ class CompanyService
             'erp_foodlab:hr:employee_shifts:list',
             'erp_foodlab:hr:employee_shift_assignments:list',
             'erp_foodlab:hr:employee_attendances:list',
+            'erp_foodlab:cpo:items:list',
+            'erp_foodlab:cpo:item_packets:list',
+            'erp_foodlab:cpo:packets:list',
+            'erp_foodlab:module:cpo',
         ];
 
         foreach ($keys as $key) {

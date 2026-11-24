@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Enums\Agama;
 use App\Enums\AttendanceStatusEnum;
 use App\Enums\GolonganDarah;
+use App\Enums\ItemType;
 use App\Enums\JenisDokumen;
 use App\Enums\JenisKelamin;
 use App\Enums\PayrollGroup;
@@ -23,7 +24,10 @@ use App\Models\EmploymentStatus;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseItem;
 use App\Models\ExpenseType;
+use App\Models\Item;
+use App\Models\ItemPacket;
 use App\Models\LabSample;
+use App\Models\Packet;
 use App\Models\PayrollGrade;
 use App\Models\PayrollItem;
 use App\Models\PayrollRun;
@@ -53,6 +57,9 @@ class DatabaseSeeder extends Seeder
             $this->seedEmployeeShifts();
             $this->seedEmployeeShiftAssignments();
             $this->seedEmployeeAttendances();
+            $this->seedCpoItems($company);
+            $this->seedCpoPackets();
+            $this->seedCpoItemPackets($company);
         });
 
         Cache::flush();
@@ -746,5 +753,103 @@ class DatabaseSeeder extends Seeder
         }
 
         PayrollItemService::syncPayrollRunTotals($payrollRun);
+    }
+
+    private function seedCpoItems(Company $company): void
+    {
+        $items = [
+            ['name' => 'Apple', 'type' => ItemType::Bahan],
+            ['name' => 'Banana', 'type' => ItemType::Bahan],
+            ['name' => 'Orange', 'type' => ItemType::Bahan],
+            ['name' => 'Jackfruit', 'type' => ItemType::Bahan],
+            ['name' => 'Blender Lab', 'type' => ItemType::Peralatan],
+            ['name' => 'Timbangan Digital', 'type' => ItemType::Peralatan],
+        ];
+
+        foreach ($items as $entry) {
+            $item = Item::query()
+                ->withTrashed()
+                ->where('company_id', $company->id)
+                ->where('name', $entry['name'])
+                ->orderByRaw('deleted_at IS NOT NULL')
+                ->first() ?? new Item();
+
+            $item->company_id = $company->id;
+            $item->name = $entry['name'];
+            $item->type = $entry['type'];
+            $item->deleted_at = null;
+            $item->save();
+        }
+    }
+
+    private function seedCpoPackets(): void
+    {
+        foreach (['Paket A', 'Paket B'] as $name) {
+            $packet = Packet::query()
+                ->withTrashed()
+                ->where('name', $name)
+                ->orderByRaw('deleted_at IS NOT NULL')
+                ->first() ?? new Packet();
+
+            $packet->name = $name;
+            $packet->deleted_at = null;
+            $packet->save();
+        }
+    }
+
+    private function seedCpoItemPackets(Company $company): void
+    {
+        $packets = Packet::query()
+            ->whereIn('name', ['Paket A', 'Paket B'])
+            ->get()
+            ->keyBy('name');
+
+        $items = Item::query()
+            ->where('company_id', $company->id)
+            ->whereIn('name', ['Apple', 'Banana', 'Orange', 'Jackfruit', 'Blender Lab'])
+            ->get()
+            ->keyBy('name');
+
+        $mappings = [
+            'Paket A' => [
+                ['item' => 'Apple', 'quantity' => 1],
+                ['item' => 'Banana', 'quantity' => 1],
+                ['item' => 'Orange', 'quantity' => 1],
+            ],
+            'Paket B' => [
+                ['item' => 'Apple', 'quantity' => 1],
+                ['item' => 'Jackfruit', 'quantity' => 1],
+                ['item' => 'Blender Lab', 'quantity' => 1],
+            ],
+        ];
+
+        foreach ($mappings as $packetName => $entries) {
+            $packet = $packets->get($packetName);
+            if ($packet === null) {
+                continue;
+            }
+
+            foreach ($entries as $entry) {
+                $item = $items->get($entry['item']);
+                if ($item === null) {
+                    continue;
+                }
+
+                $itemPacket = ItemPacket::query()
+                    ->withTrashed()
+                    ->where('company_id', $company->id)
+                    ->where('packet_id', $packet->id)
+                    ->where('item_id', $item->id)
+                    ->orderByRaw('deleted_at IS NOT NULL')
+                    ->first() ?? new ItemPacket();
+
+                $itemPacket->company_id = $company->id;
+                $itemPacket->packet_id = $packet->id;
+                $itemPacket->item_id = $item->id;
+                $itemPacket->quantity = $entry['quantity'];
+                $itemPacket->deleted_at = null;
+                $itemPacket->save();
+            }
+        }
     }
 }

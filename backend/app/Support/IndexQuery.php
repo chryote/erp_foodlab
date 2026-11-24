@@ -33,6 +33,12 @@ final class IndexQuery
         'period_to',
         'payroll_run_id',
         'payroll_group',
+        'packet_id',
+        'item_id',
+        'type',
+        'item_type',
+        'quantity_min',
+        'quantity_max',
     ];
 
     /**

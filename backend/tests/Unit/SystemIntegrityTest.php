@@ -99,6 +99,9 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
             'employee_attendances' => \App\Models\EmployeeAttendance::query()->count(),
             'payroll_runs' => \App\Models\PayrollRun::query()->count(),
             'payroll_items' => \App\Models\PayrollItem::query()->count(),
+            'items' => \App\Models\Item::query()->count(),
+            'packets' => \App\Models\Packet::query()->count(),
+            'item_packet' => \App\Models\ItemPacket::query()->count(),
             'lab_samples' => \App\Models\LabSample::query()->count(),
         ];
 
@@ -116,6 +119,9 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
         expect(\App\Models\EmployeeAttendance::query()->count())->toBe($firstCounts['employee_attendances']);
         expect(\App\Models\PayrollRun::query()->count())->toBe($firstCounts['payroll_runs']);
         expect(\App\Models\PayrollItem::query()->count())->toBe($firstCounts['payroll_items']);
+        expect(\App\Models\Item::query()->count())->toBe($firstCounts['items']);
+        expect(\App\Models\Packet::query()->count())->toBe($firstCounts['packets']);
+        expect(\App\Models\ItemPacket::query()->count())->toBe($firstCounts['item_packet']);
         expect(\App\Models\LabSample::query()->count())->toBe($firstCounts['lab_samples']);
 
         $nadia = \App\Models\Employee::query()->with('employeePosition')->where('nik_ktp', '3273011504960001')->firstOrFail();
@@ -123,6 +129,23 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
 
         expect($nadia->employee_attendance_code)->toBe('NadiaSTAFFA'.$nadia->id);
         expect($budi->employee_attendance_code)->toBe('BudiSTAFFB'.$budi->id);
+
+        $seededItems = \App\Models\Item::query()->get();
+        $companyIds = \App\Models\Company::query()->pluck('id')->all();
+        expect($seededItems)->not->toBeEmpty();
+        expect($seededItems->pluck('type')->contains(\App\Enums\ItemType::Bahan))->toBeTrue();
+        expect($seededItems->pluck('type')->contains(\App\Enums\ItemType::Peralatan))->toBeTrue();
+        foreach ($seededItems as $seededItem) {
+            expect($companyIds)->toContain($seededItem->company_id);
+            expect($seededItem->type)->toBeInstanceOf(\App\Enums\ItemType::class);
+        }
+
+        $seededItemPackets = \App\Models\ItemPacket::query()->with('item')->get();
+        expect($seededItemPackets)->not->toBeEmpty();
+        foreach ($seededItemPackets as $seededItemPacket) {
+            expect($companyIds)->toContain($seededItemPacket->company_id);
+            expect($seededItemPacket->company_id)->toBe($seededItemPacket->item?->company_id);
+        }
     });
 
     it('verifies all registered GET API endpoints return 200 OK with CORS headers after seeding', function () {
