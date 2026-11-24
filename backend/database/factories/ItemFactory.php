@@ -22,6 +22,7 @@ class ItemFactory extends Factory
 
         return [
             'company_id' => Company::factory(),
+            'code' => sprintf('ITM-%04d', $seq),
             'name' => ucfirst($this->faker->unique()->words(2, true)).' #'.$seq,
             'type' => ItemType::Bahan,
         ];

@@ -18,6 +18,7 @@ class Item extends Model
 
     protected $fillable = [
         'company_id',
+        'code',
         'name',
         'type',
     ];

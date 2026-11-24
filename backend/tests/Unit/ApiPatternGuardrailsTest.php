@@ -896,6 +896,7 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
         Item::factory()->count(4)->create(['company_id' => $companyA->id]);
         $specialItem = Item::factory()->create([
             'company_id' => $companyA->id,
+            'code' => 'ITM-100%',
             'name' => 'Gula 100% Murni',
             'type' => 'Bahan',
         ]);
@@ -947,16 +948,27 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             ->assertOk()
             ->assertJsonCount(5, 'data');
 
-        // 6. Direct DB bypass hits items_company_name_active_unique, service sharedLock throws ValidationException, and Idempotency-Key deduplicates POSTs
+        $this->getJson('/api/v1/modules/cpo/items?filter[code]='.urlencode('100%'))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $specialItem->id);
+
+        $this->getJson('/api/v1/modules/cpo/items?filter[code]=%20%20%20')
+            ->assertOk()
+            ->assertJsonCount(5, 'data');
+
+        // 6. Direct DB bypass hits items_company_name_active_unique & items_company_code_active_unique, service sharedLock throws ValidationException, and Idempotency-Key deduplicates POSTs
         $idemHeaders = ['Idempotency-Key' => 'idem-cpo-item-001'];
         $itemPayload = [
             'company_id' => $companyA->id,
+            'code' => '  ITM-TAP-01  ',
             'name' => '  Tepung   Tapioka  ',
             'type' => 'Bahan',
         ];
 
         $firstPost = $this->postJson('/api/v1/modules/cpo/items', $itemPayload, $idemHeaders)
             ->assertCreated()
+            ->assertJsonPath('data.code', 'ITM-TAP-01')
             ->assertJsonPath('data.name', 'Tepung Tapioka')
             ->assertJsonMissingPath('data.active_flag');
 
@@ -978,9 +990,21 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'name' => 'Tepung Tapioka',
         ]))->toThrow(QueryException::class);
 
+        expect(fn () => Item::factory()->create([
+            'company_id' => $companyA->id,
+            'code' => 'ITM-TAP-01',
+            'name' => 'Tepung Lain',
+        ]))->toThrow(QueryException::class);
+
         expect(fn () => app(ItemService::class)->createItem([
             'company_id' => $companyA->id,
             'name' => 'tepung tapioka',
+        ]))->toThrow(ValidationException::class);
+
+        expect(fn () => app(ItemService::class)->createItem([
+            'company_id' => $companyA->id,
+            'code' => 'itm-tap-01',
+            'name' => 'Tepung Beras',
         ]))->toThrow(ValidationException::class);
     });
 

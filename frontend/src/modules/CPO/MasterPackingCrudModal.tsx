@@ -104,6 +104,13 @@ export const MasterPackingCrudModal: React.FC<
         renderValue: (row) => renderCompanyName(row.company_id, row.company),
       },
       {
+        key: 'code',
+        label: 'Kode Item',
+        optional: true,
+        placeholder: 'Contoh: ITM-001',
+        renderValue: (row) => row.code || '-',
+      },
+      {
         key: 'name',
         label: 'Nama Item',
         placeholder: 'Contoh: Kardus Kemasan 30x20',
@@ -264,6 +271,7 @@ export const MasterPackingCrudModal: React.FC<
     values: Record<string, string>
   ): ItemPayload | null => {
     const companyId = parseInt(values.company_id ?? '', 10);
+    const code = (values.code ?? '').trim();
     const name = (values.name ?? '').trim();
     const type: ItemType =
       values.type === 'Peralatan' ? 'Peralatan' : 'Bahan';
@@ -272,6 +280,7 @@ export const MasterPackingCrudModal: React.FC<
     }
     return {
       company_id: companyId,
+      code: code || null,
       name,
       type,
     };

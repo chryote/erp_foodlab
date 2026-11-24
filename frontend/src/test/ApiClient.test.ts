@@ -253,8 +253,8 @@ describe('General API Client Contract & Error Handling', () => {
     } as Response);
 
     await fetchItems();
-    await createItem({ company_id: 1, name: 'Kardus', type: 'Bahan' });
-    await updateItem(5, { company_id: 1, name: 'Kardus Baru', type: 'Peralatan' });
+    await createItem({ company_id: 1, code: 'ITM-001', name: 'Kardus', type: 'Bahan' });
+    await updateItem(5, { company_id: 1, code: null, name: 'Kardus Baru', type: 'Peralatan' });
     await deleteItem(5);
 
     await fetchPackets();

@@ -707,6 +707,7 @@ export type ItemType = 'Bahan' | 'Peralatan';
 export interface Item {
   id: number;
   company_id: number;
+  code?: string | null;
   name: string;
   type: ItemType;
   company?: Company | null;
@@ -717,6 +718,7 @@ export interface Item {
 
 export interface ItemPayload {
   company_id: number;
+  code?: string | null;
   name: string;
   type: ItemType;
 }

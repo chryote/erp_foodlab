@@ -68,6 +68,7 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
       {
         id: 10,
         company_id: 1,
+        code: 'ITM-001',
         name: 'Kardus Packing 30x20',
         type: 'Bahan',
         company: companiesStore[0],
@@ -75,6 +76,7 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
       {
         id: 11,
         company_id: 2,
+        code: null,
         name: 'Lakban Cabang 2',
         type: 'Peralatan',
         company: companiesStore[1],
@@ -90,6 +92,7 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
       const created: apiClient.Item = {
         id: 12,
         company_id: payload.company_id,
+        code: payload.code ?? null,
         name: payload.name,
         type: payload.type,
         company:
@@ -103,6 +106,7 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
       const updated: apiClient.Item = {
         id,
         company_id: payload.company_id,
+        code: payload.code ?? null,
         name: payload.name,
         type: payload.type,
         company:
@@ -286,7 +290,11 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
       'Pilih Perusahaan'
     ) as HTMLSelectElement;
     expect(itemCompanySelect.value).toBe('1');
+    expect(within(modal).getByText('ITM-001')).toBeInTheDocument();
 
+    fireEvent.change(within(modal).getByLabelText('Kode Item'), {
+      target: { value: 'ITM-012' },
+    });
     fireEvent.change(within(modal).getByLabelText('Nama Item'), {
       target: { value: 'Sealer Mesin' },
     });
@@ -299,13 +307,18 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
     await waitFor(() => {
       expect(apiClient.createItem).toHaveBeenCalledWith({
         company_id: 1,
+        code: 'ITM-012',
         name: 'Sealer Mesin',
         type: 'Peralatan',
       });
+      expect(within(modal).getByText('ITM-012')).toBeInTheDocument();
       expect(within(modal).getByText('Sealer Mesin')).toBeInTheDocument();
     });
 
     fireEvent.click(within(modal).getByTestId('edit-row-12'));
+    fireEvent.change(within(modal).getByLabelText('Kode Item'), {
+      target: { value: '' },
+    });
     fireEvent.change(within(modal).getByLabelText('Nama Item'), {
       target: { value: 'Sealer Mesin Pro' },
     });
@@ -315,6 +328,7 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
     await waitFor(() => {
       expect(apiClient.updateItem).toHaveBeenCalledWith(12, {
         company_id: 1,
+        code: null,
         name: 'Sealer Mesin Pro',
         type: 'Peralatan',
       });

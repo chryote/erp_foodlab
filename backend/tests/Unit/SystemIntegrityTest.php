@@ -137,6 +137,8 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
         expect($seededItems->pluck('type')->contains(\App\Enums\ItemType::Peralatan))->toBeTrue();
         foreach ($seededItems as $seededItem) {
             expect($companyIds)->toContain($seededItem->company_id);
+            expect($seededItem->code)->not->toBeNull();
+            expect($seededItem->code)->toStartWith('ITM-');
             expect($seededItem->type)->toBeInstanceOf(\App\Enums\ItemType::class);
         }
 

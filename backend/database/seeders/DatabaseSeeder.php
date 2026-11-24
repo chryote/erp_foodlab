@@ -758,23 +758,27 @@ class DatabaseSeeder extends Seeder
     private function seedCpoItems(Company $company): void
     {
         $items = [
-            ['name' => 'Apple', 'type' => ItemType::Bahan],
-            ['name' => 'Banana', 'type' => ItemType::Bahan],
-            ['name' => 'Orange', 'type' => ItemType::Bahan],
-            ['name' => 'Jackfruit', 'type' => ItemType::Bahan],
-            ['name' => 'Blender Lab', 'type' => ItemType::Peralatan],
-            ['name' => 'Timbangan Digital', 'type' => ItemType::Peralatan],
+            ['code' => 'ITM-001', 'name' => 'Apple', 'type' => ItemType::Bahan],
+            ['code' => 'ITM-002', 'name' => 'Banana', 'type' => ItemType::Bahan],
+            ['code' => 'ITM-003', 'name' => 'Orange', 'type' => ItemType::Bahan],
+            ['code' => 'ITM-004', 'name' => 'Jackfruit', 'type' => ItemType::Bahan],
+            ['code' => 'ITM-005', 'name' => 'Blender Lab', 'type' => ItemType::Peralatan],
+            ['code' => 'ITM-006', 'name' => 'Timbangan Digital', 'type' => ItemType::Peralatan],
         ];
 
         foreach ($items as $entry) {
             $item = Item::query()
                 ->withTrashed()
                 ->where('company_id', $company->id)
-                ->where('name', $entry['name'])
+                ->where(function ($query) use ($entry): void {
+                    $query->where('code', $entry['code'])
+                        ->orWhere('name', $entry['name']);
+                })
                 ->orderByRaw('deleted_at IS NOT NULL')
                 ->first() ?? new Item();
 
             $item->company_id = $company->id;
+            $item->code = $entry['code'];
             $item->name = $entry['name'];
             $item->type = $entry['type'];
             $item->deleted_at = null;

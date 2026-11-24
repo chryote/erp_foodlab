@@ -5,6 +5,7 @@ namespace App\Modules\CPO\Services;
 use App\Enums\ItemType;
 use App\Models\Company;
 use App\Models\Item;
+use App\Support\ActiveCompany;
 use App\Support\IndexQuery;
 use App\Support\InputNormalizer;
 use App\Support\WriteGuard;
@@ -58,6 +59,11 @@ class ItemService
     public function createItem(array $attributes): Item
     {
         $attributes['company_id'] = (int) $attributes['company_id'];
+        if (array_key_exists('code', $attributes)) {
+            $attributes['code'] = $attributes['code'] !== null
+                ? InputNormalizer::nullableText((string) $attributes['code'])
+                : null;
+        }
         $attributes['name'] = InputNormalizer::text((string) $attributes['name']) ?? '';
         $rawType = $attributes['type'] ?? null;
         $typeValue = $rawType instanceof ItemType
@@ -74,12 +80,15 @@ class ItemService
 
         $item = DB::transaction(function () use ($attributes): Item {
             $this->assertActiveCompany($attributes['company_id']);
+            if (($attributes['code'] ?? null) !== null && $attributes['code'] !== '') {
+                $this->assertCodeUnique($attributes['company_id'], (string) $attributes['code']);
+            }
             $this->assertNameUnique($attributes['company_id'], $attributes['name']);
 
             return Item::query()->create($attributes);
         });
 
-        $this->forgetDependentCaches();
+        $this->forgetDependentCaches($attributes['company_id']);
 
         return $item->load(self::RELATIONS);
     }
@@ -91,6 +100,12 @@ class ItemService
     {
         if (array_key_exists('company_id', $attributes)) {
             $attributes['company_id'] = (int) $attributes['company_id'];
+        }
+
+        if (array_key_exists('code', $attributes)) {
+            $attributes['code'] = $attributes['code'] !== null
+                ? InputNormalizer::nullableText((string) $attributes['code'])
+                : null;
         }
 
         if (array_key_exists('name', $attributes)) {
@@ -123,6 +138,11 @@ class ItemService
 
             $this->assertActiveCompany($targetCompanyId);
 
+            $targetCode = array_key_exists('code', $attributes) ? $attributes['code'] : $locked->code;
+            if ($targetCode !== null && $targetCode !== '') {
+                $this->assertCodeUnique($targetCompanyId, (string) $targetCode, $locked->getKey());
+            }
+
             $targetName = (string) ($attributes['name'] ?? $locked->name);
             $this->assertNameUnique($targetCompanyId, $targetName, $locked->getKey());
 
@@ -131,14 +151,14 @@ class ItemService
             return $locked;
         });
 
-        $this->forgetDependentCaches();
+        $this->forgetDependentCaches($updated->company_id);
 
         return $updated->refresh()->load(self::RELATIONS);
     }
 
     public function deleteItem(Item $item): void
     {
-        DB::transaction(function () use ($item): void {
+        $companyId = DB::transaction(function () use ($item): int {
             $locked = Item::query()->lockForUpdate()->findOrFail($item->getKey());
 
             if (
@@ -149,10 +169,13 @@ class ItemService
                 $locked->itemPackets()->delete();
             }
 
+            $companyId = (int) $locked->company_id;
             $locked->delete();
+
+            return $companyId;
         });
 
-        $this->forgetDependentCaches();
+        $this->forgetDependentCaches($companyId);
     }
 
     private function query(Request $request): QueryBuilder
@@ -161,6 +184,14 @@ class ItemService
             ->allowedFilters([
                 AllowedFilter::exact('company_id'),
                 AllowedFilter::exact('type'),
+                AllowedFilter::callback('code', function (Builder $query, mixed $value): void {
+                    $escaped = IndexQuery::escapeLike($value);
+                    if ($escaped === null) {
+                        return;
+                    }
+
+                    IndexQuery::whereLike($query, 'code', $escaped);
+                }),
                 AllowedFilter::callback('name', function (Builder $query, mixed $value): void {
                     $escaped = IndexQuery::escapeLike($value);
                     if ($escaped === null) {
@@ -175,10 +206,13 @@ class ItemService
                         return;
                     }
 
-                    IndexQuery::whereLike($query, 'name', $escaped);
+                    $query->where(function (Builder $searchQuery) use ($escaped): void {
+                        IndexQuery::whereLike($searchQuery, 'code', $escaped);
+                        IndexQuery::orWhereLike($searchQuery, 'name', $escaped);
+                    });
                 }),
             ])
-            ->allowedSorts(['id', 'name', 'type', 'company_id', 'created_at', 'updated_at'])
+            ->allowedSorts(['id', 'code', 'name', 'type', 'company_id', 'created_at', 'updated_at'])
             ->defaultSort('name', 'id');
 
         $availableIncludes = array_values(array_filter([
@@ -209,6 +243,20 @@ class ItemService
         }
     }
 
+    private function assertCodeUnique(int $companyId, string $code, mixed $ignoreKey = null): void
+    {
+        WriteGuard::assertUniqueActive(
+            Item::query(),
+            'code',
+            $code,
+            ['company_id' => $companyId],
+            'code',
+            'Item dengan kode yang sama sudah terdaftar pada perusahaan ini.',
+            $ignoreKey,
+            true
+        );
+    }
+
     private function assertNameUnique(int $companyId, string $name, mixed $ignoreKey = null): void
     {
         WriteGuard::assertUniqueActive(
@@ -223,11 +271,12 @@ class ItemService
         );
     }
 
-    private function forgetDependentCaches(): void
+    private function forgetDependentCaches(?int $companyId = null): void
     {
         Cache::forget(self::CACHE_KEY_LIST);
         Cache::forget(CpoService::CACHE_KEY);
         Cache::forget(self::CACHE_KEY_ITEM_PACKETS_LIST);
         Cache::forget(self::CACHE_KEY_PACKETS_LIST);
+        ActiveCompany::forgetCompanyCache($companyId);
     }
 }
