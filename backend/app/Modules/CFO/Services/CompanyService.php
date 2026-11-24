@@ -4,6 +4,7 @@ namespace App\Modules\CFO\Services;
 
 use App\Models\Company;
 use App\Models\DefaultPackage;
+use App\Models\Ingredient;
 use App\Modules\CHO\Services\PayrollItemService;
 use App\Modules\CHO\Services\PayrollRunService;
 use App\Support\ActiveCompany;
@@ -153,6 +154,12 @@ class CompanyService
                 }
             }
             $locked->itemPackets()->delete();
+            $companyItemIds = $locked->items()->lockForUpdate()->pluck('id')->all();
+            if ($companyItemIds !== [] && class_exists(Ingredient::class) && Schema::hasTable('ingredients')) {
+                Ingredient::query()
+                    ->whereIn('item_id', $companyItemIds)
+                    ->delete();
+            }
             $locked->items()->delete();
 
             $locked->delete();

@@ -27,6 +27,7 @@ use App\Models\EmploymentStatus;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseItem;
 use App\Models\ExpenseType;
+use App\Models\Ingredient;
 use App\Models\Item;
 use App\Models\ItemPacket;
 use App\Models\LabSample;
@@ -80,7 +81,8 @@ class DatabaseSeeder extends Seeder
             $packetVendors = $this->seedCpoPacketVendors();
             $packetCategories = $this->seedCpoPacketCategories();
             $itemPackets = $this->seedCpoItemPackets($primaryCompany, $items, $packets);
-            $this->seedCpoDefaultPackages($primaryCompany, $packetNames, $packetVendors, $packetCategories, $itemPackets);
+            $defaultPackages = $this->seedCpoDefaultPackages($primaryCompany, $packetNames, $packetVendors, $packetCategories, $itemPackets);
+            $this->seedCpoIngredients($defaultPackages, $items);
         });
 
         Cache::flush();
@@ -1714,6 +1716,7 @@ class DatabaseSeeder extends Seeder
      * @param  EloquentCollection<int, PacketVendor>  $packetVendors
      * @param  EloquentCollection<int, PacketCategory>  $packetCategories
      * @param  EloquentCollection<int, ItemPacket>  $itemPackets
+     * @return EloquentCollection<int, DefaultPackage>
      */
     private function seedCpoDefaultPackages(
         Company $primaryCompany,
@@ -1721,7 +1724,7 @@ class DatabaseSeeder extends Seeder
         EloquentCollection $packetVendors,
         EloquentCollection $packetCategories,
         EloquentCollection $itemPackets
-    ): void {
+    ): EloquentCollection {
         $existingByKey = DefaultPackage::query()
             ->withTrashed()
             ->get()
@@ -1740,7 +1743,9 @@ class DatabaseSeeder extends Seeder
             ->first(fn (ItemPacket $ip): bool => (int) $ip->company_id === (int) $primaryCompany->id)
             ?? $itemPackets->firstOrFail();
 
-        $this->upsertDefaultPackage(
+        $seeded = new EloquentCollection;
+
+        $seeded->push($this->upsertDefaultPackage(
             $existingByKey,
             'Brand A',
             $canonicalName->id,
@@ -1748,7 +1753,7 @@ class DatabaseSeeder extends Seeder
             $canonicalCategory->id,
             $canonicalItemPacket->id,
             15000.00
-        );
+        ));
 
         $nameList = $packetNames->values();
         $vendorList = $packetVendors->values();
@@ -1765,7 +1770,7 @@ class DatabaseSeeder extends Seeder
             /** @var ItemPacket $itemPacket */
             $itemPacket = $itemPacketList[($i - 1) % $itemPacketList->count()];
 
-            $this->upsertDefaultPackage(
+            $seeded->push($this->upsertDefaultPackage(
                 $existingByKey,
                 sprintf('Brand Paket %03d', $i),
                 $pktName->id,
@@ -1773,8 +1778,10 @@ class DatabaseSeeder extends Seeder
                 $pktCategory->id,
                 $itemPacket->id,
                 round(10000.00 + ($i * 2500.00), 2)
-            );
+            ));
         }
+
+        return $seeded;
     }
 
     /**
@@ -1788,7 +1795,7 @@ class DatabaseSeeder extends Seeder
         int $packetCategoryId,
         int $itemPacketId,
         float $price
-    ): void {
+    ): DefaultPackage {
         $key = implode('|', [
             $brandName,
             $packetNameId,
@@ -1809,5 +1816,64 @@ class DatabaseSeeder extends Seeder
         $defaultPackage->deleted_at = null;
         $defaultPackage->save();
         $existingByKey->put($key, $defaultPackage);
+
+        return $defaultPackage;
+    }
+
+    /**
+     * @param  EloquentCollection<int, DefaultPackage>  $defaultPackages
+     * @param  EloquentCollection<int, Item>  $items
+     */
+    private function seedCpoIngredients(
+        EloquentCollection $defaultPackages,
+        EloquentCollection $items
+    ): void {
+        $existingByKey = Ingredient::query()
+            ->withTrashed()
+            ->get()
+            ->keyBy(fn (Ingredient $ing): string => $ing->default_package_id.'|'.$ing->item_id);
+
+        $firstDefaultPackage = $defaultPackages->firstOrFail();
+        $firstItem = $items->firstOrFail();
+
+        $this->upsertIngredient($existingByKey, $firstDefaultPackage->id, $firstItem->id, 1.00);
+
+        $dpList = $defaultPackages->values();
+        $itemList = $items->values();
+
+        for ($i = 1; $i <= self::MIN_SEED_ROWS; $i++) {
+            /** @var DefaultPackage $dp */
+            $dp = $dpList[($i - 1) % $dpList->count()];
+            /** @var Item $item */
+            $item = $itemList[$i % $itemList->count()];
+
+            $this->upsertIngredient(
+                $existingByKey,
+                $dp->id,
+                $item->id,
+                round(1500.00 + ($i * 500.00), 2)
+            );
+        }
+    }
+
+    /**
+     * @param  EloquentCollection<int, Ingredient>  $existingByKey
+     */
+    private function upsertIngredient(
+        EloquentCollection $existingByKey,
+        int $defaultPackageId,
+        int $itemId,
+        float $price
+    ): void {
+        $key = $defaultPackageId.'|'.$itemId;
+        /** @var Ingredient $ingredient */
+        $ingredient = $existingByKey->get($key) ?? new Ingredient([
+            'default_package_id' => $defaultPackageId,
+            'item_id' => $itemId,
+        ]);
+        $ingredient->price = $price;
+        $ingredient->deleted_at = null;
+        $ingredient->save();
+        $existingByKey->put($key, $ingredient);
     }
 }

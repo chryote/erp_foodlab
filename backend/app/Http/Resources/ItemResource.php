@@ -30,6 +30,7 @@ class ItemResource extends JsonResource
             'company' => $this->whenLoaded('company', fn ($company) => $company !== null ? new CompanyResource($company) : null),
             'item_packets' => ItemPacketResource::collection($this->whenLoaded('itemPackets')),
             'packets' => PacketResource::collection($this->whenLoaded('packets')),
+            'ingredients' => IngredientResource::collection($this->whenLoaded('ingredients')),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
             'deleted_at' => $this->deleted_at?->toISOString(),

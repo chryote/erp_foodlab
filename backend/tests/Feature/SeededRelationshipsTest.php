@@ -13,6 +13,7 @@ use App\Models\EmployeeShiftAssignment;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseItem;
 use App\Models\ExpenseType;
+use App\Models\Ingredient;
 use App\Models\Item;
 use App\Models\ItemPacket;
 use App\Models\Packet;
@@ -148,6 +149,8 @@ describe('Automated Seeded Relationships & Multi-Row Integrity Strategy', functi
         expect(ItemPacket::query()->whereDoesntHave('company')->count())->toBe(0);
         expect(ItemPacket::query()->whereDoesntHave('packet')->count())->toBe(0);
         expect(ItemPacket::query()->whereDoesntHave('item')->count())->toBe(0);
+        expect(Ingredient::query()->whereDoesntHave('defaultPackage')->count())->toBe(0);
+        expect(Ingredient::query()->whereDoesntHave('item')->count())->toBe(0);
 
         // 2. Tenant (company_id) and hierarchy cohesion across multi-FK tables
         expect(
@@ -318,6 +321,7 @@ describe('Automated Seeded Relationships & Multi-Row Integrity Strategy', functi
             '/api/v1/modules/cpo/packet-vendors',
             '/api/v1/modules/cpo/item-packets',
             '/api/v1/modules/cpo/default-packages',
+            '/api/v1/modules/cpo/ingredients',
             '/api/v1/samples',
         ];
 
@@ -362,9 +366,13 @@ describe('Automated Seeded Relationships & Multi-Row Integrity Strategy', functi
             ->assertOk()
             ->assertJsonStructure(['data' => [['id', 'name', 'items']]]);
 
-        $this->getJson('/api/v1/modules/cpo/default-packages?include=packetName,packetVendor,packetCategory,itemPacket&page=1&per_page=10')
+        $this->getJson('/api/v1/modules/cpo/default-packages?include=packetName,packetVendor,packetCategory,itemPacket,ingredients&page=1&per_page=10')
             ->assertOk()
-            ->assertJsonStructure(['data' => [['id', 'brand_name', 'packet_name', 'packet_vendor', 'packet_category', 'item_packet']]]);
+            ->assertJsonStructure(['data' => [['id', 'brand_name', 'packet_name', 'packet_vendor', 'packet_category', 'item_packet', 'ingredients']]]);
+
+        $this->getJson('/api/v1/modules/cpo/ingredients?include=defaultPackage,item&page=1&per_page=10')
+            ->assertOk()
+            ->assertJsonStructure(['data' => [['id', 'default_package_id', 'item_id', 'price', 'default_package', 'item']]]);
 
         // Verify ?active_company=1 isolates seeded relationships to the requested active company
         $primaryCompany = Company::query()->where('name', 'PT. Slaras Nusa Foodlab')->firstOrFail();

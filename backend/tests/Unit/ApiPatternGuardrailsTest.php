@@ -15,6 +15,7 @@ use App\Models\EmploymentStatus;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseItem;
 use App\Models\ExpenseType;
+use App\Models\Ingredient;
 use App\Models\Item;
 use App\Models\ItemPacket;
 use App\Models\LabSample;
@@ -32,6 +33,7 @@ use App\Modules\CHO\Services\EmployeeService;
 use App\Modules\CHO\Services\PayrollItemService;
 use App\Modules\CHO\Services\PayrollRunService;
 use App\Modules\CPO\Services\DefaultPackageService;
+use App\Modules\CPO\Services\IngredientService;
 use App\Modules\CPO\Services\ItemPacketService;
 use App\Modules\CPO\Services\ItemService;
 use App\Modules\CPO\Services\PacketCategoryService;
@@ -614,6 +616,7 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'packet_vendors' => PacketVendor::class,
             'item_packet' => ItemPacket::class,
             'default_packages' => DefaultPackage::class,
+            'ingredients' => Ingredient::class,
         ];
 
         foreach ($uniqueEntityMap as $table => $modelClass) {
@@ -653,6 +656,7 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'Modules/CPO/Requests/SavePacketVendorRequest.php',
             'Modules/CPO/Requests/SaveItemPacketRequest.php',
             'Modules/CPO/Requests/SaveDefaultPackageRequest.php',
+            'Modules/CPO/Requests/SaveIngredientRequest.php',
         ];
 
         foreach ($uniqueRequests as $requestPath) {
@@ -688,6 +692,7 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'Modules/CPO/Services/PacketVendorService.php',
             'Modules/CPO/Services/ItemPacketService.php',
             'Modules/CPO/Services/DefaultPackageService.php',
+            'Modules/CPO/Services/IngredientService.php',
         ];
 
         foreach ($lockedWriteGuards as $guardPath) {
@@ -1578,6 +1583,98 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'packet_category_id' => $packetCategory->id,
             'item_packet_id' => $itemPacket->id,
             'price' => 15000,
+        ]))->toThrow(ValidationException::class);
+    });
+
+    it('enforces CPO Ingredients speed, cache, pagination, and anti-duplication guardrails', function () {
+        $company = Company::factory()->create(['name' => 'PT. CPO Ingredient Alpha']);
+        $defaultPackage = DefaultPackage::factory()->create(['brand_name' => 'Paket Ingredient DP']);
+        $items = Item::factory()->count(5)->create(['company_id' => $company->id]);
+
+        foreach ($items as $index => $item) {
+            Ingredient::factory()->create([
+                'default_package_id' => $defaultPackage->id,
+                'item_id' => $item->id,
+                'price' => ($index + 1) * 5000,
+            ]);
+        }
+
+        // 1. Pagination cap prevents unbounded ?per_page=99999 dumps
+        $this->getJson('/api/v1/modules/cpo/ingredients?page=1&per_page=99999')
+            ->assertOk()
+            ->assertJsonPath('meta.per_page', IndexQuery::MAX_PER_PAGE);
+
+        // 2. Cold-cache query count is bounded (no N+1, no SUM())
+        Cache::flush();
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->getJson('/api/v1/modules/cpo/ingredients')->assertOk()->assertJsonCount(5, 'data');
+        $coldQueries = collect(DB::getQueryLog())
+            ->reject(fn ($q) => str_contains($q['query'], 'personal_access_tokens'));
+        DB::disableQueryLog();
+
+        // 1 ingredients select + 2 eager loads (defaultPackage, item) = <= 3 queries
+        expect($coldQueries->count())->toBeLessThanOrEqual(3);
+        expect($coldQueries->contains(fn ($q) => str_contains(strtoupper($q['query']), 'SUM(')))->toBeFalse();
+
+        // 3. Warm cache hit executes 0 SQL queries
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->getJson('/api/v1/modules/cpo/ingredients')->assertOk()->assertJsonCount(5, 'data');
+        $warmQueries = DB::getQueryLog();
+        DB::disableQueryLog();
+
+        expect($warmQueries)->toHaveCount(0);
+
+        // 4. Numeric range & exact filters work without LIKE
+        $this->getJson('/api/v1/modules/cpo/ingredients?filter[min_price]=15000&filter[max_price]=20000')
+            ->assertOk()
+            ->assertJsonCount(2, 'data');
+
+        $this->getJson("/api/v1/modules/cpo/ingredients?filter[default_package_id]={$defaultPackage->id}")
+            ->assertOk()
+            ->assertJsonCount(5, 'data');
+
+        // 5. Direct DB bypass hits ingredients_pkg_item_active_unique, service sharedLock throws ValidationException, and Idempotency-Key deduplicates POSTs
+        $newItem = Item::factory()->create(['company_id' => $company->id, 'name' => 'Garam Ingredient']);
+        $idemHeaders = ['Idempotency-Key' => 'idem-cpo-ingredient-001'];
+        $ingredientPayload = [
+            'default_package_id' => $defaultPackage->id,
+            'item_id' => $newItem->id,
+            'price' => 12500,
+        ];
+
+        $firstPost = $this->postJson('/api/v1/modules/cpo/ingredients', $ingredientPayload, $idemHeaders)
+            ->assertCreated()
+            ->assertJsonPath('data.price', 12500)
+            ->assertJsonMissingPath('data.active_flag');
+
+        $replayPost = $this->postJson('/api/v1/modules/cpo/ingredients', $ingredientPayload, $idemHeaders)
+            ->assertCreated();
+
+        expect($replayPost->headers->get('X-Idempotency-Replayed'))->toBe('true');
+        expect($replayPost->json('data.id'))->toBe($firstPost->json('data.id'));
+        expect(Ingredient::query()
+            ->where('default_package_id', $defaultPackage->id)
+            ->where('item_id', $newItem->id)
+            ->count())->toBe(1);
+
+        $this->postJson('/api/v1/modules/cpo/ingredients', [
+            ...$ingredientPayload,
+            'price' => 19000,
+        ], $idemHeaders)->assertUnprocessable()->assertJsonValidationErrors(['idempotency_key']);
+
+        expect(fn () => Ingredient::factory()->create([
+            'default_package_id' => $defaultPackage->id,
+            'item_id' => $newItem->id,
+            'price' => 9999,
+        ]))->toThrow(QueryException::class);
+
+        expect(fn () => app(IngredientService::class)->createIngredient([
+            'default_package_id' => $defaultPackage->id,
+            'item_id' => $newItem->id,
+            'price' => 9999,
         ]))->toThrow(ValidationException::class);
     });
 });

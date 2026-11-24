@@ -58,12 +58,7 @@ class DefaultPackage extends Model
         return $this->belongsTo(ItemPacket::class);
     }
 
-    /**
-     * Deferred until App\Models\Ingredient exists.
-     *
-     * @return HasMany
-     */
-    public function ingredients()
+    public function ingredients(): HasMany
     {
         return $this->hasMany(Ingredient::class);
     }

@@ -45,6 +45,11 @@ class Item extends Model
         return $this->hasMany(ItemPacket::class);
     }
 
+    public function ingredients(): HasMany
+    {
+        return $this->hasMany(Ingredient::class);
+    }
+
     public function packets(): BelongsToMany
     {
         return $this->belongsToMany(Packet::class, 'item_packet')

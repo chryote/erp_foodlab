@@ -15,6 +15,7 @@ use App\Models\EmploymentStatus;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseItem;
 use App\Models\ExpenseType;
+use App\Models\Ingredient;
 use App\Models\Item;
 use App\Models\ItemPacket;
 use App\Models\LabSample;
@@ -133,6 +134,7 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
             'packet_vendors' => PacketVendor::query()->count(),
             'item_packet' => ItemPacket::query()->count(),
             'default_packages' => DefaultPackage::query()->count(),
+            'ingredients' => Ingredient::query()->count(),
             'lab_samples' => LabSample::query()->count(),
         ];
 
@@ -172,6 +174,7 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
             'packet_vendors' => PacketVendor::query()->count(),
             'item_packet' => ItemPacket::query()->count(),
             'default_packages' => DefaultPackage::query()->count(),
+            'ingredients' => Ingredient::query()->count(),
             'lab_samples' => LabSample::query()->count(),
         ];
 

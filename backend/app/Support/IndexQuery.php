@@ -45,6 +45,7 @@ final class IndexQuery
         'packet_vendor_id',
         'packet_category_id',
         'item_packet_id',
+        'default_package_id',
         'min_price',
         'max_price',
     ];

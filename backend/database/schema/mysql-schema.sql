@@ -90,7 +90,7 @@ DROP TABLE IF EXISTS `default_packages`;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `default_packages` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `brand_name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `brand_name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `packet_name_id` bigint unsigned NOT NULL,
   `packet_vendor_id` bigint unsigned NOT NULL,
   `packet_category_id` bigint unsigned NOT NULL,
@@ -379,6 +379,27 @@ CREATE TABLE `expense_types` (
   KEY `expense_types_deleted_id_idx` (`deleted_at`,`id`),
   CONSTRAINT `expense_types_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `expense_types_expense_category_id_foreign` FOREIGN KEY (`expense_category_id`) REFERENCES `expense_categories` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `ingredients`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ingredients` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `default_package_id` bigint unsigned NOT NULL,
+  `item_id` bigint unsigned NOT NULL,
+  `price` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `ingredients_pkg_item_active_unique` (`default_package_id`,`item_id`,`active_flag`),
+  KEY `ingredients_item_id_foreign` (`item_id`),
+  KEY `ingredients_del_pkg_id_idx` (`deleted_at`,`default_package_id`,`id`),
+  KEY `ingredients_del_item_id_idx` (`deleted_at`,`item_id`,`id`),
+  CONSTRAINT `ingredients_default_package_id_foreign` FOREIGN KEY (`default_package_id`) REFERENCES `default_packages` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `ingredients_item_id_foreign` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `item_packet`;
@@ -749,5 +770,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (53,'2026_11_24_150
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (54,'2026_11_24_160000_create_packet_vendors_table',39);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (55,'2026_11_24_170000_create_packet_categories_table',40);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (56,'2026_11_24_180000_create_default_packages_table',41);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (57,'2026_11_24_190000_create_ingredients_table',42);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;

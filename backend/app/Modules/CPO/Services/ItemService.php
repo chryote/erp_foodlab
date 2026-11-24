@@ -171,6 +171,14 @@ class ItemService
                 $locked->itemPackets()->delete();
             }
 
+            if (
+                class_exists('App\\Models\\Ingredient')
+                && Schema::hasTable('ingredients')
+                && method_exists($locked, 'ingredients')
+            ) {
+                $locked->ingredients()->delete();
+            }
+
             $companyId = (int) $locked->company_id;
             $locked->delete();
 
@@ -221,6 +229,7 @@ class ItemService
             'company',
             class_exists('App\\Models\\ItemPacket') ? 'itemPackets' : null,
             class_exists('App\\Models\\Packet') ? 'packets' : null,
+            class_exists('App\\Models\\Ingredient') ? 'ingredients' : null,
         ]));
 
         if ($availableIncludes !== []) {

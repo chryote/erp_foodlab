@@ -2,6 +2,7 @@
 
 use App\Modules\CPO\Controllers\CpoController;
 use App\Modules\CPO\Controllers\DefaultPackageController;
+use App\Modules\CPO\Controllers\IngredientController;
 use App\Modules\CPO\Controllers\ItemController;
 use App\Modules\CPO\Controllers\ItemPacketController;
 use App\Modules\CPO\Controllers\PacketCategoryController;
@@ -61,4 +62,11 @@ Route::prefix('cpo')->group(function () {
     Route::put('/default-packages/{defaultPackage}', [DefaultPackageController::class, 'update'])->name('api.modules.cpo.default-packages.update');
     Route::patch('/default-packages/{defaultPackage}', [DefaultPackageController::class, 'update'])->name('api.modules.cpo.default-packages.patch');
     Route::delete('/default-packages/{defaultPackage}', [DefaultPackageController::class, 'destroy'])->name('api.modules.cpo.default-packages.destroy');
+
+    Route::get('/ingredients', [IngredientController::class, 'index'])->name('api.modules.cpo.ingredients.index');
+    Route::post('/ingredients', [IngredientController::class, 'store'])->name('api.modules.cpo.ingredients.store');
+    Route::get('/ingredients/{ingredient}', [IngredientController::class, 'show'])->name('api.modules.cpo.ingredients.show');
+    Route::put('/ingredients/{ingredient}', [IngredientController::class, 'update'])->name('api.modules.cpo.ingredients.update');
+    Route::patch('/ingredients/{ingredient}', [IngredientController::class, 'update'])->name('api.modules.cpo.ingredients.patch');
+    Route::delete('/ingredients/{ingredient}', [IngredientController::class, 'destroy'])->name('api.modules.cpo.ingredients.destroy');
 });
