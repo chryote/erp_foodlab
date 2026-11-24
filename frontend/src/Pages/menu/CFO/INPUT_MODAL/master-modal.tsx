@@ -374,9 +374,9 @@ export default function CfoMasterModalPage() {
           />
         )}
 
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(420px,0.95fr)_minmax(0,1.05fr)]">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(420px,0.95fr)_minmax(0,1.05fr)] lg:items-start">
           <section
-            className="min-w-0 border-b border-border lg:border-b-0"
+            className="min-w-0 border-b border-border lg:max-h-[calc(100dvh-12rem)] lg:overflow-y-auto lg:border-b-0 lg:pl-1"
             data-testid="perusahaan-crud-page"
           >
             <CardHeader
@@ -456,7 +456,7 @@ export default function CfoMasterModalPage() {
           <section
             className={`${
               selectedCompany && isStakeholderModalOpen ? 'block' : 'hidden'
-            } fixed inset-4 z-50 max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-2xl lg:static lg:block lg:max-h-none lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none`}
+            } fixed inset-4 z-50 max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-2xl lg:static lg:block lg:max-h-[calc(100dvh-12rem)] lg:overflow-y-auto lg:rounded-none lg:border-0 lg:bg-transparent lg:py-0 lg:px-1 lg:shadow-none`}
             data-testid="pemegang-saham"
             role={selectedCompany && isStakeholderModalOpen ? 'dialog' : undefined}
             aria-modal={

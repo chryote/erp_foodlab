@@ -38,10 +38,13 @@ describe('CFO master modal', () => {
       </QueryClientProvider>
     );
 
-    expect(screen.getByTestId('perusahaan-crud-page')).toBeInTheDocument();
+    const companyPanel = screen.getByTestId('perusahaan-crud-page');
+    expect(companyPanel).toBeInTheDocument();
+    expect(companyPanel).toHaveClass('lg:overflow-y-auto');
     const stakeholderPanel = screen.getByTestId('pemegang-saham');
     expect(stakeholderPanel).toHaveClass('hidden');
     expect(stakeholderPanel).toHaveClass('lg:block');
+    expect(stakeholderPanel).toHaveClass('lg:overflow-y-auto');
 
     fireEvent.click(await screen.findByTestId('stakeholder-row-21'));
     expect(await screen.findByText('Existing Owner')).toBeInTheDocument();

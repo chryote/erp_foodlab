@@ -32,6 +32,7 @@ import {
 import { DEFAULT_CPO_MODULE } from '@/modules/CPO/CpoModuleCard';
 import { DEFAULT_CDO_MODULE } from '@/modules/CDO/CdoModuleCard';
 import { DEFAULT_CMO_MODULE } from '@/modules/CMO/CmoModuleCard';
+import { useTheme } from '@/lib/theme';
 
 const COMPANY_MENU_ITEMS: HorizontalMenuItem[] = [
   {
@@ -131,6 +132,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   onSelectItem,
   onLogout,
 }) => {
+  const theme = useTheme();
   const [logoutConfirmationOpen, setLogoutConfirmationOpen] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
   const seriesList = useMemo(
@@ -268,7 +270,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     aria-current={isSelected ? 'page' : undefined}
                     data-testid={`dashboard-company-tab-${company.id}`}
                     className={cn(
-                      'relative h-12 shrink-0 rounded-none px-3 text-xs font-semibold transition-colors sm:px-4',
+                      'relative h-12 shrink-0 rounded-sm px-3 text-xs font-semibold transition-colors sm:px-4',
                       isSelected
                         ? 'after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-primary'
                         : ''
@@ -276,7 +278,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   >
                     {company.name}
                   </MenubarTrigger>
-                  <MenubarContent className='border-gray-200'>
+                  <MenubarContent className={theme === "dark" ?'border-gray-800' : 'border-gray-200'}>
                     {COMPANY_MENU_MODULES.map((moduleConfig) => {
                       const module =
                         modulesMap[moduleConfig.code] ?? moduleConfig.fallback;
@@ -284,6 +286,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                       return (
                         <MenubarSub key={moduleConfig.code}>
                           <MenubarSubTrigger
+                            className="border-b last:border-none border-border"
                             aria-current={
                               selectedModuleCode === moduleConfig.code
                                 ? 'page'
@@ -292,11 +295,12 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                           >
                             {moduleConfig.code}
                           </MenubarSubTrigger>
-                          <MenubarSubContent className='border-gray-200'>
+                          <MenubarSubContent className={theme === "dark" ?'border-gray-800' : 'border-gray-200'}>
                             {moduleConfig.items.map((menuItem) => (
                               menuItem.children?.length ? (
                                 <MenubarSub key={menuItem.code}>
                                   <MenubarSubTrigger
+                                    className="border-b last:border-none border-border"
                                     aria-current={
                                       selectedSubMenuCode === menuItem.code
                                         ? 'page'
@@ -305,10 +309,11 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                                   >
                                     {menuItem.title}
                                   </MenubarSubTrigger>
-                                  <MenubarSubContent className='border-gray-200'>
+                                  <MenubarSubContent className={theme === "dark" ?'border-gray-800' : 'border-gray-200'}>
                                     {menuItem.children.map((childItem, index) => (
                                       <MenubarItem
                                         key={`${childItem.code}-${index}`}
+                                        className="border-b last:border-none border-border"
                                         aria-current={
                                           selectedChildSubMenuCode === childItem.code
                                             ? 'page'
@@ -335,6 +340,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                               ) : (
                                 <MenubarItem
                                   key={menuItem.code}
+                                  className="border-b last:border-none border-border"
                                   aria-current={
                                     selectedSubMenuCode === menuItem.code
                                       ? 'page'
