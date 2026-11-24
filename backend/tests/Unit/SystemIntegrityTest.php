@@ -19,6 +19,7 @@ use App\Models\ItemPacket;
 use App\Models\LabSample;
 use App\Models\Packet;
 use App\Models\PacketName;
+use App\Models\PacketVendor;
 use App\Models\PayrollGrade;
 use App\Models\PayrollItem;
 use App\Models\PayrollRun;
@@ -126,6 +127,7 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
             'items' => Item::query()->count(),
             'packets' => Packet::query()->count(),
             'packet_names' => PacketName::query()->count(),
+            'packet_vendors' => PacketVendor::query()->count(),
             'item_packet' => ItemPacket::query()->count(),
             'lab_samples' => LabSample::query()->count(),
         ];
@@ -162,6 +164,7 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
             'items' => Item::query()->count(),
             'packets' => Packet::query()->count(),
             'packet_names' => PacketName::query()->count(),
+            'packet_vendors' => PacketVendor::query()->count(),
             'item_packet' => ItemPacket::query()->count(),
             'lab_samples' => LabSample::query()->count(),
         ];

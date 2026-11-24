@@ -313,6 +313,8 @@ describe('Automated Seeded Relationships & Multi-Row Integrity Strategy', functi
             '/api/v1/modules/hr/employee-attendances',
             '/api/v1/modules/cpo/items',
             '/api/v1/modules/cpo/packets',
+            '/api/v1/modules/cpo/packet-names',
+            '/api/v1/modules/cpo/packet-vendors',
             '/api/v1/modules/cpo/item-packets',
             '/api/v1/samples',
         ];

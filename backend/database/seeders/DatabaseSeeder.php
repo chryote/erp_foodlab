@@ -31,6 +31,7 @@ use App\Models\ItemPacket;
 use App\Models\LabSample;
 use App\Models\Packet;
 use App\Models\PacketName;
+use App\Models\PacketVendor;
 use App\Models\PayrollGrade;
 use App\Models\PayrollItem;
 use App\Models\PayrollRun;
@@ -74,6 +75,7 @@ class DatabaseSeeder extends Seeder
             $items = $this->seedCpoItems($companies);
             $packets = $this->seedCpoPackets();
             $this->seedCpoPacketNames();
+            $this->seedCpoPacketVendors();
             $this->seedCpoItemPackets($primaryCompany, $items, $packets);
         });
 
@@ -1549,6 +1551,31 @@ class DatabaseSeeder extends Seeder
         }
 
         return $packetNames;
+    }
+
+    /**
+     * @return EloquentCollection<int, PacketVendor>
+     */
+    private function seedCpoPacketVendors(): EloquentCollection
+    {
+        $existingByName = PacketVendor::query()->withTrashed()->get()->keyBy('name');
+
+        $names = ['Vendor A', 'Vendor B'];
+        for ($i = 1; $i <= self::MIN_SEED_ROWS; $i++) {
+            $names[] = sprintf('Vendor Paket %03d', $i);
+        }
+
+        $packetVendors = new EloquentCollection;
+        foreach ($names as $name) {
+            /** @var PacketVendor $packetVendor */
+            $packetVendor = $existingByName->get($name) ?? new PacketVendor;
+            $packetVendor->name = $name;
+            $packetVendor->deleted_at = null;
+            $packetVendor->save();
+            $packetVendors->push($packetVendor);
+        }
+
+        return $packetVendors;
     }
 
     /**

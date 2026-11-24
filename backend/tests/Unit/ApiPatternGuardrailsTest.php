@@ -19,6 +19,7 @@ use App\Models\ItemPacket;
 use App\Models\LabSample;
 use App\Models\Packet;
 use App\Models\PacketName;
+use App\Models\PacketVendor;
 use App\Models\PayrollGrade;
 use App\Models\PayrollItem;
 use App\Models\PayrollRun;
@@ -32,6 +33,7 @@ use App\Modules\CPO\Services\ItemPacketService;
 use App\Modules\CPO\Services\ItemService;
 use App\Modules\CPO\Services\PacketNameService;
 use App\Modules\CPO\Services\PacketService;
+use App\Modules\CPO\Services\PacketVendorService;
 use App\Modules\HR\Actions\RecordAttendanceAction;
 use App\Modules\HR\Services\EmployeeShiftService;
 use App\Support\ActiveCompany;
@@ -604,6 +606,7 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'items' => Item::class,
             'packets' => Packet::class,
             'packet_names' => PacketName::class,
+            'packet_vendors' => PacketVendor::class,
             'item_packet' => ItemPacket::class,
         ];
 
@@ -640,6 +643,7 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'Modules/CPO/Requests/SaveItemRequest.php',
             'Modules/CPO/Requests/SavePacketRequest.php',
             'Modules/CPO/Requests/SavePacketNameRequest.php',
+            'Modules/CPO/Requests/SavePacketVendorRequest.php',
             'Modules/CPO/Requests/SaveItemPacketRequest.php',
         ];
 
@@ -672,6 +676,7 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'Modules/CPO/Services/ItemService.php',
             'Modules/CPO/Services/PacketService.php',
             'Modules/CPO/Services/PacketNameService.php',
+            'Modules/CPO/Services/PacketVendorService.php',
             'Modules/CPO/Services/ItemPacketService.php',
         ];
 
@@ -1283,6 +1288,88 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
 
         expect(fn () => app(PacketNameService::class)->createPacketName([
             'name' => 'paket sarapan',
+        ]))->toThrow(ValidationException::class);
+    });
+
+    it('enforces CPO PacketVendors speed, cache, pagination, and anti-duplication guardrails', function () {
+        $companyA = Company::factory()->create(['name' => 'PT. CPO PacketVendor Alpha']);
+        $companyB = Company::factory()->create(['name' => 'PT. CPO PacketVendor Beta']);
+
+        PacketVendor::factory()->count(4)->create();
+        $specialPacketVendor = PacketVendor::factory()->create(['name' => 'Vendor 100% Organik']);
+
+        // 1. Pagination cap prevents unbounded ?per_page=99999 dumps
+        $this->getJson('/api/v1/modules/cpo/packet-vendors?page=1&per_page=99999')
+            ->assertOk()
+            ->assertJsonPath('meta.per_page', IndexQuery::MAX_PER_PAGE);
+
+        // 2. Cold-cache query count is bounded (no N+1, no SUM())
+        Cache::flush();
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->getJson('/api/v1/modules/cpo/packet-vendors')->assertOk()->assertJsonCount(5, 'data');
+        $coldQueries = collect(DB::getQueryLog())
+            ->reject(fn ($q) => str_contains($q['query'], 'personal_access_tokens'));
+        DB::disableQueryLog();
+
+        expect($coldQueries->count())->toBeLessThanOrEqual(2);
+        expect($coldQueries->contains(fn ($q) => str_contains(strtoupper($q['query']), 'SUM(')))->toBeFalse();
+
+        // 3. Warm cache hit executes 0 SQL queries
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->getJson('/api/v1/modules/cpo/packet-vendors')->assertOk()->assertJsonCount(5, 'data');
+        $warmQueries = DB::getQueryLog();
+        DB::disableQueryLog();
+
+        expect($warmQueries)->toHaveCount(0);
+
+        // 4. Company-agnostic ?active_company=1 returns all packet vendors regardless of active company header
+        $this->getJson('/api/v1/modules/cpo/packet-vendors?active_company=1', [
+            'X-Active-Company-Id' => (string) $companyA->id,
+        ])->assertOk()->assertJsonCount(5, 'data');
+
+        $this->getJson('/api/v1/modules/cpo/packet-vendors?active_company=1', [
+            'X-Active-Company-Id' => (string) $companyB->id,
+        ])->assertOk()->assertJsonCount(5, 'data');
+
+        // 5. LIKE wildcard escaping & whitespace-only search
+        $this->getJson('/api/v1/modules/cpo/packet-vendors?filter[search]='.urlencode('100%'))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $specialPacketVendor->id);
+
+        $this->getJson('/api/v1/modules/cpo/packet-vendors?filter[name]=%20%20%20')
+            ->assertOk()
+            ->assertJsonCount(5, 'data');
+
+        // 6. Direct DB bypass hits packet_vendors_name_active_unique, service sharedLock throws ValidationException, and Idempotency-Key deduplicates POSTs
+        $idemHeaders = ['Idempotency-Key' => 'idem-cpo-packet-vendor-001'];
+        $packetVendorPayload = ['name' => '  Vendor   Nusantara  '];
+
+        $firstPost = $this->postJson('/api/v1/modules/cpo/packet-vendors', $packetVendorPayload, $idemHeaders)
+            ->assertCreated()
+            ->assertJsonPath('data.name', 'Vendor Nusantara')
+            ->assertJsonMissingPath('data.active_flag');
+
+        $replayPost = $this->postJson('/api/v1/modules/cpo/packet-vendors', $packetVendorPayload, $idemHeaders)
+            ->assertCreated();
+
+        expect($replayPost->headers->get('X-Idempotency-Replayed'))->toBe('true');
+        expect($replayPost->json('data.id'))->toBe($firstPost->json('data.id'));
+        expect(PacketVendor::query()->where('name', 'Vendor Nusantara')->count())->toBe(1);
+
+        $this->postJson('/api/v1/modules/cpo/packet-vendors', [
+            'name' => 'Vendor Sejahtera',
+        ], $idemHeaders)->assertUnprocessable()->assertJsonValidationErrors(['idempotency_key']);
+
+        expect(fn () => PacketVendor::factory()->create([
+            'name' => 'Vendor Nusantara',
+        ]))->toThrow(QueryException::class);
+
+        expect(fn () => app(PacketVendorService::class)->createPacketVendor([
+            'name' => 'vendor nusantara',
         ]))->toThrow(ValidationException::class);
     });
 });

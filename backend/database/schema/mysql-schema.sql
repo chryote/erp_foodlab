@@ -439,7 +439,7 @@ DROP TABLE IF EXISTS `packet_names`;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `packet_names` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
@@ -447,6 +447,21 @@ CREATE TABLE `packet_names` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `packet_names_name_active_unique` (`name`,`active_flag`),
   KEY `packet_names_del_name_id_idx` (`deleted_at`,`name`,`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `packet_vendors`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `packet_vendors` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `packet_vendors_name_active_unique` (`name`,`active_flag`),
+  KEY `packet_vendors_del_name_id_idx` (`deleted_at`,`name`,`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `packets`;
@@ -687,5 +702,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (50,'2026_11_24_120
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (51,'2026_11_24_130000_scope_items_and_item_packet_to_company',36);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (52,'2026_11_24_140000_add_code_to_items_table',37);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (53,'2026_11_24_150000_create_packet_names_table',38);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (54,'2026_11_24_160000_create_packet_vendors_table',39);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
