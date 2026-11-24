@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Item extends Model
@@ -20,5 +22,16 @@ class Item extends Model
         'active_flag',
     ];
 
-    // ItemPacket / Packet relations are deferred until Packet and ItemPacket models exist.
+    public function itemPackets(): HasMany
+    {
+        return $this->hasMany(ItemPacket::class);
+    }
+
+    public function packets(): BelongsToMany
+    {
+        return $this->belongsToMany(Packet::class, 'item_packet')
+            ->wherePivotNull('deleted_at')
+            ->withPivot(['id', 'quantity', 'deleted_at'])
+            ->withTimestamps();
+    }
 }

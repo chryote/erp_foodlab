@@ -101,6 +101,7 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
             'payroll_items' => \App\Models\PayrollItem::query()->count(),
             'items' => \App\Models\Item::query()->count(),
             'packets' => \App\Models\Packet::query()->count(),
+            'item_packet' => \App\Models\ItemPacket::query()->count(),
             'lab_samples' => \App\Models\LabSample::query()->count(),
         ];
 
@@ -120,6 +121,7 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
         expect(\App\Models\PayrollItem::query()->count())->toBe($firstCounts['payroll_items']);
         expect(\App\Models\Item::query()->count())->toBe($firstCounts['items']);
         expect(\App\Models\Packet::query()->count())->toBe($firstCounts['packets']);
+        expect(\App\Models\ItemPacket::query()->count())->toBe($firstCounts['item_packet']);
         expect(\App\Models\LabSample::query()->count())->toBe($firstCounts['lab_samples']);
 
         $nadia = \App\Models\Employee::query()->with('employeePosition')->where('nik_ktp', '3273011504960001')->firstOrFail();

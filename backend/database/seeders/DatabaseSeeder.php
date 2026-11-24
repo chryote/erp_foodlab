@@ -24,6 +24,7 @@ use App\Models\ExpenseCategory;
 use App\Models\ExpenseItem;
 use App\Models\ExpenseType;
 use App\Models\Item;
+use App\Models\ItemPacket;
 use App\Models\LabSample;
 use App\Models\Packet;
 use App\Models\PayrollGrade;
@@ -57,6 +58,7 @@ class DatabaseSeeder extends Seeder
             $this->seedEmployeeAttendances();
             $this->seedCpoItems();
             $this->seedCpoPackets();
+            $this->seedCpoItemPackets();
         });
 
         Cache::flush();
@@ -779,6 +781,58 @@ class DatabaseSeeder extends Seeder
             $packet->name = $name;
             $packet->deleted_at = null;
             $packet->save();
+        }
+    }
+
+    private function seedCpoItemPackets(): void
+    {
+        $packets = Packet::query()
+            ->whereIn('name', ['Paket A', 'Paket B'])
+            ->get()
+            ->keyBy('name');
+
+        $items = Item::query()
+            ->whereIn('name', ['Apple', 'Banana', 'Orange', 'Jackfruit'])
+            ->get()
+            ->keyBy('name');
+
+        $mappings = [
+            'Paket A' => [
+                ['item' => 'Apple', 'quantity' => 1],
+                ['item' => 'Banana', 'quantity' => 1],
+                ['item' => 'Orange', 'quantity' => 1],
+            ],
+            'Paket B' => [
+                ['item' => 'Apple', 'quantity' => 1],
+                ['item' => 'Jackfruit', 'quantity' => 1],
+            ],
+        ];
+
+        foreach ($mappings as $packetName => $entries) {
+            $packet = $packets->get($packetName);
+            if ($packet === null) {
+                continue;
+            }
+
+            foreach ($entries as $entry) {
+                $item = $items->get($entry['item']);
+                if ($item === null) {
+                    continue;
+                }
+
+                $itemPacket = ItemPacket::query()
+                    ->withTrashed()
+                    ->where('packet_id', $packet->id)
+                    ->where('item_id', $item->id)
+                    ->orderByRaw('deleted_at IS NOT NULL')
+                    ->first() ?? new ItemPacket();
+
+                $itemPacket->packet_id = $packet->id;
+                $itemPacket->item_id = $item->id;
+                $itemPacket->quantity = $entry['quantity'];
+                $itemPacket->deleted_at = null;
+                $itemPacket->save();
+            }
         }
     }
 }

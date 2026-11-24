@@ -352,6 +352,27 @@ CREATE TABLE `expense_types` (
   CONSTRAINT `expense_types_expense_category_id_foreign` FOREIGN KEY (`expense_category_id`) REFERENCES `expense_categories` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `item_packet`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `item_packet` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `packet_id` bigint unsigned NOT NULL,
+  `item_id` bigint unsigned NOT NULL,
+  `quantity` int unsigned NOT NULL DEFAULT '1',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `item_packet_packet_item_active_unique` (`packet_id`,`item_id`,`active_flag`),
+  KEY `item_packet_item_id_foreign` (`item_id`),
+  KEY `item_packet_del_packet_id_idx` (`deleted_at`,`packet_id`,`id`),
+  KEY `item_packet_del_item_id_idx` (`deleted_at`,`item_id`,`id`),
+  CONSTRAINT `item_packet_item_id_foreign` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `item_packet_packet_id_foreign` FOREIGN KEY (`packet_id`) REFERENCES `packets` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -404,7 +425,7 @@ DROP TABLE IF EXISTS `packets`;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `packets` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
@@ -633,5 +654,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (46,'2026_11_23_120
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (47,'2026_11_23_130000_make_cho_master_tables_company_agnostic',32);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (48,'2026_11_24_100000_create_items_table',33);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (49,'2026_11_24_110000_create_packets_table',34);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (50,'2026_11_24_120000_create_item_packet_table',35);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;

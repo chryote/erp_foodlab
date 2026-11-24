@@ -19,6 +19,8 @@ class ItemResource extends JsonResource
         return [
             'id' => (int) $this->id,
             'name' => $this->name,
+            'item_packets' => ItemPacketResource::collection($this->whenLoaded('itemPackets')),
+            'packets' => PacketResource::collection($this->whenLoaded('packets')),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
             'deleted_at' => $this->deleted_at?->toISOString(),
