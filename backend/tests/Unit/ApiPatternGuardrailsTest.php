@@ -14,6 +14,7 @@ use App\Models\EmploymentStatus;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseItem;
 use App\Models\ExpenseType;
+use App\Models\Item;
 use App\Models\LabSample;
 use App\Models\PayrollGrade;
 use App\Models\PayrollItem;
@@ -24,6 +25,7 @@ use App\Modules\CFO\Services\CompanyService;
 use App\Modules\CHO\Services\EmployeeService;
 use App\Modules\CHO\Services\PayrollItemService;
 use App\Modules\CHO\Services\PayrollRunService;
+use App\Modules\CPO\Services\ItemService;
 use App\Modules\HR\Actions\RecordAttendanceAction;
 use App\Modules\HR\Services\EmployeeShiftService;
 use App\Support\ActiveCompany;
@@ -591,6 +593,7 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'employee_attendances' => EmployeeAttendance::class,
             'payroll_runs' => PayrollRun::class,
             'payroll_items' => PayrollItem::class,
+            'items' => Item::class,
         ];
 
         foreach ($uniqueEntityMap as $table => $modelClass) {
@@ -623,6 +626,7 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'Modules/CHO/Requests/SavePayrollItemRequest.php',
             'Modules/HR/Requests/SaveEmployeeShiftRequest.php',
             'Modules/HR/Requests/SaveEmployeeAttendanceRequest.php',
+            'Modules/CPO/Requests/SaveItemRequest.php',
         ];
 
         foreach ($uniqueRequests as $requestPath) {
@@ -651,6 +655,7 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'Modules/CHO/Actions/AssertEmployeeContextAction.php',
             'Modules/HR/Services/EmployeeShiftService.php',
             'Modules/HR/Actions/RecordAttendanceAction.php',
+            'Modules/CPO/Services/ItemService.php',
         ];
 
         foreach ($lockedWriteGuards as $guardPath) {
@@ -870,5 +875,87 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'payroll_run_id' => $draftRunId,
             'employee_id' => $employee->id,
         ]))->toThrow(QueryException::class);
+    });
+
+    it('enforces CPO Items speed, cache, pagination, and anti-duplication guardrails', function () {
+        $companyA = Company::factory()->create(['name' => 'PT. CPO Alpha']);
+        $companyB = Company::factory()->create(['name' => 'PT. CPO Beta']);
+
+        Item::factory()->count(4)->create();
+        $specialItem = Item::factory()->create(['name' => 'Gula 100% Murni']);
+
+        // 1. Pagination cap prevents unbounded ?per_page=99999 dumps
+        $this->getJson('/api/v1/modules/cpo/items?page=1&per_page=99999')
+            ->assertOk()
+            ->assertJsonPath('meta.per_page', IndexQuery::MAX_PER_PAGE);
+
+        // 2. Cold-cache query count is bounded (no N+1, no SUM())
+        Cache::flush();
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->getJson('/api/v1/modules/cpo/items')->assertOk()->assertJsonCount(5, 'data');
+        $coldQueries = collect(DB::getQueryLog())
+            ->reject(fn ($q) => str_contains($q['query'], 'personal_access_tokens'));
+        DB::disableQueryLog();
+
+        expect($coldQueries->count())->toBeLessThanOrEqual(2);
+        expect($coldQueries->contains(fn ($q) => str_contains(strtoupper($q['query']), 'SUM(')))->toBeFalse();
+
+        // 3. Warm cache hit executes 0 SQL queries
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->getJson('/api/v1/modules/cpo/items')->assertOk()->assertJsonCount(5, 'data');
+        $warmQueries = DB::getQueryLog();
+        DB::disableQueryLog();
+
+        expect($warmQueries)->toHaveCount(0);
+
+        // 4. Company-agnostic ?active_company=1 returns all items regardless of active company header
+        $this->getJson('/api/v1/modules/cpo/items?active_company=1', [
+            'X-Active-Company-Id' => (string) $companyA->id,
+        ])->assertOk()->assertJsonCount(5, 'data');
+
+        $this->getJson('/api/v1/modules/cpo/items?active_company=1', [
+            'X-Active-Company-Id' => (string) $companyB->id,
+        ])->assertOk()->assertJsonCount(5, 'data');
+
+        // 5. LIKE wildcard escaping & whitespace-only search
+        $this->getJson('/api/v1/modules/cpo/items?filter[search]='.urlencode('100%'))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $specialItem->id);
+
+        $this->getJson('/api/v1/modules/cpo/items?filter[name]=%20%20%20')
+            ->assertOk()
+            ->assertJsonCount(5, 'data');
+
+        // 6. Direct DB bypass hits items_name_active_unique, service sharedLock throws ValidationException, and Idempotency-Key deduplicates POSTs
+        $idemHeaders = ['Idempotency-Key' => 'idem-cpo-item-001'];
+        $itemPayload = ['name' => '  Tepung   Tapioka  '];
+
+        $firstPost = $this->postJson('/api/v1/modules/cpo/items', $itemPayload, $idemHeaders)
+            ->assertCreated()
+            ->assertJsonPath('data.name', 'Tepung Tapioka')
+            ->assertJsonMissingPath('data.active_flag');
+
+        $replayPost = $this->postJson('/api/v1/modules/cpo/items', $itemPayload, $idemHeaders)
+            ->assertCreated();
+
+        expect($replayPost->headers->get('X-Idempotency-Replayed'))->toBe('true');
+        expect($replayPost->json('data.id'))->toBe($firstPost->json('data.id'));
+        expect(Item::query()->where('name', 'Tepung Tapioka')->count())->toBe(1);
+
+        $this->postJson('/api/v1/modules/cpo/items', [
+            'name' => 'Tepung Maizena',
+        ], $idemHeaders)->assertUnprocessable()->assertJsonValidationErrors(['idempotency_key']);
+
+        expect(fn () => Item::factory()->create([
+            'name' => 'Tepung Tapioka',
+        ]))->toThrow(QueryException::class);
+
+        expect(fn () => app(ItemService::class)->createItem([
+            'name' => 'tepung tapioka',
+        ]))->toThrow(ValidationException::class);
     });
 });

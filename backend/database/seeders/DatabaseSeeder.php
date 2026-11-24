@@ -23,6 +23,7 @@ use App\Models\EmploymentStatus;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseItem;
 use App\Models\ExpenseType;
+use App\Models\Item;
 use App\Models\LabSample;
 use App\Models\PayrollGrade;
 use App\Models\PayrollItem;
@@ -53,6 +54,7 @@ class DatabaseSeeder extends Seeder
             $this->seedEmployeeShifts();
             $this->seedEmployeeShiftAssignments();
             $this->seedEmployeeAttendances();
+            $this->seedCpoItems();
         });
 
         Cache::flush();
@@ -746,5 +748,20 @@ class DatabaseSeeder extends Seeder
         }
 
         PayrollItemService::syncPayrollRunTotals($payrollRun);
+    }
+
+    private function seedCpoItems(): void
+    {
+        foreach (['Apple', 'Banana', 'Orange', 'Jackfruit'] as $name) {
+            $item = Item::query()
+                ->withTrashed()
+                ->where('name', $name)
+                ->orderByRaw('deleted_at IS NOT NULL')
+                ->first() ?? new Item();
+
+            $item->name = $name;
+            $item->deleted_at = null;
+            $item->save();
+        }
     }
 }

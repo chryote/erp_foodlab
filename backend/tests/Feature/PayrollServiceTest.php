@@ -23,8 +23,8 @@ describe('PayrollService & Input Payroll CHO workflow', function () {
     });
 
     it('exposes cutoff and effective work days constants and resolves cutoff windows', function () {
-        expect(PayrollService::CUTOFF_DAY)->toBe(22);
-        expect(PayrollService::PERIOD_START_DAY)->toBe(21);
+        expect(PayrollService::CUTOFF_DAY)->toBe(21);
+        expect(PayrollService::PERIOD_START_DAY)->toBe(22);
         expect(PayrollService::EFFECTIVE_WORK_DAYS)->toBe(25);
 
         $service = app(PayrollService::class);
@@ -33,8 +33,8 @@ describe('PayrollService & Input Payroll CHO workflow', function () {
         expect($janWindow)->toBe([
             'period' => '2026-01',
             'period_date' => '2026-01-01',
-            'cutoff_start_date' => '2025-12-21',
-            'cutoff_end_date' => '2026-01-22',
+            'cutoff_start_date' => '2025-12-22',
+            'cutoff_end_date' => '2026-01-21',
         ]);
     });
 
@@ -124,8 +124,8 @@ describe('PayrollService & Input Payroll CHO workflow', function () {
             'name' => 'Orang Luar',
         ]);
 
-        // Office employee: 25 attended days within 2025-12-21..2026-01-22
-        $startDate = \Carbon\CarbonImmutable::parse('2025-12-21');
+        // Office employee: 25 attended days within 2025-12-22..2026-01-21
+        $startDate = \Carbon\CarbonImmutable::parse('2025-12-22');
         for ($i = 0; $i < 25; $i++) {
             EmployeeAttendance::factory()->create([
                 'company_id' => $company->id,
@@ -144,13 +144,13 @@ describe('PayrollService & Input Payroll CHO workflow', function () {
         EmployeeAttendance::factory()->create([
             'company_id' => $company->id,
             'employee_id' => $officeEmp->id,
-            'attendance_date' => '2025-12-20', // before cutoff start 2025-12-21
+            'attendance_date' => '2025-12-21', // before cutoff start 2025-12-22
             'status' => AttendanceStatusEnum::PRESENT,
         ]);
         EmployeeAttendance::factory()->create([
             'company_id' => $company->id,
             'employee_id' => $officeEmp->id,
-            'attendance_date' => '2026-01-23', // after cutoff end 2026-01-22
+            'attendance_date' => '2026-01-22', // after cutoff end 2026-01-21
             'status' => AttendanceStatusEnum::PRESENT,
         ]);
 
@@ -169,9 +169,9 @@ describe('PayrollService & Input Payroll CHO workflow', function () {
         $workspaceRes->assertOk()
             ->assertJsonPath('data.period', '2026-01')
             ->assertJsonPath('data.period_date', '2026-01-01')
-            ->assertJsonPath('data.cutoff_start_date', '2025-12-21')
-            ->assertJsonPath('data.cutoff_end_date', '2026-01-22')
-            ->assertJsonPath('data.cutoff_day', 22)
+            ->assertJsonPath('data.cutoff_start_date', '2025-12-22')
+            ->assertJsonPath('data.cutoff_end_date', '2026-01-21')
+            ->assertJsonPath('data.cutoff_day', 21)
             ->assertJsonPath('data.effective_work_days', 25)
             ->assertJsonPath('data.payroll_run', null)
             ->assertJsonCount(2, 'data.rows');

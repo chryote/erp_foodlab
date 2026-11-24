@@ -352,6 +352,22 @@ CREATE TABLE `expense_types` (
   CONSTRAINT `expense_types_expense_category_id_foreign` FOREIGN KEY (`expense_category_id`) REFERENCES `expense_categories` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `items`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `items` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `items_name_active_unique` (`name`,`active_flag`),
+  KEY `items_name_index` (`name`),
+  KEY `items_del_name_id_idx` (`deleted_at`,`name`,`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `lab_samples`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -430,7 +446,7 @@ CREATE TABLE `payroll_items` (
   `thr` decimal(18,2) NOT NULL DEFAULT '0.00',
   `pph21` decimal(18,2) NOT NULL DEFAULT '0.00',
   `total_net` decimal(18,2) NOT NULL DEFAULT '0.00',
-  `status` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+  `status` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
   `notes` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `finalized_by` bigint unsigned DEFAULT NULL,
   `finalized_at` timestamp NULL DEFAULT NULL,
@@ -599,5 +615,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (44,'2026_11_23_100
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (45,'2026_11_23_110000_update_payroll_items_table_for_spec',30);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (46,'2026_11_23_120000_add_finalization_fields_to_payroll_items_table',31);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (47,'2026_11_23_130000_make_cho_master_tables_company_agnostic',32);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (48,'2026_11_24_100000_create_items_table',33);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;

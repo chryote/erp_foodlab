@@ -1,0 +1,24 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+class Item extends Model
+{
+    use HasFactory, SoftDeletes;
+
+    protected $table = 'items';
+
+    protected $fillable = [
+        'name',
+    ];
+
+    protected $hidden = [
+        'active_flag',
+    ];
+
+    // ItemPacket / Packet relations are deferred until Packet and ItemPacket models exist.
+}
