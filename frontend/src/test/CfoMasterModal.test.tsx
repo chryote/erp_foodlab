@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -43,7 +43,7 @@ describe('CFO master modal', () => {
     expect(companyPanel).toHaveClass('lg:overflow-y-auto');
     const stakeholderPanel = screen.getByTestId('pemegang-saham');
     expect(stakeholderPanel).toHaveClass('hidden');
-    expect(stakeholderPanel).toHaveClass('lg:block');
+    expect(stakeholderPanel).toHaveClass('lg:flex');
     expect(stakeholderPanel).toHaveClass('lg:overflow-y-auto');
 
     fireEvent.click(await screen.findByTestId('stakeholder-row-21'));
@@ -195,5 +195,180 @@ describe('CFO master modal', () => {
     await waitFor(() =>
       expect(screen.queryByTestId('confirm-dialog')).not.toBeInTheDocument()
     );
+  });
+
+  it('loads ten more rows on scroll and searches each table', async () => {
+    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
+      data: Array.from({ length: 25 }, (_, index) => ({
+        id: 21 + index,
+        name: `Company ${index + 1}`,
+        series: 1,
+      })),
+      meta: { count: 25 },
+    });
+    vi.mocked(apiClient.fetchCapitalCompanies).mockResolvedValue({
+      data: Array.from({ length: 25 }, (_, index) => ({
+        id: 31 + index,
+        company_id: 21,
+        stakeholder_name: `Owner ${index + 1}`,
+        capital: 250000,
+      })),
+      meta: { count: 25 },
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CfoMasterModalPage />
+      </QueryClientProvider>
+    );
+
+    expect(await screen.findByText('Company 1')).toBeInTheDocument();
+    expect(screen.queryByText('Company 11')).not.toBeInTheDocument();
+    const scrollToBottom = (testId: string) => {
+      const scrollContainer = screen.getByTestId(testId);
+      Object.defineProperties(scrollContainer, {
+        scrollHeight: { configurable: true, value: 1000 },
+        clientHeight: { configurable: true, value: 400 },
+        scrollTop: { configurable: true, writable: true, value: 600 },
+      });
+      fireEvent.scroll(scrollContainer);
+    };
+    const searchAndWait = async (testId: string, value: string) => {
+      vi.useFakeTimers();
+      try {
+        fireEvent.change(screen.getByTestId(testId), {
+          target: { value },
+        });
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(5000);
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    };
+
+    scrollToBottom('perusahaan-table-scroll');
+    expect(screen.getByText('Company 11')).toBeInTheDocument();
+    expect(screen.queryByTestId('perusahaan-pagination')).not.toBeInTheDocument();
+    scrollToBottom('perusahaan-table-scroll');
+    expect(screen.getByText('Company 21')).toBeInTheDocument();
+    await searchAndWait('perusahaan-table-search', 'Company 2');
+    expect(screen.getByText('Company 2')).toBeInTheDocument();
+    expect(screen.getByText('Company 21')).toBeInTheDocument();
+    expect(screen.queryByText('Company 1')).not.toBeInTheDocument();
+    await searchAndWait('perusahaan-table-search', '');
+
+    fireEvent.click(screen.getByTestId('stakeholder-row-21'));
+    expect(await screen.findByText('Owner 1')).toBeInTheDocument();
+    expect(screen.queryByText('Owner 11')).not.toBeInTheDocument();
+    scrollToBottom('pemegang-saham-table-scroll');
+    expect(screen.getByText('Owner 11')).toBeInTheDocument();
+    await searchAndWait('pemegang-saham-table-search', 'Owner 2');
+    expect(screen.getByText('Owner 2')).toBeInTheDocument();
+    expect(screen.getByText('Owner 21')).toBeInTheDocument();
+    expect(screen.queryByText('Owner 1')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('pemegang-saham-pagination')
+    ).not.toBeInTheDocument();
+  });
+
+  it('sorts supported columns on header clicks and keeps the table headers sticky', async () => {
+    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
+      data: [
+        { id: 21, name: 'Zeta', series: 2 },
+        { id: 22, name: 'Alpha', series: 3 },
+        { id: 23, name: 'Beta', series: 1 },
+      ],
+      meta: { count: 3 },
+    });
+    vi.mocked(apiClient.fetchCapitalCompanies).mockResolvedValue({
+      data: [
+        {
+          id: 31,
+          company_id: 21,
+          stakeholder_name: 'Owner Z',
+          capital: 100,
+        },
+        {
+          id: 32,
+          company_id: 21,
+          stakeholder_name: 'Owner A',
+          capital: 300,
+        },
+        {
+          id: 33,
+          company_id: 21,
+          stakeholder_name: 'Owner B',
+          capital: 200,
+        },
+      ],
+      meta: { count: 3 },
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CfoMasterModalPage />
+      </QueryClientProvider>
+    );
+
+    const companySection = screen.getByTestId('perusahaan-crud-page');
+    const getCompanyNames = () =>
+      Array.from(
+        companySection.querySelectorAll('tbody tr'),
+        (row) => row.querySelector('td')?.textContent?.trim()
+      );
+    expect(await screen.findByText('Zeta')).toBeInTheDocument();
+    expect(getCompanyNames()).toEqual(['Zeta', 'Alpha', 'Beta']);
+    expect(companySection.querySelector('thead th')).toHaveClass(
+      'sticky',
+      'top-0'
+    );
+    expect(companySection.querySelector('thead th:last-child')).toHaveClass(
+      'right-0',
+      'z-20'
+    );
+    expect(companySection.querySelector('tbody td:last-child')).toHaveClass(
+      'sticky',
+      'right-0'
+    );
+    expect(companySection.querySelector('table')).toHaveClass(
+      'table-auto',
+      'w-max',
+      'min-w-full'
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Urutkan Nama Perusahaan' })
+    );
+    expect(getCompanyNames()).toEqual(['Alpha', 'Beta', 'Zeta']);
+    fireEvent.click(screen.getByRole('button', { name: 'Urutkan Seri' }));
+    expect(getCompanyNames()).toEqual(['Beta', 'Zeta', 'Alpha']);
+
+    fireEvent.click(screen.getByTestId('stakeholder-row-21'));
+    const stakeholderSection = screen.getByTestId('pemegang-saham');
+    const getStakeholderNames = () =>
+      Array.from(
+        stakeholderSection.querySelectorAll('tbody tr'),
+        (row) => row.querySelector('td')?.textContent?.trim()
+      );
+    expect(await screen.findByText('Owner Z')).toBeInTheDocument();
+    expect(stakeholderSection.querySelector('thead th')).toHaveClass(
+      'sticky',
+      'top-0'
+    );
+    expect(
+      stakeholderSection.querySelector('thead th:last-child')
+    ).toHaveClass('right-0', 'z-20');
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Urutkan Nama Pemegang Saham' })
+    );
+    expect(getStakeholderNames()).toEqual(['Owner A', 'Owner B', 'Owner Z']);
+    fireEvent.click(screen.getByRole('button', { name: 'Urutkan Kapital' }));
+    expect(getStakeholderNames()).toEqual(['Owner Z', 'Owner B', 'Owner A']);
   });
 });

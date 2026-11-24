@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Eye, Pencil, Trash2, X } from 'lucide-react';
 import type { CapitalCompany, Company } from '@/api/client';
 import {
@@ -14,6 +14,13 @@ import {
   useCompanyCrudResource,
   useStakeholderCrudResource,
 } from '@/lib/cfoResources';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
+
+const LAZY_LOAD_BATCH_SIZE = 10;
+
+type SortDirection = 'asc' | 'desc';
+type CompanySortKey = 'name' | 'series';
+type StakeholderSortKey = 'stakeholder_name' | 'capital';
 
 type CompanyPendingAction =
   | { type: 'create'; name: string; series: number }
@@ -52,15 +59,51 @@ export default function CfoMasterModalPage() {
   } = useCompanyCrudResource(true);
   const [companyName, setCompanyName] = useState('');
   const [companySeries, setCompanySeries] = useState('1');
+  const [companySearch, setCompanySearch] = useState('');
+  const [companyVisibleCount, setCompanyVisibleCount] =
+    useState(LAZY_LOAD_BATCH_SIZE);
+  const debouncedCompanySearch = useDebouncedValue(companySearch);
+  const [companySort, setCompanySort] = useState<{
+    key: CompanySortKey;
+    direction: SortDirection;
+  } | null>(null);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [isStakeholderModalOpen, setIsStakeholderModalOpen] = useState(false);
   const [companyPendingAction, setCompanyPendingAction] =
     useState<CompanyPendingAction | null>(null);
   const [companyActionLoading, setCompanyActionLoading] = useState(false);
+  const filteredCompanies = useMemo(() => {
+    const query = debouncedCompanySearch.trim().toLowerCase();
+    const matchingCompanies = query
+      ? companies.filter(
+          (company) =>
+            company.name.toLowerCase().includes(query) ||
+            String(company.series ?? 1).includes(query)
+        )
+      : companies;
+    if (!companySort) return matchingCompanies;
+
+    return [...matchingCompanies].sort((a, b) => {
+      const comparison =
+        companySort.key === 'name'
+          ? a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+          : (a.series ?? 1) - (b.series ?? 1);
+      return companySort.direction === 'asc' ? comparison : -comparison;
+    });
+  }, [companies, companySort, debouncedCompanySearch]);
+  const visibleCompanies = useMemo(
+    () => filteredCompanies.slice(0, companyVisibleCount),
+    [companyVisibleCount, filteredCompanies]
+  );
+
+  useEffect(() => {
+    setCompanyVisibleCount(LAZY_LOAD_BATCH_SIZE);
+  }, [debouncedCompanySearch]);
 
   const selectCompany = (company: Company) => {
     setSelectedCompany(company);
+    setStakeholderVisibleCount(LAZY_LOAD_BATCH_SIZE);
     setIsStakeholderModalOpen(true);
   };
 
@@ -130,16 +173,19 @@ export default function CfoMasterModalPage() {
       {
         key: 'name',
         header: 'Nama Perusahaan',
+        sortable: true,
         render: (row) => row.name,
       },
       {
         key: 'series',
         header: 'Seri',
+        sortable: true,
         render: (row) => `Seri ${row.series ?? 1}`,
       },
       {
         key: 'actions',
         header: 'Aksi',
+        sticky: true,
         render: (row) => (
           <div className="flex flex-wrap gap-2">
             <Button
@@ -200,6 +246,46 @@ export default function CfoMasterModalPage() {
     useState<StakeholderPendingAction | null>(null);
   const [stakeholderActionLoading, setStakeholderActionLoading] =
     useState(false);
+  const [stakeholderSearch, setStakeholderSearch] = useState('');
+  const [stakeholderVisibleCount, setStakeholderVisibleCount] =
+    useState(LAZY_LOAD_BATCH_SIZE);
+  const debouncedStakeholderSearch = useDebouncedValue(stakeholderSearch);
+  const [stakeholderSort, setStakeholderSort] = useState<{
+    key: StakeholderSortKey;
+    direction: SortDirection;
+  } | null>(null);
+  const filteredStakeholders = useMemo(() => {
+    const query = debouncedStakeholderSearch.trim().toLowerCase();
+    const matchingStakeholders = query
+      ? stakeholders.filter((stakeholder) => {
+          const capital = Number(stakeholder.capital);
+          return (
+            stakeholder.stakeholder_name.toLowerCase().includes(query) ||
+            String(stakeholder.capital).includes(query) ||
+            formatCapitalIdr(capital).toLowerCase().includes(query)
+          );
+        })
+      : stakeholders;
+    if (!stakeholderSort) return matchingStakeholders;
+
+    return [...matchingStakeholders].sort((a, b) => {
+      const comparison =
+        stakeholderSort.key === 'stakeholder_name'
+          ? a.stakeholder_name.localeCompare(b.stakeholder_name, undefined, {
+              sensitivity: 'base',
+            })
+          : (Number(a.capital) || 0) - (Number(b.capital) || 0);
+      return stakeholderSort.direction === 'asc' ? comparison : -comparison;
+    });
+  }, [debouncedStakeholderSearch, stakeholderSort, stakeholders]);
+  const visibleStakeholders = useMemo(
+    () => filteredStakeholders.slice(0, stakeholderVisibleCount),
+    [filteredStakeholders, stakeholderVisibleCount]
+  );
+
+  useEffect(() => {
+    setStakeholderVisibleCount(LAZY_LOAD_BATCH_SIZE);
+  }, [debouncedStakeholderSearch]);
 
   const resetStakeholderForm = () => {
     setEditingStakeholder(null);
@@ -267,16 +353,19 @@ export default function CfoMasterModalPage() {
       {
         key: 'stakeholder_name',
         header: 'Nama Pemegang Saham',
+        sortable: true,
         render: (row) => row.stakeholder_name,
       },
       {
         key: 'capital',
         header: 'Kapital',
+        sortable: true,
         render: (row) => formatCapitalIdr(Number(row.capital)),
       },
       {
         key: 'actions',
         header: 'Aksi',
+        sticky: true,
         render: (row) => (
           <div className="flex flex-wrap gap-2">
             <Button
@@ -376,7 +465,7 @@ export default function CfoMasterModalPage() {
 
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(420px,0.95fr)_minmax(0,1.05fr)] lg:items-start">
           <section
-            className="min-w-0 border-b border-border lg:max-h-[calc(100dvh-12rem)] lg:overflow-y-auto lg:border-b-0 lg:pl-1"
+            className="min-w-0 border-b border-border lg:flex lg:h-[calc(100dvh-12rem)] lg:flex-col lg:overflow-y-auto lg:border-b-0 lg:px-1"
             data-testid="perusahaan-crud-page"
           >
             <CardHeader
@@ -384,7 +473,7 @@ export default function CfoMasterModalPage() {
               title="Manajemen Perusahaan"
               subtitle="Kelola data perusahaan pada modul CFO"
             />
-            <div>
+            <div className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
               {error && (
                 <p className="mb-4 text-sm text-red-600" role="alert">
                   {error}
@@ -444,9 +533,44 @@ export default function CfoMasterModalPage() {
               ) : (
                 <DataTable
                   columns={companyColumns}
-                  data={companies}
+                  data={visibleCompanies}
                   rowKey={(row) => row.id}
-                  emptyMessage="Belum ada data perusahaan."
+                  stickyHeader
+                  searchValue={companySearch}
+                  searchLabel="Cari perusahaan"
+                  searchPlaceholder="Cari perusahaan..."
+                  searchTestId="perusahaan-table-search"
+                  scrollTestId="perusahaan-table-scroll"
+                  onSearchChange={(value) => {
+                    setCompanySearch(value);
+                    setCompanyVisibleCount(LAZY_LOAD_BATCH_SIZE);
+                  }}
+                  hasMore={visibleCompanies.length < filteredCompanies.length}
+                  onLoadMore={() =>
+                    setCompanyVisibleCount(
+                      (count) => count + LAZY_LOAD_BATCH_SIZE
+                    )
+                  }
+                  sortKey={companySort?.key ?? null}
+                  sortDirection={companySort?.direction}
+                  onSort={(key) => {
+                    if (key !== 'name' && key !== 'series') return;
+                    setCompanyVisibleCount(LAZY_LOAD_BATCH_SIZE);
+                    setCompanySort((current) =>
+                      current?.key === key
+                        ? {
+                            key,
+                            direction:
+                              current.direction === 'asc' ? 'desc' : 'asc',
+                          }
+                        : { key, direction: 'asc' }
+                    );
+                  }}
+                  emptyMessage={
+                    debouncedCompanySearch.trim()
+                      ? 'Tidak ada perusahaan yang cocok dengan pencarian.'
+                      : 'Belum ada data perusahaan.'
+                  }
                   emptyTestId="perusahaan-empty"
                 />
               )}
@@ -456,7 +580,7 @@ export default function CfoMasterModalPage() {
           <section
             className={`${
               selectedCompany && isStakeholderModalOpen ? 'block' : 'hidden'
-            } fixed inset-4 z-50 max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-2xl lg:static lg:block lg:max-h-[calc(100dvh-12rem)] lg:overflow-y-auto lg:rounded-none lg:border-0 lg:bg-transparent lg:py-0 lg:px-1 lg:shadow-none`}
+            } fixed inset-4 z-50 max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-2xl lg:static lg:flex lg:h-[calc(100dvh-12rem)] lg:flex-col lg:overflow-y-auto lg:rounded-none lg:border-0 lg:bg-transparent lg:py-0 lg:px-1 lg:shadow-none`}
             data-testid="pemegang-saham"
             role={selectedCompany && isStakeholderModalOpen ? 'dialog' : undefined}
             aria-modal={
@@ -470,11 +594,16 @@ export default function CfoMasterModalPage() {
           >
             {selectedCompany ? (
               <>
-                <CardHeader
-                  eyebrow="CFO / Input Modal"
-                  title="Input Pemegang Saham"
-                  subtitle={`Kelola pemegang saham & modal untuk ${selectedCompany.name}`}
-                  actions={
+                <div className="pb-6 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+                  <div className='flex flex-row gap-2'>
+                    <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 flex-auto">
+                      <span className="text-sm text-muted-foreground">
+                        Total Kapital {selectedCompany.name}
+                      </span>
+                      <p className="text-lg font-bold">
+                        {formatCapitalIdr(totalCapital)}
+                      </p>
+                    </div>
                     <Button
                       variant="secondary"
                       className="h-9 w-9 p-0 lg:hidden"
@@ -484,16 +613,6 @@ export default function CfoMasterModalPage() {
                     >
                       <X className="h-4 w-4" />
                     </Button>
-                  }
-                />
-                <div className="pb-6">
-                  <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
-                    <span className="text-sm text-muted-foreground">
-                      Total Kapital {selectedCompany.name}
-                    </span>
-                    <p className="text-lg font-bold">
-                      {formatCapitalIdr(totalCapital)}
-                    </p>
                   </div>
                   {stakeholderError && (
                     <p className="mb-4 text-sm text-red-600" role="alert">
@@ -558,9 +677,51 @@ export default function CfoMasterModalPage() {
                   ) : (
                     <DataTable
                       columns={stakeholderColumns}
-                      data={stakeholders}
+                      data={visibleStakeholders}
                       rowKey={(row) => row.id}
-                      emptyMessage="Belum ada data pemegang saham untuk perusahaan ini."
+                      stickyHeader
+                      searchValue={stakeholderSearch}
+                      searchLabel="Cari pemegang saham"
+                      searchPlaceholder="Cari pemegang saham..."
+                      searchTestId="pemegang-saham-table-search"
+                      scrollTestId="pemegang-saham-table-scroll"
+                      onSearchChange={(value) => {
+                        setStakeholderSearch(value);
+                        setStakeholderVisibleCount(LAZY_LOAD_BATCH_SIZE);
+                      }}
+                      hasMore={
+                        visibleStakeholders.length < filteredStakeholders.length
+                      }
+                      onLoadMore={() =>
+                        setStakeholderVisibleCount(
+                          (count) => count + LAZY_LOAD_BATCH_SIZE
+                        )
+                      }
+                      sortKey={stakeholderSort?.key ?? null}
+                      sortDirection={stakeholderSort?.direction}
+                      onSort={(key) => {
+                        if (
+                          key !== 'stakeholder_name' &&
+                          key !== 'capital'
+                        ) {
+                          return;
+                        }
+                        setStakeholderVisibleCount(LAZY_LOAD_BATCH_SIZE);
+                        setStakeholderSort((current) =>
+                          current?.key === key
+                            ? {
+                                key,
+                                direction:
+                                  current.direction === 'asc' ? 'desc' : 'asc',
+                              }
+                            : { key, direction: 'asc' }
+                        );
+                      }}
+                      emptyMessage={
+                        debouncedStakeholderSearch.trim()
+                          ? 'Tidak ada pemegang saham yang cocok dengan pencarian.'
+                          : 'Belum ada data pemegang saham untuk perusahaan ini.'
+                      }
                       emptyTestId="pemegang-saham-empty"
                     />
                   )}
