@@ -30,6 +30,7 @@ use App\Models\Item;
 use App\Models\ItemPacket;
 use App\Models\LabSample;
 use App\Models\Packet;
+use App\Models\PacketName;
 use App\Models\PayrollGrade;
 use App\Models\PayrollItem;
 use App\Models\PayrollRun;
@@ -45,7 +46,7 @@ use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
-    public const MIN_SEED_ROWS = 5;
+    public const MIN_SEED_ROWS = 10;
 
     public function run(): void
     {
@@ -72,6 +73,7 @@ class DatabaseSeeder extends Seeder
 
             $items = $this->seedCpoItems($companies);
             $packets = $this->seedCpoPackets();
+            $this->seedCpoPacketNames();
             $this->seedCpoItemPackets($primaryCompany, $items, $packets);
         });
 
@@ -1522,6 +1524,31 @@ class DatabaseSeeder extends Seeder
         }
 
         return $packets;
+    }
+
+    /**
+     * @return EloquentCollection<int, PacketName>
+     */
+    private function seedCpoPacketNames(): EloquentCollection
+    {
+        $existingByName = PacketName::query()->withTrashed()->get()->keyBy('name');
+
+        $names = ['Paket A', 'Paket B'];
+        for ($i = 1; $i <= self::MIN_SEED_ROWS; $i++) {
+            $names[] = sprintf('Paket Nama %03d', $i);
+        }
+
+        $packetNames = new EloquentCollection;
+        foreach ($names as $name) {
+            /** @var PacketName $packetName */
+            $packetName = $existingByName->get($name) ?? new PacketName;
+            $packetName->name = $name;
+            $packetName->deleted_at = null;
+            $packetName->save();
+            $packetNames->push($packetName);
+        }
+
+        return $packetNames;
     }
 
     /**

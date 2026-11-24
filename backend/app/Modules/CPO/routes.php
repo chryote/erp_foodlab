@@ -4,6 +4,7 @@ use App\Modules\CPO\Controllers\CpoController;
 use App\Modules\CPO\Controllers\ItemController;
 use App\Modules\CPO\Controllers\ItemPacketController;
 use App\Modules\CPO\Controllers\PacketController;
+use App\Modules\CPO\Controllers\PacketNameController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('cpo')->group(function () {
@@ -22,6 +23,13 @@ Route::prefix('cpo')->group(function () {
     Route::put('/packets/{packet}', [PacketController::class, 'update'])->name('api.modules.cpo.packets.update');
     Route::patch('/packets/{packet}', [PacketController::class, 'update'])->name('api.modules.cpo.packets.patch');
     Route::delete('/packets/{packet}', [PacketController::class, 'destroy'])->name('api.modules.cpo.packets.destroy');
+
+    Route::get('/packet-names', [PacketNameController::class, 'index'])->name('api.modules.cpo.packet-names.index');
+    Route::post('/packet-names', [PacketNameController::class, 'store'])->name('api.modules.cpo.packet-names.store');
+    Route::get('/packet-names/{packetName}', [PacketNameController::class, 'show'])->name('api.modules.cpo.packet-names.show');
+    Route::put('/packet-names/{packetName}', [PacketNameController::class, 'update'])->name('api.modules.cpo.packet-names.update');
+    Route::patch('/packet-names/{packetName}', [PacketNameController::class, 'update'])->name('api.modules.cpo.packet-names.patch');
+    Route::delete('/packet-names/{packetName}', [PacketNameController::class, 'destroy'])->name('api.modules.cpo.packet-names.destroy');
 
     Route::get('/item-packets', [ItemPacketController::class, 'index'])->name('api.modules.cpo.item-packets.index');
     Route::post('/item-packets', [ItemPacketController::class, 'store'])->name('api.modules.cpo.item-packets.store');

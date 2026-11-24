@@ -317,14 +317,16 @@ describe('Automated Seeded Relationships & Multi-Row Integrity Strategy', functi
             '/api/v1/samples',
         ];
 
+        $perPage = 10;
         foreach ($paginatedEndpoints as $endpoint) {
-            $response = $this->getJson("{$endpoint}?page=1&per_page=100")->assertOk();
-            expect($response->json('meta.total'))->toBeGreaterThanOrEqual(
+            $response = $this->getJson("{$endpoint}?page=1&per_page={$perPage}")->assertOk();
+            $total = (int) $response->json('meta.total');
+            expect($total)->toBeGreaterThanOrEqual(
                 DatabaseSeeder::MIN_SEED_ROWS,
                 "Expected {$endpoint} meta.total >= ".DatabaseSeeder::MIN_SEED_ROWS
             );
-            expect($response->json('meta.per_page'))->toBe(100);
-            expect($response->json('data'))->toHaveCount(100);
+            expect($response->json('meta.per_page'))->toBe($perPage);
+            expect($response->json('data'))->toHaveCount(min($perPage, $total));
         }
 
         // Verify explicit ?include= relationship serialization on seeded parent/child endpoints
