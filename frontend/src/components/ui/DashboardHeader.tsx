@@ -276,7 +276,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   >
                     {company.name}
                   </MenubarTrigger>
-                  <MenubarContent>
+                  <MenubarContent className='border-gray-200'>
                     {COMPANY_MENU_MODULES.map((moduleConfig) => {
                       const module =
                         modulesMap[moduleConfig.code] ?? moduleConfig.fallback;
@@ -292,7 +292,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                           >
                             {moduleConfig.code}
                           </MenubarSubTrigger>
-                          <MenubarSubContent>
+                          <MenubarSubContent className='border-gray-200'>
                             {moduleConfig.items.map((menuItem) => (
                               menuItem.children?.length ? (
                                 <MenubarSub key={menuItem.code}>
@@ -305,7 +305,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                                   >
                                     {menuItem.title}
                                   </MenubarSubTrigger>
-                                  <MenubarSubContent>
+                                  <MenubarSubContent className='border-gray-200'>
                                     {menuItem.children.map((childItem, index) => (
                                       <MenubarItem
                                         key={`${childItem.code}-${index}`}

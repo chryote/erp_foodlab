@@ -119,9 +119,7 @@ describe('Dashboard', () => {
       'aria-selected',
       'true'
     );
-    expect(
-      await screen.findByText('Konten Master Modal akan tersedia di sini.')
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Manajemen Perusahaan')).toBeInTheDocument();
     expect(screen.getByTestId('current-path')).toHaveTextContent(
       '/dashboard/company/3/menu/CFO/INPUT_MODAL/master-modal'
     );
@@ -143,7 +141,7 @@ describe('Dashboard', () => {
     expect(apiClient.syncActiveCompany).not.toHaveBeenCalledWith(1);
   });
 
-  it('navigates from a nested menu leaf to its placeholder page', async () => {
+  it('navigates from a nested menu leaf to the master modal page', async () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
       data: [{ id: 1, name: 'FoodLab Utama', series: 1 }],
@@ -168,7 +166,6 @@ describe('Dashboard', () => {
     expect(screen.getByTestId('current-path')).toHaveTextContent(
       '/dashboard/company/1/menu/CFO/INPUT_MODAL/master-modal'
     );
-    expect(await screen.findByText('Konten Master Modal akan tersedia di sini.'))
-      .toBeInTheDocument();
+    expect(await screen.findByText('Manajemen Perusahaan')).toBeInTheDocument();
   });
 });

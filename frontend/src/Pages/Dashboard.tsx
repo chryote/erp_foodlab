@@ -195,7 +195,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           <div
             key={message}
             role="alert"
-            className="mb-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-primary"
+            className="mb-3 rounded-xl bg-primary/5 text-sm text-primary"
           >
             {message}
           </div>
@@ -203,7 +203,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         {MenuPage ? (
           <MenuPage />
         ) : (
-          <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border bg-card/50 p-6 text-center">
+          <div className="flex flex-col items-center justify-center gap-4 rounded-xl bg-card/50 p-6 text-center">
             <img src={theme === 'dark' ? '/white-logo.png' : '/black-logo.png'}
               alt="Dashboard Illustration"
               className="mx-auto max-h-96 opacity-30"
