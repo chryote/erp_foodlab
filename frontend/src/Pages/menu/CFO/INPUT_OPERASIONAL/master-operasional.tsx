@@ -7,6 +7,7 @@ import {
   CardHeader,
   ConfirmDialog,
   DataTable,
+  DataTableSearch,
   SelectInput,
   TextInput,
   type DataTableColumn,
@@ -18,7 +19,7 @@ import {
   useMasterOperasionalCrudResource,
 } from '@/lib/cfoResources';
 import { getActiveCompanyId } from '@/lib/activeCompanyStorage';
-import { useDebouncedValue } from '@/lib/useDebouncedValue';
+import { useDebouncedSearch } from '@/lib/useDebouncedValue';
 
 type ActiveTab = 'kategori' | 'tipe';
 type SortDirection = 'asc' | 'desc';
@@ -73,8 +74,10 @@ export default function CfoMasterOperasionalPage() {
     null
   );
   const [isActionLoading, setIsActionLoading] = useState(false);
-  const debouncedCategorySearch = useDebouncedValue(categorySearch);
-  const debouncedTypeSearch = useDebouncedValue(typeSearch);
+  const [debouncedCategorySearch, submitCategorySearch] =
+    useDebouncedSearch(categorySearch);
+  const [debouncedTypeSearch, submitTypeSearch] =
+    useDebouncedSearch(typeSearch);
   const categorySortParam = categorySort
     ? `${categorySort.direction === 'desc' ? '-' : ''}${categorySort.key}`
     : '-id';
@@ -407,6 +410,17 @@ export default function CfoMasterOperasionalPage() {
               </div>
             </form>
 
+            <div className="mt-2">
+              <DataTableSearch
+                searchValue={categorySearch}
+                onSearchChange={setCategorySearch}
+                searchLabel="Cari kategori"
+                searchPlaceholder="Cari kategori..."
+                searchTestId="master-operasional-kategori-search"
+                onSearchSubmit={submitCategorySearch}
+              />
+            </div>
+
             {categoryListQuery.isLoading ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 Memuat data kategori...
@@ -417,11 +431,9 @@ export default function CfoMasterOperasionalPage() {
                 data={listedCategories}
                 rowKey={(row) => row.id}
                 stickyHeader
+                showSearch={false}
                 searchValue={categorySearch}
                 onSearchChange={setCategorySearch}
-                searchLabel="Cari kategori"
-                searchPlaceholder="Cari kategori..."
-                searchTestId="master-operasional-kategori-search"
                 scrollTestId="master-operasional-kategori-table-scroll"
                 hasMore={
                   Boolean(categoryListQuery.hasNextPage) &&
@@ -534,6 +546,17 @@ export default function CfoMasterOperasionalPage() {
               </div>
             </form>
 
+            <div className="mt-2">
+              <DataTableSearch
+                searchValue={typeSearch}
+                onSearchChange={setTypeSearch}
+                searchLabel="Cari tipe"
+                searchPlaceholder="Cari tipe..."
+                searchTestId="master-operasional-tipe-search"
+                onSearchSubmit={submitTypeSearch}
+              />
+            </div>
+
             {typeListQuery.isLoading ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 Memuat data tipe...
@@ -544,11 +567,9 @@ export default function CfoMasterOperasionalPage() {
                 data={listedTypes}
                 rowKey={(row) => row.id}
                 stickyHeader
+                showSearch={false}
                 searchValue={typeSearch}
                 onSearchChange={setTypeSearch}
-                searchLabel="Cari tipe"
-                searchPlaceholder="Cari tipe..."
-                searchTestId="master-operasional-tipe-search"
                 scrollTestId="master-operasional-tipe-table-scroll"
                 hasMore={
                   Boolean(typeListQuery.hasNextPage) && !typeListQuery.error

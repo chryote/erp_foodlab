@@ -11,6 +11,8 @@ import {
   CardHeader,
   ConfirmDialog,
   DataTable,
+  DataTableSearch,
+  DecimalInput,
   Dialog,
   DialogClose,
   DialogContent,
@@ -31,7 +33,7 @@ import {
 } from '@/lib/cfoResources';
 import { getActiveCompanyId } from '@/lib/activeCompanyStorage';
 import { formatCapitalIdr } from '@/modules/CFO/CapitalCompanyCrudModal';
-import { useDebouncedValue } from '@/lib/useDebouncedValue';
+import { useDebouncedSearch } from '@/lib/useDebouncedValue';
 
 interface ItemFormValues {
   categoryId: string;
@@ -167,17 +169,14 @@ function ItemOperasionalForm({
         disabled={loading}
         data-testid="operasional-item-name"
       />
-      <TextInput
+      <DecimalInput
         label="Nominal"
-        type="number"
-        min="0"
-        step="0.01"
-        placeholder="Contoh: 1500000"
+        placeholder="Contoh: 1.500.000"
         value={formValues.amount}
-        onChange={(event) =>
+        onChange={(value) =>
           setFormValues((current) => ({
             ...current,
-            amount: event.target.value,
+            amount: value,
           }))
         }
         required
@@ -247,7 +246,7 @@ export default function CfoItemOperasionalPage() {
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(
     null
   );
-  const debouncedSearch = useDebouncedValue(search);
+  const [debouncedSearch, submitSearch] = useDebouncedSearch(search);
   const itemSortParam = itemSort
     ? `${itemSort.direction === 'desc' ? '-' : ''}${itemSort.key}`
     : '-id';
@@ -530,6 +529,16 @@ export default function CfoItemOperasionalPage() {
                   testId="operasional-item-total"
                 />
               </div>
+              <div className="mt-2">
+                <DataTableSearch
+                  searchValue={search}
+                  onSearchChange={setSearch}
+                  searchLabel="Cari item operasional"
+                  searchPlaceholder="Cari nama, tipe, atau keterangan..."
+                  searchTestId="operasional-item-search"
+                  onSearchSubmit={submitSearch}
+                />
+              </div>
               {itemListQuery.isLoading && listedItems.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">
                   Memuat data item operasional...
@@ -541,11 +550,9 @@ export default function CfoItemOperasionalPage() {
                     data={listedItems}
                     rowKey={(row) => row.id}
                     stickyHeader
+                    showSearch={false}
                     searchValue={search}
                     onSearchChange={setSearch}
-                    searchLabel="Cari item operasional"
-                    searchPlaceholder="Cari nama, tipe, atau keterangan..."
-                    searchTestId="operasional-item-search"
                     scrollTestId="operasional-item-table-scroll"
                     hasMore={
                       Boolean(itemListQuery.hasNextPage) &&

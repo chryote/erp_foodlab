@@ -7,6 +7,7 @@ import {
   CardHeader,
   ConfirmDialog,
   DataTable,
+  DataTableSearch,
   TextInput,
   type DataTableColumn,
 } from '@/components/ui';
@@ -18,7 +19,8 @@ import {
   useCompanyCrudResource,
   useStakeholderCrudResource,
 } from '@/lib/cfoResources';
-import { useDebouncedValue } from '@/lib/useDebouncedValue';
+import { useDebouncedSearch } from '@/lib/useDebouncedValue';
+import { formatCapitalInput } from '@/lib/utils';
 
 type SortDirection = 'asc' | 'desc';
 type CompanySortKey = 'name' | 'series';
@@ -34,22 +36,6 @@ type StakeholderPendingAction =
   | { type: 'update'; id: number; name: string; capital: number }
   | { type: 'delete'; id: number; name: string };
 
-function formatCapitalInput(value: string): string {
-  const [integerPart, ...fractionParts] = value
-    .replace(/[^\d,]/g, '')
-    .split(',');
-  const normalizedInteger = integerPart.replace(/^0+(?=\d)/, '');
-  const groupedInteger = normalizedInteger.replace(
-    /\B(?=(\d{3})+(?!\d))/g,
-    '.'
-  );
-  if (fractionParts.length === 0) {
-    return groupedInteger;
-  }
-
-  return `${groupedInteger || '0'},${fractionParts.join('').slice(0, 2)}`;
-}
-
 export default function CfoMasterModalPage() {
   const {
     loading,
@@ -62,8 +48,10 @@ export default function CfoMasterModalPage() {
   const [companySeries, setCompanySeries] = useState('1');
   const [companyNameSearch, setCompanyNameSearch] = useState('');
   const [companySeriesSearch, setCompanySeriesSearch] = useState('');
-  const debouncedCompanyNameSearch = useDebouncedValue(companyNameSearch);
-  const debouncedCompanySeriesSearch = useDebouncedValue(companySeriesSearch);
+  const [debouncedCompanyNameSearch, submitCompanyNameSearch] =
+    useDebouncedSearch(companyNameSearch);
+  const [debouncedCompanySeriesSearch, submitCompanySeriesSearch] =
+    useDebouncedSearch(companySeriesSearch);
   const [companySort, setCompanySort] = useState<{
     key: CompanySortKey;
     direction: SortDirection;
@@ -231,7 +219,8 @@ export default function CfoMasterModalPage() {
   const [stakeholderActionLoading, setStakeholderActionLoading] =
     useState(false);
   const [stakeholderSearch, setStakeholderSearch] = useState('');
-  const debouncedStakeholderSearch = useDebouncedValue(stakeholderSearch);
+  const [debouncedStakeholderSearch, submitStakeholderSearch] =
+    useDebouncedSearch(stakeholderSearch);
   const [stakeholderSort, setStakeholderSort] = useState<{
     key: StakeholderSortKey;
     direction: SortDirection;
@@ -524,16 +513,8 @@ export default function CfoMasterModalPage() {
                   )}
                 </div>
               </form>
-              {loading || companyListQuery.isLoading ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  Memuat data perusahaan...
-                </p>
-              ) : (
-                <DataTable
-                  columns={companyColumns}
-                  data={companies}
-                  rowKey={(row) => row.id}
-                  stickyHeader
+              <div className="mt-2">
+                <DataTableSearch
                   searchValue={companyNameSearch}
                   searchLabel="Cari nama perusahaan"
                   searchPlaceholder="Cari nama perusahaan..."
@@ -544,10 +525,29 @@ export default function CfoMasterModalPage() {
                   secondarySearchPlaceholder="Cari seri..."
                   secondarySearchTestId="perusahaan-series-search"
                   secondarySearchType="number"
-                  scrollTestId="perusahaan-table-scroll"
-                  onSearchChange={(value) => {
-                    setCompanyNameSearch(value);
+                  onSearchChange={setCompanyNameSearch}
+                  onSearchSubmit={() => {
+                    submitCompanyNameSearch();
+                    submitCompanySeriesSearch();
                   }}
+                />
+              </div>
+              {loading || companyListQuery.isLoading ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  Memuat data perusahaan...
+                </p>
+              ) : (
+                <DataTable
+                  columns={companyColumns}
+                  data={companies}
+                  rowKey={(row) => row.id}
+                  stickyHeader
+                  showSearch={false}
+                  searchValue={companyNameSearch}
+                  onSearchChange={setCompanyNameSearch}
+                  secondarySearchValue={companySeriesSearch}
+                  onSecondarySearchChange={setCompanySeriesSearch}
+                  scrollTestId="perusahaan-table-scroll"
                   hasMore={
                     Boolean(companyListQuery.hasNextPage) &&
                     !companyListQuery.isFetchNextPageError
@@ -694,6 +694,16 @@ export default function CfoMasterModalPage() {
                       )}
                     </div>
                   </form>
+                  <div className="mt-2">
+                    <DataTableSearch
+                      searchValue={stakeholderSearch}
+                      searchLabel="Cari pemegang saham"
+                      searchPlaceholder="Cari pemegang saham..."
+                      searchTestId="pemegang-saham-table-search"
+                      onSearchChange={setStakeholderSearch}
+                      onSearchSubmit={submitStakeholderSearch}
+                    />
+                  </div>
                   {stakeholderLoading ? (
                     <p className="py-8 text-center text-sm text-muted-foreground">
                       Memuat data pemegang saham...
@@ -704,14 +714,10 @@ export default function CfoMasterModalPage() {
                       data={stakeholders}
                       rowKey={(row) => row.id}
                       stickyHeader
+                      showSearch={false}
                       searchValue={stakeholderSearch}
-                      searchLabel="Cari pemegang saham"
-                      searchPlaceholder="Cari pemegang saham..."
-                      searchTestId="pemegang-saham-table-search"
+                      onSearchChange={setStakeholderSearch}
                       scrollTestId="pemegang-saham-table-scroll"
-                      onSearchChange={(value) => {
-                        setStakeholderSearch(value);
-                      }}
                       hasMore={
                         Boolean(stakeholderListQuery.hasNextPage) &&
                         !stakeholderListQuery.isFetchNextPageError

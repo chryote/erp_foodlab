@@ -5,6 +5,7 @@ import {
   Badge,
   CardHeader,
   DataTable,
+  DataTableSearch,
   type DataTableColumn,
 } from '@/components/ui';
 import { formatCapitalIdr } from '@/modules/CFO/CapitalCompanyCrudModal';
@@ -14,7 +15,7 @@ import {
   useStakeholdersTotalCapitalQuery,
 } from '@/lib/cfoResources';
 import { getActiveCompanyId } from '@/lib/activeCompanyStorage';
-import { useDebouncedValue } from '@/lib/useDebouncedValue';
+import { useDebouncedSearch } from '@/lib/useDebouncedValue';
 
 type SortDirection = 'asc' | 'desc';
 type StakeholderSortKey = 'stakeholder_name' | 'capital';
@@ -33,7 +34,8 @@ export default function CfoViewModalPage() {
     ) ?? null;
 
   const [stakeholderSearch, setStakeholderSearch] = useState('');
-  const debouncedStakeholderSearch = useDebouncedValue(stakeholderSearch);
+  const [debouncedStakeholderSearch, submitStakeholderSearch] =
+    useDebouncedSearch(stakeholderSearch);
   const [stakeholderSort, setStakeholderSort] = useState<{
     key: StakeholderSortKey;
     direction: SortDirection;
@@ -159,6 +161,17 @@ export default function CfoViewModalPage() {
                 </p>
               </div>
 
+              <div className="mt-2">
+                <DataTableSearch
+                  searchValue={stakeholderSearch}
+                  onSearchChange={setStakeholderSearch}
+                  searchLabel="Cari pemegang saham"
+                  searchPlaceholder="Cari pemegang saham..."
+                  searchTestId="pemegang-saham-table-search"
+                  onSearchSubmit={submitStakeholderSearch}
+                />
+              </div>
+
               {stakeholderLoading ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">
                   Memuat data pemegang saham...
@@ -169,12 +182,10 @@ export default function CfoViewModalPage() {
                   data={stakeholders}
                   rowKey={(row) => row.id}
                   stickyHeader
+                  showSearch={false}
                   searchValue={stakeholderSearch}
-                  searchLabel="Cari pemegang saham"
-                  searchPlaceholder="Cari pemegang saham..."
-                  searchTestId="pemegang-saham-table-search"
-                  scrollTestId="pemegang-saham-table-scroll"
                   onSearchChange={setStakeholderSearch}
+                  scrollTestId="pemegang-saham-table-scroll"
                   hasMore={
                     Boolean(stakeholderListQuery.hasNextPage) &&
                     !stakeholderListQuery.isFetchNextPageError
