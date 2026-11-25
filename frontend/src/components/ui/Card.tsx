@@ -36,7 +36,7 @@ export const Card: React.FC<CardProps> = ({
 
 export interface CardHeaderProps {
   eyebrow?: string;
-  title: string;
+  title?: string;
   subtitle?: string;
   actions?: React.ReactNode;
 }
@@ -55,7 +55,7 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
             {eyebrow}
           </span>
         )}
-        <ShadcnCardTitle>{title}</ShadcnCardTitle>
+        {title ? <ShadcnCardTitle>{title}</ShadcnCardTitle> : null}
         {subtitle && <ShadcnCardDescription>{subtitle}</ShadcnCardDescription>}
       </div>
       {actions && <div className="flex items-center gap-3">{actions}</div>}
