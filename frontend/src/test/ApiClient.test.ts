@@ -30,6 +30,7 @@ import {
   deletePacketVendor,
   fetchActiveCompanyEmployees,
   fetchCapitalCompanies,
+  fetchCfoEnums,
   fetchChoEnums,
   fetchCompanies,
   fetchCpoEnums,
@@ -89,9 +90,10 @@ describe('General API Client Contract & Error Handling', () => {
     await fetchHealthStatus();
     await fetchErpModules();
     await fetchLabSamples();
+    await fetchCfoEnums();
     await fetchCompanies();
-    await createCompany({ name: 'PT A' });
-    await updateCompany(1, { name: 'PT A2' });
+    await createCompany({ name: 'PT A', type: 'Packing' });
+    await updateCompany(1, { name: 'PT A2', type: 'Produksi' });
     await deleteCompany(1);
     await fetchCapitalCompanies();
     await createCapitalCompany({
@@ -106,7 +108,7 @@ describe('General API Client Contract & Error Handling', () => {
     });
     await deleteCapitalCompany(1);
 
-    expect(globalThis.fetch).toHaveBeenCalledTimes(11);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(12);
     for (const call of vi.mocked(globalThis.fetch).mock.calls) {
       const options = call[1] as RequestInit;
       const headers = options?.headers as Record<string, string>;

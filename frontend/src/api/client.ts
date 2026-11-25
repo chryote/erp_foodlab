@@ -77,10 +77,17 @@ export interface ErpModulesListResponse {
   };
 }
 
+export type CompanyType = 'Utama' | 'Packing' | 'Produksi' | (string & {});
+
+export interface CfoEnums {
+  company_type: EnumOption[];
+}
+
 export interface Company {
   id: number;
   name: string;
   series?: number;
+  type?: CompanyType;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
@@ -1053,6 +1060,14 @@ export async function fetchLabSamples(): Promise<SamplesListResponse> {
   );
 }
 
+export async function fetchCfoEnums(): Promise<{ data: CfoEnums }> {
+  return requestJson<{ data: CfoEnums }>(
+    '/v1/modules/cfo/enums',
+    {},
+    'Failed to fetch CFO enums'
+  );
+}
+
 export async function fetchCompanies(): Promise<CompaniesListResponse> {
   return requestJson<CompaniesListResponse>(
     '/v1/modules/cfo/companies',
@@ -1064,6 +1079,7 @@ export async function fetchCompanies(): Promise<CompaniesListResponse> {
 export async function createCompany(payload: {
   name: string;
   series?: number;
+  type?: CompanyType;
 }): Promise<{ data: Company }> {
   return requestJson<{ data: Company }>(
     '/v1/modules/cfo/companies',
@@ -1078,7 +1094,7 @@ export async function createCompany(payload: {
 
 export async function updateCompany(
   id: number,
-  payload: { name: string; series?: number }
+  payload: { name: string; series?: number; type?: CompanyType }
 ): Promise<{ data: Company }> {
   return requestJson<{ data: Company }>(
     `/v1/modules/cfo/companies/${id}`,

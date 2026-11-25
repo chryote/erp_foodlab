@@ -108,12 +108,21 @@ export const MasterPackingCrudModal: React.FC<
     () => [
       {
         key: 'company_id',
-        label: 'Pilih Perusahaan',
+        label: 'Pilih Vendor',
         type: 'select',
-        placeholder: 'Pilih perusahaan...',
+        placeholder: 'Pilih vendor...',
         defaultValue: defaultCompanyId,
         options: companyOptions,
         renderValue: (row) => renderCompanyName(row.company_id, row.company),
+      },
+      {
+        key: 'type',
+        label: 'Tipe Item',
+        type: 'select',
+        placeholder: 'Pilih tipe item...',
+        defaultValue: defaultItemType,
+        options: itemTypeOptions,
+        renderValue: (row) => itemTypeLabelMap.get(row.type) ?? row.type,
       },
       {
         key: 'code',
@@ -126,15 +135,6 @@ export const MasterPackingCrudModal: React.FC<
         key: 'name',
         label: 'Nama Item',
         placeholder: 'Contoh: Kardus Kemasan 30x20',
-      },
-      {
-        key: 'type',
-        label: 'Tipe Item',
-        type: 'select',
-        placeholder: 'Pilih tipe item...',
-        defaultValue: defaultItemType,
-        options: itemTypeOptions,
-        renderValue: (row) => itemTypeLabelMap.get(row.type) ?? row.type,
       },
     ],
     [
@@ -171,9 +171,9 @@ export const MasterPackingCrudModal: React.FC<
     () => [
       {
         key: 'company_id',
-        label: 'Pilih Perusahaan',
+        label: 'Pilih Vendor',
         type: 'select',
-        placeholder: 'Pilih perusahaan...',
+        placeholder: 'Pilih vendor...',
         defaultValue: defaultCompanyId,
         options: companyOptions,
         resetFieldsOnChange: ['item_id'],

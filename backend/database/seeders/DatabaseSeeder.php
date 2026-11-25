@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Enums\Agama;
 use App\Enums\AttendanceStatusEnum;
+use App\Enums\CompanyType;
 use App\Enums\GolonganDarah;
 use App\Enums\ItemType;
 use App\Enums\JenisDokumen;
@@ -166,10 +167,12 @@ class DatabaseSeeder extends Seeder
             'name' => 'PT. Slaras Nusa Foodlab',
             'series' => 1,
         ]);
+        $primary->type = CompanyType::Utama;
         $primary->deleted_at = null;
         $primary->save();
         $companies->push($primary);
 
+        $companyTypes = CompanyType::cases();
         for ($i = 2; $i <= self::MIN_SEED_ROWS; $i++) {
             $name = sprintf('PT. Slaras Nusa Foodlab Unit %03d', $i);
             $series = (($i - 1) % 5) + 1;
@@ -178,6 +181,7 @@ class DatabaseSeeder extends Seeder
                 'name' => $name,
                 'series' => $series,
             ]);
+            $company->type = $companyTypes[($i - 1) % count($companyTypes)];
             $company->deleted_at = null;
             $company->save();
             $companies->push($company);

@@ -52,6 +52,7 @@ CREATE TABLE `companies` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `series` int unsigned NOT NULL DEFAULT '1',
+  `type` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Utama',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
@@ -59,7 +60,8 @@ CREATE TABLE `companies` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `companies_name_series_active_unique` (`name`,`series`,`active_flag`),
   KEY `companies_deleted_at_index` (`deleted_at`),
-  KEY `companies_name_index` (`name`)
+  KEY `companies_name_index` (`name`),
+  KEY `companies_del_type_id_idx` (`deleted_at`,`type`,`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `company_assets`;
@@ -771,5 +773,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (54,'2026_11_24_160
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (55,'2026_11_24_170000_create_packet_categories_table',40);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (56,'2026_11_24_180000_create_default_packages_table',41);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (57,'2026_11_24_190000_create_ingredients_table',42);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (58,'2026_11_25_100000_add_type_to_companies_table',43);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;

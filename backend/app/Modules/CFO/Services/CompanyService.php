@@ -2,6 +2,7 @@
 
 namespace App\Modules\CFO\Services;
 
+use App\Enums\CompanyType;
 use App\Models\Company;
 use App\Models\DefaultPackage;
 use App\Models\Ingredient;
@@ -18,6 +19,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -49,8 +51,18 @@ class CompanyService
     {
         $name = InputNormalizer::text((string) $attributes['name']) ?? '';
         $series = (int) ($attributes['series'] ?? 1);
+        $rawType = $attributes['type'] ?? null;
+        $typeValue = $rawType instanceof CompanyType
+            ? $rawType->value
+            : (string) ($rawType ?? CompanyType::Utama->value);
 
-        $company = DB::transaction(function () use ($name, $series): Company {
+        if (CompanyType::tryFrom($typeValue) === null) {
+            throw ValidationException::withMessages([
+                'type' => ['The selected type is invalid.'],
+            ]);
+        }
+
+        $company = DB::transaction(function () use ($name, $series, $typeValue): Company {
             WriteGuard::assertUniqueActive(
                 Company::query(),
                 'name',
@@ -63,6 +75,7 @@ class CompanyService
             return Company::query()->create([
                 'name' => $name,
                 'series' => $series,
+                'type' => $typeValue,
             ]);
         });
 
@@ -75,6 +88,19 @@ class CompanyService
     {
         if (array_key_exists('name', $attributes)) {
             $attributes['name'] = InputNormalizer::text((string) $attributes['name']) ?? '';
+        }
+
+        if (array_key_exists('type', $attributes)) {
+            $rawType = $attributes['type'];
+            $typeValue = $rawType instanceof CompanyType ? $rawType->value : (string) $rawType;
+
+            if (CompanyType::tryFrom($typeValue) === null) {
+                throw ValidationException::withMessages([
+                    'type' => ['The selected type is invalid.'],
+                ]);
+            }
+
+            $attributes['type'] = $typeValue;
         }
 
         $updated = DB::transaction(function () use ($company, $attributes): Company {
@@ -193,8 +219,9 @@ class CompanyService
                     IndexQuery::whereLike($query, 'name', $escaped);
                 }),
                 AllowedFilter::exact('series'),
+                AllowedFilter::exact('type'),
             ])
-            ->allowedSorts(['id', 'name', 'series', 'created_at', 'updated_at'])
+            ->allowedSorts(['id', 'name', 'series', 'type', 'created_at', 'updated_at'])
             ->allowedIncludes(['capitalCompanies'])
             ->defaultSort('-id');
     }

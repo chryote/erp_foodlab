@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('cfo')->group(function () {
     Route::get('/', [CfoController::class, 'index'])->name('api.modules.cfo.index');
+    Route::get('/enums', [CfoController::class, 'enums'])->name('api.modules.cfo.enums');
 
     Route::get('/companies', [CompanyController::class, 'index'])->name('api.modules.cfo.companies.index');
     Route::post('/companies', [CompanyController::class, 'store'])->name('api.modules.cfo.companies.store');
