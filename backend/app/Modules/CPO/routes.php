@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('cpo')->group(function () {
     Route::get('/', [CpoController::class, 'index'])->name('api.modules.cpo.index');
+    Route::get('/enums', [CpoController::class, 'enums'])->name('api.modules.cpo.enums');
 
     Route::get('/items', [ItemController::class, 'index'])->name('api.modules.cpo.items.index');
     Route::post('/items', [ItemController::class, 'store'])->name('api.modules.cpo.items.store');

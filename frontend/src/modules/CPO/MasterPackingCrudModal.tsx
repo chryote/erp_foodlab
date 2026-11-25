@@ -24,11 +24,6 @@ export const MASTER_PACKING_TABS: Array<{
   { key: 'assignment', label: 'Item Paket' },
 ];
 
-const ITEM_TYPE_OPTIONS: Array<{ value: ItemType; label: string }> = [
-  { value: 'Bahan', label: 'Bahan' },
-  { value: 'Peralatan', label: 'Peralatan' },
-];
-
 export interface MasterPackingCrudModalProps {
   isOpen: boolean;
   company: Company | null;
@@ -42,6 +37,7 @@ export const MasterPackingCrudModal: React.FC<
   const [activeTab, setActiveTab] = useState<MasterPackingTabKey>('item');
 
   const {
+    enums,
     allItems,
     allPackets,
     allItemPackets,
@@ -92,6 +88,22 @@ export const MasterPackingCrudModal: React.FC<
     [availableCompanies]
   );
 
+  const itemTypeOptions = useMemo(
+    () =>
+      enums.item_type.map((opt) => ({
+        value: opt.value,
+        label: opt.nama,
+      })),
+    [enums.item_type]
+  );
+
+  const itemTypeLabelMap = useMemo(
+    () => new Map(enums.item_type.map((opt) => [opt.value, opt.nama])),
+    [enums.item_type]
+  );
+
+  const defaultItemType = enums.item_type[0]?.value ?? 'Bahan';
+
   const itemFields = useMemo<CrudFieldConfig<Item>[]>(
     () => [
       {
@@ -120,12 +132,19 @@ export const MasterPackingCrudModal: React.FC<
         label: 'Tipe Item',
         type: 'select',
         placeholder: 'Pilih tipe item...',
-        defaultValue: 'Bahan',
-        options: ITEM_TYPE_OPTIONS,
-        renderValue: (row) => row.type,
+        defaultValue: defaultItemType,
+        options: itemTypeOptions,
+        renderValue: (row) => itemTypeLabelMap.get(row.type) ?? row.type,
       },
     ],
-    [companyOptions, defaultCompanyId, renderCompanyName]
+    [
+      companyOptions,
+      defaultCompanyId,
+      defaultItemType,
+      itemTypeLabelMap,
+      itemTypeOptions,
+      renderCompanyName,
+    ]
   );
 
   const packetFields = useMemo<CrudFieldConfig<Packet>[]>(
@@ -273,8 +292,10 @@ export const MasterPackingCrudModal: React.FC<
     const companyId = parseInt(values.company_id ?? '', 10);
     const code = (values.code ?? '').trim();
     const name = (values.name ?? '').trim();
+    const rawType = (values.type ?? '').trim();
     const type: ItemType =
-      values.type === 'Peralatan' ? 'Peralatan' : 'Bahan';
+      enums.item_type.find((opt) => opt.value === rawType)?.value ??
+      defaultItemType;
     if (!Number.isFinite(companyId) || !name) {
       return null;
     }

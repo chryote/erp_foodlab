@@ -32,6 +32,7 @@ import {
   fetchCapitalCompanies,
   fetchChoEnums,
   fetchCompanies,
+  fetchCpoEnums,
   fetchDefaultPackages,
   fetchErpModules,
   fetchExpenseCategories,
@@ -272,6 +273,7 @@ describe('General API Client Contract & Error Handling', () => {
       json: async () => ({ data: [] }),
     } as Response);
 
+    await fetchCpoEnums();
     await fetchItems();
     await createItem({ company_id: 1, code: 'ITM-001', name: 'Kardus', type: 'Bahan' });
     await updateItem(5, { company_id: 1, code: null, name: 'Kardus Baru', type: 'Peralatan' });
@@ -288,13 +290,14 @@ describe('General API Client Contract & Error Handling', () => {
     await deleteItemPacket(7);
 
     const calls = vi.mocked(globalThis.fetch).mock.calls;
-    expect(calls).toHaveLength(12);
-    expect(String(calls[0][0])).toContain('/v1/modules/cpo/items');
-    expect(String(calls[2][0])).toContain('/v1/modules/cpo/items/5');
-    expect(String(calls[4][0])).toContain('/v1/modules/cpo/packets');
-    expect(String(calls[6][0])).toContain('/v1/modules/cpo/packets/6');
-    expect(String(calls[8][0])).toContain('/v1/modules/cpo/item-packets');
-    expect(String(calls[10][0])).toContain('/v1/modules/cpo/item-packets/7');
+    expect(calls).toHaveLength(13);
+    expect(String(calls[0][0])).toContain('/v1/modules/cpo/enums');
+    expect(String(calls[1][0])).toContain('/v1/modules/cpo/items');
+    expect(String(calls[3][0])).toContain('/v1/modules/cpo/items/5');
+    expect(String(calls[5][0])).toContain('/v1/modules/cpo/packets');
+    expect(String(calls[7][0])).toContain('/v1/modules/cpo/packets/6');
+    expect(String(calls[9][0])).toContain('/v1/modules/cpo/item-packets');
+    expect(String(calls[11][0])).toContain('/v1/modules/cpo/item-packets/7');
   });
 
   it('calls CPO paket master endpoints for packet-names, packet-vendors, and packet-categories', async () => {

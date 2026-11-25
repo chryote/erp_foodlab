@@ -83,6 +83,16 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
       },
     ];
 
+    vi.mocked(apiClient.fetchCpoEnums).mockResolvedValue({
+      data: {
+        item_type: [
+          { value: 'Bahan', nama: 'Bahan' },
+          { value: 'Peralatan', nama: 'Peralatan' },
+          { value: 'Paket Usaha', nama: 'Paket Usaha' },
+        ],
+      },
+    });
+
     vi.mocked(apiClient.fetchItems).mockImplementation(async () => ({
       data: [...itemsStore],
       meta: { count: itemsStore.length },
@@ -690,5 +700,97 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
     expect(
       screen.queryByTestId('view-packing-modal')
     ).not.toBeInTheDocument();
+  });
+
+  it('syncs Master Packing Tipe Item dropdown from CPO enums endpoint and submits Paket Usaha', async () => {
+    vi.mocked(apiClient.fetchErpModules).mockResolvedValue({
+      data: [DEFAULT_CPO_MODULE],
+      meta: { count: 1 },
+    });
+
+    const companiesStore: apiClient.Company[] = [
+      { id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1 },
+    ];
+    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
+      data: companiesStore,
+      meta: { count: 1 },
+    });
+    vi.mocked(apiClient.syncActiveCompany).mockResolvedValue({
+      data: companiesStore[0],
+    });
+    vi.mocked(apiClient.fetchCpoEnums).mockResolvedValue({
+      data: {
+        item_type: [
+          { value: 'Bahan', nama: 'Bahan' },
+          { value: 'Peralatan', nama: 'Peralatan' },
+          { value: 'Paket Usaha', nama: 'Paket Usaha' },
+        ],
+      },
+    });
+    vi.mocked(apiClient.fetchItems).mockResolvedValue({
+      data: [],
+      meta: { count: 0 },
+    });
+    vi.mocked(apiClient.fetchPackets).mockResolvedValue({
+      data: [],
+      meta: { count: 0 },
+    });
+    vi.mocked(apiClient.fetchItemPackets).mockResolvedValue({
+      data: [],
+      meta: { count: 0 },
+    });
+    vi.mocked(apiClient.createItem).mockResolvedValue({
+      data: {
+        id: 99,
+        company_id: 1,
+        code: 'ITM-PU-01',
+        name: 'Booth Usaha',
+        type: 'Paket Usaha',
+        company: companiesStore[0],
+      },
+    });
+
+    renderApp();
+
+    fireEvent.click(await screen.findByTestId('company-tab-1'));
+    fireEvent.click(screen.getByTestId('module-card-CPO'));
+
+    const cpoMenu = await screen.findByTestId('cpo-horizontal-menu');
+    fireEvent.click(
+      within(cpoMenu).getByTestId('horizontal-menu-card-INPUT_PACKING')
+    );
+    const submenu = screen.getByTestId('horizontal-submenu-INPUT_PACKING');
+    fireEvent.click(
+      within(submenu).getByTestId('horizontal-menu-card-MASTER_PACKING')
+    );
+
+    const modal = await screen.findByTestId('master-packing-crud-modal');
+    const typeSelect = within(modal).getByLabelText('Tipe Item') as HTMLSelectElement;
+
+    await waitFor(() => {
+      const optionValues = Array.from(typeSelect.options).map((opt) => opt.value);
+      expect(optionValues).toContain('Paket Usaha');
+    });
+
+    fireEvent.change(within(modal).getByLabelText('Kode Item'), {
+      target: { value: 'ITM-PU-01' },
+    });
+    fireEvent.change(within(modal).getByLabelText('Nama Item'), {
+      target: { value: 'Booth Usaha' },
+    });
+    fireEvent.change(typeSelect, {
+      target: { value: 'Paket Usaha' },
+    });
+    fireEvent.click(within(modal).getByRole('button', { name: 'Tambah' }));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    await waitFor(() => {
+      expect(apiClient.createItem).toHaveBeenCalledWith({
+        company_id: 1,
+        code: 'ITM-PU-01',
+        name: 'Booth Usaha',
+        type: 'Paket Usaha',
+      });
+    });
   });
 });

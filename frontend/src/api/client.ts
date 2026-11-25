@@ -702,7 +702,11 @@ export interface EmployeeAttendancesListResponse {
   };
 }
 
-export type ItemType = 'Bahan' | 'Peralatan';
+export type ItemType = 'Bahan' | 'Peralatan' | 'Paket Usaha' | (string & {});
+
+export interface CpoEnums {
+  item_type: EnumOption[];
+}
 
 export interface Item {
   id: number;
@@ -1859,6 +1863,14 @@ export async function finalizeEmployeePayrollRow(
       body: JSON.stringify(payload),
     },
     'Failed to finalize payroll row'
+  );
+}
+
+export async function fetchCpoEnums(): Promise<{ data: CpoEnums }> {
+  return requestJson<{ data: CpoEnums }>(
+    '/v1/modules/cpo/enums',
+    {},
+    'Failed to fetch CPO enums'
   );
 }
 

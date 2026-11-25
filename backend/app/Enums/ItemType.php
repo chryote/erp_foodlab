@@ -13,6 +13,7 @@ enum ItemType: string
 
     case Bahan = 'Bahan';
     case Peralatan = 'Peralatan';
+    case PaketUsaha = 'Paket Usaha';
 
     /**
      * Human-readable Indonesian display name.
@@ -22,6 +23,7 @@ enum ItemType: string
         return match ($this) {
             self::Bahan => 'Bahan',
             self::Peralatan => 'Peralatan',
+            self::PaketUsaha => 'Paket Usaha',
         };
     }
 }

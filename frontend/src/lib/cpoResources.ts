@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ApiRequestError,
   type Company,
+  type CpoEnums,
   type DefaultPackage,
   type DefaultPackagePayload,
   type Ingredient,
@@ -35,6 +36,7 @@ import {
   deletePacketCategory,
   deletePacketName,
   deletePacketVendor,
+  fetchCpoEnums,
   fetchDefaultPackages,
   fetchIngredients,
   fetchItemPackets,
@@ -53,7 +55,16 @@ import {
   updatePacketVendor,
 } from '@/api/client';
 
+export const DEFAULT_CPO_ENUMS: CpoEnums = {
+  item_type: [
+    { value: 'Bahan', nama: 'Bahan' },
+    { value: 'Peralatan', nama: 'Peralatan' },
+    { value: 'Paket Usaha', nama: 'Paket Usaha' },
+  ],
+};
+
 export const cpoQueryKeys = {
+  enums: ['cpo', 'enums'] as const,
   items: ['cpo', 'items'] as const,
   packets: ['cpo', 'packets'] as const,
   itemPackets: ['cpo', 'item-packets'] as const,
@@ -77,12 +88,29 @@ function getErrorMessage(err: unknown, fallback: string): string | null {
   return err instanceof Error ? err.message : fallback;
 }
 
+export function useCpoEnumsResource(enabled: boolean) {
+  const enumsQuery = useQuery<CpoEnums>({
+    queryKey: cpoQueryKeys.enums,
+    queryFn: async () => {
+      const res = await fetchCpoEnums();
+      return res?.data ?? DEFAULT_CPO_ENUMS;
+    },
+    enabled,
+  });
+
+  return {
+    enums: enumsQuery.data ?? DEFAULT_CPO_ENUMS,
+    loading: enumsQuery.isLoading,
+  };
+}
+
 export function useMasterPackingCrudResource(
   enabled: boolean,
   company: Company | null
 ) {
   const queryClient = useQueryClient();
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const enumsResource = useCpoEnumsResource(enabled);
 
   const itemsQuery = useQuery<Item[]>({
     queryKey: cpoQueryKeys.items,
@@ -401,6 +429,7 @@ export function useMasterPackingCrudResource(
     itemsQuery.error ?? packetsQuery.error ?? itemPacketsQuery.error;
 
   return {
+    enums: enumsResource.enums,
     allItems,
     allPackets,
     allItemPackets,

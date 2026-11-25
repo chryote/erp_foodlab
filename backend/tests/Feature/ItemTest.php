@@ -404,4 +404,20 @@ describe('Item CPO module', function () {
 
         expect($recreated->json('data.id'))->not->toBe($firstId);
     });
+
+    it('exposes CPO ItemType enum options and accepts Paket Usaha on item creation', function () {
+        $this->getJson('/api/v1/modules/cpo/enums')
+            ->assertOk()
+            ->assertJsonPath('data.item_type', ItemType::options());
+
+        $company = Company::factory()->create();
+
+        $this->postJson('/api/v1/modules/cpo/items', [
+            'company_id' => $company->id,
+            'code' => 'ITM-PKT-01',
+            'name' => 'Booth Gerobak Usaha',
+            'type' => ItemType::PaketUsaha->value,
+        ])->assertCreated()
+            ->assertJsonPath('data.type', ItemType::PaketUsaha->value);
+    });
 });
