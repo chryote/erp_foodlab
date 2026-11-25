@@ -13,6 +13,7 @@ enum CompanyType: string
 
     case Utama = 'Utama';
     case Packing = 'Packing';
+    case Perlengkapan = 'Perlengkapan';
     case Produksi = 'Produksi';
 
     /**
@@ -23,6 +24,7 @@ enum CompanyType: string
         return match ($this) {
             self::Utama => 'Utama',
             self::Packing => 'Packing',
+            self::Perlengkapan => 'Perlengkapan',
             self::Produksi => 'Produksi',
         };
     }
