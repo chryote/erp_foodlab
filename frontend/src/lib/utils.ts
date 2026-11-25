@@ -19,3 +19,19 @@ export function resolveDocumentUrl(url: string): string {
   }
   return trimmed;
 }
+
+export function formatCapitalInput(value: string): string {
+  const [integerPart, ...fractionParts] = value
+    .replace(/[^\d,]/g, '')
+    .split(',');
+  const normalizedInteger = integerPart.replace(/^0+(?=\d)/, '');
+  const groupedInteger = normalizedInteger.replace(
+    /\B(?=(\d{3})+(?!\d))/g,
+    '.'
+  );
+  if (fractionParts.length === 0) {
+    return groupedInteger;
+  }
+
+  return `${groupedInteger || '0'},${fractionParts.join('').slice(0, 2)}`;
+}

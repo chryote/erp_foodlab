@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, formatCapitalInput } from '@/lib/utils';
 import { Button, type ButtonVariant } from './Button';
 import { DataTable, type DataTableColumn } from './DataTable';
 import { Pagination } from './Pagination';
@@ -236,24 +236,7 @@ export interface DecimalInputProps
 }
 
 export function formatDecimalInputDisplay(raw: string): string {
-  if (!raw) {
-    return '';
-  }
-  const normalized = raw.trim().replace(/,/g, '.');
-  const [intPart = '', fracPart] = normalized.split('.');
-  const digitsOnlyInt = intPart.replace(/\D/g, '');
-  if (!digitsOnlyInt && fracPart === undefined) {
-    return '';
-  }
-  const formattedInt = (digitsOnlyInt || '0').replace(
-    /\B(?=(\d{3})+(?!\d))/g,
-    '.'
-  );
-  if (fracPart !== undefined) {
-    const cleanFrac = fracPart.replace(/\D/g, '');
-    return `${formattedInt},${cleanFrac}`;
-  }
-  return formattedInt;
+  return formatCapitalInput(raw.trim().replace('.', ','));
 }
 
 export function parseDecimalInputRaw(displayValue: string): string {
@@ -265,7 +248,7 @@ export function parseDecimalInputRaw(displayValue: string): string {
   if (trimmed.includes(',')) {
     const [intSide = '', ...fracParts] = trimmed.split(',');
     const cleanInt = intSide.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
-    const cleanFrac = fracParts.join('').replace(/\D/g, '');
+    const cleanFrac = fracParts.join('').replace(/\D/g, '').slice(0, 2);
     return `${cleanInt || '0'}.${cleanFrac}`;
   }
 
@@ -274,7 +257,7 @@ export function parseDecimalInputRaw(displayValue: string): string {
     const [left = '', right = ''] = dotParts;
     if (left.length > 3 && right.length > 0 && right.length <= 2) {
       const cleanLeft = left.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
-      const cleanRight = right.replace(/\D/g, '');
+      const cleanRight = right.replace(/\D/g, '').slice(0, 2);
       return `${cleanLeft || '0'}.${cleanRight}`;
     }
   }
