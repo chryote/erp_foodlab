@@ -8,17 +8,7 @@ import type {
   PacketName,
   PacketVendor,
 } from '@/api/client';
-import {
-  Button,
-  ConfirmDialog,
-  type CrudFieldConfig,
-  CrudModal,
-  DataTable,
-  type DataTableColumn,
-  Modal,
-  Pagination,
-  TextInput,
-} from '@/components/ui';
+import { type CrudFieldConfig, CrudModal } from '@/components/ui';
 import { useMasterPaketCrudResource } from '@/lib/cpoResources';
 import { cn } from '@/lib/utils';
 import { formatCapitalIdr } from '@/modules/CFO/CapitalCompanyCrudModal';
@@ -34,6 +24,16 @@ export const MASTER_PAKET_TABS: Array<{
   { key: 'default-package', label: 'Paket Awal' },
 ];
 
+interface CombinedPaketRow {
+  id: number;
+  packet_name: string;
+  packet_vendor: string;
+  packet_category: string;
+  packetNameRecord: PacketName | null;
+  packetVendorRecord: PacketVendor | null;
+  packetCategoryRecord: PacketCategory | null;
+}
+
 function formatCompanyPacketLabel(
   company: Company | null | undefined,
   companyId: number,
@@ -43,232 +43,6 @@ function formatCompanyPacketLabel(
   const companyName = company?.name ?? `Perusahaan #${companyId}`;
   const packetName = packet?.name ?? `Paket #${packetId}`;
   return `${companyName} — ${packetName}`;
-}
-
-type PaketEntityKey = 'packet-name' | 'packet-vendor' | 'packet-category';
-
-interface NamedEntity {
-  id: number;
-  name: string;
-}
-
-type PendingPaketAction =
-  | { entity: PaketEntityKey; type: 'create'; name: string }
-  | { entity: PaketEntityKey; type: 'update'; id: number; name: string }
-  | { entity: PaketEntityKey; type: 'delete'; id: number };
-
-interface SplitNameCrudSectionProps<T extends NamedEntity> {
-  sectionKey: PaketEntityKey;
-  sectionTitle: string;
-  inputLabel: string;
-  inputPlaceholder: string;
-  emptyMessage: string;
-  items: T[];
-  loading: boolean;
-  pageSize?: number;
-  resetSignal: number;
-  onRequestAction: (action: PendingPaketAction) => void;
-}
-
-function SplitNameCrudSection<T extends NamedEntity>({
-  sectionKey,
-  sectionTitle,
-  inputLabel,
-  inputPlaceholder,
-  emptyMessage,
-  items,
-  loading,
-  pageSize = 5,
-  resetSignal,
-  onRequestAction,
-}: SplitNameCrudSectionProps<T>) {
-  const [nameValue, setNameValue] = useState('');
-  const [editingItem, setEditingItem] = useState<T | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-
-  useEffect(() => {
-    setNameValue('');
-    setEditingItem(null);
-    setCurrentPage(1);
-  }, [resetSignal]);
-
-  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-
-  const paginatedItems = useMemo(() => {
-    const start = (safeCurrentPage - 1) * pageSize;
-    return items.slice(start, start + pageSize);
-  }, [items, safeCurrentPage, pageSize]);
-
-  const handleStartEdit = (row: T) => {
-    setEditingItem(row);
-    setNameValue(row.name ?? '');
-  };
-
-  const handleCancelEdit = () => {
-    setEditingItem(null);
-    setNameValue('');
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = nameValue.trim();
-    if (!trimmed) {
-      return;
-    }
-    if (editingItem) {
-      onRequestAction({
-        entity: sectionKey,
-        type: 'update',
-        id: editingItem.id,
-        name: trimmed,
-      });
-    } else {
-      onRequestAction({
-        entity: sectionKey,
-        type: 'create',
-        name: trimmed,
-      });
-    }
-  };
-
-  const columns: DataTableColumn<T>[] = [
-    {
-      key: 'no',
-      header: 'No',
-      render: (_row, index) => (
-        <code>{(safeCurrentPage - 1) * pageSize + index + 1}</code>
-      ),
-    },
-    {
-      key: 'name',
-      header: inputLabel,
-      render: (row) => row.name,
-    },
-    {
-      key: 'actions',
-      header: 'Aksi',
-      render: (row) => (
-        <div
-          className="flex flex-nowrap items-center gap-1.5 whitespace-nowrap"
-          data-testid={`actions-row-${row.id}`}
-        >
-          <Button
-            variant="secondary"
-            className="h-7 px-2.5 py-1 text-xs"
-            data-testid={`edit-row-${row.id}`}
-            onClick={() => handleStartEdit(row)}
-          >
-            Edit
-          </Button>
-          <Button
-            variant="ghost"
-            className="h-7 px-2.5 py-1 text-xs"
-            data-testid={`delete-row-${row.id}`}
-            onClick={() =>
-              onRequestAction({
-                entity: sectionKey,
-                type: 'delete',
-                id: row.id,
-              })
-            }
-          >
-            Hapus
-          </Button>
-        </div>
-      ),
-    },
-  ];
-
-  return (
-    <section
-      data-testid={`master-paket-section-${sectionKey}`}
-      className="flex flex-col gap-3 rounded-xl border border-border bg-card/50 p-4"
-    >
-      <div className="flex items-center justify-between border-b border-border pb-2">
-        <h3 className="text-sm font-bold tracking-tight text-foreground">
-          {sectionTitle}
-        </h3>
-        <span className="text-xs text-muted-foreground">
-          {items.length} data
-        </span>
-      </div>
-
-      <div
-        data-testid={`master-paket-${sectionKey}-split-layout`}
-        className="grid min-h-0 grid-cols-1 gap-6 lg:grid-cols-[420px_minmax(0,1fr)] xl:grid-cols-[460px_minmax(0,1fr)]"
-      >
-        <div
-          data-testid={`master-paket-${sectionKey}-form-panel`}
-          className="flex min-h-0 flex-col rounded-xl border border-border bg-muted/25 p-4"
-        >
-          <form
-            onSubmit={handleSubmit}
-            data-testid={`master-paket-${sectionKey}-form`}
-            className="flex flex-col gap-4"
-          >
-            <div className="border-b border-border pb-2.5">
-              <h4 className="text-sm font-semibold text-foreground">
-                {editingItem ? 'Edit Data' : 'Tambah Data'}
-              </h4>
-              <p className="text-xs text-muted-foreground">
-                {editingItem
-                  ? 'Perbarui data yang dipilih lalu simpan perubahan.'
-                  : 'Lengkapi formulir di bawah ini untuk menambahkan data baru.'}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3">
-              <TextInput
-                id={`master-paket-${sectionKey}-name-input`}
-                label={inputLabel}
-                labelPlacement="left"
-                placeholder={inputPlaceholder}
-                value={nameValue}
-                onChange={(e) => setNameValue(e.target.value)}
-              />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-              <Button type="submit" variant="primary" disabled={loading}>
-                {editingItem ? 'Perbarui' : 'Tambah'}
-              </Button>
-              {editingItem && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={handleCancelEdit}
-                >
-                  Batal
-                </Button>
-              )}
-            </div>
-          </form>
-        </div>
-
-        <div
-          data-testid={`master-paket-${sectionKey}-table-panel`}
-          className="flex min-h-0 min-w-0 flex-col justify-between gap-4 rounded-xl border border-border bg-card p-4"
-        >
-          <DataTable
-            columns={columns}
-            data={paginatedItems}
-            rowKey={(row) => row.id}
-            emptyMessage={emptyMessage}
-          />
-          <div className="shrink-0 border-t border-border pt-3">
-            <Pagination
-              currentPage={safeCurrentPage}
-              totalPages={totalPages}
-              totalItems={items.length}
-              testId={`master-paket-${sectionKey}-pagination`}
-              onPageChange={setCurrentPage}
-            />
-          </div>
-        </div>
-      </div>
-    </section>
-  );
 }
 
 export interface MasterPaketCrudModalProps {
@@ -281,15 +55,6 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<MasterPaketTabKey>('paket');
-  const [pendingAction, setPendingAction] =
-    useState<PendingPaketAction | null>(null);
-  const [resetSignals, setResetSignals] = useState<
-    Record<PaketEntityKey, number>
-  >({
-    'packet-name': 0,
-    'packet-vendor': 0,
-    'packet-category': 0,
-  });
 
   const {
     allPacketNames,
@@ -317,15 +82,60 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
   useEffect(() => {
     if (!isOpen) {
       setActiveTab('paket');
-      setPendingAction(null);
-      setResetSignals((prev) => ({
-        'packet-name': prev['packet-name'] + 1,
-        'packet-vendor': prev['packet-vendor'] + 1,
-        'packet-category': prev['packet-category'] + 1,
-      }));
       clearError();
     }
   }, [isOpen, clearError]);
+
+  const combinedPaketRows = useMemo<CombinedPaketRow[]>(() => {
+    const rowCount = Math.max(
+      allPacketNames.length,
+      allPacketVendors.length,
+      allPacketCategories.length
+    );
+    const rows: CombinedPaketRow[] = [];
+    for (let index = 0; index < rowCount; index += 1) {
+      const packetNameRecord = allPacketNames[index] ?? null;
+      const packetVendorRecord = allPacketVendors[index] ?? null;
+      const packetCategoryRecord = allPacketCategories[index] ?? null;
+      rows.push({
+        id: index + 1,
+        packet_name: packetNameRecord?.name ?? '',
+        packet_vendor: packetVendorRecord?.name ?? '',
+        packet_category: packetCategoryRecord?.name ?? '',
+        packetNameRecord,
+        packetVendorRecord,
+        packetCategoryRecord,
+      });
+    }
+    return rows;
+  }, [allPacketCategories, allPacketNames, allPacketVendors]);
+
+  const paketFields = useMemo<CrudFieldConfig<CombinedPaketRow>[]>(
+    () => [
+      {
+        key: 'packet_name',
+        label: 'Nama Paket',
+        optional: true,
+        placeholder: 'Contoh: Paket Hemat',
+        renderValue: (row) => row.packet_name || '-',
+      },
+      {
+        key: 'packet_vendor',
+        label: 'Vendor Paket',
+        optional: true,
+        placeholder: 'Contoh: Vendor Utama',
+        renderValue: (row) => row.packet_vendor || '-',
+      },
+      {
+        key: 'packet_category',
+        label: 'Kategori Paket',
+        optional: true,
+        placeholder: 'Contoh: Kategori Reguler',
+        renderValue: (row) => row.packet_category || '-',
+      },
+    ],
+    []
+  );
 
   const packetNameOptions = useMemo(
     () =>
@@ -535,86 +345,6 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
     };
   };
 
-  const bumpResetSignal = (entity: PaketEntityKey) => {
-    setResetSignals((prev) => ({ ...prev, [entity]: prev[entity] + 1 }));
-  };
-
-  const handleConfirmPendingAction = async () => {
-    if (!pendingAction) {
-      return;
-    }
-    const action = pendingAction;
-    setPendingAction(null);
-
-    const handlers: Record<
-      PaketEntityKey,
-      {
-        create: (payload: { name: string }) => Promise<NamedEntity | null>;
-        update: (
-          id: number,
-          payload: { name: string }
-        ) => Promise<NamedEntity | null>;
-        remove: (id: number) => Promise<boolean>;
-      }
-    > = {
-      'packet-name': {
-        create: createPacketName,
-        update: updatePacketName,
-        remove: removePacketName,
-      },
-      'packet-vendor': {
-        create: createPacketVendor,
-        update: updatePacketVendor,
-        remove: removePacketVendor,
-      },
-      'packet-category': {
-        create: createPacketCategory,
-        update: updatePacketCategory,
-        remove: removePacketCategory,
-      },
-    };
-
-    const handler = handlers[action.entity];
-    if (action.type === 'create') {
-      const created = await handler.create({ name: action.name });
-      if (created) {
-        bumpResetSignal(action.entity);
-      }
-    } else if (action.type === 'update') {
-      const updated = await handler.update(action.id, { name: action.name });
-      if (updated) {
-        bumpResetSignal(action.entity);
-      }
-    } else {
-      const removed = await handler.remove(action.id);
-      if (removed) {
-        bumpResetSignal(action.entity);
-      }
-    }
-  };
-
-  const confirmDialogConfig = useMemo(() => {
-    if (!pendingAction) {
-      return { title: '', message: '' };
-    }
-    if (pendingAction.type === 'create') {
-      return {
-        title: 'Konfirmasi Tambah Data',
-        message: 'Apakah Anda yakin ingin menambahkan data ini?',
-      };
-    }
-    if (pendingAction.type === 'update') {
-      return {
-        title: 'Konfirmasi Perbarui Data',
-        message: 'Apakah Anda yakin ingin memperbarui data ini?',
-      };
-    }
-    return {
-      title: 'Konfirmasi Hapus Data',
-      message: 'Apakah Anda yakin ingin menghapus data ini?',
-    };
-  }, [pendingAction]);
-
   const tabsBar = (
     <div
       role="tablist"
@@ -649,25 +379,29 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
     </div>
   );
 
+  const commonCrudProps = {
+    isOpen,
+    title: 'Master Paket',
+    subtitle: 'Kelola nama paket, vendor paket, kategori paket, dan paket awal',
+    testId: 'master-paket-crud-modal',
+    tabs: tabsBar,
+    layout: 'split' as const,
+    labelPlacement: 'left' as const,
+    modalSize: 'expanded' as const,
+    pageSize: 10,
+    loading,
+    error,
+    onClose,
+  };
+
   if (activeTab === 'default-package') {
     return (
       <CrudModal
-        isOpen={isOpen}
-        title="Master Paket"
-        subtitle="Kelola nama paket, vendor paket, kategori paket, dan paket awal"
-        testId="master-paket-crud-modal"
-        tabs={tabsBar}
+        {...commonCrudProps}
         resetKey="default-package"
-        layout="split"
-        labelPlacement="left"
-        modalSize="expanded"
-        pageSize={10}
         fields={defaultPackageFields}
         emptyMessage="Belum ada data paket awal."
         items={allDefaultPackages}
-        loading={loading}
-        error={error}
-        onClose={onClose}
         onCreate={async (values) => {
           const payload = parseDefaultPackagePayload(values);
           if (payload) {
@@ -688,80 +422,117 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
   }
 
   return (
-    <>
-      <Modal
-        isOpen={isOpen}
-        title="Master Paket"
-        subtitle="Kelola nama paket, vendor paket, kategori paket, dan paket awal"
-        testId="master-paket-crud-modal"
-        maxWidthClass="max-w-[95vw]"
-        dialogClassName="h-[92vh] max-h-[92vh]"
-        bodyClassName="flex-1 min-h-0 overflow-hidden"
-        onClose={onClose}
-      >
-        {tabsBar}
+    <CrudModal
+      {...commonCrudProps}
+      resetKey="paket"
+      fields={paketFields}
+      emptyMessage="Belum ada data nama, vendor, atau kategori paket."
+      items={combinedPaketRows}
+      onCreate={async (values) => {
+        const packetName = (values.packet_name ?? '').trim();
+        const packetVendor = (values.packet_vendor ?? '').trim();
+        const packetCategory = (values.packet_category ?? '').trim();
 
-        {error && (
-          <div
-            role="alert"
-            className="shrink-0 rounded-lg border border-primary/30 bg-primary/5 px-3.5 py-2.5 text-sm text-primary"
-          >
-            {error}
-          </div>
-        )}
+        if (packetName) {
+          const created = await createPacketName({ name: packetName });
+          if (!created) {
+            return;
+          }
+        }
+        if (packetVendor) {
+          const created = await createPacketVendor({ name: packetVendor });
+          if (!created) {
+            return;
+          }
+        }
+        if (packetCategory) {
+          await createPacketCategory({ name: packetCategory });
+        }
+      }}
+      onUpdate={async (id, values) => {
+        const matched = combinedPaketRows.find((row) => row.id === id);
+        if (!matched) {
+          return;
+        }
 
-        {activeTab === 'paket' && (
-          <div
-            data-testid="master-paket-tab-panel-paket"
-            className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto pr-1"
-          >
-            <SplitNameCrudSection<PacketName>
-              sectionKey="packet-name"
-              sectionTitle="Nama Paket"
-              inputLabel="Nama Paket"
-              inputPlaceholder="Contoh: Paket Hemat"
-              emptyMessage="Belum ada data nama paket."
-              items={allPacketNames}
-              loading={loading}
-              resetSignal={resetSignals['packet-name']}
-              onRequestAction={setPendingAction}
-            />
+        const packetName = (values.packet_name ?? '').trim();
+        const packetVendor = (values.packet_vendor ?? '').trim();
+        const packetCategory = (values.packet_category ?? '').trim();
 
-            <SplitNameCrudSection<PacketVendor>
-              sectionKey="packet-vendor"
-              sectionTitle="Vendor Paket"
-              inputLabel="Nama Vendor Paket"
-              inputPlaceholder="Contoh: Vendor Utama"
-              emptyMessage="Belum ada data vendor paket."
-              items={allPacketVendors}
-              loading={loading}
-              resetSignal={resetSignals['packet-vendor']}
-              onRequestAction={setPendingAction}
-            />
+        if (packetName) {
+          if (matched.packetNameRecord) {
+            if (packetName !== matched.packetNameRecord.name) {
+              const updated = await updatePacketName(
+                matched.packetNameRecord.id,
+                { name: packetName }
+              );
+              if (!updated) {
+                return;
+              }
+            }
+          } else {
+            const created = await createPacketName({ name: packetName });
+            if (!created) {
+              return;
+            }
+          }
+        }
 
-            <SplitNameCrudSection<PacketCategory>
-              sectionKey="packet-category"
-              sectionTitle="Kategori Paket"
-              inputLabel="Nama Kategori Paket"
-              inputPlaceholder="Contoh: Kategori Reguler"
-              emptyMessage="Belum ada data kategori paket."
-              items={allPacketCategories}
-              loading={loading}
-              resetSignal={resetSignals['packet-category']}
-              onRequestAction={setPendingAction}
-            />
-          </div>
-        )}
-      </Modal>
+        if (packetVendor) {
+          if (matched.packetVendorRecord) {
+            if (packetVendor !== matched.packetVendorRecord.name) {
+              const updated = await updatePacketVendor(
+                matched.packetVendorRecord.id,
+                { name: packetVendor }
+              );
+              if (!updated) {
+                return;
+              }
+            }
+          } else {
+            const created = await createPacketVendor({ name: packetVendor });
+            if (!created) {
+              return;
+            }
+          }
+        }
 
-      <ConfirmDialog
-        isOpen={isOpen && pendingAction !== null}
-        title={confirmDialogConfig.title}
-        message={confirmDialogConfig.message}
-        loading={loading}
-        onConfirm={handleConfirmPendingAction}
-        onCancel={() => setPendingAction(null)}
-      />
-    </>
+        if (packetCategory) {
+          if (matched.packetCategoryRecord) {
+            if (packetCategory !== matched.packetCategoryRecord.name) {
+              await updatePacketCategory(matched.packetCategoryRecord.id, {
+                name: packetCategory,
+              });
+            }
+          } else {
+            await createPacketCategory({ name: packetCategory });
+          }
+        }
+      }}
+      onDelete={async (id) => {
+        const matched = combinedPaketRows.find((row) => row.id === id);
+        if (!matched) {
+          return;
+        }
+
+        if (matched.packetNameRecord) {
+          const removed = await removePacketName(matched.packetNameRecord.id);
+          if (!removed) {
+            return;
+          }
+        }
+        if (matched.packetVendorRecord) {
+          const removed = await removePacketVendor(
+            matched.packetVendorRecord.id
+          );
+          if (!removed) {
+            return;
+          }
+        }
+        if (matched.packetCategoryRecord) {
+          await removePacketCategory(matched.packetCategoryRecord.id);
+        }
+      }}
+    />
   );
 };

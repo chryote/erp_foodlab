@@ -1,4 +1,5 @@
 import type {
+  Company,
   DefaultPackage,
   Ingredient,
   Item,
@@ -37,6 +38,41 @@ export function resolveDefaultPackageCompanyId(
     Number.isFinite(Number(companyId))
     ? Number(companyId)
     : null;
+}
+
+export function resolveDefaultPackageCompanyName(
+  defaultPackage: DefaultPackage | undefined,
+  allItemPackets: ItemPacket[],
+  companies: Company[] = [],
+  allItems: Item[] = []
+): string | null {
+  if (!defaultPackage) {
+    return null;
+  }
+  const matchedItemPacket =
+    allItemPackets.find(
+      (ip) => Number(ip.id) === Number(defaultPackage.item_packet_id)
+    ) ?? defaultPackage.item_packet;
+  if (matchedItemPacket?.company?.name) {
+    return matchedItemPacket.company.name;
+  }
+  const companyId = resolveDefaultPackageCompanyId(
+    defaultPackage,
+    allItemPackets
+  );
+  if (companyId === null) {
+    return null;
+  }
+  return (
+    companies.find((c) => Number(c.id) === companyId)?.name ??
+    allItemPackets.find(
+      (ip) => Number(ip.company_id) === companyId && ip.company?.name
+    )?.company?.name ??
+    allItems.find(
+      (item) => Number(item.company_id) === companyId && item.company?.name
+    )?.company?.name ??
+    null
+  );
 }
 
 export function formatItemLabel(item: Item): string {

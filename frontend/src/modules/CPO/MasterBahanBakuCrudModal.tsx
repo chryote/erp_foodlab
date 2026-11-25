@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type {
+  Company,
   DefaultPackage,
   Ingredient,
   IngredientPayload,
@@ -24,6 +25,7 @@ import {
   formatItemLabel,
   groupIngredientsByPackage,
   resolveDefaultPackageCompanyId,
+  resolveDefaultPackageCompanyName,
 } from './ingredientGrouping';
 
 interface IngredientRowDraft {
@@ -52,12 +54,13 @@ type PendingIngredientAction =
 
 export interface MasterBahanBakuCrudModalProps {
   isOpen: boolean;
+  companies?: Company[];
   onClose: () => void;
 }
 
 export const MasterBahanBakuCrudModal: React.FC<
   MasterBahanBakuCrudModalProps
-> = ({ isOpen, onClose }) => {
+> = ({ isOpen, companies, onClose }) => {
   const {
     allIngredients,
     allDefaultPackages,
@@ -137,6 +140,17 @@ export const MasterBahanBakuCrudModal: React.FC<
   const targetCompanyId = useMemo(
     () => resolveDefaultPackageCompanyId(selectedDefaultPackage, allItemPackets),
     [selectedDefaultPackage, allItemPackets]
+  );
+
+  const targetCompanyName = useMemo(
+    () =>
+      resolveDefaultPackageCompanyName(
+        selectedDefaultPackage,
+        allItemPackets,
+        companies,
+        allItems
+      ),
+    [allItemPackets, allItems, companies, selectedDefaultPackage]
   );
 
   const bahanItems = useMemo<Item[]>(() => {
@@ -671,8 +685,9 @@ export const MasterBahanBakuCrudModal: React.FC<
 
                 {defaultPackageId && bahanItems.length === 0 && (
                   <p className="rounded-lg border border-dashed border-border bg-card px-3 py-2 text-xs text-muted-foreground">
-                    Belum ada item bertipe Bahan untuk perusahaan pada paket
-                    ini.
+                    {targetCompanyName
+                      ? `Silakan tambahkan item bertipe "Bahan" untuk ${targetCompanyName}.`
+                      : 'Silakan tambahkan item bertipe "Bahan" untuk perusahaan pada paket ini.'}
                   </p>
                 )}
 

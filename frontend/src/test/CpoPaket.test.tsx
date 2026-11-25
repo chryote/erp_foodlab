@@ -53,6 +53,7 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
     const companiesStore: apiClient.Company[] = [
       { id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1 },
       { id: 2, name: 'PT. Pangan Nusantara', series: 1 },
+      { id: 3, name: 'PT. Kuliner Mandiri', series: 1 },
     ];
 
     vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
@@ -336,195 +337,125 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
     expect(tabDefaultPackage).toHaveTextContent('Paket Awal');
     expect(tabPaket).toHaveAttribute('aria-selected', 'true');
 
-    const paketPanel = screen.getByTestId('master-paket-tab-panel-paket');
-
-    const assertSplitSection = (
-      sectionKey: 'packet-name' | 'packet-vendor' | 'packet-category'
-    ) => {
-      const section = within(paketPanel).getByTestId(
-        `master-paket-section-${sectionKey}`
-      );
-      const splitLayout = within(section).getByTestId(
-        `master-paket-${sectionKey}-split-layout`
-      );
-      const formPanel = within(section).getByTestId(
-        `master-paket-${sectionKey}-form-panel`
-      );
-      const tablePanel = within(section).getByTestId(
-        `master-paket-${sectionKey}-table-panel`
-      );
-      const formEl = within(section).getByTestId(
-        `master-paket-${sectionKey}-form`
-      );
-      expect(splitLayout).toContainElement(formPanel);
-      expect(splitLayout).toContainElement(tablePanel);
-      expect(formPanel).toContainElement(formEl);
-      expect(formEl).toHaveClass('flex-col');
-      expect(
-        within(section).getByTestId(
-          `master-paket-${sectionKey}-name-input-field`
-        )
-      ).toHaveClass('sm:grid-cols-[140px_minmax(0,1fr)]');
-      expect(tablePanel).toContainElement(
-        within(section).getByTestId(`master-paket-${sectionKey}-pagination`)
-      );
-      return section;
-    };
-
-    const packetNameSection = assertSplitSection('packet-name');
-    const packetVendorSection = assertSplitSection('packet-vendor');
-    const packetCategorySection = assertSplitSection('packet-category');
-
-    // All three seeded records visible on the same "Paket" tab
+    const splitLayout = screen.getByTestId('master-paket-crud-modal-split-layout');
+    const formPanel = screen.getByTestId('master-paket-crud-modal-form-panel');
+    const tablePanel = screen.getByTestId('master-paket-crud-modal-table-panel');
+    const formEl = screen.getByTestId('master-paket-crud-modal-form');
+    expect(splitLayout).toContainElement(formPanel);
+    expect(splitLayout).toContainElement(tablePanel);
+    expect(formPanel).toContainElement(formEl);
+    expect(formEl).toHaveClass('flex-col');
     expect(
-      await within(packetNameSection).findByText('Paket Starter')
-    ).toBeInTheDocument();
-    expect(
-      await within(packetVendorSection).findByText('Vendor Nusantara')
-    ).toBeInTheDocument();
-    expect(
-      await within(packetCategorySection).findByText('Kategori Reguler')
-    ).toBeInTheDocument();
-
-    // CRUD 1: PacketName
-    fireEvent.change(within(packetNameSection).getByLabelText('Nama Paket'), {
-      target: { value: 'Paket Hemat' },
-    });
-    fireEvent.click(
-      within(packetNameSection).getByRole('button', { name: 'Tambah' })
+      screen.getByTestId('master-paket-crud-modal-packet_name-input-field')
+    ).toHaveClass('sm:grid-cols-[140px_minmax(0,1fr)]');
+    expect(tablePanel).toContainElement(
+      screen.getByTestId('master-paket-crud-modal-pagination')
     );
+
+    // All three seeded records visible in the same row on the "Paket" tab
+    expect(
+      await within(tablePanel).findByText('Paket Starter')
+    ).toBeInTheDocument();
+    expect(
+      await within(tablePanel).findByText('Vendor Nusantara')
+    ).toBeInTheDocument();
+    expect(
+      await within(tablePanel).findByText('Kategori Reguler')
+    ).toBeInTheDocument();
+
+    const packetNameInput = within(formPanel).getByLabelText(
+      'Nama Paket'
+    ) as HTMLInputElement;
+    const packetVendorInput = within(formPanel).getByLabelText(
+      'Vendor Paket'
+    ) as HTMLInputElement;
+    const packetCategoryInput = within(formPanel).getByLabelText(
+      'Kategori Paket'
+    ) as HTMLInputElement;
+
+    // Simultaneous Create: PacketName + PacketVendor + PacketCategory in one submit
+    fireEvent.change(packetNameInput, { target: { value: 'Paket Hemat' } });
+    fireEvent.change(packetVendorInput, {
+      target: { value: 'Vendor Sentosa' },
+    });
+    fireEvent.change(packetCategoryInput, {
+      target: { value: 'Kategori Premium' },
+    });
+    fireEvent.click(within(formPanel).getByRole('button', { name: 'Tambah' }));
     fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
 
     await waitFor(() => {
       expect(apiClient.createPacketName).toHaveBeenCalledWith({
         name: 'Paket Hemat',
       });
+      expect(apiClient.createPacketVendor).toHaveBeenCalledWith({
+        name: 'Vendor Sentosa',
+      });
+      expect(apiClient.createPacketCategory).toHaveBeenCalledWith({
+        name: 'Kategori Premium',
+      });
+      expect(within(tablePanel).getByText('Paket Hemat')).toBeInTheDocument();
       expect(
-        within(packetNameSection).getByText('Paket Hemat')
+        within(tablePanel).getByText('Vendor Sentosa')
+      ).toBeInTheDocument();
+      expect(
+        within(tablePanel).getByText('Kategori Premium')
       ).toBeInTheDocument();
     });
 
-    fireEvent.click(within(packetNameSection).getByTestId('edit-row-2'));
-    fireEvent.change(within(packetNameSection).getByLabelText('Nama Paket'), {
+    // Simultaneous Edit on row 1 (newly created items at index 0)
+    fireEvent.click(within(tablePanel).getByTestId('edit-row-1'));
+    expect(packetNameInput.value).toBe('Paket Hemat');
+    expect(packetVendorInput.value).toBe('Vendor Sentosa');
+    expect(packetCategoryInput.value).toBe('Kategori Premium');
+
+    fireEvent.change(packetNameInput, {
       target: { value: 'Paket Hemat Ekstra' },
     });
-    fireEvent.click(
-      within(packetNameSection).getByRole('button', { name: 'Perbarui' })
-    );
+    fireEvent.change(packetVendorInput, {
+      target: { value: 'Vendor Sentosa Jaya' },
+    });
+    fireEvent.change(packetCategoryInput, {
+      target: { value: 'Kategori VIP' },
+    });
+    fireEvent.click(within(formPanel).getByRole('button', { name: 'Perbarui' }));
     fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
 
     await waitFor(() => {
       expect(apiClient.updatePacketName).toHaveBeenCalledWith(2, {
         name: 'Paket Hemat Ekstra',
       });
-      expect(
-        within(packetNameSection).getByText('Paket Hemat Ekstra')
-      ).toBeInTheDocument();
-    });
-
-    fireEvent.click(within(packetNameSection).getByTestId('delete-row-2'));
-    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
-
-    await waitFor(() => {
-      expect(apiClient.deletePacketName).toHaveBeenCalledWith(2);
-      expect(
-        within(packetNameSection).queryByText('Paket Hemat Ekstra')
-      ).not.toBeInTheDocument();
-    });
-
-    // CRUD 2: PacketVendor
-    fireEvent.change(
-      within(packetVendorSection).getByLabelText('Nama Vendor Paket'),
-      { target: { value: 'Vendor Sentosa' } }
-    );
-    fireEvent.click(
-      within(packetVendorSection).getByRole('button', { name: 'Tambah' })
-    );
-    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
-
-    await waitFor(() => {
-      expect(apiClient.createPacketVendor).toHaveBeenCalledWith({
-        name: 'Vendor Sentosa',
-      });
-      expect(
-        within(packetVendorSection).getByText('Vendor Sentosa')
-      ).toBeInTheDocument();
-    });
-
-    fireEvent.click(within(packetVendorSection).getByTestId('edit-row-2'));
-    fireEvent.change(
-      within(packetVendorSection).getByLabelText('Nama Vendor Paket'),
-      { target: { value: 'Vendor Sentosa Jaya' } }
-    );
-    fireEvent.click(
-      within(packetVendorSection).getByRole('button', { name: 'Perbarui' })
-    );
-    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
-
-    await waitFor(() => {
       expect(apiClient.updatePacketVendor).toHaveBeenCalledWith(2, {
         name: 'Vendor Sentosa Jaya',
       });
-      expect(
-        within(packetVendorSection).getByText('Vendor Sentosa Jaya')
-      ).toBeInTheDocument();
-    });
-
-    fireEvent.click(within(packetVendorSection).getByTestId('delete-row-2'));
-    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
-
-    await waitFor(() => {
-      expect(apiClient.deletePacketVendor).toHaveBeenCalledWith(2);
-      expect(
-        within(packetVendorSection).queryByText('Vendor Sentosa Jaya')
-      ).not.toBeInTheDocument();
-    });
-
-    // CRUD 3: PacketCategory
-    fireEvent.change(
-      within(packetCategorySection).getByLabelText('Nama Kategori Paket'),
-      { target: { value: 'Kategori Premium' } }
-    );
-    fireEvent.click(
-      within(packetCategorySection).getByRole('button', { name: 'Tambah' })
-    );
-    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
-
-    await waitFor(() => {
-      expect(apiClient.createPacketCategory).toHaveBeenCalledWith({
-        name: 'Kategori Premium',
-      });
-      expect(
-        within(packetCategorySection).getByText('Kategori Premium')
-      ).toBeInTheDocument();
-    });
-
-    fireEvent.click(within(packetCategorySection).getByTestId('edit-row-2'));
-    fireEvent.change(
-      within(packetCategorySection).getByLabelText('Nama Kategori Paket'),
-      { target: { value: 'Kategori VIP' } }
-    );
-    fireEvent.click(
-      within(packetCategorySection).getByRole('button', { name: 'Perbarui' })
-    );
-    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
-
-    await waitFor(() => {
       expect(apiClient.updatePacketCategory).toHaveBeenCalledWith(2, {
         name: 'Kategori VIP',
       });
       expect(
-        within(packetCategorySection).getByText('Kategori VIP')
+        within(tablePanel).getByText('Paket Hemat Ekstra')
       ).toBeInTheDocument();
+      expect(
+        within(tablePanel).getByText('Vendor Sentosa Jaya')
+      ).toBeInTheDocument();
+      expect(within(tablePanel).getByText('Kategori VIP')).toBeInTheDocument();
     });
 
-    fireEvent.click(within(packetCategorySection).getByTestId('delete-row-2'));
+    // Simultaneous Delete on row 1
+    fireEvent.click(within(tablePanel).getByTestId('delete-row-1'));
     fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
 
     await waitFor(() => {
+      expect(apiClient.deletePacketName).toHaveBeenCalledWith(2);
+      expect(apiClient.deletePacketVendor).toHaveBeenCalledWith(2);
       expect(apiClient.deletePacketCategory).toHaveBeenCalledWith(2);
       expect(
-        within(packetCategorySection).queryByText('Kategori VIP')
+        within(tablePanel).queryByText('Paket Hemat Ekstra')
+      ).not.toBeInTheDocument();
+      expect(
+        within(tablePanel).queryByText('Vendor Sentosa Jaya')
+      ).not.toBeInTheDocument();
+      expect(
+        within(tablePanel).queryByText('Kategori VIP')
       ).not.toBeInTheDocument();
     });
 
@@ -681,6 +612,7 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
     const companiesStore: apiClient.Company[] = [
       { id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1 },
       { id: 2, name: 'PT. Pangan Nusantara', series: 1 },
+      { id: 3, name: 'PT. Kuliner Mandiri', series: 1 },
     ];
 
     vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
@@ -758,6 +690,16 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
         packet: { id: 21, name: 'Paket Cabang 2' },
         item: itemsStore[4],
       },
+      {
+        id: 12,
+        company_id: 3,
+        packet_id: 22,
+        item_id: 201,
+        quantity: 1,
+        company: companiesStore[2],
+        packet: { id: 22, name: 'Paket Kosong' },
+        item: null,
+      },
     ];
 
     const defaultPackagesStore: apiClient.DefaultPackage[] = [
@@ -782,6 +724,17 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
         price: 150000,
         packet_name: { id: 1, name: 'Paket Cabang' },
         item_packet: itemPacketsStore[1],
+      },
+      {
+        id: 52,
+        brand_name: 'Brand Tiga',
+        packet_name_id: 1,
+        packet_vendor_id: 1,
+        packet_category_id: 1,
+        item_packet_id: 12,
+        price: 175000,
+        packet_name: { id: 1, name: 'Paket Kosong' },
+        item_packet: itemPacketsStore[2],
       },
     ];
 
@@ -897,6 +850,16 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
       )
     ).toBeInTheDocument();
     expect(within(modal).getByText('Rp 40.000')).toBeInTheDocument();
+
+    // Selecting a brand whose company has no Bahan items shows the Indonesian instruction with company name
+    fireEvent.change(within(modal).getByLabelText('Nama Brand'), {
+      target: { value: '52' },
+    });
+    expect(
+      within(modal).getByText(
+        'Silakan tambahkan item bertipe "Bahan" untuk PT. Kuliner Mandiri.'
+      )
+    ).toBeInTheDocument();
 
     // Select Nama Brand (company 1) -> filters Bahan Baku to company 1 + type Bahan only
     const brandSelect = within(modal).getByLabelText(
@@ -1043,6 +1006,7 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
     const companiesStore: apiClient.Company[] = [
       { id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1 },
       { id: 2, name: 'PT. Pangan Nusantara', series: 1 },
+      { id: 3, name: 'PT. Kuliner Mandiri', series: 1 },
     ];
 
     vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
