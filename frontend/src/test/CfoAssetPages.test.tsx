@@ -186,7 +186,13 @@ describe('CFO asset pages', () => {
     expect(screen.getByTestId('master-aset-search')).toBeInTheDocument();
     expect(search).toHaveValue('Asset 2');
 
-    releaseSearch?.();
+    const finishSearch = await waitFor(() => {
+      if (!releaseSearch) {
+        throw new Error('The search request did not start.');
+      }
+      return releaseSearch;
+    });
+    finishSearch();
     expect(await screen.findByText('Asset 2')).toBeInTheDocument();
   });
 

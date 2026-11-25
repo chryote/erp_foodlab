@@ -1,47 +1,77 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import type {
   ExpenseCategory,
   ExpenseItem,
   ExpenseType,
 } from '@/api/client';
+import type { DateRange } from 'react-day-picker';
 import {
   CardHeader,
   SummaryBanner,
 } from '@/components/ui';
+import { Calendar } from '@/components/ui/shadcn/calendar';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/shadcn/dialog';
 import {
   useCompanyCrudResource,
   useMasterOperasionalCrudResource,
 } from '@/lib/cfoResources';
 import { getActiveCompanyId } from '@/lib/activeCompanyStorage';
 import { formatCapitalIdr } from '@/modules/CFO/CapitalCompanyCrudModal';
-import {
-  formatCurrentMonthDateRange,
-  formatOperasionalNumber,
-} from '@/modules/CFO/ViewOperasionalModal';
+import { formatOperasionalNumber } from '@/modules/CFO/ViewOperasionalModal';
 
 type SelectedDetail =
   | { kind: 'category'; category: ExpenseCategory }
   | { kind: 'type'; type: ExpenseType; categoryName: string };
 
-function isInMonth(
-  dateValue: string | null | undefined,
-  referenceDate: Date
-): boolean {
-  if (!dateValue) return true;
-  const ymdMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateValue.trim());
-  if (ymdMatch && !dateValue.includes('T')) {
-    return (
-      Number(ymdMatch[1]) === referenceDate.getFullYear() &&
-      Number(ymdMatch[2]) - 1 === referenceDate.getMonth()
+function formatDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getDateKey(dateValue: string): string | null {
+  const trimmedValue = dateValue.trim();
+  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmedValue);
+  if (dateOnlyMatch) {
+    const date = new Date(
+      Number(dateOnlyMatch[1]),
+      Number(dateOnlyMatch[2]) - 1,
+      Number(dateOnlyMatch[3])
     );
+    return formatDateKey(date) === trimmedValue ? trimmedValue : null;
   }
-  const parsed = new Date(dateValue);
-  if (Number.isNaN(parsed.getTime())) return true;
-  return (
-    parsed.getFullYear() === referenceDate.getFullYear() &&
-    parsed.getMonth() === referenceDate.getMonth()
-  );
+
+  const parsed = new Date(trimmedValue);
+  return Number.isNaN(parsed.getTime()) ? null : formatDateKey(parsed);
+}
+
+function getMonthDateRange(referenceDate: Date): DateRange {
+  const year = referenceDate.getFullYear();
+  const month = referenceDate.getMonth();
+  return {
+    from: new Date(year, month, 1),
+    to: new Date(year, month + 1, 0),
+  };
+}
+
+function formatDateRangeLabel(range: DateRange): string {
+  const formatter = new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
+  if (!range.from) return 'Pilih rentang tanggal';
+  return `${formatter.format(range.from)} - ${formatter.format(range.to ?? range.from)}`;
 }
 
 function resolveItemCategoryId(
@@ -69,15 +99,24 @@ export default function CfoViewOperasionalPage() {
     null;
   const resource = useMasterOperasionalCrudResource(Boolean(company), company);
 
-  const [selectedDetail, setSelectedDetail] = useState<SelectedDetail | null>(
+  const [, setSelectedDetail] = useState<SelectedDetail | null>(
     null
   );
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
+  const [, setSearch] = useState('');
+  const [, setPage] = useState(1);
   const effectiveDate = useMemo(() => new Date(), []);
+  const [appliedDateRange, setAppliedDateRange] = useState<DateRange>(() =>
+    getMonthDateRange(effectiveDate)
+  );
+  const [draftDateRange, setDraftDateRange] =
+    useState<DateRange>(appliedDateRange);
+  const [isSelectingEndDate, setIsSelectingEndDate] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(effectiveDate);
+  const [isDateRangeDialogOpen, setIsDateRangeDialogOpen] = useState(false);
+  const [dateRangeError, setDateRangeError] = useState('');
   const dateRangeLabel = useMemo(
-    () => formatCurrentMonthDateRange(effectiveDate),
-    [effectiveDate]
+    () => formatDateRangeLabel(appliedDateRange),
+    [appliedDateRange]
   );
 
   useEffect(() => {
@@ -86,12 +125,21 @@ export default function CfoViewOperasionalPage() {
     setPage(1);
   }, [company?.id]);
 
-  const currentMonthItems = useMemo(
+  const filteredItems = useMemo(
     () =>
-      resource.items.filter((item) =>
-        isInMonth(item.purchased_on || item.created_at, effectiveDate)
-      ),
-    [effectiveDate, resource.items]
+      resource.items.filter((item) => {
+        const dateValue = item.purchased_on || item.created_at;
+        if (!dateValue) return true;
+        const dateKey = getDateKey(dateValue);
+        if (!dateKey || !appliedDateRange.from || !appliedDateRange.to) {
+          return true;
+        }
+        return (
+          dateKey >= formatDateKey(appliedDateRange.from) &&
+          dateKey <= formatDateKey(appliedDateRange.to)
+        );
+      }),
+    [resource.items, appliedDateRange]
   );
 
   const {
@@ -115,7 +163,7 @@ export default function CfoViewOperasionalPage() {
       }
     }
 
-    for (const item of currentMonthItems) {
+    for (const item of filteredItems) {
       const amount = Number(item.amount) || 0;
       const typeId = Number(item.expense_type_id);
       const categoryId = resolveItemCategoryId(item, typesMap);
@@ -137,19 +185,32 @@ export default function CfoViewOperasionalPage() {
       typesByCategoryId: groupedTypes,
       typeLookup: typesMap,
     };
-  }, [currentMonthItems, resource.types]);
+  }, [filteredItems, resource.types]);
 
 
-  const monthTotal = useMemo(
+  const periodTotal = useMemo(
     () =>
-      currentMonthItems.reduce(
+      filteredItems.reduce(
         (sum, item) => sum + (Number(item.amount) || 0),
         0
       ),
-    [currentMonthItems]
+    [filteredItems]
   );
 
   const error = companyResource.error ?? resource.error;
+
+  const handleDateRangeSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!draftDateRange.from || !draftDateRange.to) {
+      setDateRangeError('Pilih tanggal mulai dan tanggal akhir.');
+      return;
+    }
+
+    setAppliedDateRange(draftDateRange);
+    setIsSelectingEndDate(false);
+    setDateRangeError('');
+    setIsDateRangeDialogOpen(false);
+  };
 
   return (
     <div className="flex flex-col gap-5">
@@ -159,15 +220,93 @@ export default function CfoViewOperasionalPage() {
         subtitle="Ringkasan pengeluaran berdasarkan kategori dan tipe."
       />
       <div className="grid gap-3 pb-5 sm:grid-cols-2">
-        <div
-          className="rounded-xl border border-border bg-background px-4 py-3 text-center text-sm font-semibold"
-          data-testid="view-operasional-date-range"
+        <Dialog
+          open={isDateRangeDialogOpen}
+          onOpenChange={(open) => {
+            setIsDateRangeDialogOpen(open);
+            if (open) {
+              setDraftDateRange(appliedDateRange);
+              setIsSelectingEndDate(false);
+              setDateRangeError('');
+            }
+          }}
         >
-          {dateRangeLabel}
-        </div>
+          <DialogTrigger asChild>
+            <button
+              type="button"
+              data-testid="view-operasional-date-range"
+              aria-label="Pilih rentang tanggal operasional"
+              className="rounded-xl border border-border bg-background px-4 py-3 text-center text-sm font-semibold transition-colors hover:bg-muted"
+            >
+              {dateRangeLabel}
+            </button>
+          </DialogTrigger>
+          <DialogContent
+            data-testid="view-operasional-date-range-dialog"
+            className="w-[calc(100%-2rem)] max-w-sm"
+          >
+            <DialogHeader className="flex-col">
+              <DialogTitle>Pilih Rentang Tanggal</DialogTitle>
+              <DialogDescription>
+                Pilih tanggal mulai dan akhir. Filter diterapkan setelah Anda
+                menekan Terapkan.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleDateRangeSubmit}>
+              <Calendar
+                mode="range"
+                month={calendarMonth}
+                onMonthChange={setCalendarMonth}
+                selected={draftDateRange}
+                disabled={
+                  isSelectingEndDate && draftDateRange.from
+                    ? { before: draftDateRange.from }
+                    : undefined
+                }
+                onSelect={(_, selectedDay) => {
+                  if (!isSelectingEndDate) {
+                    setDraftDateRange({ from: selectedDay });
+                    setIsSelectingEndDate(true);
+                  } else if (
+                    draftDateRange.from &&
+                    selectedDay >= draftDateRange.from
+                  ) {
+                    setDraftDateRange({
+                      from: draftDateRange.from,
+                      to: selectedDay,
+                    });
+                    setIsSelectingEndDate(false);
+                  }
+                  setDateRangeError('');
+                }}
+                showOutsideDays={false}
+              />
+              {dateRangeError && (
+                <p className="mt-2 text-sm text-destructive" role="alert">
+                  {dateRangeError}
+                </p>
+              )}
+              <DialogFooter className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsDateRangeDialogOpen(false)}
+                  className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                >
+                  Terapkan
+                </button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
         <SummaryBanner
-          label="Total Bulan Ini"
-          value={`${formatCapitalIdr(monthTotal)} (${formatOperasionalNumber(monthTotal)})`}
+          label="Total Periode Dipilih"
+          value={`${formatCapitalIdr(periodTotal)} (${formatOperasionalNumber(periodTotal)})`}
           testId="view-operasional-month-total"
         />
       </div>
