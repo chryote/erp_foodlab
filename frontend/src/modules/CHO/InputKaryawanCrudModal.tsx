@@ -315,6 +315,9 @@ export interface InputKaryawanCrudModalProps {
   isOpen: boolean;
   company: Company | null;
   companies?: Company[];
+  formOnly?: boolean;
+  inlineForm?: boolean;
+  initialEmployee?: Employee | null;
   onClose: () => void;
 }
 
@@ -322,6 +325,9 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
   isOpen,
   company,
   companies,
+  formOnly = false,
+  inlineForm = false,
+  initialEmployee = null,
   onClose,
 }) => {
   const {
@@ -340,7 +346,7 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
     updateEmployee,
     removeEmployee,
     uploadDocument,
-  } = useEmployeeCrudResource(isOpen, company);
+  } = useEmployeeCrudResource(isOpen, company, !formOnly);
 
   const availableCompanies = useMemo<Company[]>(() => {
     if (companies && companies.length > 0) {
@@ -731,6 +737,14 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (isOpen && initialEmployee) {
+      handleStartEdit(initialEmployee);
+    }
+    // The edit handler only depends on the selected employee and modal state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialEmployee?.id, isOpen]);
+
   const handleCancelEdit = () => {
     clearError();
     setFieldErrors({});
@@ -876,18 +890,8 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
     };
   }, [pendingAction]);
 
-  return (
+  const modalContent = (
     <>
-      <Modal
-        isOpen={isOpen}
-        title="Input Karyawan"
-        subtitle="Kelola data karyawan, enum agama & golongan darah, serta unggah dokumen"
-        testId="input-karyawan-crud-modal"
-        maxWidthClass="max-w-[95vw]"
-        dialogClassName="h-[92vh] max-h-[92vh]"
-        bodyClassName="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden"
-        onClose={onClose}
-      >
         {error && (
           <div
             role="alert"
@@ -899,11 +903,15 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
 
         <div
           data-testid="input-karyawan-crud-modal-split-layout"
-          className="grid min-h-0 flex-1 grid-cols-1 gap-6 lg:grid-cols-[440px_minmax(0,1fr)] xl:grid-cols-[480px_minmax(0,1fr)]"
+          className={`grid min-h-0 flex-1 grid-cols-1 gap-6 ${formOnly ? '' : 'lg:grid-cols-[440px_minmax(0,1fr)] xl:grid-cols-[480px_minmax(0,1fr)]'}`}
         >
           <div
             data-testid="input-karyawan-crud-modal-form-panel"
-            className="flex min-h-0 flex-col rounded-xl border border-border bg-muted/25 p-4 lg:overflow-y-auto"
+            className={
+              inlineForm
+                ? 'flex min-h-0 flex-col lg:overflow-y-auto'
+                : 'flex min-h-0 flex-col rounded-xl border border-border bg-muted/25 p-4 lg:overflow-y-auto'
+            }
           >
             <form
               noValidate
@@ -1441,37 +1449,63 @@ export const InputKaryawanCrudModal: React.FC<InputKaryawanCrudModalProps> = ({
             </form>
           </div>
 
-          <div
-            data-testid="input-karyawan-crud-modal-table-panel"
-            className="flex min-h-0 min-w-0 flex-col justify-between gap-4 rounded-xl border border-border bg-card p-4"
-          >
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Daftar Karyawan
-                </h3>
-                <Badge variant="neutral">{allEmployees.length} karyawan</Badge>
+          {!formOnly && (
+            <div
+              data-testid="input-karyawan-crud-modal-table-panel"
+              className="flex min-h-0 min-w-0 flex-col justify-between gap-4 rounded-xl border border-border bg-card p-4"
+            >
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Daftar Karyawan
+                  </h3>
+                  <Badge variant="neutral">
+                    {allEmployees.length} karyawan
+                  </Badge>
+                </div>
+                <DataTable
+                  columns={columns}
+                  data={paginatedEmployees}
+                  rowKey={(row) => row.id}
+                  emptyMessage="Belum ada data karyawan."
+                />
               </div>
-              <DataTable
-                columns={columns}
-                data={paginatedEmployees}
-                rowKey={(row) => row.id}
-                emptyMessage="Belum ada data karyawan."
-              />
-            </div>
 
-            <div className="shrink-0 border-t border-border pt-3">
-              <Pagination
-                currentPage={safeCurrentPage}
-                totalPages={totalPages}
-                totalItems={allEmployees.length}
-                testId="input-karyawan-pagination"
-                onPageChange={setCurrentPage}
-              />
+              <div className="shrink-0 border-t border-border pt-3">
+                <Pagination
+                  currentPage={safeCurrentPage}
+                  totalPages={totalPages}
+                  totalItems={allEmployees.length}
+                  testId="input-karyawan-pagination"
+                  onPageChange={setCurrentPage}
+                />
+              </div>
             </div>
-          </div>
+          )}
         </div>
-      </Modal>
+    </>
+  );
+
+  return (
+    <>
+      {inlineForm ? (
+        <div className="min-w-0" data-testid="input-karyawan-inline-form">
+          {modalContent}
+        </div>
+      ) : (
+        <Modal
+          isOpen={isOpen}
+          title="Input Karyawan"
+          subtitle="Kelola data karyawan, enum agama & golongan darah, serta unggah dokumen"
+          testId="input-karyawan-crud-modal"
+          maxWidthClass="max-w-[95vw]"
+          dialogClassName="h-[92vh] max-h-[92vh]"
+          bodyClassName="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden"
+          onClose={onClose}
+        >
+          {modalContent}
+        </Modal>
+      )}
 
       <ConfirmDialog
         isOpen={isOpen && pendingAction !== null}
