@@ -21,7 +21,7 @@ const assets: CompanyAsset[] = Array.from({ length: 25 }, (_, index) => ({
   company_id: 21,
   asset_date: `2026-11-${String(index + 1).padStart(2, '0')}`,
   name: `Asset ${index + 1}`,
-  amount: index + 1,
+  amount: index === 24 ? 1000 : index + 1,
   price_per_unit: 1000,
   total_price: (index + 1) * 1000,
 }));
@@ -150,6 +150,7 @@ describe('CFO asset pages', () => {
     renderPage('/company/21', <CfoMasterAsetPage />);
 
     expect(await screen.findByText('Asset 25')).toBeInTheDocument();
+    expect(screen.getByText('1.000')).toBeInTheDocument();
     expect(screen.queryByTestId('master-aset-pagination')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Urutkan Harga Satuan' }));
     await waitFor(() =>
@@ -234,12 +235,16 @@ describe('CFO asset pages', () => {
     fireEvent.change(within(formModal).getByLabelText('Nama Aset'), {
       target: { value: 'New Asset' },
     });
-    fireEvent.change(within(formModal).getByLabelText('Jumlah'), {
-      target: { value: '2' },
+    const amountInput = within(formModal).getByLabelText('Jumlah');
+    fireEvent.change(amountInput, {
+      target: { value: '2000' },
     });
-    fireEvent.change(within(formModal).getByLabelText('Harga Satuan'), {
+    expect(amountInput).toHaveValue('2.000');
+    const priceInput = within(formModal).getByLabelText('Harga Satuan');
+    fireEvent.change(priceInput, {
       target: { value: '1500' },
     });
+    expect(priceInput).toHaveValue('1.500');
     fireEvent.click(within(formModal).getByRole('button', { name: 'Tambah' }));
 
     expect(apiClient.createCompanyAsset).not.toHaveBeenCalled();
@@ -249,7 +254,7 @@ describe('CFO asset pages', () => {
         company_id: 21,
         asset_date: '2026-11-25',
         name: 'New Asset',
-        amount: 2,
+        amount: 2000,
         price_per_unit: 1500,
       })
     );

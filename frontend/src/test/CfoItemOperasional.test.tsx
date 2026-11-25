@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import * as apiClient from '@/api/client';
@@ -73,6 +79,49 @@ describe('CFO item operasional', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('formats expense amounts and submits the numeric value', async () => {
+    vi.mocked(apiClient.createExpenseItem).mockResolvedValue({
+      data: { ...makeItem(2), name: 'New expense', amount: 1500000 },
+    });
+
+    renderPage();
+    await screen.findByText('Item 1');
+    fireEvent.change(screen.getByTestId('operasional-item-category'), {
+      target: { value: '31' },
+    });
+    fireEvent.change(screen.getByTestId('operasional-item-type'), {
+      target: { value: '41' },
+    });
+    fireEvent.change(screen.getByTestId('operasional-item-date'), {
+      target: { value: '2026-11-25' },
+    });
+    fireEvent.change(screen.getByTestId('operasional-item-name'), {
+      target: { value: 'New expense' },
+    });
+    const amountInput = screen.getByTestId('operasional-item-amount');
+    fireEvent.change(amountInput, { target: { value: '1500000' } });
+    expect(amountInput).toHaveValue('1.500.000');
+
+    fireEvent.click(
+      within(screen.getByTestId('operasional-item-form')).getByRole('button', {
+        name: 'Tambah Item',
+      })
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Ya, tambahkan' }));
+
+    await waitFor(() =>
+      expect(apiClient.createExpenseItem).toHaveBeenCalledWith({
+        expense_category_id: 31,
+        expense_type_id: 41,
+        company_id: 21,
+        name: 'New expense',
+        amount: 1500000,
+        purchased_on: '2026-11-25',
+        detail: null,
+      })
+    );
   });
 
   it('searches and sorts item results through paginated server queries', async () => {
