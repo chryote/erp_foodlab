@@ -597,7 +597,7 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows Input Paket -> Master Bahan Baku modal, filters Bahan items by DefaultPackage ItemPacket company_id, supports dynamic + rows and full CRUD', async () => {
+  it('shows Input Paket -> Master Bahan Baku modal, displays all Bahan and Kelengkapan items across companies with company.name, supports dynamic + rows and full CRUD', async () => {
     vi.mocked(apiClient.fetchErpModules).mockResolvedValue({
       data: [
         DEFAULT_CFO_MODULE,
@@ -649,9 +649,9 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
       {
         id: 103,
         company_id: 1,
-        code: 'PRL-01',
-        name: 'Mixer Lab',
-        type: 'Peralatan',
+        code: 'SRP-01',
+        name: 'Booth Gerobak',
+        type: 'Sarpras',
       },
       {
         id: 201,
@@ -666,6 +666,13 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
         code: 'BHN-202',
         name: 'Coklat Bubuk Cabang 2',
         type: 'Bahan',
+      },
+      {
+        id: 105,
+        company_id: 3,
+        code: 'KLP-01',
+        name: 'Cup Sealer',
+        type: 'Kelengkapan',
       },
     ];
 
@@ -851,17 +858,7 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
     ).toBeInTheDocument();
     expect(within(modal).getByText('Rp 40.000')).toBeInTheDocument();
 
-    // Selecting a brand whose company has no Bahan items shows the Indonesian instruction with company name
-    fireEvent.change(within(modal).getByLabelText('Nama Brand'), {
-      target: { value: '52' },
-    });
-    expect(
-      within(modal).getByText(
-        'Silakan tambahkan item bertipe "Bahan" untuk PT. Kuliner Mandiri.'
-      )
-    ).toBeInTheDocument();
-
-    // Select Nama Brand (company 1) -> filters Bahan Baku to company 1 + type Bahan only
+    // Select Nama Brand (company 1) -> shows all Bahan and Kelengkapan items across all companies with company.name (excluding Sarpras)
     const brandSelect = within(modal).getByLabelText(
       'Nama Brand'
     ) as HTMLSelectElement;
@@ -874,14 +871,32 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
     const row0OptionLabels = Array.from(row0Select.options).map(
       (opt) => opt.textContent
     );
-    expect(row0OptionLabels).toContain('Tepung Terigu (BHN-01)');
-    expect(row0OptionLabels).toContain('Gula Pasir (BHN-02)');
-    expect(row0OptionLabels).toContain('Mentega (BHN-03)');
-    expect(row0OptionLabels).not.toContain('Mixer Lab (PRL-01)');
-    expect(row0OptionLabels).not.toContain('Susu Bubuk Cabang 2 (BHN-201)');
+    expect(row0OptionLabels).toContain(
+      'Tepung Terigu (BHN-01) - PT. Slaras Nusa Foodlab'
+    );
+    expect(row0OptionLabels).toContain(
+      'Gula Pasir (BHN-02) - PT. Slaras Nusa Foodlab'
+    );
+    expect(row0OptionLabels).toContain(
+      'Mentega (BHN-03) - PT. Slaras Nusa Foodlab'
+    );
+    expect(row0OptionLabels).toContain(
+      'Cup Sealer (KLP-01) - PT. Kuliner Mandiri'
+    );
+    expect(row0OptionLabels).toContain(
+      'Susu Bubuk Cabang 2 (BHN-201) - PT. Pangan Nusantara'
+    );
+    expect(row0OptionLabels).not.toContain(
+      'Booth Gerobak (SRP-01) - PT. Slaras Nusa Foodlab'
+    );
 
-    // Switching brand to company 2 clears incompatible item and excludes already-saved Brand Dua items
+    // Switching brand keeps non-persisted items from any company, while clearing items already persisted on the target brand
     fireEvent.change(row0Select, { target: { value: '101' } });
+    fireEvent.change(brandSelect, { target: { value: '51' } });
+    expect(row0Select.value).toBe('101');
+    fireEvent.change(brandSelect, { target: { value: '50' } });
+    fireEvent.change(row0Select, { target: { value: '201' } });
+    expect(row0Select.value).toBe('201');
     fireEvent.change(brandSelect, { target: { value: '51' } });
     expect(row0Select.value).toBe('');
 
@@ -903,8 +918,12 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
     const row1OptionLabels = Array.from(row1Select.options).map(
       (opt) => opt.textContent
     );
-    expect(row1OptionLabels).toContain('Gula Pasir (BHN-02)');
-    expect(row1OptionLabels).not.toContain('Tepung Terigu (BHN-01)');
+    expect(row1OptionLabels).toContain(
+      'Gula Pasir (BHN-02) - PT. Slaras Nusa Foodlab'
+    );
+    expect(row1OptionLabels).not.toContain(
+      'Tepung Terigu (BHN-01) - PT. Slaras Nusa Foodlab'
+    );
 
     fireEvent.change(row1Select, { target: { value: '102' } });
     fireEvent.change(within(row1).getByLabelText('Harga (Rp)'), {

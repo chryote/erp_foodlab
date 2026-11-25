@@ -79,6 +79,16 @@ export function formatItemLabel(item: Item): string {
   return item.code ? `${item.name} (${item.code})` : item.name;
 }
 
+export function formatIngredientOptionLabel(
+  item: Item,
+  companiesById?: Map<number, Company>
+): string {
+  const baseLabel = formatItemLabel(item);
+  const companyName =
+    item.company?.name ?? companiesById?.get(Number(item.company_id))?.name;
+  return companyName ? `${baseLabel} - ${companyName}` : baseLabel;
+}
+
 export function groupIngredientsByPackage(
   ingredients: Ingredient[],
   defaultPackagesById: Map<number, DefaultPackage>

@@ -22,10 +22,9 @@ import { formatCapitalIdr } from '@/modules/CFO/CapitalCompanyCrudModal';
 import {
   type GroupedIngredientRow,
   formatDefaultPackageLabel,
+  formatIngredientOptionLabel,
   formatItemLabel,
   groupIngredientsByPackage,
-  resolveDefaultPackageCompanyId,
-  resolveDefaultPackageCompanyName,
 } from './ingredientGrouping';
 
 interface IngredientRowDraft {
@@ -64,7 +63,6 @@ export const MasterBahanBakuCrudModal: React.FC<
   const {
     allIngredients,
     allDefaultPackages,
-    allItemPackets,
     allItems,
     loading,
     error,
@@ -116,6 +114,14 @@ export const MasterBahanBakuCrudModal: React.FC<
     return map;
   }, [allDefaultPackages]);
 
+  const companiesById = useMemo(() => {
+    const map = new Map<number, Company>();
+    for (const company of companies ?? []) {
+      map.set(Number(company.id), company);
+    }
+    return map;
+  }, [companies]);
+
   const itemsById = useMemo(() => {
     const map = new Map<number, Item>();
     for (const item of allItems) {
@@ -129,39 +135,13 @@ export const MasterBahanBakuCrudModal: React.FC<
     [allIngredients, defaultPackagesById]
   );
 
-  const selectedDefaultPackage = useMemo(
+  const bahanItems = useMemo<Item[]>(
     () =>
-      allDefaultPackages.find(
-        (dp) => String(dp.id) === String(defaultPackageId)
+      allItems.filter(
+        (item) => item.type === 'Bahan' || item.type === 'Kelengkapan'
       ),
-    [allDefaultPackages, defaultPackageId]
+    [allItems]
   );
-
-  const targetCompanyId = useMemo(
-    () => resolveDefaultPackageCompanyId(selectedDefaultPackage, allItemPackets),
-    [selectedDefaultPackage, allItemPackets]
-  );
-
-  const targetCompanyName = useMemo(
-    () =>
-      resolveDefaultPackageCompanyName(
-        selectedDefaultPackage,
-        allItemPackets,
-        companies,
-        allItems
-      ),
-    [allItemPackets, allItems, companies, selectedDefaultPackage]
-  );
-
-  const bahanItems = useMemo<Item[]>(() => {
-    if (targetCompanyId === null) {
-      return [];
-    }
-    return allItems.filter(
-      (item) =>
-        Number(item.company_id) === targetCompanyId && item.type === 'Bahan'
-    );
-  }, [allItems, targetCompanyId]);
 
   // In create mode, exclude items already saved on the selected brand so the user
   // doesn't hit duplicate-item validation errors; in edit mode, all company Bahan items remain available.
@@ -198,13 +178,6 @@ export const MasterBahanBakuCrudModal: React.FC<
     clearError();
     setDefaultPackageId(nextDefaultPackageId);
 
-    const nextDp = allDefaultPackages.find(
-      (dp) => String(dp.id) === nextDefaultPackageId
-    );
-    const nextCompanyId = resolveDefaultPackageCompanyId(
-      nextDp,
-      allItemPackets
-    );
     const persistedForNextBrand = new Set(
       editingPackageId === null && nextDefaultPackageId
         ? allIngredients
@@ -215,16 +188,9 @@ export const MasterBahanBakuCrudModal: React.FC<
         : []
     );
     const validItemIds = new Set(
-      nextCompanyId === null
-        ? []
-        : allItems
-            .filter(
-              (item) =>
-                Number(item.company_id) === nextCompanyId &&
-                item.type === 'Bahan' &&
-                !persistedForNextBrand.has(String(item.id))
-            )
-            .map((item) => String(item.id))
+      bahanItems
+        .filter((item) => !persistedForNextBrand.has(String(item.id)))
+        .map((item) => String(item.id))
     );
 
     setRows((prev) =>
@@ -685,9 +651,8 @@ export const MasterBahanBakuCrudModal: React.FC<
 
                 {defaultPackageId && bahanItems.length === 0 && (
                   <p className="rounded-lg border border-dashed border-border bg-card px-3 py-2 text-xs text-muted-foreground">
-                    {targetCompanyName
-                      ? `Silakan tambahkan item bertipe "Bahan" untuk ${targetCompanyName}.`
-                      : 'Silakan tambahkan item bertipe "Bahan" untuk perusahaan pada paket ini.'}
+                    Silakan tambahkan item bertipe "Bahan" atau "Kelengkapan"
+                    terlebih dahulu.
                   </p>
                 )}
 
@@ -696,8 +661,9 @@ export const MasterBahanBakuCrudModal: React.FC<
                   bahanItems.length > 0 &&
                   availableBahanCount === 0 && (
                     <p className="rounded-lg border border-dashed border-border bg-card px-3 py-2 text-xs text-muted-foreground">
-                      Semua item Bahan untuk paket ini sudah terdaftar. Klik
-                      Edit pada tabel untuk mengubah atau menambah harga.
+                      Semua item Bahan dan Kelengkapan untuk paket ini sudah
+                      terdaftar. Klik Edit pada tabel untuk mengubah atau
+                      menambah harga.
                     </p>
                   )}
 
@@ -723,7 +689,7 @@ export const MasterBahanBakuCrudModal: React.FC<
                       )
                       .map((item) => ({
                         value: String(item.id),
-                        label: formatItemLabel(item),
+                        label: formatIngredientOptionLabel(item, companiesById),
                       }));
 
                     return (
