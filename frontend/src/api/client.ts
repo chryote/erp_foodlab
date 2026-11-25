@@ -1217,9 +1217,11 @@ export async function deleteExpenseItem(
   );
 }
 
-export async function fetchCompanyAssets(): Promise<CompanyAssetsListResponse> {
+export async function fetchCompanyAssets(
+  params?: ListRequestParams
+): Promise<CompanyAssetsListResponse> {
   return requestJson<CompanyAssetsListResponse>(
-    '/v1/modules/cfo/company-assets',
+    `/v1/modules/cfo/company-assets${buildListQuery(params)}`,
     {},
     'Failed to fetch company assets'
   );
@@ -1330,9 +1332,11 @@ export async function fetchChoEnums(): Promise<{ data: ChoEnums }> {
   );
 }
 
-export async function fetchEmployeePositions(): Promise<EmployeePositionsListResponse> {
+export async function fetchEmployeePositions(
+  params?: ListRequestParams
+): Promise<EmployeePositionsListResponse> {
   return requestJson<EmployeePositionsListResponse>(
-    '/v1/modules/cho/employee-positions',
+    `/v1/modules/cho/employee-positions${buildListQuery(params)}`,
     {},
     'Failed to fetch employee positions'
   );
@@ -1377,9 +1381,11 @@ export async function deleteEmployeePosition(
   );
 }
 
-export async function fetchEmploymentStatuses(): Promise<EmploymentStatusesListResponse> {
+export async function fetchEmploymentStatuses(
+  params?: ListRequestParams
+): Promise<EmploymentStatusesListResponse> {
   return requestJson<EmploymentStatusesListResponse>(
-    '/v1/modules/cho/employment-statuses',
+    `/v1/modules/cho/employment-statuses${buildListQuery(params)}`,
     {},
     'Failed to fetch employment statuses'
   );
@@ -1424,9 +1430,11 @@ export async function deleteEmploymentStatus(
   );
 }
 
-export async function fetchPayrollGrades(): Promise<PayrollGradesListResponse> {
+export async function fetchPayrollGrades(
+  params?: ListRequestParams
+): Promise<PayrollGradesListResponse> {
   return requestJson<PayrollGradesListResponse>(
-    '/v1/modules/cho/payroll-grades',
+    `/v1/modules/cho/payroll-grades${buildListQuery(params)}`,
     {},
     'Failed to fetch payroll grades'
   );
@@ -1471,9 +1479,11 @@ export async function deletePayrollGrade(
   );
 }
 
-export async function fetchTaxStatuses(): Promise<TaxStatusesListResponse> {
+export async function fetchTaxStatuses(
+  params?: ListRequestParams
+): Promise<TaxStatusesListResponse> {
   return requestJson<TaxStatusesListResponse>(
-    '/v1/modules/cho/tax-statuses',
+    `/v1/modules/cho/tax-statuses${buildListQuery(params)}`,
     {},
     'Failed to fetch tax statuses'
   );
@@ -1518,9 +1528,11 @@ export async function deleteTaxStatus(
   );
 }
 
-export async function fetchEmployees(): Promise<EmployeesListResponse> {
+export async function fetchEmployees(
+  params?: ListRequestParams
+): Promise<EmployeesListResponse> {
   return requestJson<EmployeesListResponse>(
-    '/v1/modules/cho/employees',
+    `/v1/modules/cho/employees${buildListQuery(params)}`,
     {},
     'Failed to fetch employees'
   );

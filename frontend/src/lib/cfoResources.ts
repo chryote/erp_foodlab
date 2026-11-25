@@ -226,6 +226,35 @@ export function useInfiniteExpenseItemsQuery(
   });
 }
 
+export function useInfiniteCompanyAssetsQuery(
+  companyId: number | null,
+  search: string,
+  sort: string,
+  enabled = true
+) {
+  return useInfiniteQuery({
+    queryKey: [
+      ...cfoQueryKeys.companyAssets,
+      'infinite',
+      companyId,
+      search,
+      sort,
+    ],
+    queryFn: ({ pageParam }) =>
+      fetchCompanyAssets({
+        page: pageParam,
+        per_page: CFO_LIST_PAGE_SIZE,
+        company_id: companyId ?? undefined,
+        search: search.trim() || undefined,
+        sort,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      getNextListPage(lastPage, lastPageParam),
+    enabled,
+  });
+}
+
 export function createAppQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: {
@@ -1131,32 +1160,9 @@ export interface CompanyAssetMutationInput {
   pricePerUnit: number;
 }
 
-export function useCompanyAssetCrudResource(
-  enabled: boolean,
-  company: Company | null
-) {
+export function useCompanyAssetMutationResource(company: Company | null) {
   const queryClient = useQueryClient();
   const [mutationError, setMutationError] = useState<string | null>(null);
-
-  const assetsQuery = useQuery<CompanyAsset[]>({
-    queryKey: cfoQueryKeys.companyAssets,
-    queryFn: async () => {
-      const res = await fetchCompanyAssets();
-      return res?.data ?? [];
-    },
-    enabled,
-  });
-
-  const allAssets = assetsQuery.data ?? [];
-
-  const assets = useMemo<CompanyAsset[]>(() => {
-    if (!company) {
-      return allAssets;
-    }
-    return allAssets.filter(
-      (asset) => Number(asset.company_id) === company.id
-    );
-  }, [allAssets, company]);
 
   const createMutation = useMutation({
     mutationFn: async (payload: CompanyAssetPayload) => {
@@ -1272,18 +1278,51 @@ export function useCompanyAssetCrudResource(
   );
 
   return {
-    allAssets,
-    assets,
-    loading:
-      assetsQuery.isLoading ||
+    mutationLoading:
       createMutation.isPending ||
       updateMutation.isPending ||
       deleteMutation.isPending,
-    error:
-      mutationError ??
-      getErrorMessage(assetsQuery.error, 'Gagal memuat data aset perusahaan.'),
+    error: mutationError,
     createAsset,
     updateAsset,
     removeAsset,
+  };
+}
+
+export function useCompanyAssetCrudResource(
+  enabled: boolean,
+  company: Company | null
+) {
+  const assetsQuery = useQuery<CompanyAsset[]>({
+    queryKey: cfoQueryKeys.companyAssets,
+    queryFn: async () => {
+      const res = await fetchCompanyAssets();
+      return res?.data ?? [];
+    },
+    enabled,
+  });
+  const mutations = useCompanyAssetMutationResource(company);
+  const allAssets = assetsQuery.data ?? [];
+
+  const assets = useMemo<CompanyAsset[]>(() => {
+    if (!company) {
+      return allAssets;
+    }
+    return allAssets.filter(
+      (asset) => Number(asset.company_id) === company.id
+    );
+  }, [allAssets, company]);
+
+  return {
+    allAssets,
+    assets,
+    loading:
+      assetsQuery.isLoading || mutations.mutationLoading,
+    error:
+      mutations.error ??
+      getErrorMessage(assetsQuery.error, 'Gagal memuat data aset perusahaan.'),
+    createAsset: mutations.createAsset,
+    updateAsset: mutations.updateAsset,
+    removeAsset: mutations.removeAsset,
   };
 }
