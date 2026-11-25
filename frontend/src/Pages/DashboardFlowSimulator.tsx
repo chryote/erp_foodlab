@@ -43,6 +43,7 @@ import {
   CpoModuleCard,
 } from '@/modules/CPO/CpoModuleCard';
 import { MasterBahanBakuCrudModal } from '@/modules/CPO/MasterBahanBakuCrudModal';
+import { MasterItemVendorCrudModal } from '@/modules/CPO/MasterItemVendorCrudModal';
 import { MasterPackingCrudModal } from '@/modules/CPO/MasterPackingCrudModal';
 import { MasterPaketCrudModal } from '@/modules/CPO/MasterPaketCrudModal';
 import { ViewBahanBakuModal } from '@/modules/CPO/ViewBahanBakuModal';
@@ -337,6 +338,13 @@ export const DashboardFlowSimulator: React.FC<DashboardProps> = ({ onLogout }) =
 
             <ViewBahanBakuModal
               isOpen={selectedChildSubMenu?.code === 'VIEW_BAHAN_BAKU'}
+              onClose={() => setSelectedChildSubMenu(null)}
+            />
+
+            <MasterItemVendorCrudModal
+              isOpen={selectedChildSubMenu?.code === 'MASTER_ITEM_VENDOR'}
+              company={selectedCompany}
+              companies={companyResource.companies}
               onClose={() => setSelectedChildSubMenu(null)}
             />
           </>

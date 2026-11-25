@@ -58,8 +58,8 @@ import {
 export const DEFAULT_CPO_ENUMS: CpoEnums = {
   item_type: [
     { value: 'Bahan', nama: 'Bahan' },
-    { value: 'Peralatan', nama: 'Peralatan' },
-    { value: 'Paket Usaha', nama: 'Paket Usaha' },
+    { value: 'Kelengkapan', nama: 'Kelengkapan' },
+    { value: 'Sarpras', nama: 'Sarpras' },
   ],
 };
 
@@ -104,13 +104,11 @@ export function useCpoEnumsResource(enabled: boolean) {
   };
 }
 
-export function useMasterPackingCrudResource(
+function useItemsCore(
   enabled: boolean,
-  company: Company | null
+  runMutation: <R>(fn: () => Promise<R>, fallback: string) => Promise<R | null>
 ) {
   const queryClient = useQueryClient();
-  const [mutationError, setMutationError] = useState<string | null>(null);
-  const enumsResource = useCpoEnumsResource(enabled);
 
   const itemsQuery = useQuery<Item[]>({
     queryKey: cpoQueryKeys.items,
@@ -121,58 +119,6 @@ export function useMasterPackingCrudResource(
     enabled,
   });
 
-  const packetsQuery = useQuery<Packet[]>({
-    queryKey: cpoQueryKeys.packets,
-    queryFn: async () => {
-      const res = await fetchPackets();
-      return res?.data ?? [];
-    },
-    enabled,
-  });
-
-  const itemPacketsQuery = useQuery<ItemPacket[]>({
-    queryKey: cpoQueryKeys.itemPackets,
-    queryFn: async () => {
-      const res = await fetchItemPackets();
-      return res?.data ?? [];
-    },
-    enabled,
-  });
-
-  const allItems = itemsQuery.data ?? [];
-  const allPackets = packetsQuery.data ?? [];
-  const allItemPackets = itemPacketsQuery.data ?? [];
-
-  const items = useMemo<Item[]>(() => {
-    if (!company) {
-      return allItems;
-    }
-    return allItems.filter((item) => Number(item.company_id) === company.id);
-  }, [allItems, company]);
-
-  const itemPackets = useMemo<ItemPacket[]>(() => {
-    if (!company) {
-      return allItemPackets;
-    }
-    return allItemPackets.filter(
-      (assignment) => Number(assignment.company_id) === company.id
-    );
-  }, [allItemPackets, company]);
-
-  const runMutation = useCallback(
-    async <T>(fn: () => Promise<T>, fallbackError: string): Promise<T | null> => {
-      setMutationError(null);
-      try {
-        return await fn();
-      } catch (err) {
-        setMutationError(getErrorMessage(err, fallbackError));
-        return null;
-      }
-    },
-    []
-  );
-
-  // Item mutations
   const createItemMutation = useMutation({
     mutationFn: async (payload: ItemPayload) => {
       const res = await createItem(payload);
@@ -223,6 +169,141 @@ export function useMasterPackingCrudResource(
       });
     },
   });
+
+  const addItem = useCallback(
+    (payload: ItemPayload) =>
+      runMutation(
+        () => createItemMutation.mutateAsync(payload),
+        'Gagal menambahkan item.'
+      ),
+    [createItemMutation, runMutation]
+  );
+
+  const editItem = useCallback(
+    (id: number, payload: ItemPayload) =>
+      runMutation(
+        () => updateItemMutation.mutateAsync({ id, payload }),
+        'Gagal memperbarui item.'
+      ),
+    [runMutation, updateItemMutation]
+  );
+
+  const removeItem = useCallback(
+    async (id: number) =>
+      (await runMutation(
+        () => deleteItemMutation.mutateAsync(id),
+        'Gagal menghapus item.'
+      )) !== null,
+    [deleteItemMutation, runMutation]
+  );
+
+  return {
+    allItems: itemsQuery.data ?? [],
+    isLoading:
+      itemsQuery.isLoading ||
+      createItemMutation.isPending ||
+      updateItemMutation.isPending ||
+      deleteItemMutation.isPending,
+    error: itemsQuery.error,
+    createItem: addItem,
+    updateItem: editItem,
+    removeItem,
+  };
+}
+
+export function useItemCrudResource(enabled: boolean) {
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const enumsResource = useCpoEnumsResource(enabled);
+
+  const runMutation = useCallback(
+    async <T>(fn: () => Promise<T>, fallbackError: string): Promise<T | null> => {
+      setMutationError(null);
+      try {
+        return await fn();
+      } catch (err) {
+        setMutationError(getErrorMessage(err, fallbackError));
+        return null;
+      }
+    },
+    []
+  );
+
+  const itemsCore = useItemsCore(enabled, runMutation);
+
+  return {
+    enums: enumsResource.enums,
+    allItems: itemsCore.allItems,
+    loading: itemsCore.isLoading,
+    error:
+      mutationError ??
+      getErrorMessage(itemsCore.error, 'Gagal memuat data item vendor.'),
+    clearError: useCallback(() => setMutationError(null), []),
+    createItem: itemsCore.createItem,
+    updateItem: itemsCore.updateItem,
+    removeItem: itemsCore.removeItem,
+  };
+}
+
+export function useMasterPackingCrudResource(
+  enabled: boolean,
+  company: Company | null
+) {
+  const queryClient = useQueryClient();
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const enumsResource = useCpoEnumsResource(enabled);
+
+  const runMutation = useCallback(
+    async <T>(fn: () => Promise<T>, fallbackError: string): Promise<T | null> => {
+      setMutationError(null);
+      try {
+        return await fn();
+      } catch (err) {
+        setMutationError(getErrorMessage(err, fallbackError));
+        return null;
+      }
+    },
+    []
+  );
+
+  const itemsCore = useItemsCore(enabled, runMutation);
+
+  const packetsQuery = useQuery<Packet[]>({
+    queryKey: cpoQueryKeys.packets,
+    queryFn: async () => {
+      const res = await fetchPackets();
+      return res?.data ?? [];
+    },
+    enabled,
+  });
+
+  const itemPacketsQuery = useQuery<ItemPacket[]>({
+    queryKey: cpoQueryKeys.itemPackets,
+    queryFn: async () => {
+      const res = await fetchItemPackets();
+      return res?.data ?? [];
+    },
+    enabled,
+  });
+
+  const allItems = itemsCore.allItems;
+  const allPackets = packetsQuery.data ?? [];
+  const allItemPackets = itemPacketsQuery.data ?? [];
+
+  const items = useMemo<Item[]>(() => {
+    if (!company) {
+      return allItems;
+    }
+    return allItems.filter((item) => Number(item.company_id) === company.id);
+  }, [allItems, company]);
+
+  const itemPackets = useMemo<ItemPacket[]>(() => {
+    if (!company) {
+      return allItemPackets;
+    }
+    return allItemPackets.filter(
+      (assignment) => Number(assignment.company_id) === company.id
+    );
+  }, [allItemPackets, company]);
 
   // Packet mutations
   const createPacketMutation = useMutation({
@@ -330,33 +411,6 @@ export function useMasterPackingCrudResource(
     },
   });
 
-  const addItem = useCallback(
-    (payload: ItemPayload) =>
-      runMutation(
-        () => createItemMutation.mutateAsync(payload),
-        'Gagal menambahkan item.'
-      ),
-    [createItemMutation, runMutation]
-  );
-
-  const editItem = useCallback(
-    (id: number, payload: ItemPayload) =>
-      runMutation(
-        () => updateItemMutation.mutateAsync({ id, payload }),
-        'Gagal memperbarui item.'
-      ),
-    [runMutation, updateItemMutation]
-  );
-
-  const removeItem = useCallback(
-    async (id: number) =>
-      (await runMutation(
-        () => deleteItemMutation.mutateAsync(id),
-        'Gagal menghapus item.'
-      )) !== null,
-    [deleteItemMutation, runMutation]
-  );
-
   const addPacket = useCallback(
     (payload: PacketPayload) =>
       runMutation(
@@ -412,12 +466,9 @@ export function useMasterPackingCrudResource(
   );
 
   const loading =
-    itemsQuery.isLoading ||
+    itemsCore.isLoading ||
     packetsQuery.isLoading ||
     itemPacketsQuery.isLoading ||
-    createItemMutation.isPending ||
-    updateItemMutation.isPending ||
-    deleteItemMutation.isPending ||
     createPacketMutation.isPending ||
     updatePacketMutation.isPending ||
     deletePacketMutation.isPending ||
@@ -426,7 +477,7 @@ export function useMasterPackingCrudResource(
     deleteItemPacketMutation.isPending;
 
   const queryError =
-    itemsQuery.error ?? packetsQuery.error ?? itemPacketsQuery.error;
+    itemsCore.error ?? packetsQuery.error ?? itemPacketsQuery.error;
 
   return {
     enums: enumsResource.enums,
@@ -441,9 +492,9 @@ export function useMasterPackingCrudResource(
       mutationError ??
       getErrorMessage(queryError, 'Gagal memuat data master packing.'),
     clearError: useCallback(() => setMutationError(null), []),
-    createItem: addItem,
-    updateItem: editItem,
-    removeItem,
+    createItem: itemsCore.createItem,
+    updateItem: itemsCore.updateItem,
+    removeItem: itemsCore.removeItem,
     createPacket: addPacket,
     updatePacket: editPacket,
     removePacket,

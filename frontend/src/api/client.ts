@@ -715,7 +715,7 @@ export interface EmployeeAttendancesListResponse {
   };
 }
 
-export type ItemType = 'Bahan' | 'Peralatan' | 'Paket Usaha' | (string & {});
+export type ItemType = 'Bahan' | 'Kelengkapan' | 'Sarpras' | (string & {});
 
 export interface CpoEnums {
   item_type: EnumOption[];

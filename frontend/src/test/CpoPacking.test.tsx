@@ -794,7 +794,7 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
     });
   });
 
-  it('filters Master Packing Item and Item Paket datatables and Pilih Vendor dropdown to Utama and Packing companies only', async () => {
+  it('displays all companies across CompanyType values in Master Packing Item/Item Paket datatables and Pilih Vendor dropdown', async () => {
     vi.mocked(apiClient.fetchErpModules).mockResolvedValue({
       data: [DEFAULT_CPO_MODULE],
       meta: { count: 1 },
@@ -803,7 +803,7 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
     const companiesStore: apiClient.Company[] = [
       { id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1, type: 'Utama' },
       { id: 2, name: 'PT. Packing', series: 1, type: 'Packing' },
-      { id: 3, name: 'PT. Produksi', series: 1, type: 'Produksi' },
+      { id: 3, name: 'PT. Sarpras', series: 1, type: 'Sarpras' },
     ];
     vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
       data: companiesStore,
@@ -924,19 +924,24 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
 
     const modal = await screen.findByTestId('master-packing-crud-modal');
 
-    // Tab 1 (Item): Pilih Vendor dropdown & datatable only include Utama & Packing
+    // Tab 1 (Item): Pilih Vendor dropdown & datatable include all companies regardless of CompanyType
     expect(await within(modal).findByText('Item Utama')).toBeInTheDocument();
     expect(within(modal).getByText('Item Packing')).toBeInTheDocument();
-    expect(within(modal).queryByText('Item Produksi')).not.toBeInTheDocument();
+    expect(within(modal).getByText('Item Produksi')).toBeInTheDocument();
 
     const itemVendorSelect = within(modal).getByLabelText(
       'Pilih Vendor'
     ) as HTMLSelectElement;
     expect(
       Array.from(itemVendorSelect.options).map((opt) => opt.textContent)
-    ).toEqual(['Pilih vendor...', 'PT. Slaras Nusa Foodlab', 'PT. Packing']);
+    ).toEqual([
+      'Pilih vendor...',
+      'PT. Slaras Nusa Foodlab',
+      'PT. Packing',
+      'PT. Sarpras',
+    ]);
 
-    // Tab 3 (Item Paket): Pilih Vendor dropdown & datatable only include Utama & Packing
+    // Tab 3 (Item Paket): Pilih Vendor dropdown & datatable include all companies regardless of CompanyType
     fireEvent.click(screen.getByTestId('master-packing-tab-assignment'));
     const tablePanel = screen.getByTestId(
       'master-packing-crud-modal-table-panel'
@@ -948,14 +953,19 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
       within(tablePanel).getByText('Item Packing (Peralatan)')
     ).toBeInTheDocument();
     expect(
-      within(tablePanel).queryByText('Item Produksi (Bahan)')
-    ).not.toBeInTheDocument();
+      within(tablePanel).getByText('Item Produksi (Bahan)')
+    ).toBeInTheDocument();
 
     const assignVendorSelect = within(modal).getByLabelText(
       'Pilih Vendor'
     ) as HTMLSelectElement;
     expect(
       Array.from(assignVendorSelect.options).map((opt) => opt.textContent)
-    ).toEqual(['Pilih vendor...', 'PT. Slaras Nusa Foodlab', 'PT. Packing']);
+    ).toEqual([
+      'Pilih vendor...',
+      'PT. Slaras Nusa Foodlab',
+      'PT. Packing',
+      'PT. Sarpras',
+    ]);
   });
 });
