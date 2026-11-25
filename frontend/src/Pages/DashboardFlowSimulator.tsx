@@ -42,7 +42,9 @@ import {
   CpoHorizontalMenu,
   CpoModuleCard,
 } from '@/modules/CPO/CpoModuleCard';
+import { MasterBahanBakuCrudModal } from '@/modules/CPO/MasterBahanBakuCrudModal';
 import { MasterPackingCrudModal } from '@/modules/CPO/MasterPackingCrudModal';
+import { MasterPaketCrudModal } from '@/modules/CPO/MasterPaketCrudModal';
 
 export interface DashboardProps {
   onLogout?: () => void | Promise<void>;
@@ -310,6 +312,16 @@ export const DashboardFlowSimulator: React.FC<DashboardProps> = ({ onLogout }) =
               isOpen={selectedChildSubMenu?.code === 'MASTER_PACKING'}
               company={selectedCompany}
               companies={companyResource.companies}
+              onClose={() => setSelectedChildSubMenu(null)}
+            />
+
+            <MasterPaketCrudModal
+              isOpen={selectedChildSubMenu?.code === 'MASTER_PAKET'}
+              onClose={() => setSelectedChildSubMenu(null)}
+            />
+
+            <MasterBahanBakuCrudModal
+              isOpen={selectedChildSubMenu?.code === 'MASTER_BAHAN_BAKU'}
               onClose={() => setSelectedChildSubMenu(null)}
             />
           </>

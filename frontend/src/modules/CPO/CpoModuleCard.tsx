@@ -10,11 +10,21 @@ export const CPO_INPUT_PACKING_ITEMS: HorizontalMenuItem[] = [
   { code: 'MASTER_PACKING', title: 'Master Packing' },
 ];
 
+export const CPO_INPUT_PAKET_ITEMS: HorizontalMenuItem[] = [
+  { code: 'MASTER_PAKET', title: 'Master Paket' },
+  { code: 'MASTER_BAHAN_BAKU', title: 'Master Bahan Baku' },
+];
+
 export const CPO_MENU_ITEMS: HorizontalMenuItem[] = [
   {
     code: 'INPUT_PACKING',
     title: 'Input Packing',
     children: CPO_INPUT_PACKING_ITEMS,
+  },
+  {
+    code: 'INPUT_PAKET',
+    title: 'Input Paket',
+    children: CPO_INPUT_PAKET_ITEMS,
   },
 ];
 

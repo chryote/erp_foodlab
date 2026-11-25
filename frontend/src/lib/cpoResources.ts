@@ -3,30 +3,65 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ApiRequestError,
   type Company,
+  type DefaultPackage,
+  type DefaultPackagePayload,
+  type Ingredient,
+  type IngredientPayload,
   type Item,
   type ItemPacket,
   type ItemPacketPayload,
   type ItemPayload,
   type Packet,
+  type PacketCategory,
+  type PacketCategoryPayload,
+  type PacketName,
+  type PacketNamePayload,
   type PacketPayload,
+  type PacketVendor,
+  type PacketVendorPayload,
+  createDefaultPackage,
+  createIngredient,
   createItem,
   createItemPacket,
   createPacket,
+  createPacketCategory,
+  createPacketName,
+  createPacketVendor,
+  deleteDefaultPackage,
+  deleteIngredient,
   deleteItem,
   deleteItemPacket,
   deletePacket,
+  deletePacketCategory,
+  deletePacketName,
+  deletePacketVendor,
+  fetchDefaultPackages,
+  fetchIngredients,
   fetchItemPackets,
   fetchItems,
+  fetchPacketCategories,
+  fetchPacketNames,
+  fetchPacketVendors,
   fetchPackets,
+  updateDefaultPackage,
+  updateIngredient,
   updateItem,
   updateItemPacket,
   updatePacket,
+  updatePacketCategory,
+  updatePacketName,
+  updatePacketVendor,
 } from '@/api/client';
 
 export const cpoQueryKeys = {
   items: ['cpo', 'items'] as const,
   packets: ['cpo', 'packets'] as const,
   itemPackets: ['cpo', 'item-packets'] as const,
+  packetNames: ['cpo', 'packet-names'] as const,
+  packetVendors: ['cpo', 'packet-vendors'] as const,
+  packetCategories: ['cpo', 'packet-categories'] as const,
+  defaultPackages: ['cpo', 'default-packages'] as const,
+  ingredients: ['cpo', 'ingredients'] as const,
 };
 
 function getErrorMessage(err: unknown, fallback: string): string | null {
@@ -386,5 +421,476 @@ export function useMasterPackingCrudResource(
     createItemPacket: addItemPacket,
     updateItemPacket: editItemPacket,
     removeItemPacket,
+  };
+}
+
+function useNamedCpoEntity<T extends { id: number; name: string }>(
+  queryKey: readonly string[],
+  enabled: boolean,
+  api: {
+    fetchAll: () => Promise<{ data: T[] }>;
+    create: (payload: { name: string }) => Promise<{ data: T }>;
+    update: (id: number, payload: { name: string }) => Promise<{ data: T }>;
+    remove: (id: number) => Promise<{ message: string }>;
+  },
+  messages: { create: string; update: string; remove: string },
+  runMutation: <R>(fn: () => Promise<R>, fallback: string) => Promise<R | null>
+) {
+  const queryClient = useQueryClient();
+
+  const query = useQuery<T[]>({
+    queryKey,
+    queryFn: async () => {
+      const res = await api.fetchAll();
+      return res?.data ?? [];
+    },
+    enabled,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (payload: { name: string }) => {
+      const res = await api.create(payload);
+      return res.data;
+    },
+    onSuccess: (created) => {
+      queryClient.setQueryData<T[]>(queryKey, (prev = []) => [created, ...prev]);
+      void queryClient.invalidateQueries({ queryKey });
+      void queryClient.invalidateQueries({
+        queryKey: cpoQueryKeys.defaultPackages,
+      });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (input: { id: number; payload: { name: string } }) => {
+      const res = await api.update(input.id, input.payload);
+      return res.data;
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData<T[]>(queryKey, (prev = []) =>
+        prev.map((row) => (row.id === updated.id ? updated : row))
+      );
+      void queryClient.invalidateQueries({ queryKey });
+      void queryClient.invalidateQueries({
+        queryKey: cpoQueryKeys.defaultPackages,
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await api.remove(id);
+      return id;
+    },
+    onSuccess: (deletedId) => {
+      queryClient.setQueryData<T[]>(queryKey, (prev = []) =>
+        prev.filter((row) => row.id !== deletedId)
+      );
+      void queryClient.invalidateQueries({ queryKey });
+      void queryClient.invalidateQueries({
+        queryKey: cpoQueryKeys.defaultPackages,
+      });
+    },
+  });
+
+  const add = useCallback(
+    (payload: { name: string }) =>
+      runMutation(() => createMutation.mutateAsync(payload), messages.create),
+    [createMutation, messages.create, runMutation]
+  );
+
+  const edit = useCallback(
+    (id: number, payload: { name: string }) =>
+      runMutation(
+        () => updateMutation.mutateAsync({ id, payload }),
+        messages.update
+      ),
+    [messages.update, runMutation, updateMutation]
+  );
+
+  const remove = useCallback(
+    async (id: number) =>
+      (await runMutation(
+        () => deleteMutation.mutateAsync(id),
+        messages.remove
+      )) !== null,
+    [deleteMutation, messages.remove, runMutation]
+  );
+
+  return {
+    items: query.data ?? [],
+    isLoading:
+      query.isLoading ||
+      createMutation.isPending ||
+      updateMutation.isPending ||
+      deleteMutation.isPending,
+    error: query.error,
+    create: add,
+    update: edit,
+    remove,
+  };
+}
+
+export function useMasterPaketCrudResource(enabled: boolean) {
+  const queryClient = useQueryClient();
+  const [mutationError, setMutationError] = useState<string | null>(null);
+
+  const runMutation = useCallback(
+    async <T>(fn: () => Promise<T>, fallbackError: string): Promise<T | null> => {
+      setMutationError(null);
+      try {
+        return await fn();
+      } catch (err) {
+        setMutationError(getErrorMessage(err, fallbackError));
+        return null;
+      }
+    },
+    []
+  );
+
+  const packetNames = useNamedCpoEntity<PacketName>(
+    cpoQueryKeys.packetNames,
+    enabled,
+    {
+      fetchAll: fetchPacketNames,
+      create: (payload: PacketNamePayload) => createPacketName(payload),
+      update: (id, payload: PacketNamePayload) => updatePacketName(id, payload),
+      remove: deletePacketName,
+    },
+    {
+      create: 'Gagal menambahkan nama paket.',
+      update: 'Gagal memperbarui nama paket.',
+      remove: 'Gagal menghapus nama paket.',
+    },
+    runMutation
+  );
+
+  const packetVendors = useNamedCpoEntity<PacketVendor>(
+    cpoQueryKeys.packetVendors,
+    enabled,
+    {
+      fetchAll: fetchPacketVendors,
+      create: (payload: PacketVendorPayload) => createPacketVendor(payload),
+      update: (id, payload: PacketVendorPayload) =>
+        updatePacketVendor(id, payload),
+      remove: deletePacketVendor,
+    },
+    {
+      create: 'Gagal menambahkan vendor paket.',
+      update: 'Gagal memperbarui vendor paket.',
+      remove: 'Gagal menghapus vendor paket.',
+    },
+    runMutation
+  );
+
+  const packetCategories = useNamedCpoEntity<PacketCategory>(
+    cpoQueryKeys.packetCategories,
+    enabled,
+    {
+      fetchAll: fetchPacketCategories,
+      create: (payload: PacketCategoryPayload) => createPacketCategory(payload),
+      update: (id, payload: PacketCategoryPayload) =>
+        updatePacketCategory(id, payload),
+      remove: deletePacketCategory,
+    },
+    {
+      create: 'Gagal menambahkan kategori paket.',
+      update: 'Gagal memperbarui kategori paket.',
+      remove: 'Gagal menghapus kategori paket.',
+    },
+    runMutation
+  );
+
+  const itemPacketsQuery = useQuery<ItemPacket[]>({
+    queryKey: cpoQueryKeys.itemPackets,
+    queryFn: async () => {
+      const res = await fetchItemPackets();
+      return res?.data ?? [];
+    },
+    enabled,
+  });
+
+  const defaultPackagesQuery = useQuery<DefaultPackage[]>({
+    queryKey: cpoQueryKeys.defaultPackages,
+    queryFn: async () => {
+      const res = await fetchDefaultPackages();
+      return res?.data ?? [];
+    },
+    enabled,
+  });
+
+  const createDefaultPackageMutation = useMutation({
+    mutationFn: async (payload: DefaultPackagePayload) => {
+      const res = await createDefaultPackage(payload);
+      return res.data;
+    },
+    onSuccess: (created) => {
+      queryClient.setQueryData<DefaultPackage[]>(
+        cpoQueryKeys.defaultPackages,
+        (prev = []) => [created, ...prev]
+      );
+      void queryClient.invalidateQueries({
+        queryKey: cpoQueryKeys.defaultPackages,
+      });
+    },
+  });
+
+  const updateDefaultPackageMutation = useMutation({
+    mutationFn: async (input: {
+      id: number;
+      payload: DefaultPackagePayload;
+    }) => {
+      const res = await updateDefaultPackage(input.id, input.payload);
+      return res.data;
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData<DefaultPackage[]>(
+        cpoQueryKeys.defaultPackages,
+        (prev = []) =>
+          prev.map((pkg) => (pkg.id === updated.id ? updated : pkg))
+      );
+      void queryClient.invalidateQueries({
+        queryKey: cpoQueryKeys.defaultPackages,
+      });
+    },
+  });
+
+  const deleteDefaultPackageMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await deleteDefaultPackage(id);
+      return id;
+    },
+    onSuccess: (deletedId) => {
+      queryClient.setQueryData<DefaultPackage[]>(
+        cpoQueryKeys.defaultPackages,
+        (prev = []) => prev.filter((pkg) => pkg.id !== deletedId)
+      );
+      void queryClient.invalidateQueries({
+        queryKey: cpoQueryKeys.defaultPackages,
+      });
+    },
+  });
+
+  const addDefaultPackage = useCallback(
+    (payload: DefaultPackagePayload) =>
+      runMutation(
+        () => createDefaultPackageMutation.mutateAsync(payload),
+        'Gagal menambahkan paket awal.'
+      ),
+    [createDefaultPackageMutation, runMutation]
+  );
+
+  const editDefaultPackage = useCallback(
+    (id: number, payload: DefaultPackagePayload) =>
+      runMutation(
+        () => updateDefaultPackageMutation.mutateAsync({ id, payload }),
+        'Gagal memperbarui paket awal.'
+      ),
+    [runMutation, updateDefaultPackageMutation]
+  );
+
+  const removeDefaultPackage = useCallback(
+    async (id: number) =>
+      (await runMutation(
+        () => deleteDefaultPackageMutation.mutateAsync(id),
+        'Gagal menghapus paket awal.'
+      )) !== null,
+    [deleteDefaultPackageMutation, runMutation]
+  );
+
+  const loading =
+    packetNames.isLoading ||
+    packetVendors.isLoading ||
+    packetCategories.isLoading ||
+    itemPacketsQuery.isLoading ||
+    defaultPackagesQuery.isLoading ||
+    createDefaultPackageMutation.isPending ||
+    updateDefaultPackageMutation.isPending ||
+    deleteDefaultPackageMutation.isPending;
+
+  const queryError =
+    packetNames.error ??
+    packetVendors.error ??
+    packetCategories.error ??
+    itemPacketsQuery.error ??
+    defaultPackagesQuery.error;
+
+  return {
+    allPacketNames: packetNames.items,
+    allPacketVendors: packetVendors.items,
+    allPacketCategories: packetCategories.items,
+    allItemPackets: itemPacketsQuery.data ?? [],
+    allDefaultPackages: defaultPackagesQuery.data ?? [],
+    loading,
+    error:
+      mutationError ??
+      getErrorMessage(queryError, 'Gagal memuat data master paket.'),
+    clearError: useCallback(() => setMutationError(null), []),
+    createPacketName: packetNames.create,
+    updatePacketName: packetNames.update,
+    removePacketName: packetNames.remove,
+    createPacketVendor: packetVendors.create,
+    updatePacketVendor: packetVendors.update,
+    removePacketVendor: packetVendors.remove,
+    createPacketCategory: packetCategories.create,
+    updatePacketCategory: packetCategories.update,
+    removePacketCategory: packetCategories.remove,
+    createDefaultPackage: addDefaultPackage,
+    updateDefaultPackage: editDefaultPackage,
+    removeDefaultPackage,
+  };
+}
+
+export function useIngredientCrudResource(enabled: boolean) {
+  const queryClient = useQueryClient();
+  const [mutationError, setMutationError] = useState<string | null>(null);
+
+  const runMutation = useCallback(
+    async <T>(fn: () => Promise<T>, fallbackError: string): Promise<T | null> => {
+      setMutationError(null);
+      try {
+        return await fn();
+      } catch (err) {
+        setMutationError(getErrorMessage(err, fallbackError));
+        return null;
+      }
+    },
+    []
+  );
+
+  const ingredientsQuery = useQuery<Ingredient[]>({
+    queryKey: cpoQueryKeys.ingredients,
+    queryFn: async () => {
+      const res = await fetchIngredients();
+      return res?.data ?? [];
+    },
+    enabled,
+  });
+
+  const defaultPackagesQuery = useQuery<DefaultPackage[]>({
+    queryKey: cpoQueryKeys.defaultPackages,
+    queryFn: async () => {
+      const res = await fetchDefaultPackages();
+      return res?.data ?? [];
+    },
+    enabled,
+  });
+
+  const itemPacketsQuery = useQuery<ItemPacket[]>({
+    queryKey: cpoQueryKeys.itemPackets,
+    queryFn: async () => {
+      const res = await fetchItemPackets();
+      return res?.data ?? [];
+    },
+    enabled,
+  });
+
+  const itemsQuery = useQuery<Item[]>({
+    queryKey: cpoQueryKeys.items,
+    queryFn: async () => {
+      const res = await fetchItems();
+      return res?.data ?? [];
+    },
+    enabled,
+  });
+
+  const createIngredientMutation = useMutation({
+    mutationFn: async (payload: IngredientPayload) => {
+      const res = await createIngredient(payload);
+      return res.data;
+    },
+    onSuccess: (created) => {
+      queryClient.setQueryData<Ingredient[]>(
+        cpoQueryKeys.ingredients,
+        (prev = []) => [created, ...prev]
+      );
+      void queryClient.invalidateQueries({ queryKey: cpoQueryKeys.ingredients });
+    },
+  });
+
+  const updateIngredientMutation = useMutation({
+    mutationFn: async (input: { id: number; payload: IngredientPayload }) => {
+      const res = await updateIngredient(input.id, input.payload);
+      return res.data;
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData<Ingredient[]>(
+        cpoQueryKeys.ingredients,
+        (prev = []) =>
+          prev.map((row) => (row.id === updated.id ? updated : row))
+      );
+      void queryClient.invalidateQueries({ queryKey: cpoQueryKeys.ingredients });
+    },
+  });
+
+  const deleteIngredientMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await deleteIngredient(id);
+      return id;
+    },
+    onSuccess: (deletedId) => {
+      queryClient.setQueryData<Ingredient[]>(
+        cpoQueryKeys.ingredients,
+        (prev = []) => prev.filter((row) => row.id !== deletedId)
+      );
+      void queryClient.invalidateQueries({ queryKey: cpoQueryKeys.ingredients });
+    },
+  });
+
+  const addIngredient = useCallback(
+    (payload: IngredientPayload) =>
+      runMutation(
+        () => createIngredientMutation.mutateAsync(payload),
+        'Gagal menambahkan bahan baku.'
+      ),
+    [createIngredientMutation, runMutation]
+  );
+
+  const editIngredient = useCallback(
+    (id: number, payload: IngredientPayload) =>
+      runMutation(
+        () => updateIngredientMutation.mutateAsync({ id, payload }),
+        'Gagal memperbarui bahan baku.'
+      ),
+    [runMutation, updateIngredientMutation]
+  );
+
+  const removeIngredient = useCallback(
+    async (id: number) =>
+      (await runMutation(
+        () => deleteIngredientMutation.mutateAsync(id),
+        'Gagal menghapus bahan baku.'
+      )) !== null,
+    [deleteIngredientMutation, runMutation]
+  );
+
+  const loading =
+    ingredientsQuery.isLoading ||
+    defaultPackagesQuery.isLoading ||
+    itemPacketsQuery.isLoading ||
+    itemsQuery.isLoading ||
+    createIngredientMutation.isPending ||
+    updateIngredientMutation.isPending ||
+    deleteIngredientMutation.isPending;
+
+  const queryError =
+    ingredientsQuery.error ??
+    defaultPackagesQuery.error ??
+    itemPacketsQuery.error ??
+    itemsQuery.error;
+
+  return {
+    allIngredients: ingredientsQuery.data ?? [],
+    allDefaultPackages: defaultPackagesQuery.data ?? [],
+    allItemPackets: itemPacketsQuery.data ?? [],
+    allItems: itemsQuery.data ?? [],
+    loading,
+    error:
+      mutationError ??
+      getErrorMessage(queryError, 'Gagal memuat data master bahan baku.'),
+    clearError: useCallback(() => setMutationError(null), []),
+    createIngredient: addIngredient,
+    updateIngredient: editIngredient,
+    removeIngredient,
   };
 }

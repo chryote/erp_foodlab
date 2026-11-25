@@ -1,0 +1,963 @@
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import App from '../App';
+import * as apiClient from '../api/client';
+import { clearActiveCompanyId } from '../lib/activeCompanyStorage';
+import { DEFAULT_CDO_MODULE } from '../modules/CDO/CdoModuleCard';
+import { DEFAULT_CFO_MODULE } from '../modules/CFO/CfoModuleCard';
+import { DEFAULT_CHO_MODULE } from '../modules/CHO/ChoModuleCard';
+import { DEFAULT_CMO_MODULE } from '../modules/CMO/CmoModuleCard';
+import { DEFAULT_CPO_MODULE } from '../modules/CPO/CpoModuleCard';
+
+vi.mock('../api/client');
+
+function renderApp() {
+  return render(
+    <MemoryRouter initialEntries={['/dashboard-flow-simulator']}>
+      <App />
+    </MemoryRouter>
+  );
+}
+
+describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    clearActiveCompanyId();
+    window.localStorage.setItem('erp_foodlab.auth_token', 'test-token');
+  });
+
+  afterEach(() => {
+    clearActiveCompanyId();
+    window.localStorage.clear();
+  });
+
+  it('shows Input Paket -> Master Paket modal with Paket tab and Paket Awal (DefaultPackage) tab', async () => {
+    vi.mocked(apiClient.fetchErpModules).mockResolvedValue({
+      data: [
+        DEFAULT_CFO_MODULE,
+        DEFAULT_CHO_MODULE,
+        DEFAULT_CPO_MODULE,
+        DEFAULT_CDO_MODULE,
+        DEFAULT_CMO_MODULE,
+      ],
+      meta: { count: 5 },
+    });
+
+    const companiesStore: apiClient.Company[] = [
+      { id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1 },
+    ];
+
+    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
+      data: [...companiesStore],
+      meta: { count: companiesStore.length },
+    });
+
+    vi.mocked(apiClient.syncActiveCompany).mockImplementation(async (id) => ({
+      data: companiesStore.find((c) => c.id === id) ?? null,
+    }));
+
+    let packetNamesStore: apiClient.PacketName[] = [
+      { id: 1, name: 'Paket Starter' },
+    ];
+    let packetVendorsStore: apiClient.PacketVendor[] = [
+      { id: 1, name: 'Vendor Nusantara' },
+    ];
+    let packetCategoriesStore: apiClient.PacketCategory[] = [
+      { id: 1, name: 'Kategori Reguler' },
+    ];
+    const itemPacketsStore: apiClient.ItemPacket[] = [
+      {
+        id: 10,
+        company_id: 1,
+        packet_id: 20,
+        item_id: 30,
+        quantity: 2,
+        company: companiesStore[0],
+        packet: { id: 20, name: 'Paket Dasar' },
+        item: {
+          id: 30,
+          company_id: 1,
+          code: 'ITM-001',
+          name: 'Kardus Packing',
+          type: 'Bahan',
+        },
+      },
+    ];
+    let defaultPackagesStore: apiClient.DefaultPackage[] = [
+      {
+        id: 50,
+        brand_name: 'Brand Awal',
+        packet_name_id: 1,
+        packet_vendor_id: 1,
+        packet_category_id: 1,
+        item_packet_id: 10,
+        price: 120000,
+        packet_name: packetNamesStore[0],
+        packet_vendor: packetVendorsStore[0],
+        packet_category: packetCategoriesStore[0],
+        item_packet: itemPacketsStore[0],
+      },
+    ];
+
+    vi.mocked(apiClient.fetchPacketNames).mockImplementation(async () => ({
+      data: [...packetNamesStore],
+      meta: { count: packetNamesStore.length },
+    }));
+    vi.mocked(apiClient.createPacketName).mockImplementation(async (payload) => {
+      const created: apiClient.PacketName = { id: 2, name: payload.name };
+      packetNamesStore = [created, ...packetNamesStore];
+      return { data: created };
+    });
+    vi.mocked(apiClient.updatePacketName).mockImplementation(
+      async (id, payload) => {
+        const updated: apiClient.PacketName = { id, name: payload.name };
+        packetNamesStore = packetNamesStore.map((row) =>
+          row.id === id ? updated : row
+        );
+        return { data: updated };
+      }
+    );
+    vi.mocked(apiClient.deletePacketName).mockImplementation(async (id) => {
+      packetNamesStore = packetNamesStore.filter((row) => row.id !== id);
+      return { message: 'Packet name deleted successfully.' };
+    });
+
+    vi.mocked(apiClient.fetchPacketVendors).mockImplementation(async () => ({
+      data: [...packetVendorsStore],
+      meta: { count: packetVendorsStore.length },
+    }));
+    vi.mocked(apiClient.createPacketVendor).mockImplementation(
+      async (payload) => {
+        const created: apiClient.PacketVendor = { id: 2, name: payload.name };
+        packetVendorsStore = [created, ...packetVendorsStore];
+        return { data: created };
+      }
+    );
+    vi.mocked(apiClient.updatePacketVendor).mockImplementation(
+      async (id, payload) => {
+        const updated: apiClient.PacketVendor = { id, name: payload.name };
+        packetVendorsStore = packetVendorsStore.map((row) =>
+          row.id === id ? updated : row
+        );
+        return { data: updated };
+      }
+    );
+    vi.mocked(apiClient.deletePacketVendor).mockImplementation(async (id) => {
+      packetVendorsStore = packetVendorsStore.filter((row) => row.id !== id);
+      return { message: 'Packet vendor deleted successfully.' };
+    });
+
+    vi.mocked(apiClient.fetchPacketCategories).mockImplementation(async () => ({
+      data: [...packetCategoriesStore],
+      meta: { count: packetCategoriesStore.length },
+    }));
+    vi.mocked(apiClient.createPacketCategory).mockImplementation(
+      async (payload) => {
+        const created: apiClient.PacketCategory = {
+          id: 2,
+          name: payload.name,
+        };
+        packetCategoriesStore = [created, ...packetCategoriesStore];
+        return { data: created };
+      }
+    );
+    vi.mocked(apiClient.updatePacketCategory).mockImplementation(
+      async (id, payload) => {
+        const updated: apiClient.PacketCategory = { id, name: payload.name };
+        packetCategoriesStore = packetCategoriesStore.map((row) =>
+          row.id === id ? updated : row
+        );
+        return { data: updated };
+      }
+    );
+    vi.mocked(apiClient.deletePacketCategory).mockImplementation(async (id) => {
+      packetCategoriesStore = packetCategoriesStore.filter(
+        (row) => row.id !== id
+      );
+      return { message: 'Packet category deleted successfully.' };
+    });
+
+    vi.mocked(apiClient.fetchItemPackets).mockImplementation(async () => ({
+      data: [...itemPacketsStore],
+      meta: { count: itemPacketsStore.length },
+    }));
+
+    vi.mocked(apiClient.fetchDefaultPackages).mockImplementation(async () => ({
+      data: [...defaultPackagesStore],
+      meta: { count: defaultPackagesStore.length },
+    }));
+    vi.mocked(apiClient.createDefaultPackage).mockImplementation(
+      async (payload) => {
+        const created: apiClient.DefaultPackage = {
+          id: 51,
+          brand_name: payload.brand_name,
+          packet_name_id: payload.packet_name_id,
+          packet_vendor_id: payload.packet_vendor_id,
+          packet_category_id: payload.packet_category_id,
+          item_packet_id: payload.item_packet_id,
+          price: payload.price ?? 0,
+          packet_name:
+            packetNamesStore.find((p) => p.id === payload.packet_name_id) ??
+            null,
+          packet_vendor:
+            packetVendorsStore.find((v) => v.id === payload.packet_vendor_id) ??
+            null,
+          packet_category:
+            packetCategoriesStore.find(
+              (c) => c.id === payload.packet_category_id
+            ) ?? null,
+          item_packet:
+            itemPacketsStore.find((ip) => ip.id === payload.item_packet_id) ??
+            null,
+        };
+        defaultPackagesStore = [created, ...defaultPackagesStore];
+        return { data: created };
+      }
+    );
+    vi.mocked(apiClient.updateDefaultPackage).mockImplementation(
+      async (id, payload) => {
+        const updated: apiClient.DefaultPackage = {
+          id,
+          brand_name: payload.brand_name,
+          packet_name_id: payload.packet_name_id,
+          packet_vendor_id: payload.packet_vendor_id,
+          packet_category_id: payload.packet_category_id,
+          item_packet_id: payload.item_packet_id,
+          price: payload.price ?? 0,
+          packet_name:
+            packetNamesStore.find((p) => p.id === payload.packet_name_id) ??
+            null,
+          packet_vendor:
+            packetVendorsStore.find((v) => v.id === payload.packet_vendor_id) ??
+            null,
+          packet_category:
+            packetCategoriesStore.find(
+              (c) => c.id === payload.packet_category_id
+            ) ?? null,
+          item_packet:
+            itemPacketsStore.find((ip) => ip.id === payload.item_packet_id) ??
+            null,
+        };
+        defaultPackagesStore = defaultPackagesStore.map((row) =>
+          row.id === id ? updated : row
+        );
+        return { data: updated };
+      }
+    );
+    vi.mocked(apiClient.deleteDefaultPackage).mockImplementation(async (id) => {
+      defaultPackagesStore = defaultPackagesStore.filter(
+        (row) => row.id !== id
+      );
+      return { message: 'Default package deleted successfully.' };
+    });
+
+    renderApp();
+
+    // 1. Select company & open CPO module
+    fireEvent.click(await screen.findByTestId('company-tab-1'));
+    fireEvent.click(screen.getByTestId('module-card-CPO'));
+
+    const cpoMenu = await screen.findByTestId('cpo-horizontal-menu');
+    const inputPaketCard = within(cpoMenu).getByTestId(
+      'horizontal-menu-card-INPUT_PAKET'
+    );
+    expect(inputPaketCard).toHaveTextContent('Input Paket');
+    expect(
+      screen.queryByTestId('horizontal-submenu-INPUT_PAKET')
+    ).not.toBeInTheDocument();
+
+    // 2. Click Input Paket -> shows Master Paket and Master Bahan Baku child cards
+    fireEvent.click(inputPaketCard);
+    const paketSubmenu = screen.getByTestId('horizontal-submenu-INPUT_PAKET');
+    const masterPaketCard = within(paketSubmenu).getByTestId(
+      'horizontal-menu-card-MASTER_PAKET'
+    );
+    const masterBahanBakuCard = within(paketSubmenu).getByTestId(
+      'horizontal-menu-card-MASTER_BAHAN_BAKU'
+    );
+    expect(masterPaketCard).toHaveTextContent('Master Paket');
+    expect(masterBahanBakuCard).toHaveTextContent('Master Bahan Baku');
+
+    // 3. Click Master Paket -> shows Master Paket modal with Master Karyawan split style
+    fireEvent.click(masterPaketCard);
+    const modal = await screen.findByTestId('master-paket-crud-modal');
+    expect(modal).toBeInTheDocument();
+    expect(modal).toHaveClass('max-w-[95vw]', 'h-[92vh]', 'max-h-[92vh]');
+
+    const tabPaket = screen.getByTestId('master-paket-tab-paket');
+    const tabDefaultPackage = screen.getByTestId(
+      'master-paket-tab-default-package'
+    );
+    expect(tabPaket).toHaveTextContent('Paket');
+    expect(tabDefaultPackage).toHaveTextContent('Paket Awal');
+    expect(tabPaket).toHaveAttribute('aria-selected', 'true');
+
+    const paketPanel = screen.getByTestId('master-paket-tab-panel-paket');
+
+    const assertSplitSection = (
+      sectionKey: 'packet-name' | 'packet-vendor' | 'packet-category'
+    ) => {
+      const section = within(paketPanel).getByTestId(
+        `master-paket-section-${sectionKey}`
+      );
+      const splitLayout = within(section).getByTestId(
+        `master-paket-${sectionKey}-split-layout`
+      );
+      const formPanel = within(section).getByTestId(
+        `master-paket-${sectionKey}-form-panel`
+      );
+      const tablePanel = within(section).getByTestId(
+        `master-paket-${sectionKey}-table-panel`
+      );
+      const formEl = within(section).getByTestId(
+        `master-paket-${sectionKey}-form`
+      );
+      expect(splitLayout).toContainElement(formPanel);
+      expect(splitLayout).toContainElement(tablePanel);
+      expect(formPanel).toContainElement(formEl);
+      expect(formEl).toHaveClass('flex-col');
+      expect(
+        within(section).getByTestId(
+          `master-paket-${sectionKey}-name-input-field`
+        )
+      ).toHaveClass('sm:grid-cols-[140px_minmax(0,1fr)]');
+      expect(tablePanel).toContainElement(
+        within(section).getByTestId(`master-paket-${sectionKey}-pagination`)
+      );
+      return section;
+    };
+
+    const packetNameSection = assertSplitSection('packet-name');
+    const packetVendorSection = assertSplitSection('packet-vendor');
+    const packetCategorySection = assertSplitSection('packet-category');
+
+    // All three seeded records visible on the same "Paket" tab
+    expect(
+      await within(packetNameSection).findByText('Paket Starter')
+    ).toBeInTheDocument();
+    expect(
+      await within(packetVendorSection).findByText('Vendor Nusantara')
+    ).toBeInTheDocument();
+    expect(
+      await within(packetCategorySection).findByText('Kategori Reguler')
+    ).toBeInTheDocument();
+
+    // CRUD 1: PacketName
+    fireEvent.change(within(packetNameSection).getByLabelText('Nama Paket'), {
+      target: { value: 'Paket Hemat' },
+    });
+    fireEvent.click(
+      within(packetNameSection).getByRole('button', { name: 'Tambah' })
+    );
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    await waitFor(() => {
+      expect(apiClient.createPacketName).toHaveBeenCalledWith({
+        name: 'Paket Hemat',
+      });
+      expect(
+        within(packetNameSection).getByText('Paket Hemat')
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(within(packetNameSection).getByTestId('edit-row-2'));
+    fireEvent.change(within(packetNameSection).getByLabelText('Nama Paket'), {
+      target: { value: 'Paket Hemat Ekstra' },
+    });
+    fireEvent.click(
+      within(packetNameSection).getByRole('button', { name: 'Perbarui' })
+    );
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    await waitFor(() => {
+      expect(apiClient.updatePacketName).toHaveBeenCalledWith(2, {
+        name: 'Paket Hemat Ekstra',
+      });
+      expect(
+        within(packetNameSection).getByText('Paket Hemat Ekstra')
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(within(packetNameSection).getByTestId('delete-row-2'));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    await waitFor(() => {
+      expect(apiClient.deletePacketName).toHaveBeenCalledWith(2);
+      expect(
+        within(packetNameSection).queryByText('Paket Hemat Ekstra')
+      ).not.toBeInTheDocument();
+    });
+
+    // CRUD 2: PacketVendor
+    fireEvent.change(
+      within(packetVendorSection).getByLabelText('Nama Vendor Paket'),
+      { target: { value: 'Vendor Sentosa' } }
+    );
+    fireEvent.click(
+      within(packetVendorSection).getByRole('button', { name: 'Tambah' })
+    );
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    await waitFor(() => {
+      expect(apiClient.createPacketVendor).toHaveBeenCalledWith({
+        name: 'Vendor Sentosa',
+      });
+      expect(
+        within(packetVendorSection).getByText('Vendor Sentosa')
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(within(packetVendorSection).getByTestId('edit-row-2'));
+    fireEvent.change(
+      within(packetVendorSection).getByLabelText('Nama Vendor Paket'),
+      { target: { value: 'Vendor Sentosa Jaya' } }
+    );
+    fireEvent.click(
+      within(packetVendorSection).getByRole('button', { name: 'Perbarui' })
+    );
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    await waitFor(() => {
+      expect(apiClient.updatePacketVendor).toHaveBeenCalledWith(2, {
+        name: 'Vendor Sentosa Jaya',
+      });
+      expect(
+        within(packetVendorSection).getByText('Vendor Sentosa Jaya')
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(within(packetVendorSection).getByTestId('delete-row-2'));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    await waitFor(() => {
+      expect(apiClient.deletePacketVendor).toHaveBeenCalledWith(2);
+      expect(
+        within(packetVendorSection).queryByText('Vendor Sentosa Jaya')
+      ).not.toBeInTheDocument();
+    });
+
+    // CRUD 3: PacketCategory
+    fireEvent.change(
+      within(packetCategorySection).getByLabelText('Nama Kategori Paket'),
+      { target: { value: 'Kategori Premium' } }
+    );
+    fireEvent.click(
+      within(packetCategorySection).getByRole('button', { name: 'Tambah' })
+    );
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    await waitFor(() => {
+      expect(apiClient.createPacketCategory).toHaveBeenCalledWith({
+        name: 'Kategori Premium',
+      });
+      expect(
+        within(packetCategorySection).getByText('Kategori Premium')
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(within(packetCategorySection).getByTestId('edit-row-2'));
+    fireEvent.change(
+      within(packetCategorySection).getByLabelText('Nama Kategori Paket'),
+      { target: { value: 'Kategori VIP' } }
+    );
+    fireEvent.click(
+      within(packetCategorySection).getByRole('button', { name: 'Perbarui' })
+    );
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    await waitFor(() => {
+      expect(apiClient.updatePacketCategory).toHaveBeenCalledWith(2, {
+        name: 'Kategori VIP',
+      });
+      expect(
+        within(packetCategorySection).getByText('Kategori VIP')
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(within(packetCategorySection).getByTestId('delete-row-2'));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    await waitFor(() => {
+      expect(apiClient.deletePacketCategory).toHaveBeenCalledWith(2);
+      expect(
+        within(packetCategorySection).queryByText('Kategori VIP')
+      ).not.toBeInTheDocument();
+    });
+
+    // Tab 2: Paket Awal (DefaultPackage CRUD)
+    fireEvent.click(tabDefaultPackage);
+    expect(
+      screen.getByTestId('master-paket-tab-default-package')
+    ).toHaveAttribute('aria-selected', 'true');
+
+    const defaultModal = await screen.findByTestId('master-paket-crud-modal');
+    expect(
+      screen.getByTestId('master-paket-crud-modal-split-layout')
+    ).toContainElement(screen.getByTestId('master-paket-crud-modal-form-panel'));
+    expect(
+      screen.getByTestId('master-paket-crud-modal-split-layout')
+    ).toContainElement(
+      screen.getByTestId('master-paket-crud-modal-table-panel')
+    );
+    expect(
+      screen.getByTestId('master-paket-crud-modal-brand_name-input-field')
+    ).toHaveClass('sm:grid-cols-[140px_minmax(0,1fr)]');
+
+    expect(
+      await within(defaultModal).findByText('Brand Awal')
+    ).toBeInTheDocument();
+    expect(within(defaultModal).getByText('Rp 120.000')).toBeInTheDocument();
+
+    fireEvent.change(within(defaultModal).getByLabelText('Nama Brand'), {
+      target: { value: 'Brand Nusantara' },
+    });
+    fireEvent.change(within(defaultModal).getByLabelText('Nama Paket'), {
+      target: { value: '1' },
+    });
+    fireEvent.change(within(defaultModal).getByLabelText('Vendor Paket'), {
+      target: { value: '1' },
+    });
+    fireEvent.change(within(defaultModal).getByLabelText('Kategori Paket'), {
+      target: { value: '1' },
+    });
+    fireEvent.change(within(defaultModal).getByLabelText('Item Paket'), {
+      target: { value: '10' },
+    });
+    fireEvent.change(within(defaultModal).getByLabelText('Harga (Rp)'), {
+      target: { value: '250000' },
+    });
+    fireEvent.click(
+      within(defaultModal).getByRole('button', { name: 'Tambah' })
+    );
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    await waitFor(() => {
+      expect(apiClient.createDefaultPackage).toHaveBeenCalledWith({
+        brand_name: 'Brand Nusantara',
+        packet_name_id: 1,
+        packet_vendor_id: 1,
+        packet_category_id: 1,
+        item_packet_id: 10,
+        price: 250000,
+      });
+      expect(
+        within(defaultModal).getByText('Brand Nusantara')
+      ).toBeInTheDocument();
+      expect(within(defaultModal).getByText('Rp 250.000')).toBeInTheDocument();
+    });
+
+    fireEvent.click(within(defaultModal).getByTestId('edit-row-51'));
+    fireEvent.change(within(defaultModal).getByLabelText('Nama Brand'), {
+      target: { value: 'Brand Nusantara Pro' },
+    });
+    fireEvent.change(within(defaultModal).getByLabelText('Harga (Rp)'), {
+      target: { value: '300000' },
+    });
+    fireEvent.click(
+      within(defaultModal).getByRole('button', { name: 'Perbarui' })
+    );
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    await waitFor(() => {
+      expect(apiClient.updateDefaultPackage).toHaveBeenCalledWith(51, {
+        brand_name: 'Brand Nusantara Pro',
+        packet_name_id: 1,
+        packet_vendor_id: 1,
+        packet_category_id: 1,
+        item_packet_id: 10,
+        price: 300000,
+      });
+      expect(
+        within(defaultModal).getByText('Brand Nusantara Pro')
+      ).toBeInTheDocument();
+      expect(within(defaultModal).getByText('Rp 300.000')).toBeInTheDocument();
+    });
+
+    fireEvent.click(within(defaultModal).getByTestId('delete-row-51'));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    await waitFor(() => {
+      expect(apiClient.deleteDefaultPackage).toHaveBeenCalledWith(51);
+      expect(
+        within(defaultModal).queryByText('Brand Nusantara Pro')
+      ).not.toBeInTheDocument();
+    });
+
+    // Close modal
+    fireEvent.click(
+      within(defaultModal).getByRole('button', { name: 'Tutup Modal' })
+    );
+    expect(
+      screen.queryByTestId('master-paket-crud-modal')
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows Input Paket -> Master Bahan Baku modal, filters Bahan items by DefaultPackage ItemPacket company_id, supports dynamic + rows and full CRUD', async () => {
+    vi.mocked(apiClient.fetchErpModules).mockResolvedValue({
+      data: [
+        DEFAULT_CFO_MODULE,
+        DEFAULT_CHO_MODULE,
+        DEFAULT_CPO_MODULE,
+        DEFAULT_CDO_MODULE,
+        DEFAULT_CMO_MODULE,
+      ],
+      meta: { count: 5 },
+    });
+
+    const companiesStore: apiClient.Company[] = [
+      { id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1 },
+      { id: 2, name: 'PT. Pangan Nusantara', series: 1 },
+    ];
+
+    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
+      data: [...companiesStore],
+      meta: { count: companiesStore.length },
+    });
+
+    vi.mocked(apiClient.syncActiveCompany).mockImplementation(async (id) => ({
+      data: companiesStore.find((c) => c.id === id) ?? null,
+    }));
+
+    const itemsStore: apiClient.Item[] = [
+      {
+        id: 101,
+        company_id: 1,
+        code: 'BHN-01',
+        name: 'Tepung Terigu',
+        type: 'Bahan',
+      },
+      {
+        id: 102,
+        company_id: 1,
+        code: 'BHN-02',
+        name: 'Gula Pasir',
+        type: 'Bahan',
+      },
+      {
+        id: 104,
+        company_id: 1,
+        code: 'BHN-03',
+        name: 'Mentega',
+        type: 'Bahan',
+      },
+      {
+        id: 103,
+        company_id: 1,
+        code: 'PRL-01',
+        name: 'Mixer Lab',
+        type: 'Peralatan',
+      },
+      {
+        id: 201,
+        company_id: 2,
+        code: 'BHN-201',
+        name: 'Susu Bubuk Cabang 2',
+        type: 'Bahan',
+      },
+      {
+        id: 202,
+        company_id: 2,
+        code: 'BHN-202',
+        name: 'Coklat Bubuk Cabang 2',
+        type: 'Bahan',
+      },
+    ];
+
+    const itemPacketsStore: apiClient.ItemPacket[] = [
+      {
+        id: 10,
+        company_id: 1,
+        packet_id: 20,
+        item_id: 103,
+        quantity: 1,
+        company: companiesStore[0],
+        packet: { id: 20, name: 'Paket Dasar' },
+        item: itemsStore[3],
+      },
+      {
+        id: 11,
+        company_id: 2,
+        packet_id: 21,
+        item_id: 201,
+        quantity: 1,
+        company: companiesStore[1],
+        packet: { id: 21, name: 'Paket Cabang 2' },
+        item: itemsStore[4],
+      },
+    ];
+
+    const defaultPackagesStore: apiClient.DefaultPackage[] = [
+      {
+        id: 50,
+        brand_name: 'Brand Satu',
+        packet_name_id: 1,
+        packet_vendor_id: 1,
+        packet_category_id: 1,
+        item_packet_id: 10,
+        price: 100000,
+        packet_name: { id: 1, name: 'Paket Starter' },
+        item_packet: itemPacketsStore[0],
+      },
+      {
+        id: 51,
+        brand_name: 'Brand Dua',
+        packet_name_id: 1,
+        packet_vendor_id: 1,
+        packet_category_id: 1,
+        item_packet_id: 11,
+        price: 150000,
+        packet_name: { id: 1, name: 'Paket Cabang' },
+        item_packet: itemPacketsStore[1],
+      },
+    ];
+
+    let ingredientsStore: apiClient.Ingredient[] = [
+      {
+        id: 300,
+        default_package_id: 51,
+        item_id: 201,
+        price: 15000,
+        default_package: defaultPackagesStore[1],
+        item: itemsStore[4],
+      },
+      {
+        id: 301,
+        default_package_id: 51,
+        item_id: 202,
+        price: 25000,
+        default_package: defaultPackagesStore[1],
+        item: itemsStore[5],
+      },
+    ];
+    let nextIngredientId = 302;
+
+    vi.mocked(apiClient.fetchItems).mockImplementation(async () => ({
+      data: [...itemsStore],
+      meta: { count: itemsStore.length },
+    }));
+    vi.mocked(apiClient.fetchItemPackets).mockImplementation(async () => ({
+      data: [...itemPacketsStore],
+      meta: { count: itemPacketsStore.length },
+    }));
+    vi.mocked(apiClient.fetchDefaultPackages).mockImplementation(async () => ({
+      data: [...defaultPackagesStore],
+      meta: { count: defaultPackagesStore.length },
+    }));
+    vi.mocked(apiClient.fetchIngredients).mockImplementation(async () => ({
+      data: [...ingredientsStore],
+      meta: { count: ingredientsStore.length },
+    }));
+    vi.mocked(apiClient.createIngredient).mockImplementation(
+      async (payload) => {
+        const created: apiClient.Ingredient = {
+          id: nextIngredientId++,
+          default_package_id: payload.default_package_id,
+          item_id: payload.item_id,
+          price: payload.price ?? 0,
+          default_package:
+            defaultPackagesStore.find(
+              (dp) => dp.id === payload.default_package_id
+            ) ?? null,
+          item: itemsStore.find((it) => it.id === payload.item_id) ?? null,
+        };
+        ingredientsStore = [created, ...ingredientsStore];
+        return { data: created };
+      }
+    );
+    vi.mocked(apiClient.updateIngredient).mockImplementation(
+      async (id, payload) => {
+        const updated: apiClient.Ingredient = {
+          id,
+          default_package_id: payload.default_package_id,
+          item_id: payload.item_id,
+          price: payload.price ?? 0,
+          default_package:
+            defaultPackagesStore.find(
+              (dp) => dp.id === payload.default_package_id
+            ) ?? null,
+          item: itemsStore.find((it) => it.id === payload.item_id) ?? null,
+        };
+        ingredientsStore = ingredientsStore.map((row) =>
+          row.id === id ? updated : row
+        );
+        return { data: updated };
+      }
+    );
+    vi.mocked(apiClient.deleteIngredient).mockImplementation(async (id) => {
+      ingredientsStore = ingredientsStore.filter((row) => row.id !== id);
+      return { message: 'Ingredient deleted successfully.' };
+    });
+
+    renderApp();
+
+    fireEvent.click(await screen.findByTestId('company-tab-1'));
+    fireEvent.click(screen.getByTestId('module-card-CPO'));
+    const cpoMenu = await screen.findByTestId('cpo-horizontal-menu');
+    fireEvent.click(
+      within(cpoMenu).getByTestId('horizontal-menu-card-INPUT_PAKET')
+    );
+
+    const paketSubmenu = screen.getByTestId('horizontal-submenu-INPUT_PAKET');
+    fireEvent.click(
+      within(paketSubmenu).getByTestId('horizontal-menu-card-MASTER_BAHAN_BAKU')
+    );
+
+    const modal = await screen.findByTestId('master-bahan-baku-crud-modal');
+    expect(modal).toBeInTheDocument();
+    expect(modal).toHaveClass('max-w-[95vw]', 'h-[92vh]', 'max-h-[92vh]');
+    expect(
+      screen.getByTestId('master-bahan-baku-crud-modal-split-layout')
+    ).toContainElement(
+      screen.getByTestId('master-bahan-baku-crud-modal-form-panel')
+    );
+    expect(
+      screen.getByTestId('master-bahan-baku-crud-modal-split-layout')
+    ).toContainElement(
+      screen.getByTestId('master-bahan-baku-crud-modal-table-panel')
+    );
+
+    // Existing Brand Dua ingredients are grouped into one row with comma concatenation & summed price
+    expect(
+      await within(modal).findByText(
+        'Susu Bubuk Cabang 2 (BHN-201), Coklat Bubuk Cabang 2 (BHN-202)'
+      )
+    ).toBeInTheDocument();
+    expect(within(modal).getByText('Rp 40.000')).toBeInTheDocument();
+
+    // Select Nama Brand (company 1) -> filters Bahan Baku to company 1 + type Bahan only
+    const brandSelect = within(modal).getByLabelText(
+      'Nama Brand'
+    ) as HTMLSelectElement;
+    fireEvent.change(brandSelect, { target: { value: '50' } });
+
+    const row0 = within(modal).getByTestId('ingredient-item-row-0');
+    const row0Select = within(row0).getByLabelText(
+      'Bahan Baku'
+    ) as HTMLSelectElement;
+    const row0OptionLabels = Array.from(row0Select.options).map(
+      (opt) => opt.textContent
+    );
+    expect(row0OptionLabels).toContain('Tepung Terigu (BHN-01)');
+    expect(row0OptionLabels).toContain('Gula Pasir (BHN-02)');
+    expect(row0OptionLabels).toContain('Mentega (BHN-03)');
+    expect(row0OptionLabels).not.toContain('Mixer Lab (PRL-01)');
+    expect(row0OptionLabels).not.toContain('Susu Bubuk Cabang 2 (BHN-201)');
+
+    // Switching brand to company 2 clears incompatible item and excludes already-saved Brand Dua items
+    fireEvent.change(row0Select, { target: { value: '101' } });
+    fireEvent.change(brandSelect, { target: { value: '51' } });
+    expect(row0Select.value).toBe('');
+
+    // Switch back to Brand Satu (company 1), fill row 0 and click "+" to add row 1 dynamically
+    fireEvent.change(brandSelect, { target: { value: '50' } });
+    fireEvent.change(row0Select, { target: { value: '101' } });
+    fireEvent.change(within(row0).getByLabelText('Harga (Rp)'), {
+      target: { value: '12000' },
+    });
+
+    const plusBtn = within(modal).getByRole('button', { name: '+' });
+    fireEvent.click(plusBtn);
+
+    const row1 = within(modal).getByTestId('ingredient-item-row-1');
+    const row1Select = within(row1).getByLabelText(
+      'Bahan Baku'
+    ) as HTMLSelectElement;
+    // Row 1 excludes item already picked in row 0
+    const row1OptionLabels = Array.from(row1Select.options).map(
+      (opt) => opt.textContent
+    );
+    expect(row1OptionLabels).toContain('Gula Pasir (BHN-02)');
+    expect(row1OptionLabels).not.toContain('Tepung Terigu (BHN-01)');
+
+    fireEvent.change(row1Select, { target: { value: '102' } });
+    fireEvent.change(within(row1).getByLabelText('Harga (Rp)'), {
+      target: { value: '18500' },
+    });
+
+    fireEvent.click(within(modal).getByRole('button', { name: 'Tambah' }));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    await waitFor(() => {
+      expect(apiClient.createIngredient).toHaveBeenCalledTimes(2);
+      expect(apiClient.createIngredient).toHaveBeenNthCalledWith(1, {
+        default_package_id: 50,
+        item_id: 101,
+        price: 12000,
+      });
+      expect(apiClient.createIngredient).toHaveBeenNthCalledWith(2, {
+        default_package_id: 50,
+        item_id: 102,
+        price: 18500,
+      });
+      expect(
+        within(modal).getByText('Tepung Terigu (BHN-01), Gula Pasir (BHN-02)')
+      ).toBeInTheDocument();
+      expect(within(modal).getByText('Rp 30.500')).toBeInTheDocument();
+    });
+
+    // Edit grouped row for Brand Satu (50): update price on row 0 AND click "+" to add Mentega dynamically
+    fireEvent.click(within(modal).getByTestId('edit-row-50'));
+    const editRow0 = within(modal).getByTestId('ingredient-item-row-0');
+    fireEvent.change(within(editRow0).getByLabelText('Harga (Rp)'), {
+      target: { value: '15000' },
+    });
+
+    fireEvent.click(within(modal).getByRole('button', { name: '+' }));
+    const editRow2 = within(modal).getByTestId('ingredient-item-row-2');
+    fireEvent.change(within(editRow2).getByLabelText('Bahan Baku'), {
+      target: { value: '104' },
+    });
+    fireEvent.change(within(editRow2).getByLabelText('Harga (Rp)'), {
+      target: { value: '5000' },
+    });
+
+    fireEvent.click(within(modal).getByRole('button', { name: 'Perbarui' }));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    await waitFor(() => {
+      expect(apiClient.updateIngredient).toHaveBeenCalledWith(302, {
+        default_package_id: 50,
+        item_id: 101,
+        price: 15000,
+      });
+      expect(apiClient.createIngredient).toHaveBeenCalledWith({
+        default_package_id: 50,
+        item_id: 104,
+        price: 5000,
+      });
+      expect(
+        within(modal).getByText(
+          'Tepung Terigu (BHN-01), Gula Pasir (BHN-02), Mentega (BHN-03)'
+        )
+      ).toBeInTheDocument();
+      expect(within(modal).getByText('Rp 38.500')).toBeInTheDocument();
+    });
+
+    // Delete grouped row for Brand Satu (50) -> deletes all ingredients in that brand group
+    fireEvent.click(within(modal).getByTestId('delete-row-50'));
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    await waitFor(() => {
+      expect(apiClient.deleteIngredient).toHaveBeenCalledTimes(3);
+      expect(
+        within(modal).queryByText(
+          'Tepung Terigu (BHN-01), Gula Pasir (BHN-02), Mentega (BHN-03)'
+        )
+      ).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      within(modal).getByRole('button', { name: 'Tutup Modal' })
+    );
+    expect(
+      screen.queryByTestId('master-bahan-baku-crud-modal')
+    ).not.toBeInTheDocument();
+  });
+});
