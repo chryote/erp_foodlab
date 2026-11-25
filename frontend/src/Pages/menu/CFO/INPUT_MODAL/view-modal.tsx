@@ -10,12 +10,11 @@ import {
 import { formatCapitalIdr } from '@/modules/CFO/CapitalCompanyCrudModal';
 import {
   useCompanyCrudResource,
-  useStakeholderCrudResource,
+  useInfiniteStakeholdersQuery,
+  useStakeholdersTotalCapitalQuery,
 } from '@/lib/cfoResources';
 import { getActiveCompanyId } from '@/lib/activeCompanyStorage';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
-
-const LAZY_LOAD_BATCH_SIZE = 10;
 
 type SortDirection = 'asc' | 'desc';
 type StakeholderSortKey = 'stakeholder_name' | 'capital';
@@ -34,67 +33,52 @@ export default function CfoViewModalPage() {
     ) ?? null;
 
   const [stakeholderSearch, setStakeholderSearch] = useState('');
-  const [stakeholderVisibleCount, setStakeholderVisibleCount] =
-    useState(LAZY_LOAD_BATCH_SIZE);
   const debouncedStakeholderSearch = useDebouncedValue(stakeholderSearch);
   const [stakeholderSort, setStakeholderSort] = useState<{
     key: StakeholderSortKey;
     direction: SortDirection;
   } | null>(null);
-
-  const {
-    stakeholders,
-    loading: stakeholderLoading,
-    error: stakeholderError,
-  } = useStakeholderCrudResource(Boolean(selectedCompany), selectedCompany);
+  const stakeholderSortParam = stakeholderSort
+    ? `${stakeholderSort.direction === 'desc' ? '-' : ''}${stakeholderSort.key}`
+    : '-id';
+  const stakeholderListQuery = useInfiniteStakeholdersQuery(
+    selectedCompany?.id ?? null,
+    debouncedStakeholderSearch,
+    stakeholderSortParam
+  );
+  const stakeholderTotalCapitalQuery = useStakeholdersTotalCapitalQuery(
+    selectedCompany?.id ?? null
+  );
+  const stakeholders = useMemo(
+    () =>
+      stakeholderListQuery.data?.pages.flatMap((page) => page.data) ?? [],
+    [stakeholderListQuery.data]
+  );
+  const stakeholderListError =
+    stakeholderListQuery.error ?? stakeholderTotalCapitalQuery.error;
+  const stakeholderListErrorMessage =
+    stakeholderListError instanceof Error
+      ? stakeholderListError.message
+      : stakeholderListError
+        ? 'Gagal memuat data pemegang saham.'
+        : null;
 
   useEffect(() => {
     setStakeholderSearch('');
-    setStakeholderVisibleCount(LAZY_LOAD_BATCH_SIZE);
   }, [selectedCompany?.id]);
-
-  useEffect(() => {
-    setStakeholderVisibleCount(LAZY_LOAD_BATCH_SIZE);
-  }, [debouncedStakeholderSearch]);
 
   const totalCapital = useMemo(
     () =>
-      stakeholders.reduce(
-        (sum, item) => sum + (Number(item.capital) || 0),
-        0
-      ),
-    [stakeholders]
+      stakeholderTotalCapitalQuery.data ??
+      stakeholderListQuery.data?.pages[0]?.meta.total_capital ??
+      stakeholders.reduce((sum, item) => sum + (Number(item.capital) || 0), 0),
+    [
+      stakeholderListQuery.data,
+      stakeholderTotalCapitalQuery.data,
+      stakeholders,
+    ]
   );
-
-  const filteredStakeholders = useMemo(() => {
-    const query = debouncedStakeholderSearch.trim().toLowerCase();
-    const matchingStakeholders = query
-      ? stakeholders.filter((stakeholder) => {
-          const capital = Number(stakeholder.capital);
-          return (
-            stakeholder.stakeholder_name.toLowerCase().includes(query) ||
-            String(stakeholder.capital).includes(query) ||
-            formatCapitalIdr(capital).toLowerCase().includes(query)
-          );
-        })
-      : stakeholders;
-    if (!stakeholderSort) return matchingStakeholders;
-
-    return [...matchingStakeholders].sort((a, b) => {
-      const comparison =
-        stakeholderSort.key === 'stakeholder_name'
-          ? a.stakeholder_name.localeCompare(b.stakeholder_name, undefined, {
-              sensitivity: 'base',
-            })
-          : (Number(a.capital) || 0) - (Number(b.capital) || 0);
-      return stakeholderSort.direction === 'asc' ? comparison : -comparison;
-    });
-  }, [debouncedStakeholderSearch, stakeholderSort, stakeholders]);
-
-  const visibleStakeholders = useMemo(
-    () => filteredStakeholders.slice(0, stakeholderVisibleCount),
-    [filteredStakeholders, stakeholderVisibleCount]
-  );
+  const stakeholderLoading = stakeholderListQuery.isLoading;
 
   const stakeholderColumns = useMemo<DataTableColumn<CapitalCompany>[]>(
     () => [
@@ -175,12 +159,6 @@ export default function CfoViewModalPage() {
                 </p>
               </div>
 
-              {stakeholderError && (
-                <p className="mb-4 text-sm text-red-600" role="alert">
-                  {stakeholderError}
-                </p>
-              )}
-
               {stakeholderLoading ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">
                   Memuat data pemegang saham...
@@ -188,7 +166,7 @@ export default function CfoViewModalPage() {
               ) : (
                 <DataTable
                   columns={stakeholderColumns}
-                  data={visibleStakeholders}
+                  data={stakeholders}
                   rowKey={(row) => row.id}
                   stickyHeader
                   searchValue={stakeholderSearch}
@@ -196,25 +174,36 @@ export default function CfoViewModalPage() {
                   searchPlaceholder="Cari pemegang saham..."
                   searchTestId="pemegang-saham-table-search"
                   scrollTestId="pemegang-saham-table-scroll"
-                  onSearchChange={(value) => {
-                    setStakeholderSearch(value);
-                    setStakeholderVisibleCount(LAZY_LOAD_BATCH_SIZE);
-                  }}
+                  onSearchChange={setStakeholderSearch}
                   hasMore={
-                    visibleStakeholders.length < filteredStakeholders.length
+                    Boolean(stakeholderListQuery.hasNextPage) &&
+                    !stakeholderListQuery.isFetchNextPageError
                   }
-                  onLoadMore={() =>
-                    setStakeholderVisibleCount(
-                      (count) => count + LAZY_LOAD_BATCH_SIZE
-                    )
-                  }
+                  onLoadMore={() => {
+                    if (
+                      stakeholderListQuery.hasNextPage &&
+                      !stakeholderListQuery.isFetchingNextPage
+                    ) {
+                      void stakeholderListQuery.fetchNextPage();
+                    }
+                  }}
+                  isLoadingMore={stakeholderListQuery.isFetchingNextPage}
+                  loadMoreError={stakeholderListErrorMessage}
+                  onRetryLoadMore={() => {
+                    if (stakeholderTotalCapitalQuery.isError) {
+                      void stakeholderTotalCapitalQuery.refetch();
+                    } else if (stakeholderListQuery.isFetchNextPageError) {
+                      void stakeholderListQuery.fetchNextPage();
+                    } else {
+                      void stakeholderListQuery.refetch();
+                    }
+                  }}
                   sortKey={stakeholderSort?.key ?? null}
                   sortDirection={stakeholderSort?.direction}
                   onSort={(key) => {
                     if (key !== 'stakeholder_name' && key !== 'capital') {
                       return;
                     }
-                    setStakeholderVisibleCount(LAZY_LOAD_BATCH_SIZE);
                     setStakeholderSort((current) =>
                       current?.key === key
                         ? {

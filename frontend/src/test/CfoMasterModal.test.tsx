@@ -23,7 +23,7 @@ describe('CFO master modal', () => {
           capital: 250000,
         },
       ],
-      meta: { count: 1 },
+      meta: { count: 1, total_capital: 250000 },
     });
   });
 
@@ -197,24 +197,70 @@ describe('CFO master modal', () => {
     );
   });
 
-  it('loads ten more rows on scroll and searches each table', async () => {
-    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
-      data: Array.from({ length: 25 }, (_, index) => ({
+  it('loads server pages on scroll and searches each table on the server', async () => {
+    const companyRows = Array.from({ length: 25 }, (_, index) => ({
         id: 21 + index,
         name: `Company ${index + 1}`,
-        series: 1,
-      })),
-      meta: { count: 25 },
+        series: index === 11 ? 2 : 1,
+      }));
+    vi.mocked(apiClient.fetchCompanies).mockImplementation(async (params) => {
+      const matching = companyRows.filter((item) => {
+        const matchesName =
+          !params?.search ||
+          item.name.toLowerCase().includes(params.search.toLowerCase());
+        const matchesSeries =
+          params?.series === undefined || item.series === params.series;
+        return matchesName && matchesSeries;
+      });
+      const page = params?.page ?? 1;
+      const perPage = params?.per_page ?? 10;
+      return {
+        data: matching.slice((page - 1) * perPage, page * perPage),
+        meta: {
+          count: Math.min(perPage, matching.length),
+          total: matching.length,
+          page,
+          per_page: perPage,
+          last_page: Math.ceil(matching.length / perPage),
+          total_capital: stakeholderRows
+            .filter((item) => item.company_id === 21)
+            .reduce((sum, item) => sum + item.capital, 0),
+        },
+      };
     });
-    vi.mocked(apiClient.fetchCapitalCompanies).mockResolvedValue({
-      data: Array.from({ length: 25 }, (_, index) => ({
+    const stakeholderRows = Array.from({ length: 25 }, (_, index) => ({
         id: 31 + index,
         company_id: 21,
         stakeholder_name: `Owner ${index + 1}`,
         capital: 250000,
-      })),
-      meta: { count: 25 },
-    });
+      }));
+    vi.mocked(apiClient.fetchCapitalCompanies).mockImplementation(
+      async (params) => {
+        const matching = stakeholderRows.filter((item) => {
+          const matchesCompany =
+            params?.company_id === undefined ||
+            item.company_id === params.company_id;
+          const matchesSearch =
+            !params?.search ||
+            item.stakeholder_name
+              .toLowerCase()
+              .includes(params.search.toLowerCase());
+          return matchesCompany && matchesSearch;
+        });
+        const page = params?.page ?? 1;
+        const perPage = params?.per_page ?? 10;
+        return {
+          data: matching.slice((page - 1) * perPage, page * perPage),
+          meta: {
+            count: Math.min(perPage, matching.length),
+            total: matching.length,
+            page,
+            per_page: perPage,
+            last_page: Math.ceil(matching.length / perPage),
+          },
+        };
+      }
+    );
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
@@ -237,37 +283,59 @@ describe('CFO master modal', () => {
       fireEvent.scroll(scrollContainer);
     };
     const searchAndWait = async (testId: string, value: string) => {
-      vi.useFakeTimers();
-      try {
-        fireEvent.change(screen.getByTestId(testId), {
-          target: { value },
-        });
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(5000);
-        });
-      } finally {
-        vi.useRealTimers();
-      }
+      fireEvent.change(screen.getByTestId(testId), {
+        target: { value },
+      });
+      await act(async () => {
+        await new Promise((resolve) => window.setTimeout(resolve, 600));
+      });
     };
 
     scrollToBottom('perusahaan-table-scroll');
-    expect(screen.getByText('Company 11')).toBeInTheDocument();
+    expect(await screen.findByText('Company 11')).toBeInTheDocument();
+    expect(apiClient.fetchCompanies).toHaveBeenCalledWith(
+      expect.objectContaining({ page: 2, per_page: 10 })
+    );
     expect(screen.queryByTestId('perusahaan-pagination')).not.toBeInTheDocument();
     scrollToBottom('perusahaan-table-scroll');
-    expect(screen.getByText('Company 21')).toBeInTheDocument();
+    expect(await screen.findByText('Company 21')).toBeInTheDocument();
     await searchAndWait('perusahaan-table-search', 'Company 2');
-    expect(screen.getByText('Company 2')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(apiClient.fetchCompanies).toHaveBeenCalledWith(
+        expect.objectContaining({ search: 'Company 2', page: 1 })
+      )
+    );
+    expect(await screen.findByText('Company 2')).toBeInTheDocument();
     expect(screen.getByText('Company 21')).toBeInTheDocument();
     expect(screen.queryByText('Company 1')).not.toBeInTheDocument();
     await searchAndWait('perusahaan-table-search', '');
+    await searchAndWait('perusahaan-series-search', '2');
+    expect(apiClient.fetchCompanies).toHaveBeenCalledWith(
+      expect.objectContaining({ search: undefined, series: 2, page: 1 })
+    );
+    expect(await screen.findByText('Company 12')).toBeInTheDocument();
+    expect(screen.queryByText('Company 1')).not.toBeInTheDocument();
+    await searchAndWait('perusahaan-series-search', '');
 
     fireEvent.click(screen.getByTestId('stakeholder-row-21'));
     expect(await screen.findByText('Owner 1')).toBeInTheDocument();
     expect(screen.queryByText('Owner 11')).not.toBeInTheDocument();
     scrollToBottom('pemegang-saham-table-scroll');
-    expect(screen.getByText('Owner 11')).toBeInTheDocument();
+    expect(await screen.findByText('Owner 11')).toBeInTheDocument();
+    expect(apiClient.fetchCapitalCompanies).toHaveBeenCalledWith(
+      expect.objectContaining({ company_id: 21, page: 2, per_page: 10 })
+    );
     await searchAndWait('pemegang-saham-table-search', 'Owner 2');
-    expect(screen.getByText('Owner 2')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(apiClient.fetchCapitalCompanies).toHaveBeenCalledWith(
+        expect.objectContaining({
+          company_id: 21,
+          search: 'Owner 2',
+          page: 1,
+        })
+      )
+    );
+    expect(await screen.findByText('Owner 2')).toBeInTheDocument();
     expect(screen.getByText('Owner 21')).toBeInTheDocument();
     expect(screen.queryByText('Owner 1')).not.toBeInTheDocument();
     expect(
@@ -275,17 +343,118 @@ describe('CFO master modal', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('sorts supported columns on header clicks and keeps the table headers sticky', async () => {
-    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
-      data: [
-        { id: 21, name: 'Zeta', series: 2 },
-        { id: 22, name: 'Alpha', series: 3 },
-        { id: 23, name: 'Beta', series: 1 },
-      ],
-      meta: { count: 3 },
+  it('shows a bottom-page error and retries a failed next-page request', async () => {
+    const firstPage = Array.from({ length: 10 }, (_, index) => ({
+      id: 21 + index,
+      name: `Company ${index + 1}`,
+      series: 1,
+    }));
+    vi.mocked(apiClient.fetchCompanies)
+      .mockResolvedValueOnce({
+        data: firstPage,
+        meta: { count: 10, page: 1, per_page: 10, last_page: 2 },
+      })
+      .mockRejectedValueOnce(new Error('Failed to fetch companies: 500'))
+      .mockResolvedValueOnce({
+        data: [{ id: 31, name: 'Company 11', series: 1 }],
+        meta: { count: 1, page: 2, per_page: 10, last_page: 2 },
+      });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
     });
-    vi.mocked(apiClient.fetchCapitalCompanies).mockResolvedValue({
-      data: [
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CfoMasterModalPage />
+      </QueryClientProvider>
+    );
+
+    expect(await screen.findByText('Company 1')).toBeInTheDocument();
+    const scrollContainer = screen.getByTestId('perusahaan-table-scroll');
+    Object.defineProperties(scrollContainer, {
+      scrollHeight: { configurable: true, value: 1000 },
+      clientHeight: { configurable: true, value: 400 },
+      scrollTop: { configurable: true, writable: true, value: 600 },
+    });
+    fireEvent.scroll(scrollContainer);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Failed to fetch companies: 500'
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Coba lagi' }));
+    expect(await screen.findByText('Company 11')).toBeInTheDocument();
+    expect(apiClient.fetchCompanies).toHaveBeenCalledTimes(3);
+  });
+
+  it('uses the scroll container as the intersection observer root', async () => {
+    const observedOptions: IntersectionObserverInit[] = [];
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(
+          private readonly callback: IntersectionObserverCallback,
+          options: IntersectionObserverInit
+        ) {
+          observedOptions.push(options);
+        }
+
+        observe(target: Element) {
+          this.callback(
+            [{ isIntersecting: true, target } as IntersectionObserverEntry],
+            this as unknown as IntersectionObserver
+          );
+        }
+
+        disconnect() {}
+      }
+    );
+
+    vi.mocked(apiClient.fetchCompanies).mockImplementation(async (params) => ({
+      data:
+        params?.page === 1
+          ? [{ id: 21, name: 'Company 1', series: 1 }]
+          : [{ id: 22, name: 'Company 2', series: 1 }],
+      meta: { count: 1, page: params?.page, per_page: 1, last_page: 2 },
+    }));
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    try {
+      render(
+        <QueryClientProvider client={queryClient}>
+          <CfoMasterModalPage />
+        </QueryClientProvider>
+      );
+
+      expect(await screen.findByText('Company 2')).toBeInTheDocument();
+      expect(observedOptions[0]?.root).toBe(
+        screen.getByTestId('perusahaan-table-scroll')
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('sorts supported columns on header clicks and keeps the table headers sticky', async () => {
+    const companyRows = [
+      { id: 21, name: 'Zeta', series: 2 },
+      { id: 22, name: 'Alpha', series: 3 },
+      { id: 23, name: 'Beta', series: 1 },
+    ];
+    vi.mocked(apiClient.fetchCompanies).mockImplementation(async (params) => {
+      const rows = [...companyRows];
+      if (params?.sort === 'name') {
+        rows.sort((a, b) => a.name.localeCompare(b.name));
+      } else if (params?.sort === 'series') {
+        rows.sort((a, b) => a.series - b.series);
+      }
+      return {
+        data: rows,
+        meta: { count: rows.length, last_page: 1 },
+      };
+    });
+    const stakeholderRows = [
         {
           id: 31,
           company_id: 21,
@@ -304,9 +473,23 @@ describe('CFO master modal', () => {
           stakeholder_name: 'Owner B',
           capital: 200,
         },
-      ],
-      meta: { count: 3 },
-    });
+      ];
+    vi.mocked(apiClient.fetchCapitalCompanies).mockImplementation(
+      async (params) => {
+        const rows = [...stakeholderRows];
+        if (params?.sort === 'stakeholder_name') {
+          rows.sort((a, b) =>
+            a.stakeholder_name.localeCompare(b.stakeholder_name)
+          );
+        } else if (params?.sort === 'capital') {
+          rows.sort((a, b) => a.capital - b.capital);
+        }
+        return {
+          data: rows,
+          meta: { count: rows.length, last_page: 1, total_capital: 600 },
+        };
+      }
+    );
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
@@ -345,9 +528,16 @@ describe('CFO master modal', () => {
     fireEvent.click(
       screen.getByRole('button', { name: 'Urutkan Nama Perusahaan' })
     );
-    expect(getCompanyNames()).toEqual(['Alpha', 'Beta', 'Zeta']);
+    await waitFor(() =>
+      expect(getCompanyNames()).toEqual(['Alpha', 'Beta', 'Zeta'])
+    );
+    expect(apiClient.fetchCompanies).toHaveBeenCalledWith(
+      expect.objectContaining({ sort: 'name' })
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Urutkan Seri' }));
-    expect(getCompanyNames()).toEqual(['Beta', 'Zeta', 'Alpha']);
+    await waitFor(() =>
+      expect(getCompanyNames()).toEqual(['Beta', 'Zeta', 'Alpha'])
+    );
 
     fireEvent.click(screen.getByTestId('stakeholder-row-21'));
     const stakeholderSection = screen.getByTestId('pemegang-saham');
@@ -367,9 +557,16 @@ describe('CFO master modal', () => {
     fireEvent.click(
       screen.getByRole('button', { name: 'Urutkan Nama Pemegang Saham' })
     );
-    expect(getStakeholderNames()).toEqual(['Owner A', 'Owner B', 'Owner Z']);
+    await waitFor(() =>
+      expect(getStakeholderNames()).toEqual(['Owner A', 'Owner B', 'Owner Z'])
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Urutkan Kapital' }));
-    expect(getStakeholderNames()).toEqual(['Owner Z', 'Owner B', 'Owner A']);
+    await waitFor(() =>
+      expect(getStakeholderNames()).toEqual(['Owner Z', 'Owner B', 'Owner A'])
+    );
+    expect(apiClient.fetchCapitalCompanies).toHaveBeenCalledWith(
+      expect.objectContaining({ sort: 'capital' })
+    );
   });
 
   it('shows each stakeholder capital share and uses a 40/60 desktop split', async () => {
@@ -388,7 +585,7 @@ describe('CFO master modal', () => {
           capital: 750000,
         },
       ],
-      meta: { count: 2 },
+      meta: { count: 2, total_capital: 1000000 },
     });
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -424,7 +621,7 @@ describe('CFO master modal', () => {
           capital: 0,
         },
       ],
-      meta: { count: 1 },
+      meta: { count: 1, total_capital: 0 },
     });
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },

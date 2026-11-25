@@ -30,9 +30,18 @@ export interface DataTableProps<T> {
   searchLabel?: string;
   searchPlaceholder?: string;
   searchTestId?: string;
+  secondarySearchValue?: string;
+  onSecondarySearchChange?: (value: string) => void;
+  secondarySearchLabel?: string;
+  secondarySearchPlaceholder?: string;
+  secondarySearchTestId?: string;
+  secondarySearchType?: 'search' | 'number';
   scrollTestId?: string;
   hasMore?: boolean;
   onLoadMore?: () => void;
+  isLoadingMore?: boolean;
+  loadMoreError?: string | null;
+  onRetryLoadMore?: () => void;
   emptyMessage?: string;
   emptyTestId?: string;
 }
@@ -50,19 +59,54 @@ export function DataTable<T>({
   searchLabel = 'Cari data',
   searchPlaceholder = 'Cari data...',
   searchTestId = 'ui-data-table-search',
+  secondarySearchValue,
+  onSecondarySearchChange,
+  secondarySearchLabel = 'Cari data tambahan',
+  secondarySearchPlaceholder = 'Cari data...',
+  secondarySearchTestId = 'ui-data-table-secondary-search',
+  secondarySearchType = 'search',
   scrollTestId,
   hasMore = false,
   onLoadMore,
+  isLoadingMore = false,
+  loadMoreError,
+  onRetryLoadMore,
   emptyMessage = 'No records found.',
   emptyTestId = 'empty-table',
 }: DataTableProps<T>): React.ReactElement {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (stickyHeader && scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop = 0;
     }
-  }, [searchValue, sortKey, stickyHeader]);
+  }, [searchValue, secondarySearchValue, sortKey, stickyHeader]);
+
+  useEffect(() => {
+    const root = scrollContainerRef.current;
+    const sentinel = loadMoreSentinelRef.current;
+    if (
+      !root ||
+      !sentinel ||
+      !hasMore ||
+      !onLoadMore ||
+      typeof IntersectionObserver === 'undefined'
+    ) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !isLoadingMore) {
+          onLoadMore();
+        }
+      },
+      { root, rootMargin: '0px 0px 48px 0px' }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, isLoadingMore, onLoadMore]);
 
   if (data.length === 0 && !stickyHeader) {
     return (
@@ -114,8 +158,10 @@ export function DataTable<T>({
     const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
       const { scrollHeight, scrollTop, clientHeight } = event.currentTarget;
       if (
+        typeof IntersectionObserver === 'undefined' &&
         hasMore &&
         onLoadMore &&
+        !isLoadingMore &&
         scrollHeight - scrollTop - clientHeight <= 48
       ) {
         onLoadMore();
@@ -123,25 +169,50 @@ export function DataTable<T>({
     };
 
     return (
-      <div className="flex min-h-0 w-full flex-1 flex-col">
-        {searchValue !== undefined && onSearchChange && (
-          <div className="flex shrink-0 justify-end py-2">
-            <label className="relative w-full max-w-xs">
-              <span className="sr-only">{searchLabel}</span>
-              <input
-                type="search"
-                className="h-9 w-full rounded-lg border border-input bg-background px-3 py-1.5 pr-9 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label={searchLabel}
-                data-testid={searchTestId}
-                placeholder={searchPlaceholder}
-                value={searchValue}
-                onChange={(event) => onSearchChange(event.target.value)}
-              />
-              <Search
-                className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                aria-hidden="true"
-              />
-            </label>
+      <div className="flex min-h-0 w-full flex-1 flex-col mt-2">
+        {((searchValue !== undefined && onSearchChange) ||
+          (secondarySearchValue !== undefined &&
+            onSecondarySearchChange)) && (
+          <div className="flex flex-col gap-2 pb-3 sm:flex-row sm:items-center sm:justify-between">
+            {searchValue !== undefined && onSearchChange && (
+              <label className="relative w-full">
+                <span className="sr-only">{searchLabel}</span>
+                <input
+                  type="search"
+                  className="h-9 w-full rounded-lg border border-input bg-background px-3 py-1.5 pr-9 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={searchLabel}
+                  data-testid={searchTestId}
+                  placeholder={searchPlaceholder}
+                  value={searchValue}
+                  onChange={(event) => onSearchChange(event.target.value)}
+                />
+                <Search
+                  className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden="true"
+                />
+              </label>
+            )}
+            {secondarySearchValue !== undefined &&
+              onSecondarySearchChange && (
+              <label className="relative w-full">
+                <span className="sr-only">{secondarySearchLabel}</span>
+                <input
+                  type={secondarySearchType}
+                  className="h-9 w-full rounded-lg border border-input bg-background px-3 py-1.5 pr-9 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={secondarySearchLabel}
+                  data-testid={secondarySearchTestId}
+                  placeholder={secondarySearchPlaceholder}
+                  value={secondarySearchValue}
+                  onChange={(event) =>
+                    onSecondarySearchChange(event.target.value)
+                  }
+                />
+                <Search
+                  className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                </label>
+              )}
           </div>
         )}
         <div
@@ -195,6 +266,31 @@ export function DataTable<T>({
               </tbody>
             </table>
           )}
+            {isLoadingMore && (
+              <p className="py-3 text-center text-sm text-muted-foreground" role="status">
+                Memuat halaman berikutnya...
+              </p>
+            )}
+            {loadMoreError && (
+              <div className="flex flex-col items-center gap-2 py-3 text-sm text-red-600" role="alert">
+                <p>{loadMoreError}</p>
+                {onRetryLoadMore && (
+                  <button
+                    type="button"
+                    className="underline underline-offset-2"
+                    onClick={onRetryLoadMore}
+                  >
+                    Coba lagi
+                  </button>
+                )}
+              </div>
+            )}
+            <div
+              ref={loadMoreSentinelRef}
+              className="h-px"
+              data-testid={scrollTestId ? `${scrollTestId}-sentinel` : undefined}
+              aria-hidden="true"
+            />
         </div>
       </div>
     );

@@ -276,4 +276,57 @@ describe('General API Client Contract & Error Handling', () => {
     expect(String(calls[8][0])).toContain('/v1/modules/cpo/item-packets');
     expect(String(calls[10][0])).toContain('/v1/modules/cpo/item-packets/7');
   });
+
+  it('sends pagination and filter parameters for CFO operational lists', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: [], meta: { count: 0 } }),
+    } as Response);
+
+    await fetchExpenseCategories({
+      page: 2,
+      per_page: 10,
+      company_id: 21,
+      search: ' Bahan Baku ',
+      sort: 'name',
+    });
+    await fetchExpenseTypes({
+      page: 1,
+      per_page: 10,
+      company_id: 21,
+      expense_category_id: 31,
+      sort: '-name',
+    });
+    await fetchExpenseItems({
+      page: 3,
+      per_page: 10,
+      company_id: 21,
+      expense_category_id: 31,
+      expense_type_id: 41,
+      search: 'Susu',
+      sort: '-purchased_on',
+    });
+
+    const calls = vi.mocked(globalThis.fetch).mock.calls;
+    const categoryUrl = new URL(String(calls[0][0]), 'http://localhost');
+    const typeUrl = new URL(String(calls[1][0]), 'http://localhost');
+    const itemUrl = new URL(String(calls[2][0]), 'http://localhost');
+
+    expect(categoryUrl.pathname).toContain('/expense-categories');
+    expect(categoryUrl.searchParams.get('page')).toBe('2');
+    expect(categoryUrl.searchParams.get('per_page')).toBe('10');
+    expect(categoryUrl.searchParams.get('filter[company_id]')).toBe('21');
+    expect(categoryUrl.searchParams.get('filter[search]')).toBe('Bahan Baku');
+    expect(categoryUrl.searchParams.get('sort')).toBe('name');
+
+    expect(typeUrl.searchParams.get('filter[expense_category_id]')).toBe('31');
+    expect(typeUrl.searchParams.get('sort')).toBe('-name');
+
+    expect(itemUrl.searchParams.get('page')).toBe('3');
+    expect(itemUrl.searchParams.get('filter[expense_category_id]')).toBe('31');
+    expect(itemUrl.searchParams.get('filter[expense_type_id]')).toBe('41');
+    expect(itemUrl.searchParams.get('filter[search]')).toBe('Susu');
+    expect(itemUrl.searchParams.get('sort')).toBe('-purchased_on');
+  });
 });

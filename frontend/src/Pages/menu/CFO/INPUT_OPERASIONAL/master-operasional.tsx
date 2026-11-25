@@ -12,15 +12,18 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import {
+  useInfiniteExpenseCategoriesQuery,
+  useInfiniteExpenseTypesQuery,
   useCompanyCrudResource,
   useMasterOperasionalCrudResource,
 } from '@/lib/cfoResources';
 import { getActiveCompanyId } from '@/lib/activeCompanyStorage';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 
 type ActiveTab = 'kategori' | 'tipe';
 type SortDirection = 'asc' | 'desc';
 type CategorySortKey = 'name';
-type TypeSortKey = 'category' | 'name';
+type TypeSortKey = 'name';
 
 type PendingAction =
   | { kind: 'save-category'; id?: number; name: string }
@@ -33,8 +36,6 @@ type PendingAction =
   | { kind: 'delete-category'; id: number; name: string }
   | { kind: 'delete-type'; id: number; name: string };
 
-const LAZY_LOAD_BATCH_SIZE = 10;
-
 export default function CfoMasterOperasionalPage() {
   const { companyId: routeCompanyId } = useParams();
   const parsedCompanyId = Number(routeCompanyId);
@@ -46,7 +47,10 @@ export default function CfoMasterOperasionalPage() {
   const company =
     companyResource.companies.find((item) => item.id === selectedCompanyId) ??
     null;
-  const resource = useMasterOperasionalCrudResource(Boolean(company), company);
+  const resource = useMasterOperasionalCrudResource(Boolean(company), company, {
+    includeTypes: false,
+    includeItems: false,
+  });
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('kategori');
   const [categoryName, setCategoryName] = useState('');
@@ -57,10 +61,6 @@ export default function CfoMasterOperasionalPage() {
   const [editingType, setEditingType] = useState<ExpenseType | null>(null);
   const [categorySearch, setCategorySearch] = useState('');
   const [typeSearch, setTypeSearch] = useState('');
-  const [categoryVisibleCount, setCategoryVisibleCount] =
-    useState(LAZY_LOAD_BATCH_SIZE);
-  const [typeVisibleCount, setTypeVisibleCount] =
-    useState(LAZY_LOAD_BATCH_SIZE);
   const [categorySort, setCategorySort] = useState<{
     key: CategorySortKey;
     direction: SortDirection;
@@ -73,6 +73,32 @@ export default function CfoMasterOperasionalPage() {
     null
   );
   const [isActionLoading, setIsActionLoading] = useState(false);
+  const debouncedCategorySearch = useDebouncedValue(categorySearch);
+  const debouncedTypeSearch = useDebouncedValue(typeSearch);
+  const categorySortParam = categorySort
+    ? `${categorySort.direction === 'desc' ? '-' : ''}${categorySort.key}`
+    : '-id';
+  const typeSortParam = typeSort
+    ? `${typeSort.direction === 'desc' ? '-' : ''}${typeSort.key}`
+    : '-id';
+  const categoryListQuery = useInfiniteExpenseCategoriesQuery(
+    company?.id ?? null,
+    debouncedCategorySearch,
+    categorySortParam
+  );
+  const typeListQuery = useInfiniteExpenseTypesQuery(
+    company?.id ?? null,
+    debouncedTypeSearch,
+    typeSortParam
+  );
+  const listedCategories = useMemo(
+    () => categoryListQuery.data?.pages.flatMap((page) => page.data) ?? [],
+    [categoryListQuery.data]
+  );
+  const listedTypes = useMemo(
+    () => typeListQuery.data?.pages.flatMap((page) => page.data) ?? [],
+    [typeListQuery.data]
+  );
 
   const getTypeCategoryName = useCallback(
     (type: ExpenseType) =>
@@ -82,67 +108,6 @@ export default function CfoMasterOperasionalPage() {
       type.expense_category?.name ??
       '',
     [resource.categories]
-  );
-
-  const filteredCategories = useMemo(() => {
-    const query = categorySearch.trim().toLowerCase();
-    const matchingCategories = query
-      ? resource.categories.filter((category) =>
-          category.name.toLowerCase().includes(query)
-        )
-      : resource.categories;
-    if (!categorySort) return matchingCategories;
-
-    return [...matchingCategories].sort((a, b) => {
-      const comparison = a.name.localeCompare(b.name, undefined, {
-        sensitivity: 'base',
-      });
-      return categorySort.direction === 'asc' ? comparison : -comparison;
-    });
-  }, [categorySearch, categorySort, resource.categories]);
-
-  const filteredTypes = useMemo(() => {
-    const query = typeSearch.trim().toLowerCase();
-    const matchingTypes = query
-      ? resource.types.filter((type) => {
-          const categoryName =
-            resource.categories.find(
-              (category) => category.id === Number(type.expense_category_id)
-            )?.name ??
-            type.expense_category?.name ??
-            '';
-          return (
-            type.name.toLowerCase().includes(query) ||
-            categoryName.toLowerCase().includes(query)
-          );
-        })
-      : resource.types;
-    if (!typeSort) return matchingTypes;
-
-    return [...matchingTypes].sort((a, b) => {
-      const comparison =
-        typeSort.key === 'name'
-          ? a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
-          : getTypeCategoryName(a).localeCompare(getTypeCategoryName(b), undefined, {
-              sensitivity: 'base',
-            });
-      return typeSort.direction === 'asc' ? comparison : -comparison;
-    });
-  }, [
-    getTypeCategoryName,
-    resource.categories,
-    resource.types,
-    typeSearch,
-    typeSort,
-  ]);
-
-  const visibleCategories = useMemo(
-    () => filteredCategories.slice(0, categoryVisibleCount),
-    [categoryVisibleCount, filteredCategories]
-  );
-  const visibleTypes = useMemo(
-    () => filteredTypes.slice(0, typeVisibleCount),
-    [filteredTypes, typeVisibleCount]
   );
 
   const resetCategoryForm = () => {
@@ -288,7 +253,6 @@ export default function CfoMasterOperasionalPage() {
       {
         key: 'category',
         header: 'Kategori',
-        sortable: true,
         render: (row) => getTypeCategoryName(row) || '-',
       },
       {
@@ -443,36 +407,51 @@ export default function CfoMasterOperasionalPage() {
               </div>
             </form>
 
-            {resource.loading && filteredCategories.length === 0 ? (
+            {categoryListQuery.isLoading ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 Memuat data kategori...
               </p>
             ) : (
               <DataTable
                 columns={categoryColumns}
-                data={visibleCategories}
+                data={listedCategories}
                 rowKey={(row) => row.id}
                 stickyHeader
                 searchValue={categorySearch}
-                onSearchChange={(value) => {
-                  setCategorySearch(value);
-                  setCategoryVisibleCount(LAZY_LOAD_BATCH_SIZE);
-                }}
+                onSearchChange={setCategorySearch}
                 searchLabel="Cari kategori"
                 searchPlaceholder="Cari kategori..."
                 searchTestId="master-operasional-kategori-search"
                 scrollTestId="master-operasional-kategori-table-scroll"
-                hasMore={visibleCategories.length < filteredCategories.length}
-                onLoadMore={() =>
-                  setCategoryVisibleCount(
-                    (count) => count + LAZY_LOAD_BATCH_SIZE
-                  )
+                hasMore={
+                  Boolean(categoryListQuery.hasNextPage) &&
+                  !categoryListQuery.error
                 }
+                onLoadMore={() => {
+                  if (
+                    categoryListQuery.hasNextPage &&
+                    !categoryListQuery.isFetchingNextPage
+                  ) {
+                    void categoryListQuery.fetchNextPage();
+                  }
+                }}
+                isLoadingMore={categoryListQuery.isFetchingNextPage}
+                loadMoreError={
+                  categoryListQuery.error instanceof Error
+                    ? categoryListQuery.error.message
+                    : categoryListQuery.error
+                      ? 'Gagal memuat kategori operasional.'
+                      : null
+                }
+                onRetryLoadMore={() => {
+                  void (categoryListQuery.isFetchNextPageError
+                    ? categoryListQuery.fetchNextPage()
+                    : categoryListQuery.refetch());
+                }}
                 sortKey={categorySort?.key ?? null}
                 sortDirection={categorySort?.direction}
                 onSort={(key) => {
                   if (key !== 'name') return;
-                  setCategoryVisibleCount(LAZY_LOAD_BATCH_SIZE);
                   setCategorySort((current) =>
                     current?.key === key
                       ? {
@@ -555,34 +534,50 @@ export default function CfoMasterOperasionalPage() {
               </div>
             </form>
 
-            {resource.loading && filteredTypes.length === 0 ? (
+            {typeListQuery.isLoading ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 Memuat data tipe...
               </p>
             ) : (
               <DataTable
                 columns={typeColumns}
-                data={visibleTypes}
+                data={listedTypes}
                 rowKey={(row) => row.id}
                 stickyHeader
                 searchValue={typeSearch}
-                onSearchChange={(value) => {
-                  setTypeSearch(value);
-                  setTypeVisibleCount(LAZY_LOAD_BATCH_SIZE);
-                }}
+                onSearchChange={setTypeSearch}
                 searchLabel="Cari tipe"
-                searchPlaceholder="Cari tipe atau kategori..."
+                searchPlaceholder="Cari tipe..."
                 searchTestId="master-operasional-tipe-search"
                 scrollTestId="master-operasional-tipe-table-scroll"
-                hasMore={visibleTypes.length < filteredTypes.length}
-                onLoadMore={() =>
-                  setTypeVisibleCount((count) => count + LAZY_LOAD_BATCH_SIZE)
+                hasMore={
+                  Boolean(typeListQuery.hasNextPage) && !typeListQuery.error
                 }
+                onLoadMore={() => {
+                  if (
+                    typeListQuery.hasNextPage &&
+                    !typeListQuery.isFetchingNextPage
+                  ) {
+                    void typeListQuery.fetchNextPage();
+                  }
+                }}
+                isLoadingMore={typeListQuery.isFetchingNextPage}
+                loadMoreError={
+                  typeListQuery.error instanceof Error
+                    ? typeListQuery.error.message
+                    : typeListQuery.error
+                      ? 'Gagal memuat tipe operasional.'
+                      : null
+                }
+                onRetryLoadMore={() => {
+                  void (typeListQuery.isFetchNextPageError
+                    ? typeListQuery.fetchNextPage()
+                    : typeListQuery.refetch());
+                }}
                 sortKey={typeSort?.key ?? null}
                 sortDirection={typeSort?.direction}
                 onSort={(key) => {
-                  if (key !== 'name' && key !== 'category') return;
-                  setTypeVisibleCount(LAZY_LOAD_BATCH_SIZE);
+                  if (key !== 'name') return;
                   setTypeSort((current) =>
                     current?.key === key
                       ? {

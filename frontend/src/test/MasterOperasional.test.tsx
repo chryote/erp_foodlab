@@ -92,7 +92,7 @@ describe('CFO master operasional', () => {
     });
   });
 
-  it('sorts types by category without accessing an uninitialized helper', async () => {
+  it('loads the type table with server-side filtering and sorting', async () => {
     vi.mocked(apiClient.fetchExpenseCategories).mockResolvedValue({
       data: [
         { id: 21, company_id: 21, name: 'Zeta' },
@@ -133,12 +133,42 @@ describe('CFO master operasional', () => {
     const table = await screen.findByTestId(
       'master-operasional-tipe-table-scroll'
     );
-    fireEvent.click(
-      within(table).getByRole('button', { name: 'Urutkan Kategori' })
+    expect(
+      within(table).queryByRole('button', { name: 'Urutkan Kategori' })
+    ).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(apiClient.fetchExpenseTypes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          page: 1,
+          per_page: 10,
+          company_id: 21,
+          sort: '-id',
+        })
+      );
+    });
+
+    fireEvent.change(screen.getByTestId('master-operasional-tipe-search'), {
+      target: { value: 'Dairy' },
+    });
+    await waitFor(
+      () => {
+        expect(apiClient.fetchExpenseTypes).toHaveBeenCalledWith(
+          expect.objectContaining({ search: 'Dairy' })
+        );
+      },
+      { timeout: 3000 }
     );
 
-    const rows = within(table).getAllByRole('row');
-    expect(within(rows[1]).getAllByRole('cell')[0]).toHaveTextContent('Alpha');
-    expect(within(rows[2]).getAllByRole('cell')[0]).toHaveTextContent('Zeta');
+    const filteredTable = await screen.findByTestId(
+      'master-operasional-tipe-table-scroll'
+    );
+    fireEvent.click(
+      within(filteredTable).getByRole('button', { name: 'Urutkan Nama Tipe' })
+    );
+    await waitFor(() => {
+      expect(apiClient.fetchExpenseTypes).toHaveBeenCalledWith(
+        expect.objectContaining({ sort: 'name' })
+      );
+    });
   });
 });

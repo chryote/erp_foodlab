@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
   QueryClient,
+  useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
@@ -51,6 +52,179 @@ export const cfoQueryKeys = {
   expenseItems: ['cfo', 'expense-items'] as const,
   companyAssets: ['cfo', 'company-assets'] as const,
 };
+
+export const CFO_LIST_PAGE_SIZE = 10;
+
+function getNextListPage<T>(
+  response: { data: T[]; meta: { last_page?: number } },
+  page: number
+): number | undefined {
+  if (response.meta.last_page !== undefined) {
+    return page < response.meta.last_page ? page + 1 : undefined;
+  }
+
+  return response.data.length === CFO_LIST_PAGE_SIZE ? page + 1 : undefined;
+}
+
+export function useInfiniteCompaniesQuery(
+  searchName: string,
+  searchSeries: string,
+  sort: string
+) {
+  const seriesFilter = searchSeries.trim()
+    ? Number(searchSeries.trim())
+    : undefined;
+  return useInfiniteQuery({
+    queryKey: [
+      ...cfoQueryKeys.companies,
+      'infinite',
+      searchName,
+      searchSeries,
+      sort,
+    ],
+    queryFn: ({ pageParam }) =>
+      fetchCompanies({
+        page: pageParam,
+        per_page: CFO_LIST_PAGE_SIZE,
+        search: searchName.trim() || undefined,
+        sort,
+        series: seriesFilter,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      getNextListPage(lastPage, lastPageParam),
+  });
+}
+
+export function useStakeholdersTotalCapitalQuery(companyId: number | null) {
+  return useQuery({
+    queryKey: [...cfoQueryKeys.capitalCompanies, 'total-capital', companyId],
+    queryFn: async () => {
+      const response = await fetchCapitalCompanies({
+        page: 1,
+        per_page: 1,
+        company_id: companyId ?? undefined,
+      });
+      return (
+        response.meta.total_capital ??
+        Number(response.data[0]?.capital ?? 0)
+      );
+    },
+    enabled: companyId !== null,
+  });
+}
+
+export function useInfiniteStakeholdersQuery(
+  companyId: number | null,
+  search: string,
+  sort: string
+) {
+  return useInfiniteQuery({
+    queryKey: [
+      ...cfoQueryKeys.capitalCompanies,
+      'infinite',
+      companyId,
+      search,
+      sort,
+    ],
+    queryFn: ({ pageParam }) =>
+      fetchCapitalCompanies({
+        page: pageParam,
+        per_page: CFO_LIST_PAGE_SIZE,
+        company_id: companyId ?? undefined,
+        search,
+        sort,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      getNextListPage(lastPage, lastPageParam),
+    enabled: companyId !== null,
+  });
+}
+
+export function useInfiniteExpenseCategoriesQuery(
+  companyId: number | null,
+  search: string,
+  sort: string
+) {
+  return useInfiniteQuery({
+    queryKey: [
+      ...cfoQueryKeys.expenseCategories,
+      'infinite',
+      companyId,
+      search,
+      sort,
+    ],
+    queryFn: ({ pageParam }) =>
+      fetchExpenseCategories({
+        page: pageParam,
+        per_page: CFO_LIST_PAGE_SIZE,
+        company_id: companyId ?? undefined,
+        search: search.trim() || undefined,
+        sort,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      getNextListPage(lastPage, lastPageParam),
+    enabled: companyId !== null,
+  });
+}
+
+export function useInfiniteExpenseTypesQuery(
+  companyId: number | null,
+  search: string,
+  sort: string
+) {
+  return useInfiniteQuery({
+    queryKey: [
+      ...cfoQueryKeys.expenseTypes,
+      'infinite',
+      companyId,
+      search,
+      sort,
+    ],
+    queryFn: ({ pageParam }) =>
+      fetchExpenseTypes({
+        page: pageParam,
+        per_page: CFO_LIST_PAGE_SIZE,
+        company_id: companyId ?? undefined,
+        search: search.trim() || undefined,
+        sort,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      getNextListPage(lastPage, lastPageParam),
+    enabled: companyId !== null,
+  });
+}
+
+export function useInfiniteExpenseItemsQuery(
+  companyId: number | null,
+  search: string,
+  sort: string
+) {
+  return useInfiniteQuery({
+    queryKey: [
+      ...cfoQueryKeys.expenseItems,
+      'infinite',
+      companyId,
+      search,
+      sort,
+    ],
+    queryFn: ({ pageParam }) =>
+      fetchExpenseItems({
+        page: pageParam,
+        per_page: CFO_LIST_PAGE_SIZE,
+        company_id: companyId ?? undefined,
+        search: search.trim() || undefined,
+        sort,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      getNextListPage(lastPage, lastPageParam),
+    enabled: companyId !== null,
+  });
+}
 
 export function createAppQueryClient(): QueryClient {
   return new QueryClient({
@@ -456,10 +630,12 @@ export interface ExpenseItemMutationInput {
 
 export function useMasterOperasionalCrudResource(
   enabled: boolean,
-  company: Company | null
+  company: Company | null,
+  options: { includeTypes?: boolean; includeItems?: boolean } = {}
 ) {
   const queryClient = useQueryClient();
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const { includeTypes = true, includeItems = true } = options;
 
   const categoriesQuery = useQuery<ExpenseCategory[]>({
     queryKey: cfoQueryKeys.expenseCategories,
@@ -476,7 +652,7 @@ export function useMasterOperasionalCrudResource(
       const res = await fetchExpenseTypes();
       return res?.data ?? [];
     },
-    enabled,
+    enabled: enabled && includeTypes,
   });
 
   const itemsQuery = useQuery<ExpenseItem[]>({
@@ -485,7 +661,7 @@ export function useMasterOperasionalCrudResource(
       const res = await fetchExpenseItems();
       return res?.data ?? [];
     },
-    enabled,
+    enabled: enabled && includeItems,
   });
 
   const allCategories = categoriesQuery.data ?? [];

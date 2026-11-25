@@ -18,7 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  Pagination,
   SelectInput,
   SummaryBanner,
   TextInput,
@@ -26,11 +25,13 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import {
+  useInfiniteExpenseItemsQuery,
   useCompanyCrudResource,
   useMasterOperasionalCrudResource,
 } from '@/lib/cfoResources';
 import { getActiveCompanyId } from '@/lib/activeCompanyStorage';
 import { formatCapitalIdr } from '@/modules/CFO/CapitalCompanyCrudModal';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 
 interface ItemFormValues {
   categoryId: string;
@@ -55,7 +56,8 @@ type PendingAction =
   | { kind: 'save'; id?: number; values: ItemMutationValues }
   | { kind: 'delete'; id: number; name: string };
 
-const PAGE_SIZE = 10;
+type SortDirection = 'asc' | 'desc';
+type ItemSortKey = 'purchased_on' | 'name' | 'amount';
 
 function getTodayDateString(): string {
   const now = new Date();
@@ -230,39 +232,51 @@ export default function CfoItemOperasionalPage() {
   const company =
     companyResource.companies.find((item) => item.id === selectedCompanyId) ??
     null;
-  const resource = useMasterOperasionalCrudResource(Boolean(company), company);
+  const resource = useMasterOperasionalCrudResource(Boolean(company), company, {
+    includeItems: false,
+  });
 
   const [formValues, setFormValues] = useState<ItemFormValues>(emptyFormValues);
   const [editingItem, setEditingItem] = useState<ExpenseItem | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
+  const [itemSort, setItemSort] = useState<{
+    key: ItemSortKey;
+    direction: SortDirection;
+  } | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(
     null
   );
-
-  const filteredItems = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return resource.items.filter((item) => {
-      const typeName =
-        resource.types.find((type) => type.id === Number(item.expense_type_id))
-          ?.name ??
-        item.expense_type?.name ??
-        '';
-      return (
-        item.name.toLowerCase().includes(query) ||
-        typeName.toLowerCase().includes(query) ||
-        (item.detail ?? '').toLowerCase().includes(query) ||
-        (item.purchased_on ?? '').toLowerCase().includes(query)
-      );
-    });
-  }, [resource.items, resource.types, search]);
+  const debouncedSearch = useDebouncedValue(search);
+  const itemSortParam = itemSort
+    ? `${itemSort.direction === 'desc' ? '-' : ''}${itemSort.key}`
+    : '-id';
+  const itemListQuery = useInfiniteExpenseItemsQuery(
+    company?.id ?? null,
+    debouncedSearch,
+    itemSortParam
+  );
+  const listedItems = useMemo(
+    () => itemListQuery.data?.pages.flatMap((page) => page.data) ?? [],
+    [itemListQuery.data]
+  );
+  const totalItems =
+    itemListQuery.data?.pages[0]?.meta.total ?? listedItems.length;
+  const loadedAmount = useMemo(
+    () =>
+      listedItems.reduce(
+        (sum, item) => sum + (Number(item.amount) || 0),
+        0
+      ),
+    [listedItems]
+  );
 
   const columns = useMemo<DataTableColumn<ExpenseItem>[]>(
     () => [
       {
         key: 'purchased_on',
         header: 'Tanggal',
+        sortable: true,
         render: (row) => row.purchased_on ?? '-',
       },
       {
@@ -274,7 +288,12 @@ export default function CfoItemOperasionalPage() {
           row.expense_type?.name ??
           '-',
       },
-      { key: 'name', header: 'Nama Item', render: (row) => row.name },
+      {
+        key: 'name',
+        header: 'Nama Item',
+        sortable: true,
+        render: (row) => row.name,
+      },
       {
         key: 'detail',
         header: 'Keterangan',
@@ -283,6 +302,7 @@ export default function CfoItemOperasionalPage() {
       {
         key: 'amount',
         header: 'Nominal',
+        sortable: true,
         render: (row) => formatCapitalIdr(Number(row.amount)),
       },
       {
@@ -333,13 +353,6 @@ export default function CfoItemOperasionalPage() {
       },
     ],
     [resource.types]
-  );
-
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
-  const activePage = Math.min(page, totalPages);
-  const totalAmount = useMemo(
-    () => resource.items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
-    [resource.items]
   );
 
   const availableTypes = resource.types.filter(
@@ -443,7 +456,6 @@ export default function CfoItemOperasionalPage() {
       <div className="flex flex-col gap-5">
       <CardHeader
         eyebrow={`CFO / Input Operasional${company ? ` / ${company.name}` : ''}`}
-        title="Item Operasional"
       />
 
       {error && (
@@ -497,7 +509,7 @@ export default function CfoItemOperasionalPage() {
               <div className="flex items-start justify-between gap-3">
                 <CardHeader
                   title="Daftar Item Operasional"
-                  subtitle={`${filteredItems.length} data`}
+                  subtitle={`${totalItems} data`}
                 />
                 <DialogTrigger asChild>
                   <Button
@@ -513,12 +525,12 @@ export default function CfoItemOperasionalPage() {
               </div>
               <div className="pb-5">
                 <SummaryBanner
-                  label="Total Pengeluaran"
-                  value={formatCapitalIdr(totalAmount)}
+                  label="Total Pengeluaran Dimuat"
+                  value={formatCapitalIdr(loadedAmount)}
                   testId="operasional-item-total"
                 />
               </div>
-              {resource.loading && resource.items.length === 0 ? (
+              {itemListQuery.isLoading && listedItems.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">
                   Memuat data item operasional...
                 </p>
@@ -526,29 +538,62 @@ export default function CfoItemOperasionalPage() {
                 <>
                   <DataTable
                     columns={columns}
-                    data={filteredItems.slice(
-                      (activePage - 1) * PAGE_SIZE,
-                      activePage * PAGE_SIZE
-                    )}
+                    data={listedItems}
                     rowKey={(row) => row.id}
                     stickyHeader
                     searchValue={search}
-                    onSearchChange={(value) => {
-                      setSearch(value);
-                      setPage(1);
-                    }}
+                    onSearchChange={setSearch}
                     searchLabel="Cari item operasional"
-                    searchPlaceholder="Cari nama, tipe, tanggal, atau keterangan..."
+                    searchPlaceholder="Cari nama, tipe, atau keterangan..."
                     searchTestId="operasional-item-search"
+                    scrollTestId="operasional-item-table-scroll"
+                    hasMore={
+                      Boolean(itemListQuery.hasNextPage) &&
+                      !itemListQuery.error
+                    }
+                    onLoadMore={() => {
+                      if (
+                        itemListQuery.hasNextPage &&
+                        !itemListQuery.isFetchingNextPage
+                      ) {
+                        void itemListQuery.fetchNextPage();
+                      }
+                    }}
+                    isLoadingMore={itemListQuery.isFetchingNextPage}
+                    loadMoreError={
+                      itemListQuery.error instanceof Error
+                        ? itemListQuery.error.message
+                        : itemListQuery.error
+                          ? 'Gagal memuat item operasional.'
+                          : null
+                    }
+                    onRetryLoadMore={() => {
+                      void (itemListQuery.isFetchNextPageError
+                        ? itemListQuery.fetchNextPage()
+                        : itemListQuery.refetch());
+                    }}
+                    sortKey={itemSort?.key ?? null}
+                    sortDirection={itemSort?.direction}
+                    onSort={(key) => {
+                      if (
+                        key !== 'purchased_on' &&
+                        key !== 'name' &&
+                        key !== 'amount'
+                      ) {
+                        return;
+                      }
+                      setItemSort((current) =>
+                        current?.key === key
+                          ? {
+                              key,
+                              direction:
+                                current.direction === 'asc' ? 'desc' : 'asc',
+                            }
+                          : { key, direction: 'asc' }
+                      );
+                    }}
                     emptyMessage="Belum ada data item operasional."
                     emptyTestId="operasional-item-empty"
-                  />
-                  <Pagination
-                    currentPage={activePage}
-                    totalPages={totalPages}
-                    totalItems={filteredItems.length}
-                    onPageChange={setPage}
-                    testId="operasional-item-pagination"
                   />
                 </>
               )}

@@ -909,9 +909,56 @@ export async function fetchLabSamples(): Promise<SamplesListResponse> {
   );
 }
 
-export async function fetchCompanies(): Promise<CompaniesListResponse> {
+interface ListRequestParams {
+  page: number;
+  per_page: number;
+  search?: string;
+  sort?: string;
+  company_id?: number;
+  series?: number;
+  expense_category_id?: number;
+  expense_type_id?: number;
+}
+
+function buildListQuery(params?: ListRequestParams): string {
+  if (!params) {
+    return '';
+  }
+
+  const query = new URLSearchParams({
+    page: String(params.page),
+    per_page: String(params.per_page),
+  });
+  if (params.search?.trim()) {
+    query.set('filter[search]', params.search.trim());
+  }
+  if (params.sort) {
+    query.set('sort', params.sort);
+  }
+  if (params.series !== undefined) {
+    query.set('filter[series]', String(params.series));
+  }
+  if (params.company_id !== undefined) {
+    query.set('filter[company_id]', String(params.company_id));
+  }
+  if (params.expense_category_id !== undefined) {
+    query.set(
+      'filter[expense_category_id]',
+      String(params.expense_category_id)
+    );
+  }
+  if (params.expense_type_id !== undefined) {
+    query.set('filter[expense_type_id]', String(params.expense_type_id));
+  }
+
+  return `?${query.toString()}`;
+}
+
+export async function fetchCompanies(
+  params?: ListRequestParams
+): Promise<CompaniesListResponse> {
   return requestJson<CompaniesListResponse>(
-    '/v1/modules/cfo/companies',
+    `/v1/modules/cfo/companies${buildListQuery(params)}`,
     {},
     'Failed to fetch companies'
   );
@@ -957,9 +1004,11 @@ export async function deleteCompany(
   );
 }
 
-export async function fetchCapitalCompanies(): Promise<CapitalCompaniesListResponse> {
+export async function fetchCapitalCompanies(
+  params?: ListRequestParams
+): Promise<CapitalCompaniesListResponse> {
   return requestJson<CapitalCompaniesListResponse>(
-    '/v1/modules/cfo/capital-companies',
+    `/v1/modules/cfo/capital-companies${buildListQuery(params)}`,
     {},
     'Failed to fetch capital companies'
   );
@@ -1006,9 +1055,11 @@ export async function deleteCapitalCompany(
   );
 }
 
-export async function fetchExpenseCategories(): Promise<ExpenseCategoriesListResponse> {
+export async function fetchExpenseCategories(
+  params?: ListRequestParams
+): Promise<ExpenseCategoriesListResponse> {
   return requestJson<ExpenseCategoriesListResponse>(
-    '/v1/modules/cfo/expense-categories',
+    `/v1/modules/cfo/expense-categories${buildListQuery(params)}`,
     {},
     'Failed to fetch expense categories'
   );
@@ -1054,9 +1105,11 @@ export async function deleteExpenseCategory(
   );
 }
 
-export async function fetchExpenseTypes(): Promise<ExpenseTypesListResponse> {
+export async function fetchExpenseTypes(
+  params?: ListRequestParams
+): Promise<ExpenseTypesListResponse> {
   return requestJson<ExpenseTypesListResponse>(
-    '/v1/modules/cfo/expense-types',
+    `/v1/modules/cfo/expense-types${buildListQuery(params)}`,
     {},
     'Failed to fetch expense types'
   );
@@ -1103,9 +1156,11 @@ export async function deleteExpenseType(
   );
 }
 
-export async function fetchExpenseItems(): Promise<ExpenseItemsListResponse> {
+export async function fetchExpenseItems(
+  params?: ListRequestParams
+): Promise<ExpenseItemsListResponse> {
   return requestJson<ExpenseItemsListResponse>(
-    '/v1/modules/cfo/expense-items',
+    `/v1/modules/cfo/expense-items${buildListQuery(params)}`,
     {},
     'Failed to fetch expense items'
   );
