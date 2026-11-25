@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -282,13 +282,14 @@ describe('CFO master modal', () => {
       });
       fireEvent.scroll(scrollContainer);
     };
-    const searchAndWait = async (testId: string, value: string) => {
-      fireEvent.change(screen.getByTestId(testId), {
+    const submitSearch = (testId: string, value: string) => {
+      const input = screen.getByTestId(testId);
+      fireEvent.change(input, {
         target: { value },
       });
-      await act(async () => {
-        await new Promise((resolve) => window.setTimeout(resolve, 600));
-      });
+      const form = input.closest('form');
+      if (!form) throw new Error('Search input must be inside a form');
+      fireEvent.submit(form);
     };
 
     scrollToBottom('perusahaan-table-scroll');
@@ -299,23 +300,23 @@ describe('CFO master modal', () => {
     expect(screen.queryByTestId('perusahaan-pagination')).not.toBeInTheDocument();
     scrollToBottom('perusahaan-table-scroll');
     expect(await screen.findByText('Company 21')).toBeInTheDocument();
-    await searchAndWait('perusahaan-table-search', 'Company 2');
-    await waitFor(() =>
-      expect(apiClient.fetchCompanies).toHaveBeenCalledWith(
-        expect.objectContaining({ search: 'Company 2', page: 1 })
-      )
-    );
+    submitSearch('perusahaan-table-search', 'Company 2');
     expect(await screen.findByText('Company 2')).toBeInTheDocument();
+    expect(apiClient.fetchCompanies).toHaveBeenCalledWith(
+      expect.objectContaining({ search: 'Company 2', page: 1 })
+    );
     expect(screen.getByText('Company 21')).toBeInTheDocument();
     expect(screen.queryByText('Company 1')).not.toBeInTheDocument();
-    await searchAndWait('perusahaan-table-search', '');
-    await searchAndWait('perusahaan-series-search', '2');
+    submitSearch('perusahaan-table-search', '');
+    expect(await screen.findByText('Company 1')).toBeInTheDocument();
+    submitSearch('perusahaan-series-search', '2');
+    expect(await screen.findByText('Company 12')).toBeInTheDocument();
     expect(apiClient.fetchCompanies).toHaveBeenCalledWith(
       expect.objectContaining({ search: undefined, series: 2, page: 1 })
     );
-    expect(await screen.findByText('Company 12')).toBeInTheDocument();
     expect(screen.queryByText('Company 1')).not.toBeInTheDocument();
-    await searchAndWait('perusahaan-series-search', '');
+    submitSearch('perusahaan-series-search', '');
+    expect(await screen.findByText('Company 1')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('stakeholder-row-21'));
     expect(await screen.findByText('Owner 1')).toBeInTheDocument();
@@ -325,17 +326,15 @@ describe('CFO master modal', () => {
     expect(apiClient.fetchCapitalCompanies).toHaveBeenCalledWith(
       expect.objectContaining({ company_id: 21, page: 2, per_page: 10 })
     );
-    await searchAndWait('pemegang-saham-table-search', 'Owner 2');
-    await waitFor(() =>
-      expect(apiClient.fetchCapitalCompanies).toHaveBeenCalledWith(
-        expect.objectContaining({
-          company_id: 21,
-          search: 'Owner 2',
-          page: 1,
-        })
-      )
-    );
+    submitSearch('pemegang-saham-table-search', 'Owner 2');
     expect(await screen.findByText('Owner 2')).toBeInTheDocument();
+    expect(apiClient.fetchCapitalCompanies).toHaveBeenCalledWith(
+      expect.objectContaining({
+        company_id: 21,
+        search: 'Owner 2',
+        page: 1,
+      })
+    );
     expect(screen.getByText('Owner 21')).toBeInTheDocument();
     expect(screen.queryByText('Owner 1')).not.toBeInTheDocument();
     expect(

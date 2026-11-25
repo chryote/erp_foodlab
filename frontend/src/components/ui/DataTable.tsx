@@ -17,14 +17,7 @@ export interface DataTableColumn<T> {
   sticky?: boolean;
 }
 
-export interface DataTableProps<T> {
-  columns: DataTableColumn<T>[];
-  data: T[];
-  rowKey: (row: T) => string | number;
-  sortKey?: string | null;
-  sortDirection?: 'asc' | 'desc';
-  onSort?: (key: string) => void;
-  stickyHeader?: boolean;
+export interface DataTableSearchProps {
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   searchLabel?: string;
@@ -36,6 +29,18 @@ export interface DataTableProps<T> {
   secondarySearchPlaceholder?: string;
   secondarySearchTestId?: string;
   secondarySearchType?: 'search' | 'number';
+  onSearchSubmit?: () => void;
+}
+
+export interface DataTableProps<T> extends DataTableSearchProps {
+  columns: DataTableColumn<T>[];
+  data: T[];
+  rowKey: (row: T) => string | number;
+  sortKey?: string | null;
+  sortDirection?: 'asc' | 'desc';
+  onSort?: (key: string) => void;
+  stickyHeader?: boolean;
+  showSearch?: boolean;
   scrollTestId?: string;
   hasMore?: boolean;
   onLoadMore?: () => void;
@@ -46,6 +51,86 @@ export interface DataTableProps<T> {
   emptyTestId?: string;
 }
 
+export function DataTableSearch({
+  searchValue,
+  onSearchChange,
+  searchLabel = 'Cari data',
+  searchPlaceholder = 'Cari data...',
+  searchTestId = 'ui-data-table-search',
+  secondarySearchValue,
+  onSecondarySearchChange,
+  secondarySearchLabel = 'Cari data tambahan',
+  secondarySearchPlaceholder = 'Cari data...',
+  secondarySearchTestId = 'ui-data-table-secondary-search',
+  secondarySearchType = 'search',
+  onSearchSubmit,
+}: DataTableSearchProps): React.ReactElement | null {
+  if (
+    (searchValue === undefined || !onSearchChange) &&
+    (secondarySearchValue === undefined || !onSecondarySearchChange)
+  ) {
+    return null;
+  }
+
+  return (
+    <form
+      className="flex flex-col gap-2 pb-3 sm:flex-row sm:items-center sm:justify-between"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSearchSubmit?.();
+      }}
+    >
+      {searchValue !== undefined && onSearchChange && (
+        <label className="relative w-full">
+          <span className="sr-only">{searchLabel}</span>
+          <input
+            type="search"
+            className="h-9 w-full rounded-lg border border-input bg-background px-3 py-1.5 pr-9 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={searchLabel}
+            data-testid={searchTestId}
+            placeholder={searchPlaceholder}
+            value={searchValue}
+            onChange={(event) => onSearchChange(event.target.value)}
+          />
+          <Search
+            className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+        </label>
+      )}
+      {secondarySearchValue !== undefined &&
+        onSecondarySearchChange && (
+          <label className="relative w-full">
+            <span className="sr-only">{secondarySearchLabel}</span>
+            <input
+              type={secondarySearchType}
+              className="h-9 w-full rounded-lg border border-input bg-background px-3 py-1.5 pr-9 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={secondarySearchLabel}
+              data-testid={secondarySearchTestId}
+              placeholder={secondarySearchPlaceholder}
+              value={secondarySearchValue}
+              onChange={(event) =>
+                onSecondarySearchChange(event.target.value)
+              }
+            />
+            <Search
+              className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden="true"
+            />
+          </label>
+        )}
+      <button
+        type="submit"
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
+      >
+        Cari
+      </button>
+    </form>
+  );
+}
+
 export function DataTable<T>({
   columns,
   data,
@@ -54,6 +139,7 @@ export function DataTable<T>({
   sortDirection,
   onSort,
   stickyHeader = false,
+  showSearch = true,
   searchValue,
   onSearchChange,
   searchLabel = 'Cari data',
@@ -170,50 +256,20 @@ export function DataTable<T>({
 
     return (
       <div className="flex min-h-0 w-full flex-1 flex-col mt-2">
-        {((searchValue !== undefined && onSearchChange) ||
-          (secondarySearchValue !== undefined &&
-            onSecondarySearchChange)) && (
-          <div className="flex flex-col gap-2 pb-3 sm:flex-row sm:items-center sm:justify-between">
-            {searchValue !== undefined && onSearchChange && (
-              <label className="relative w-full">
-                <span className="sr-only">{searchLabel}</span>
-                <input
-                  type="search"
-                  className="h-9 w-full rounded-lg border border-input bg-background px-3 py-1.5 pr-9 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  aria-label={searchLabel}
-                  data-testid={searchTestId}
-                  placeholder={searchPlaceholder}
-                  value={searchValue}
-                  onChange={(event) => onSearchChange(event.target.value)}
-                />
-                <Search
-                  className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                  aria-hidden="true"
-                />
-              </label>
-            )}
-            {secondarySearchValue !== undefined &&
-              onSecondarySearchChange && (
-              <label className="relative w-full">
-                <span className="sr-only">{secondarySearchLabel}</span>
-                <input
-                  type={secondarySearchType}
-                  className="h-9 w-full rounded-lg border border-input bg-background px-3 py-1.5 pr-9 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  aria-label={secondarySearchLabel}
-                  data-testid={secondarySearchTestId}
-                  placeholder={secondarySearchPlaceholder}
-                  value={secondarySearchValue}
-                  onChange={(event) =>
-                    onSecondarySearchChange(event.target.value)
-                  }
-                />
-                <Search
-                  className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                </label>
-              )}
-          </div>
+        {showSearch && (
+          <DataTableSearch
+            searchValue={searchValue}
+            onSearchChange={onSearchChange}
+            searchLabel={searchLabel}
+            searchPlaceholder={searchPlaceholder}
+            searchTestId={searchTestId}
+            secondarySearchValue={secondarySearchValue}
+            onSecondarySearchChange={onSecondarySearchChange}
+            secondarySearchLabel={secondarySearchLabel}
+            secondarySearchPlaceholder={secondarySearchPlaceholder}
+            secondarySearchTestId={secondarySearchTestId}
+            secondarySearchType={secondarySearchType}
+          />
         )}
         <div
           className="max-h-[calc(100dvh-20rem)] min-h-0 w-full flex-1 overflow-auto lg:max-h-[32rem]"
