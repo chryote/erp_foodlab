@@ -13,6 +13,7 @@ export const CPO_INPUT_PACKING_ITEMS: HorizontalMenuItem[] = [
 export const CPO_INPUT_PAKET_ITEMS: HorizontalMenuItem[] = [
   { code: 'MASTER_PAKET', title: 'Master Paket' },
   { code: 'MASTER_BAHAN_BAKU', title: 'Master Bahan Baku' },
+  { code: 'VIEW_BAHAN_BAKU', title: 'View Bahan Baku' },
 ];
 
 export const CPO_MENU_ITEMS: HorizontalMenuItem[] = [

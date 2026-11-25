@@ -273,7 +273,7 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
       screen.queryByTestId('horizontal-submenu-INPUT_PAKET')
     ).not.toBeInTheDocument();
 
-    // 2. Click Input Paket -> shows Master Paket and Master Bahan Baku child cards
+    // 2. Click Input Paket -> shows Master Paket, Master Bahan Baku, and View Bahan Baku child cards
     fireEvent.click(inputPaketCard);
     const paketSubmenu = screen.getByTestId('horizontal-submenu-INPUT_PAKET');
     const masterPaketCard = within(paketSubmenu).getByTestId(
@@ -282,8 +282,12 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
     const masterBahanBakuCard = within(paketSubmenu).getByTestId(
       'horizontal-menu-card-MASTER_BAHAN_BAKU'
     );
+    const viewBahanBakuCard = within(paketSubmenu).getByTestId(
+      'horizontal-menu-card-VIEW_BAHAN_BAKU'
+    );
     expect(masterPaketCard).toHaveTextContent('Master Paket');
     expect(masterBahanBakuCard).toHaveTextContent('Master Bahan Baku');
+    expect(viewBahanBakuCard).toHaveTextContent('View Bahan Baku');
 
     // 3. Click Master Paket -> shows Master Paket modal with Master Karyawan split style
     fireEvent.click(masterPaketCard);
@@ -958,6 +962,214 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
     );
     expect(
       screen.queryByTestId('master-bahan-baku-crud-modal')
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows Input Paket -> View Bahan Baku strictly read-only datatable grouped by default_package_id with Detail inspection modal', async () => {
+    vi.mocked(apiClient.fetchErpModules).mockResolvedValue({
+      data: [
+        DEFAULT_CFO_MODULE,
+        DEFAULT_CHO_MODULE,
+        DEFAULT_CPO_MODULE,
+        DEFAULT_CDO_MODULE,
+        DEFAULT_CMO_MODULE,
+      ],
+      meta: { count: 5 },
+    });
+
+    const companiesStore: apiClient.Company[] = [
+      { id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1 },
+    ];
+
+    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
+      data: [...companiesStore],
+      meta: { count: companiesStore.length },
+    });
+
+    vi.mocked(apiClient.syncActiveCompany).mockImplementation(async (id) => ({
+      data: companiesStore.find((c) => c.id === id) ?? null,
+    }));
+
+    const itemsStore: apiClient.Item[] = [
+      {
+        id: 101,
+        company_id: 1,
+        code: 'BHN-01',
+        name: 'Tepung Terigu',
+        type: 'Bahan',
+      },
+      {
+        id: 102,
+        company_id: 1,
+        code: 'BHN-02',
+        name: 'Gula Pasir',
+        type: 'Bahan',
+      },
+      {
+        id: 104,
+        company_id: 1,
+        code: null,
+        name: 'Garam Halus',
+        type: 'Bahan',
+      },
+    ];
+
+    const defaultPackagesStore: apiClient.DefaultPackage[] = [
+      {
+        id: 50,
+        brand_name: 'Brand Satu',
+        packet_name_id: 1,
+        packet_vendor_id: 1,
+        packet_category_id: 1,
+        item_packet_id: 10,
+        price: 100000,
+        packet_name: { id: 1, name: 'Paket Starter' },
+        packet_vendor: { id: 1, name: 'Vendor Utama' },
+        packet_category: { id: 1, name: 'Kategori Reguler' },
+      },
+      {
+        id: 51,
+        brand_name: 'Brand Dua',
+        packet_name_id: 2,
+        packet_vendor_id: 1,
+        packet_category_id: 2,
+        item_packet_id: 10,
+        price: 150000,
+        packet_name: { id: 2, name: 'Paket Pro' },
+        packet_vendor: { id: 1, name: 'Vendor Utama' },
+        packet_category: { id: 2, name: 'Kategori Premium' },
+      },
+    ];
+
+    const ingredientsStore: apiClient.Ingredient[] = [
+      {
+        id: 300,
+        default_package_id: 50,
+        item_id: 101,
+        price: 12000,
+        default_package: defaultPackagesStore[0],
+        item: itemsStore[0],
+      },
+      {
+        id: 301,
+        default_package_id: 50,
+        item_id: 102,
+        price: 18500,
+        default_package: defaultPackagesStore[0],
+        item: itemsStore[1],
+      },
+      {
+        id: 302,
+        default_package_id: 51,
+        item_id: 104,
+        price: 5000,
+        default_package: defaultPackagesStore[1],
+        item: itemsStore[2],
+      },
+    ];
+
+    vi.mocked(apiClient.fetchItems).mockResolvedValue({
+      data: itemsStore,
+      meta: { count: itemsStore.length },
+    });
+    vi.mocked(apiClient.fetchItemPackets).mockResolvedValue({
+      data: [],
+      meta: { count: 0 },
+    });
+    vi.mocked(apiClient.fetchDefaultPackages).mockResolvedValue({
+      data: defaultPackagesStore,
+      meta: { count: defaultPackagesStore.length },
+    });
+    vi.mocked(apiClient.fetchIngredients).mockResolvedValue({
+      data: ingredientsStore,
+      meta: { count: ingredientsStore.length },
+    });
+
+    renderApp();
+
+    fireEvent.click(await screen.findByTestId('company-tab-1'));
+    fireEvent.click(screen.getByTestId('module-card-CPO'));
+    const cpoMenu = await screen.findByTestId('cpo-horizontal-menu');
+    fireEvent.click(
+      within(cpoMenu).getByTestId('horizontal-menu-card-INPUT_PAKET')
+    );
+
+    const paketSubmenu = screen.getByTestId('horizontal-submenu-INPUT_PAKET');
+    fireEvent.click(
+      within(paketSubmenu).getByTestId('horizontal-menu-card-VIEW_BAHAN_BAKU')
+    );
+
+    const viewModal = await screen.findByTestId('view-bahan-baku-modal');
+    expect(viewModal).toBeInTheDocument();
+
+    // Strictly read-only: no form panel, no Tambah/Edit/Hapus buttons
+    expect(
+      screen.queryByTestId('view-bahan-baku-modal-form-panel')
+    ).not.toBeInTheDocument();
+    expect(
+      within(viewModal).queryByRole('button', { name: 'Tambah' })
+    ).not.toBeInTheDocument();
+    expect(
+      within(viewModal).queryByRole('button', { name: 'Edit' })
+    ).not.toBeInTheDocument();
+    expect(
+      within(viewModal).queryByRole('button', { name: 'Hapus' })
+    ).not.toBeInTheDocument();
+
+    // Grouped rows & total summary banner
+    expect(
+      await within(viewModal).findByText(
+        'Tepung Terigu (BHN-01), Gula Pasir (BHN-02)'
+      )
+    ).toBeInTheDocument();
+    expect(within(viewModal).getByText('Rp 30.500')).toBeInTheDocument();
+    expect(within(viewModal).getByText('2 item')).toBeInTheDocument();
+    expect(within(viewModal).getByText('Garam Halus')).toBeInTheDocument();
+    expect(within(viewModal).getByText('Rp 5.000')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('view-bahan-baku-total-banner-value')
+    ).toHaveTextContent('Rp 35.500');
+
+    // Click Detail button on Brand Satu (50)
+    fireEvent.click(within(viewModal).getByTestId('detail-bahan-baku-row-50'));
+
+    const detailModal = await screen.findByTestId(
+      'view-bahan-baku-detail-modal'
+    );
+    expect(detailModal).toBeInTheDocument();
+    expect(
+      within(detailModal).getByRole('heading', { name: 'Brand Satu' })
+    ).toBeInTheDocument();
+    expect(within(detailModal).getByText('Vendor Utama')).toBeInTheDocument();
+    expect(
+      within(detailModal).getByText('Kategori Reguler')
+    ).toBeInTheDocument();
+    expect(within(detailModal).getByText('Rp 100.000')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('view-bahan-baku-detail-total-banner-value')
+    ).toHaveTextContent('Rp 30.500');
+
+    // Individual Ingredient rows in Detail modal
+    expect(within(detailModal).getByText('BHN-01')).toBeInTheDocument();
+    expect(within(detailModal).getByText('Tepung Terigu')).toBeInTheDocument();
+    expect(within(detailModal).getByText('Rp 12.000')).toBeInTheDocument();
+    expect(within(detailModal).getByText('BHN-02')).toBeInTheDocument();
+    expect(within(detailModal).getByText('Gula Pasir')).toBeInTheDocument();
+    expect(within(detailModal).getByText('Rp 18.500')).toBeInTheDocument();
+
+    // Close detail modal and main view modal
+    fireEvent.click(
+      within(detailModal).getByRole('button', { name: 'Tutup Modal' })
+    );
+    expect(
+      screen.queryByTestId('view-bahan-baku-detail-modal')
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(
+      within(viewModal).getByRole('button', { name: 'Tutup Modal' })
+    );
+    expect(
+      screen.queryByTestId('view-bahan-baku-modal')
     ).not.toBeInTheDocument();
   });
 });
