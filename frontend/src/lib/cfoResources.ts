@@ -49,7 +49,9 @@ export const DEFAULT_CFO_ENUMS: CfoEnums = {
   company_type: [
     { value: 'Utama', nama: 'Utama' },
     { value: 'Packing', nama: 'Packing' },
-    { value: 'Produksi', nama: 'Produksi' },
+    { value: 'Kelengkapan', nama: 'Kelengkapan' },
+    { value: 'Sarpras', nama: 'Sarpras' },
+    { value: 'Bahan', nama: 'Bahan' },
   ],
 };
 
@@ -116,11 +118,13 @@ export function useCfoEnumsResource(enabled = true) {
       return res?.data ?? DEFAULT_CFO_ENUMS;
     },
     enabled,
+    staleTime: 0,
   });
 
   return {
     enums: enumsQuery.data ?? DEFAULT_CFO_ENUMS,
     loading: enumsQuery.isLoading,
+    refetch: enumsQuery.refetch,
   };
 }
 
@@ -272,6 +276,7 @@ export function useCompanyCrudResource(enabled = true) {
 
   return {
     enums: enumsResource.enums,
+    refetchEnums: enumsResource.refetch,
     companies: companiesQuery.data ?? [],
     loading:
       companiesQuery.isLoading ||

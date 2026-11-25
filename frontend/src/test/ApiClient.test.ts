@@ -93,7 +93,7 @@ describe('General API Client Contract & Error Handling', () => {
     await fetchCfoEnums();
     await fetchCompanies();
     await createCompany({ name: 'PT A', type: 'Packing' });
-    await updateCompany(1, { name: 'PT A2', type: 'Produksi' });
+    await updateCompany(1, { name: 'PT A2', type: 'Sarpras' });
     await deleteCompany(1);
     await fetchCapitalCompanies();
     await createCapitalCompany({

@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
   Company,
+  CompanyType,
   Item,
   ItemPacket,
   ItemPacketPayload,
@@ -14,6 +15,11 @@ import { useMasterPackingCrudResource } from '@/lib/cpoResources';
 import { cn } from '@/lib/utils';
 
 export type MasterPackingTabKey = 'item' | 'packet' | 'assignment';
+
+export const ALLOWED_PACKING_COMPANY_TYPES: ReadonlySet<CompanyType> = new Set([
+  'Utama',
+  'Packing',
+]);
 
 export const MASTER_PACKING_TABS: Array<{
   key: MasterPackingTabKey;
@@ -62,14 +68,61 @@ export const MasterPackingCrudModal: React.FC<
     }
   }, [isOpen, clearError]);
 
-  const availableCompanies = useMemo<Company[]>(() => {
-    if (companies && companies.length > 0) {
-      return companies;
+  const allCompaniesById = useMemo(() => {
+    const map = new Map<number, Company>();
+    for (const c of companies ?? []) {
+      map.set(Number(c.id), c);
     }
-    return company ? [company] : [];
+    if (company) {
+      map.set(Number(company.id), company);
+    }
+    return map;
   }, [companies, company]);
 
-  const defaultCompanyId = company ? String(company.id) : '';
+  const isAllowedPackingCompany = useCallback(
+    (companyId: number | undefined, fallbackCompany?: Company | null): boolean => {
+      const matched =
+        allCompaniesById.get(Number(companyId)) ?? fallbackCompany;
+      if (!matched) {
+        return false;
+      }
+      return ALLOWED_PACKING_COMPANY_TYPES.has(matched.type ?? 'Utama');
+    },
+    [allCompaniesById]
+  );
+
+  const availableCompanies = useMemo<Company[]>(() => {
+    const source =
+      companies && companies.length > 0
+        ? companies
+        : company
+          ? [company]
+          : [];
+    return source.filter((c) =>
+      ALLOWED_PACKING_COMPANY_TYPES.has(c.type ?? 'Utama')
+    );
+  }, [companies, company]);
+
+  const defaultCompanyId =
+    company && availableCompanies.some((c) => c.id === company.id)
+      ? String(company.id)
+      : '';
+
+  const filteredItems = useMemo(
+    () =>
+      allItems.filter((item) =>
+        isAllowedPackingCompany(item.company_id, item.company)
+      ),
+    [allItems, isAllowedPackingCompany]
+  );
+
+  const filteredItemPackets = useMemo(
+    () =>
+      allItemPackets.filter((assignment) =>
+        isAllowedPackingCompany(assignment.company_id, assignment.company)
+      ),
+    [allItemPackets, isAllowedPackingCompany]
+  );
 
   const companyOptions = useMemo(
     () =>
@@ -201,7 +254,7 @@ export const MasterPackingCrudModal: React.FC<
           if (!Number.isFinite(companyId)) {
             return [];
           }
-          return allItems
+          return filteredItems
             .filter((item) => Number(item.company_id) === companyId)
             .map((item) => ({
               value: String(item.id),
@@ -210,7 +263,9 @@ export const MasterPackingCrudModal: React.FC<
         },
         renderValue: (row) => {
           const matched =
-            allItems.find((item) => item.id === Number(row.item_id)) ?? row.item;
+            filteredItems.find((item) => item.id === Number(row.item_id)) ??
+            allItems.find((item) => item.id === Number(row.item_id)) ??
+            row.item;
           return matched
             ? `${matched.name} (${matched.type})`
             : String(row.item_id);
@@ -232,6 +287,7 @@ export const MasterPackingCrudModal: React.FC<
       allPackets,
       companyOptions,
       defaultCompanyId,
+      filteredItems,
       packetOptions,
       renderCompanyName,
     ]
@@ -375,7 +431,7 @@ export const MasterPackingCrudModal: React.FC<
         resetKey={`assignment-${company?.id ?? 0}`}
         fields={assignmentFields}
         emptyMessage="Belum ada data item paket."
-        items={allItemPackets}
+        items={filteredItemPackets}
         onCreate={async (values) => {
           const payload = parseItemPacketPayload(values);
           if (payload) {
@@ -401,7 +457,7 @@ export const MasterPackingCrudModal: React.FC<
       resetKey={`item-${company?.id ?? 0}`}
       fields={itemFields}
       emptyMessage="Belum ada data item."
-      items={allItems}
+      items={filteredItems}
       onCreate={async (values) => {
         const payload = parseItemPayload(values);
         if (payload) {

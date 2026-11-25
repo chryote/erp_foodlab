@@ -77,7 +77,13 @@ export interface ErpModulesListResponse {
   };
 }
 
-export type CompanyType = 'Utama' | 'Packing' | 'Produksi' | (string & {});
+export type CompanyType =
+  | 'Utama'
+  | 'Packing'
+  | 'Kelengkapan'
+  | 'Sarpras'
+  | 'Bahan'
+  | (string & {});
 
 export interface CfoEnums {
   company_type: EnumOption[];

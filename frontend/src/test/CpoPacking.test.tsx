@@ -301,7 +301,7 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
     expect(within(modal).getByText('Lakban Cabang 2')).toBeInTheDocument();
 
     const itemCompanySelect = within(modal).getByLabelText(
-      'Pilih Perusahaan'
+      'Pilih Vendor'
     ) as HTMLSelectElement;
     expect(itemCompanySelect.value).toBe('1');
     expect(within(modal).getByText('ITM-001')).toBeInTheDocument();
@@ -408,7 +408,7 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
     ).toBeInTheDocument();
 
     const assignCompanySelect = within(modal).getByLabelText(
-      'Pilih Perusahaan'
+      'Pilih Vendor'
     ) as HTMLSelectElement;
     const assignPacketSelect = within(modal).getByLabelText(
       'Pilih Paket'
@@ -792,5 +792,170 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
         type: 'Paket Usaha',
       });
     });
+  });
+
+  it('filters Master Packing Item and Item Paket datatables and Pilih Vendor dropdown to Utama and Packing companies only', async () => {
+    vi.mocked(apiClient.fetchErpModules).mockResolvedValue({
+      data: [DEFAULT_CPO_MODULE],
+      meta: { count: 1 },
+    });
+
+    const companiesStore: apiClient.Company[] = [
+      { id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1, type: 'Utama' },
+      { id: 2, name: 'PT. Packing', series: 1, type: 'Packing' },
+      { id: 3, name: 'PT. Produksi', series: 1, type: 'Produksi' },
+    ];
+    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
+      data: companiesStore,
+      meta: { count: companiesStore.length },
+    });
+    vi.mocked(apiClient.syncActiveCompany).mockResolvedValue({
+      data: companiesStore[0],
+    });
+    vi.mocked(apiClient.fetchCpoEnums).mockResolvedValue({
+      data: {
+        item_type: [
+          { value: 'Bahan', nama: 'Bahan' },
+          { value: 'Peralatan', nama: 'Peralatan' },
+          { value: 'Paket Usaha', nama: 'Paket Usaha' },
+        ],
+      },
+    });
+    vi.mocked(apiClient.fetchItems).mockResolvedValue({
+      data: [
+        {
+          id: 101,
+          company_id: 1,
+          code: 'ITM-UTM',
+          name: 'Item Utama',
+          type: 'Bahan',
+          company: companiesStore[0],
+        },
+        {
+          id: 102,
+          company_id: 2,
+          code: 'ITM-PCK',
+          name: 'Item Packing',
+          type: 'Peralatan',
+          company: companiesStore[1],
+        },
+        {
+          id: 103,
+          company_id: 3,
+          code: 'ITM-PRD',
+          name: 'Item Produksi',
+          type: 'Bahan',
+          company: companiesStore[2],
+        },
+      ],
+      meta: { count: 3 },
+    });
+    vi.mocked(apiClient.fetchPackets).mockResolvedValue({
+      data: [{ id: 201, name: 'Paket Uji' }],
+      meta: { count: 1 },
+    });
+    vi.mocked(apiClient.fetchItemPackets).mockResolvedValue({
+      data: [
+        {
+          id: 301,
+          company_id: 1,
+          packet_id: 201,
+          item_id: 101,
+          quantity: 2,
+          company: companiesStore[0],
+          packet: { id: 201, name: 'Paket Uji' },
+          item: {
+            id: 101,
+            company_id: 1,
+            code: 'ITM-UTM',
+            name: 'Item Utama',
+            type: 'Bahan',
+          },
+        },
+        {
+          id: 302,
+          company_id: 2,
+          packet_id: 201,
+          item_id: 102,
+          quantity: 3,
+          company: companiesStore[1],
+          packet: { id: 201, name: 'Paket Uji' },
+          item: {
+            id: 102,
+            company_id: 2,
+            code: 'ITM-PCK',
+            name: 'Item Packing',
+            type: 'Peralatan',
+          },
+        },
+        {
+          id: 303,
+          company_id: 3,
+          packet_id: 201,
+          item_id: 103,
+          quantity: 5,
+          company: companiesStore[2],
+          packet: { id: 201, name: 'Paket Uji' },
+          item: {
+            id: 103,
+            company_id: 3,
+            code: 'ITM-PRD',
+            name: 'Item Produksi',
+            type: 'Bahan',
+          },
+        },
+      ],
+      meta: { count: 3 },
+    });
+
+    renderApp();
+
+    fireEvent.click(await screen.findByTestId('company-tab-1'));
+    fireEvent.click(screen.getByTestId('module-card-CPO'));
+
+    const cpoMenu = await screen.findByTestId('cpo-horizontal-menu');
+    fireEvent.click(
+      within(cpoMenu).getByTestId('horizontal-menu-card-INPUT_PACKING')
+    );
+    const submenu = screen.getByTestId('horizontal-submenu-INPUT_PACKING');
+    fireEvent.click(
+      within(submenu).getByTestId('horizontal-menu-card-MASTER_PACKING')
+    );
+
+    const modal = await screen.findByTestId('master-packing-crud-modal');
+
+    // Tab 1 (Item): Pilih Vendor dropdown & datatable only include Utama & Packing
+    expect(await within(modal).findByText('Item Utama')).toBeInTheDocument();
+    expect(within(modal).getByText('Item Packing')).toBeInTheDocument();
+    expect(within(modal).queryByText('Item Produksi')).not.toBeInTheDocument();
+
+    const itemVendorSelect = within(modal).getByLabelText(
+      'Pilih Vendor'
+    ) as HTMLSelectElement;
+    expect(
+      Array.from(itemVendorSelect.options).map((opt) => opt.textContent)
+    ).toEqual(['Pilih vendor...', 'PT. Slaras Nusa Foodlab', 'PT. Packing']);
+
+    // Tab 3 (Item Paket): Pilih Vendor dropdown & datatable only include Utama & Packing
+    fireEvent.click(screen.getByTestId('master-packing-tab-assignment'));
+    const tablePanel = screen.getByTestId(
+      'master-packing-crud-modal-table-panel'
+    );
+    expect(
+      await within(tablePanel).findByText('Item Utama (Bahan)')
+    ).toBeInTheDocument();
+    expect(
+      within(tablePanel).getByText('Item Packing (Peralatan)')
+    ).toBeInTheDocument();
+    expect(
+      within(tablePanel).queryByText('Item Produksi (Bahan)')
+    ).not.toBeInTheDocument();
+
+    const assignVendorSelect = within(modal).getByLabelText(
+      'Pilih Vendor'
+    ) as HTMLSelectElement;
+    expect(
+      Array.from(assignVendorSelect.options).map((opt) => opt.textContent)
+    ).toEqual(['Pilih vendor...', 'PT. Slaras Nusa Foodlab', 'PT. Packing']);
   });
 });

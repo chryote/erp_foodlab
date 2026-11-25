@@ -171,16 +171,26 @@ export const CompanyCrudModal: React.FC<CompanyCrudModalProps> = ({
   onClose,
 }) => {
   const fallbackResource = useCompanyCrudResource(isOpen && !companyResource);
-  const { enums, companies, loading, error, create, update, remove } =
-    companyResource ?? fallbackResource;
+  const {
+    enums,
+    refetchEnums,
+    companies,
+    loading,
+    error,
+    create,
+    update,
+    remove,
+  } = companyResource ?? fallbackResource;
   const [selectedStakeholderCompany, setSelectedStakeholderCompany] =
     useState<Company | null>(null);
 
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+      void refetchEnums();
+    } else {
       setSelectedStakeholderCompany(null);
     }
-  }, [isOpen]);
+  }, [isOpen, refetchEnums]);
 
   const companyTypeOptions = useMemo(
     () =>

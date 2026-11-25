@@ -39,7 +39,7 @@ describe('ItemPacket CPO module', function () {
         $mixer = Item::factory()->create([
             'company_id' => $companyB->id,
             'name' => 'Mixer Lab',
-            'type' => ItemType::Peralatan,
+            'type' => ItemType::Kelengkapan,
         ]);
 
         // Warm dependent caches to verify writes invalidate CPO overview, Packets, and Items caches
@@ -145,7 +145,7 @@ describe('ItemPacket CPO module', function () {
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', $thirdId);
 
-        $this->getJson('/api/v1/modules/cpo/item-packets?filter[item_type]=Peralatan')
+        $this->getJson('/api/v1/modules/cpo/item-packets?filter[item_type]=Kelengkapan')
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', $thirdId);

@@ -190,7 +190,7 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
         $companyIds = Company::query()->pluck('id')->all();
         expect($seededItems)->not->toBeEmpty();
         expect($seededItems->pluck('type')->contains(ItemType::Bahan))->toBeTrue();
-        expect($seededItems->pluck('type')->contains(ItemType::Peralatan))->toBeTrue();
+        expect($seededItems->pluck('type')->contains(ItemType::Kelengkapan))->toBeTrue();
         foreach ($seededItems as $seededItem) {
             expect($companyIds)->toContain($seededItem->company_id);
             expect($seededItem->code)->not->toBeNull();

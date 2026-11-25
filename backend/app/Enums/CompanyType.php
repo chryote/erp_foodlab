@@ -13,8 +13,9 @@ enum CompanyType: string
 
     case Utama = 'Utama';
     case Packing = 'Packing';
-    case Perlengkapan = 'Perlengkapan';
-    case Produksi = 'Produksi';
+    case Kelengkapan = 'Kelengkapan';
+    case Sarpras = 'Sarpras';
+    case Bahan = 'Bahan';
 
     /**
      * Human-readable Indonesian display name.
@@ -24,8 +25,10 @@ enum CompanyType: string
         return match ($this) {
             self::Utama => 'Utama',
             self::Packing => 'Packing',
-            self::Perlengkapan => 'Perlengkapan',
-            self::Produksi => 'Produksi',
+            self::Kelengkapan => 'Kelengkapan',
+            self::Sarpras => 'Sarpras',
+            self::Bahan => 'Bahan',
+            default => $this->value,
         };
     }
 }

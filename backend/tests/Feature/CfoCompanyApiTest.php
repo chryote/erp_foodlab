@@ -77,13 +77,13 @@ describe('CFO Company CRUD API (/api/v1/modules/cfo/companies)', function () {
         $updateRes = $this->putJson("/api/v1/modules/cfo/companies/{$companyId}", [
             'name' => 'PT. Slaras Nusa Foodlab Internasional',
             'series' => 3,
-            'type' => CompanyType::Produksi->value,
+            'type' => CompanyType::Sarpras->value,
         ]);
 
         $updateRes->assertOk()
             ->assertJsonPath('data.name', 'PT. Slaras Nusa Foodlab Internasional')
             ->assertJsonPath('data.series', 3)
-            ->assertJsonPath('data.type', CompanyType::Produksi->value);
+            ->assertJsonPath('data.type', CompanyType::Sarpras->value);
 
         $deleteRes = $this->deleteJson("/api/v1/modules/cfo/companies/{$companyId}");
         $deleteRes->assertOk();

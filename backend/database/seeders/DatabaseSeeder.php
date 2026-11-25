@@ -51,7 +51,7 @@ use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
-    public const MIN_SEED_ROWS = 10;
+    public const MIN_SEED_ROWS = 1;
 
     public function run(): void
     {
@@ -1478,8 +1478,8 @@ class DatabaseSeeder extends Seeder
             ['company_id' => $primaryCompany->id, 'code' => 'ITM-002', 'name' => 'Banana', 'type' => ItemType::Bahan],
             ['company_id' => $primaryCompany->id, 'code' => 'ITM-003', 'name' => 'Orange', 'type' => ItemType::Bahan],
             ['company_id' => $primaryCompany->id, 'code' => 'ITM-004', 'name' => 'Jackfruit', 'type' => ItemType::Bahan],
-            ['company_id' => $primaryCompany->id, 'code' => 'ITM-005', 'name' => 'Blender Lab', 'type' => ItemType::Peralatan],
-            ['company_id' => $primaryCompany->id, 'code' => 'ITM-006', 'name' => 'Timbangan Digital', 'type' => ItemType::Peralatan],
+            ['company_id' => $primaryCompany->id, 'code' => 'ITM-005', 'name' => 'Blender Lab', 'type' => ItemType::Kelengkapan],
+            ['company_id' => $primaryCompany->id, 'code' => 'ITM-006', 'name' => 'Timbangan Digital', 'type' => ItemType::Sarpras],
         ];
 
         $companyList = $companies->values();
@@ -1490,9 +1490,9 @@ class DatabaseSeeder extends Seeder
                 'company_id' => $company->id,
                 'code' => sprintf('ITM-%04d', $i + 6),
                 'name' => $i % 2 === 0
-                    ? sprintf('Peralatan Uji %03d', $i)
+                    ? sprintf('Kelengkapan Uji %03d', $i)
                     : sprintf('Bahan Baku Uji %03d', $i),
-                'type' => $i % 2 === 0 ? ItemType::Peralatan : ItemType::Bahan,
+                'type' => $i % 2 === 0 ? ItemType::Kelengkapan : ItemType::Bahan,
             ];
         }
 

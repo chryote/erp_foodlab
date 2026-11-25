@@ -175,7 +175,9 @@ describe('App ERP Main Menu integration', () => {
         company_type: [
           { value: 'Utama', nama: 'Utama' },
           { value: 'Packing', nama: 'Packing' },
-          { value: 'Produksi', nama: 'Produksi' },
+          { value: 'Kelengkapan', nama: 'Kelengkapan' },
+          { value: 'Sarpras', nama: 'Sarpras' },
+          { value: 'Bahan', nama: 'Bahan' },
         ],
       },
     });
@@ -319,7 +321,7 @@ describe('App ERP Main Menu integration', () => {
     ) as HTMLSelectElement;
     expect(
       Array.from(typeSelect.options).map((opt) => opt.value)
-    ).toEqual(['', 'Utama', 'Packing', 'Produksi']);
+    ).toEqual(['', 'Utama', 'Packing', 'Kelengkapan', 'Sarpras', 'Bahan']);
     fireEvent.change(nameInput, { target: { value: 'PT. Pangan Nusantara' } });
     fireEvent.change(seriesInput, { target: { value: '2' } });
     fireEvent.change(typeSelect, { target: { value: 'Packing' } });
@@ -345,7 +347,7 @@ describe('App ERP Main Menu integration', () => {
       target: { value: 'PT. Pangan Nusantara Baru' },
     });
     fireEvent.change(seriesInput, { target: { value: '2' } });
-    fireEvent.change(typeSelect, { target: { value: 'Produksi' } });
+    fireEvent.change(typeSelect, { target: { value: 'Sarpras' } });
     fireEvent.click(screen.getByRole('button', { name: 'Perbarui' }));
     expect(apiClient.updateCompany).not.toHaveBeenCalled();
     expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
@@ -355,7 +357,7 @@ describe('App ERP Main Menu integration', () => {
       expect(apiClient.updateCompany).toHaveBeenCalledWith(2, {
         name: 'PT. Pangan Nusantara Baru',
         series: 2,
-        type: 'Produksi',
+        type: 'Sarpras',
       });
       expect(screen.getByText('PT. Pangan Nusantara Baru')).toBeInTheDocument();
     });

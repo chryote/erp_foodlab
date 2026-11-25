@@ -66,7 +66,7 @@ describe('Item CPO module', function () {
             'company_id' => $companyB->id,
             'code' => 'ITM-BLD-02',
             'name' => 'Blender Lab',
-            'type' => ItemType::Peralatan,
+            'type' => ItemType::Kelengkapan,
         ]);
 
         // Unfiltered list uses defaultSort('name', 'id') and populates cache
@@ -99,7 +99,7 @@ describe('Item CPO module', function () {
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', $blender->id);
 
-        $this->getJson('/api/v1/modules/cpo/items?filter[type]=Peralatan')
+        $this->getJson('/api/v1/modules/cpo/items?filter[type]=Kelengkapan')
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', $blender->id);
@@ -198,11 +198,11 @@ describe('Item CPO module', function () {
             'company_id' => $companyA->id,
             'code' => 'ITM-SUGAR-01',
             'name' => 'Sugar 100% Pure',
-            'type' => ItemType::Peralatan->value,
+            'type' => ItemType::Kelengkapan->value,
         ])->assertOk()
             ->assertJsonPath('data.code', 'ITM-SUGAR-01')
             ->assertJsonPath('data.name', 'Sugar 100% Pure')
-            ->assertJsonPath('data.type', 'Peralatan');
+            ->assertJsonPath('data.type', 'Kelengkapan');
 
         expect(Cache::has(ItemService::CACHE_KEY_LIST))->toBeFalse();
 
@@ -212,7 +212,7 @@ describe('Item CPO module', function () {
             ->assertJsonPath('data.company_id', $companyA->id)
             ->assertJsonPath('data.code', 'ITM-SUGAR-01')
             ->assertJsonPath('data.name', 'Sugar 100% Pure')
-            ->assertJsonPath('data.type', 'Peralatan');
+            ->assertJsonPath('data.type', 'Kelengkapan');
 
         // Partial PATCH updating name and type omits code and preserves existing code
         $this->patchJson("/api/v1/modules/cpo/items/{$sugarId}", [
@@ -283,16 +283,16 @@ describe('Item CPO module', function () {
             'name' => 'Null Code Item 2',
         ])->assertCreated()->assertJsonPath('data.code', null);
 
-        // Create active item with normalized spacing and explicit Peralatan type
+        // Create active item with normalized spacing and explicit Kelengkapan type
         $first = $this->postJson('/api/v1/modules/cpo/items', [
             'company_id' => $companyA->id,
             'code' => '  ITM-001  ',
             'name' => '  Jackfruit   Kering  ',
-            'type' => ItemType::Peralatan->value,
+            'type' => ItemType::Kelengkapan->value,
         ])->assertCreated()
             ->assertJsonPath('data.code', 'ITM-001')
             ->assertJsonPath('data.name', 'Jackfruit Kering')
-            ->assertJsonPath('data.type', 'Peralatan');
+            ->assertJsonPath('data.type', 'Kelengkapan');
 
         $firstId = $first->json('data.id');
 
@@ -405,7 +405,7 @@ describe('Item CPO module', function () {
         expect($recreated->json('data.id'))->not->toBe($firstId);
     });
 
-    it('exposes CPO ItemType enum options and accepts Paket Usaha on item creation', function () {
+    it('exposes CPO ItemType enum options and accepts Sarpras on item creation', function () {
         $this->getJson('/api/v1/modules/cpo/enums')
             ->assertOk()
             ->assertJsonPath('data.item_type', ItemType::options());
@@ -414,10 +414,10 @@ describe('Item CPO module', function () {
 
         $this->postJson('/api/v1/modules/cpo/items', [
             'company_id' => $company->id,
-            'code' => 'ITM-PKT-01',
+            'code' => 'ITM-SRP-01',
             'name' => 'Booth Gerobak Usaha',
-            'type' => ItemType::PaketUsaha->value,
+            'type' => ItemType::Sarpras->value,
         ])->assertCreated()
-            ->assertJsonPath('data.type', ItemType::PaketUsaha->value);
+            ->assertJsonPath('data.type', ItemType::Sarpras->value);
     });
 });
