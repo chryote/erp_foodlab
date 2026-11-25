@@ -52,6 +52,7 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
 
     const companiesStore: apiClient.Company[] = [
       { id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1 },
+      { id: 2, name: 'PT. Pangan Nusantara', series: 1 },
     ];
 
     vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
@@ -89,6 +90,38 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
           type: 'Bahan',
         },
       },
+      {
+        id: 11,
+        company_id: 1,
+        packet_id: 20,
+        item_id: 31,
+        quantity: 5,
+        company: companiesStore[0],
+        packet: { id: 20, name: 'Paket Dasar' },
+        item: {
+          id: 31,
+          company_id: 1,
+          code: 'ITM-002',
+          name: 'Lakban Bening',
+          type: 'Peralatan',
+        },
+      },
+      {
+        id: 12,
+        company_id: 2,
+        packet_id: 20,
+        item_id: 32,
+        quantity: 1,
+        company: companiesStore[1],
+        packet: { id: 20, name: 'Paket Dasar' },
+        item: {
+          id: 32,
+          company_id: 2,
+          code: 'ITM-003',
+          name: 'Plastik Segel',
+          type: 'Bahan',
+        },
+      },
     ];
     let defaultPackagesStore: apiClient.DefaultPackage[] = [
       {
@@ -97,12 +130,12 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
         packet_name_id: 1,
         packet_vendor_id: 1,
         packet_category_id: 1,
-        item_packet_id: 10,
+        item_packet_id: 11,
         price: 120000,
         packet_name: packetNamesStore[0],
         packet_vendor: packetVendorsStore[0],
         packet_category: packetCategoriesStore[0],
-        item_packet: itemPacketsStore[0],
+        item_packet: itemPacketsStore[1],
       },
     ];
 
@@ -518,6 +551,36 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
       await within(defaultModal).findByText('Brand Awal')
     ).toBeInTheDocument();
     expect(within(defaultModal).getByText('Rp 120.000')).toBeInTheDocument();
+
+    // Datatable displays only Company Name and Packet Name in Item Paket column
+    const defaultTablePanel = screen.getByTestId(
+      'master-paket-crud-modal-table-panel'
+    );
+    expect(
+      within(defaultTablePanel).getByText('PT. Slaras Nusa Foodlab — Paket Dasar')
+    ).toBeInTheDocument();
+    expect(
+      within(defaultTablePanel).queryByText(/Kardus Packing|Lakban Bening/)
+    ).not.toBeInTheDocument();
+
+    // Dropdown has only unique (company_id, packet_id) options displaying Company Name — Packet Name
+    const itemPacketSelect = within(defaultModal).getByLabelText(
+      'Item Paket'
+    ) as HTMLSelectElement;
+    const itemPacketOptionLabels = Array.from(itemPacketSelect.options).map(
+      (opt) => opt.textContent
+    );
+    expect(itemPacketOptionLabels).toEqual([
+      'Pilih item paket...',
+      'PT. Slaras Nusa Foodlab — Paket Dasar',
+      'PT. Pangan Nusantara — Paket Dasar',
+    ]);
+
+    // Editing row 50 (item_packet_id = 11, second item in company 1 + packet 20) still selects the group cleanly
+    fireEvent.click(within(defaultModal).getByTestId('edit-row-50'));
+    expect(itemPacketSelect.value).toBe('11');
+    expect(itemPacketSelect.options).toHaveLength(3);
+    fireEvent.click(within(defaultModal).getByRole('button', { name: 'Batal' }));
 
     fireEvent.change(within(defaultModal).getByLabelText('Nama Brand'), {
       target: { value: 'Brand Nusantara' },
@@ -979,6 +1042,7 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
 
     const companiesStore: apiClient.Company[] = [
       { id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1 },
+      { id: 2, name: 'PT. Pangan Nusantara', series: 1 },
     ];
 
     vi.mocked(apiClient.fetchCompanies).mockResolvedValue({

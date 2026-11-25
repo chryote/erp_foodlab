@@ -8,6 +8,7 @@ import { ModuleLauncherCard } from '../../components/ui/ModuleLauncherCard';
 
 export const CPO_INPUT_PACKING_ITEMS: HorizontalMenuItem[] = [
   { code: 'MASTER_PACKING', title: 'Master Packing' },
+  { code: 'VIEW_PACKING', title: 'View Packing' },
 ];
 
 export const CPO_INPUT_PAKET_ITEMS: HorizontalMenuItem[] = [

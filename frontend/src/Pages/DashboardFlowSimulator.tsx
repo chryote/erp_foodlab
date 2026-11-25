@@ -46,6 +46,7 @@ import { MasterBahanBakuCrudModal } from '@/modules/CPO/MasterBahanBakuCrudModal
 import { MasterPackingCrudModal } from '@/modules/CPO/MasterPackingCrudModal';
 import { MasterPaketCrudModal } from '@/modules/CPO/MasterPaketCrudModal';
 import { ViewBahanBakuModal } from '@/modules/CPO/ViewBahanBakuModal';
+import { ViewPackingModal } from '@/modules/CPO/ViewPackingModal';
 
 export interface DashboardProps {
   onLogout?: () => void | Promise<void>;
@@ -311,6 +312,13 @@ export const DashboardFlowSimulator: React.FC<DashboardProps> = ({ onLogout }) =
 
             <MasterPackingCrudModal
               isOpen={selectedChildSubMenu?.code === 'MASTER_PACKING'}
+              company={selectedCompany}
+              companies={companyResource.companies}
+              onClose={() => setSelectedChildSubMenu(null)}
+            />
+
+            <ViewPackingModal
+              isOpen={selectedChildSubMenu?.code === 'VIEW_PACKING'}
               company={selectedCompany}
               companies={companyResource.companies}
               onClose={() => setSelectedChildSubMenu(null)}

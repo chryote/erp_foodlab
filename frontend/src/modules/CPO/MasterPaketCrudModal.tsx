@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
+  Company,
   DefaultPackage,
   DefaultPackagePayload,
-  ItemPacket,
+  Packet,
   PacketCategory,
   PacketName,
   PacketVendor,
@@ -21,6 +22,7 @@ import {
 import { useMasterPaketCrudResource } from '@/lib/cpoResources';
 import { cn } from '@/lib/utils';
 import { formatCapitalIdr } from '@/modules/CFO/CapitalCompanyCrudModal';
+import { groupItemPacketsByCompanyAndPacket } from './packingGrouping';
 
 export type MasterPaketTabKey = 'paket' | 'default-package';
 
@@ -32,12 +34,15 @@ export const MASTER_PAKET_TABS: Array<{
   { key: 'default-package', label: 'Paket Awal' },
 ];
 
-function formatItemPacketLabel(ip: ItemPacket): string {
-  const packetName = ip.packet?.name ?? `Paket #${ip.packet_id}`;
-  const itemName = ip.item?.name ?? `Item #${ip.item_id}`;
-  const qty = ip.quantity ?? 1;
-  const companyPrefix = ip.company?.name ? `${ip.company.name} — ` : '';
-  return `${companyPrefix}${packetName} / ${itemName} (${qty})`;
+function formatCompanyPacketLabel(
+  company: Company | null | undefined,
+  companyId: number,
+  packet: Packet | null | undefined,
+  packetId: number
+): string {
+  const companyName = company?.name ?? `Perusahaan #${companyId}`;
+  const packetName = packet?.name ?? `Paket #${packetId}`;
+  return `${companyName} — ${packetName}`;
 }
 
 type PaketEntityKey = 'packet-name' | 'packet-vendor' | 'packet-category';
@@ -349,13 +354,62 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
     [allPacketCategories]
   );
 
-  const itemPacketOptions = useMemo(
+  const groupedItemPackets = useMemo(
     () =>
-      allItemPackets.map((ip) => ({
-        value: String(ip.id),
-        label: formatItemPacketLabel(ip),
-      })),
+      groupItemPacketsByCompanyAndPacket(
+        allItemPackets,
+        new Map(),
+        new Map()
+      ),
     [allItemPackets]
+  );
+
+  const getItemPacketOptions = useCallback(
+    (values: Record<string, string>) => {
+      const selectedId = Number(values.item_packet_id);
+      const hasSelected =
+        Boolean(values.item_packet_id) && Number.isFinite(selectedId);
+
+      let matchedGroup = false;
+      const options = groupedItemPackets.map((group) => {
+        const matchesSelected =
+          hasSelected &&
+          group.item_packets.some((ip) => Number(ip.id) === selectedId);
+        if (matchesSelected) {
+          matchedGroup = true;
+        }
+        return {
+          value: matchesSelected ? String(selectedId) : String(group.id),
+          label: formatCompanyPacketLabel(
+            group.company,
+            group.company_id,
+            group.packet,
+            group.packet_id
+          ),
+        };
+      });
+
+      if (hasSelected && !matchedGroup) {
+        const fallback =
+          allDefaultPackages.find(
+            (dp) => Number(dp.item_packet_id) === selectedId
+          )?.item_packet ?? null;
+        if (fallback) {
+          options.push({
+            value: String(selectedId),
+            label: formatCompanyPacketLabel(
+              fallback.company,
+              fallback.company_id,
+              fallback.packet,
+              fallback.packet_id
+            ),
+          });
+        }
+      }
+
+      return options;
+    },
+    [allDefaultPackages, groupedItemPackets]
   );
 
   const defaultPackageFields = useMemo<CrudFieldConfig<DefaultPackage>[]>(
@@ -407,14 +461,25 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
         label: 'Item Paket',
         type: 'select',
         placeholder: 'Pilih item paket...',
-        options: itemPacketOptions,
+        options: getItemPacketOptions,
         renderValue: (row) => {
           const matched =
             allItemPackets.find((ip) => ip.id === Number(row.item_packet_id)) ??
             row.item_packet;
-          return matched
-            ? formatItemPacketLabel(matched)
-            : String(row.item_packet_id);
+          if (!matched) {
+            return String(row.item_packet_id);
+          }
+          const group = groupedItemPackets.find(
+            (g) =>
+              g.company_id === Number(matched.company_id) &&
+              g.packet_id === Number(matched.packet_id)
+          );
+          return formatCompanyPacketLabel(
+            matched.company ?? group?.company,
+            Number(matched.company_id),
+            matched.packet ?? group?.packet,
+            Number(matched.packet_id)
+          );
         },
       },
       {
@@ -432,7 +497,8 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
       allPacketCategories,
       allPacketNames,
       allPacketVendors,
-      itemPacketOptions,
+      getItemPacketOptions,
+      groupedItemPackets,
       packetCategoryOptions,
       packetNameOptions,
       packetVendorOptions,
