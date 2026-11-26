@@ -42,12 +42,11 @@ import {
   CpoHorizontalMenu,
   CpoModuleCard,
 } from '@/modules/CPO/CpoModuleCard';
-import { MasterBahanBakuCrudModal } from '@/modules/CPO/MasterBahanBakuCrudModal';
 import { MasterItemInternalCrudModal } from '@/modules/CPO/MasterItemInternalCrudModal';
 import { MasterItemVendorCrudModal } from '@/modules/CPO/MasterItemVendorCrudModal';
 import { MasterPackingCrudModal } from '@/modules/CPO/MasterPackingCrudModal';
 import { MasterPaketCrudModal } from '@/modules/CPO/MasterPaketCrudModal';
-import { ViewBahanBakuModal } from '@/modules/CPO/ViewBahanBakuModal';
+import { ViewPaketAwalModal } from '@/modules/CPO/ViewPaketAwalModal';
 import { ViewPackingModal } from '@/modules/CPO/ViewPackingModal';
 
 export interface DashboardProps {
@@ -332,14 +331,9 @@ export const DashboardFlowSimulator: React.FC<DashboardProps> = ({ onLogout }) =
               onClose={() => setSelectedChildSubMenu(null)}
             />
 
-            <MasterBahanBakuCrudModal
-              isOpen={selectedChildSubMenu?.code === 'MASTER_BAHAN_BAKU'}
+            <ViewPaketAwalModal
+              isOpen={selectedChildSubMenu?.code === 'VIEW_PAKET_AWAL'}
               companies={companyResource.companies}
-              onClose={() => setSelectedChildSubMenu(null)}
-            />
-
-            <ViewBahanBakuModal
-              isOpen={selectedChildSubMenu?.code === 'VIEW_BAHAN_BAKU'}
               onClose={() => setSelectedChildSubMenu(null)}
             />
 

@@ -184,4 +184,11 @@ describe('Scout Search Integration Preserving ERP API Patterns', function () {
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', $sample->id);
     });
+
+    it('runs scout:bootstrap cleanly when Scout driver is not meilisearch', function () {
+        config(['scout.driver' => 'null']);
+
+        $this->artisan('scout:bootstrap')
+            ->assertSuccessful();
+    });
 });

@@ -1,18 +1,23 @@
-.PHONY: help setup up down restart ps logs test test-backend test-filter test-frontend k6-smoke k6-load k6-stress migrate schema-dump seed scout-sync scout-import
+.PHONY: help setup up down restart ps logs deploy migrate schema-dump seed scout-sync scout-import test test-backend test-filter test-frontend k6-smoke k6-load k6-stress
+
+SCOUT_MODELS := ExpenseItem Item Packet Employee LabSample
 
 help: ## Show available Make targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
-setup: ## Copy environment files and start all containers
+setup: ## Copy environment files, start containers, migrate/seed DB, and initialize Meilisearch
 	cp -n .env.example .env || true
 	cp -n backend/.env.example backend/.env || true
 	cp -n frontend/.env.example frontend/.env || true
 	docker compose up -d --build -V --wait
-	docker compose exec app php artisan key:generate
-	docker compose exec app php artisan migrate --seed
+	docker compose exec -T app php artisan key:generate
+	$(MAKE) scout-sync
+	docker compose exec -T app php artisan migrate --seed
+	$(MAKE) scout-import
 
-up: ## Start all Docker services in detached mode
-	docker compose up -d --build -V
+up: ## Start all Docker services in detached mode and sync Meilisearch settings
+	docker compose up -d --build -V --wait
+	$(MAKE) scout-sync
 
 down: ## Stop and remove Docker containers
 	docker compose down
@@ -25,24 +30,32 @@ ps: ## List running containers
 logs: ## Follow container logs
 	docker compose logs -f
 
+deploy: ## Production/staging deploy: build/start containers, migrate, sync/import Scout, optimize caches, restart queue
+	docker compose up -d --build --wait
+	docker compose exec -T app php artisan migrate --force
+	$(MAKE) scout-sync
+	$(MAKE) scout-import
+	docker compose exec -T app php artisan optimize
+	docker compose exec -T app php artisan queue:restart
+
 migrate: ## Run Laravel database migrations
-	docker compose exec app php artisan migrate
+	docker compose exec -T app php artisan migrate
 
 schema-dump: ## Dump MySQL schema into database/schema/mysql-schema.sql
 	docker compose exec app php artisan schema:dump
 
-seed: ## Seed Laravel database with sample FoodLab data
-	docker compose exec app php artisan db:seed
+seed: ## Seed Laravel database with sample FoodLab data and refresh Meilisearch
+	docker compose exec -T app php artisan db:seed
+	$(MAKE) scout-sync
+	$(MAKE) scout-import
 
 scout-sync: ## Sync Meilisearch index settings from config/scout.php
-	docker compose exec app php artisan scout:sync-index-settings
+	docker compose exec -T app php artisan scout:sync-index-settings
 
 scout-import: ## Import all Searchable models into Meilisearch
-	docker compose exec app php artisan scout:import "App\Models\ExpenseItem"
-	docker compose exec app php artisan scout:import "App\Models\Item"
-	docker compose exec app php artisan scout:import "App\Models\Packet"
-	docker compose exec app php artisan scout:import "App\Models\Employee"
-	docker compose exec app php artisan scout:import "App\Models\LabSample"
+	@for model in $(SCOUT_MODELS); do \
+		docker compose exec -T app php artisan scout:import "$$model"; \
+	done
 
 test: test-backend test-frontend ## Run both Backend (Pest) and Frontend (Vitest) unit tests
 
