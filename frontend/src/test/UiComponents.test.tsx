@@ -235,6 +235,36 @@ describe('Reusable UI Components (src/components/ui)', () => {
     expect(onDelete).toHaveBeenCalledWith(10);
   });
 
+  it('renders CrudModal as a page with lazy-load rows and no pagination', () => {
+    render(
+      <CrudModal
+        isOpen
+        pageMode
+        title="Master Packing"
+        fields={[{ key: 'name', label: 'Nama Item', sortable: true }]}
+        items={[]}
+        displayItems={[
+          { id: 1, name: 'Item pertama' },
+          { id: 2, name: 'Item kedua' },
+        ]}
+        hasMore
+        onLoadMore={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('crud-modal-page')).toBeInTheDocument();
+    expect(screen.getByText('Item pertama')).toBeInTheDocument();
+    expect(screen.getByText('Item kedua')).toBeInTheDocument();
+    expect(screen.getByTestId('crud-modal-table-panel')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('crud-modal-table-scroll-sentinel')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('crud-modal-pagination-info')
+    ).not.toBeInTheDocument();
+  });
+
   it('renders reusable CrudModal with select and number fields', async () => {
     const onCreate = vi.fn();
     const onUpdate = vi.fn();
