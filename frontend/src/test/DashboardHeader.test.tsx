@@ -1,10 +1,37 @@
 import { useState } from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { DashboardHeader } from '../components/ui/DashboardHeader';
 
 describe('DashboardHeader', () => {
+  it('opens company menus on click, not while scrolling the menubar', async () => {
+    const user = userEvent.setup();
+    render(
+      <DashboardHeader
+        companies={[
+          { id: 1, name: 'PT ABC' },
+          { id: 2, name: 'PT XYZ' },
+        ]}
+        selectedCompanyId={1}
+      />
+    );
+
+    const firstCompany = screen.getByTestId('dashboard-company-tab-1');
+    fireEvent.pointerDown(firstCompany, { pointerType: 'touch' });
+    fireEvent.pointerMove(firstCompany, { pointerType: 'touch' });
+
+    expect(screen.queryByText('CFO')).not.toBeInTheDocument();
+
+    await user.click(firstCompany);
+    expect(await screen.findByText('CFO')).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+    expect(screen.queryByText('CFO')).not.toBeInTheDocument();
+    await user.keyboard('{ArrowDown}');
+    expect(await screen.findByText('CFO')).toBeInTheDocument();
+  });
+
   it('shows the fixed company module hierarchy and handles leaf selection', async () => {
     const user = userEvent.setup();
     const onSelectCompany = vi.fn();

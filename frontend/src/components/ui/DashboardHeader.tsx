@@ -135,6 +135,9 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   const theme = useTheme();
   const [logoutConfirmationOpen, setLogoutConfirmationOpen] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
+  const [openCompanyMenuId, setOpenCompanyMenuId] = useState<number | null>(
+    null
+  );
   const seriesList = useMemo(
     () =>
       Array.from(new Set(companies.map((company) => company.series ?? 1))).sort(
@@ -259,16 +262,32 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         <div className="flex min-h-12 items-center justify-between gap-3">
           <Menubar
             aria-label="Companies"
+            value={openCompanyMenuId?.toString() ?? ''}
+            onValueChange={(value) => {
+              if (!value) {
+                setOpenCompanyMenuId(null);
+              }
+            }}
             className="flex h-auto min-h-12 min-w-0 flex-1 justify-start gap-1 overflow-x-auto rounded-none border-0 bg-transparent p-0 shadow-none"
           >
             {companiesInActiveSeries.map((company) => {
               const isSelected = selectedCompanyId === company.id;
               return (
-                <MenubarMenu key={company.id}>
+                <MenubarMenu key={company.id} value={company.id.toString()}>
                   <MenubarTrigger
                     aria-selected={isSelected}
                     aria-current={isSelected ? 'page' : undefined}
                     data-testid={`dashboard-company-tab-${company.id}`}
+                    onClick={() =>
+                      setOpenCompanyMenuId(
+                        openCompanyMenuId === company.id ? null : company.id
+                      )
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === 'ArrowDown') {
+                        setOpenCompanyMenuId(company.id);
+                      }
+                    }}
                     className={cn(
                       'relative h-12 shrink-0 rounded-sm px-3 text-xs font-semibold transition-colors sm:px-4',
                       isSelected
