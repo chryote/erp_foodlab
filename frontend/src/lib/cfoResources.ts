@@ -67,29 +67,61 @@ function getNextListPage<T>(
 }
 
 export function useInfiniteCompaniesQuery(
-  searchName: string,
-  searchSeries: string,
+  search: string,
   sort: string
 ) {
-  const seriesFilter = searchSeries.trim()
-    ? Number(searchSeries.trim())
-    : undefined;
+  const searchTerm = search.trim();
+  const seriesFilter = /^\d+$/.test(searchTerm) ? Number(searchTerm) : undefined;
+  const canSearchSeries =
+    seriesFilter !== undefined && Number.isSafeInteger(seriesFilter);
+
   return useInfiniteQuery({
     queryKey: [
       ...cfoQueryKeys.companies,
       'infinite',
-      searchName,
-      searchSeries,
+      search,
       sort,
     ],
-    queryFn: ({ pageParam }) =>
-      fetchCompanies({
+    queryFn: async ({ pageParam }) => {
+      const searchResults = await fetchCompanies({
         page: pageParam,
         per_page: CFO_LIST_PAGE_SIZE,
-        search: searchName.trim() || undefined,
+        search: searchTerm || undefined,
         sort,
+      });
+
+      if (!canSearchSeries) {
+        return searchResults;
+      }
+
+      const seriesResults = await fetchCompanies({
+        page: pageParam,
+        per_page: CFO_LIST_PAGE_SIZE,
         series: seriesFilter,
-      }),
+        sort,
+      });
+      const companies = new Map(
+        [...searchResults.data, ...seriesResults.data].map((company) => [
+          company.id,
+          company,
+        ])
+      );
+      const lastPage = Math.max(
+        ...[searchResults, seriesResults].map(
+          (response) =>
+            response.meta.last_page ??
+            (response.data.length === CFO_LIST_PAGE_SIZE
+              ? pageParam + 1
+              : pageParam)
+        )
+      );
+
+      return {
+        ...searchResults,
+        data: [...companies.values()],
+        meta: { ...searchResults.meta, last_page: lastPage },
+      };
+    },
     initialPageParam: 1,
     getNextPageParam: (lastPage, _allPages, lastPageParam) =>
       getNextListPage(lastPage, lastPageParam),

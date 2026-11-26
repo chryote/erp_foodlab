@@ -166,7 +166,7 @@ export default function CfoViewModalPage() {
                   searchValue={stakeholderSearch}
                   onSearchChange={setStakeholderSearch}
                   searchLabel="Cari pemegang saham"
-                  searchPlaceholder="Cari pemegang saham..."
+                  searchPlaceholder="Cari nama atau kapital pemegang saham..."
                   searchTestId="pemegang-saham-table-search"
                   onSearchSubmit={submitStakeholderSearch}
                 />
