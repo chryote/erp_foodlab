@@ -5,6 +5,7 @@ use App\Models\Company;
 use App\Models\Item;
 use App\Models\ItemPacket;
 use App\Models\Packet;
+use App\Models\PacketVendor;
 use App\Modules\CPO\Services\CpoService;
 use App\Modules\CPO\Services\ItemPacketService;
 use App\Modules\CPO\Services\ItemService;
@@ -419,5 +420,145 @@ describe('Item CPO module', function () {
             'type' => ItemType::Sarpras->value,
         ])->assertCreated()
             ->assertJsonPath('data.type', ItemType::Sarpras->value);
+    });
+
+    it('supports exclusive PacketVendor ownership, XOR validation, owner switching edge cases, and vendor-scoped uniqueness', function () {
+        $company = Company::factory()->create(['name' => 'PT. Owner Company']);
+        $vendorA = PacketVendor::factory()->create(['name' => 'Vendor Alpha']);
+        $vendorB = PacketVendor::factory()->create(['name' => 'Vendor Beta']);
+
+        // Submitting both company_id and packet_vendor_id (even with identical numeric IDs) or neither fails with 422
+        $this->postJson('/api/v1/modules/cpo/items', [
+            'company_id' => $company->id,
+            'packet_vendor_id' => $vendorA->id,
+            'name' => 'Dual Owner Item',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['company_id', 'packet_vendor_id']);
+
+        $this->postJson('/api/v1/modules/cpo/items', [
+            'company_id' => null,
+            'packet_vendor_id' => null,
+            'name' => 'No Owner Item',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['company_id', 'packet_vendor_id']);
+
+        // Soft-deleted packet_vendor_id fails with 422
+        $deletedVendor = PacketVendor::factory()->create(['name' => 'Vendor Deleted']);
+        $deletedVendor->delete();
+
+        $this->postJson('/api/v1/modules/cpo/items', [
+            'packet_vendor_id' => $deletedVendor->id,
+            'name' => 'Deleted Vendor Item',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['packet_vendor_id']);
+
+        // Create PacketVendor-owned item (company_id = null)
+        $vendorRes = $this->postJson('/api/v1/modules/cpo/items', [
+            'packet_vendor_id' => $vendorA->id,
+            'code' => '  VND-001  ',
+            'name' => '  Kemasan   Standing Pouch  ',
+            'type' => ItemType::Kelengkapan->value,
+        ])->assertCreated()
+            ->assertJsonPath('data.company_id', null)
+            ->assertJsonPath('data.packet_vendor_id', $vendorA->id)
+            ->assertJsonPath('data.company', null)
+            ->assertJsonPath('data.packet_vendor.id', $vendorA->id)
+            ->assertJsonPath('data.code', 'VND-001')
+            ->assertJsonPath('data.name', 'Kemasan Standing Pouch');
+
+        $vendorItemId = $vendorRes->json('data.id');
+
+        // Duplicate code/name within same PacketVendor fails with 422 (including case & whitespace variants)
+        $this->postJson('/api/v1/modules/cpo/items', [
+            'packet_vendor_id' => $vendorA->id,
+            'code' => 'vnd-001',
+            'name' => 'Kemasan Lain',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['code']);
+
+        $this->postJson('/api/v1/modules/cpo/items', [
+            'packet_vendor_id' => $vendorA->id,
+            'name' => '  KEMASAN   STANDING POUCH ',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
+
+        // Same code and name is allowed on Company AND on a different PacketVendor
+        $companyItem = $this->postJson('/api/v1/modules/cpo/items', [
+            'company_id' => $company->id,
+            'code' => 'VND-001',
+            'name' => 'Kemasan Standing Pouch',
+        ])->assertCreated()
+            ->assertJsonPath('data.company_id', $company->id)
+            ->assertJsonPath('data.packet_vendor_id', null);
+
+        $this->postJson('/api/v1/modules/cpo/items', [
+            'packet_vendor_id' => $vendorB->id,
+            'code' => 'VND-001',
+            'name' => 'Kemasan Standing Pouch',
+        ])->assertCreated()
+            ->assertJsonPath('data.company_id', null)
+            ->assertJsonPath('data.packet_vendor_id', $vendorB->id);
+
+        // Filtering by packet_vendor_id & ?active_company=1 behavior
+        $this->getJson("/api/v1/modules/cpo/items?filter[packet_vendor_id]={$vendorA->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $vendorItemId);
+
+        $this->getJson("/api/v1/modules/cpo/items?packet_vendor_id={$vendorB->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data');
+
+        $this->getJson('/api/v1/modules/cpo/items?active_company=1', [
+            'X-Active-Company-Id' => (string) $company->id,
+        ])->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $companyItem->json('data.id'));
+
+        // Clearing owner to null via PATCH without providing the other owner fails with 422
+        $this->patchJson("/api/v1/modules/cpo/items/{$vendorItemId}", [
+            'packet_vendor_id' => null,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['company_id', 'packet_vendor_id']);
+
+        // Submitting both on PATCH fails with 422
+        $this->patchJson("/api/v1/modules/cpo/items/{$vendorItemId}", [
+            'company_id' => $company->id,
+            'packet_vendor_id' => $vendorA->id,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['company_id', 'packet_vendor_id']);
+
+        // Switching owner while active ItemPacket exists is blocked with 422
+        $packet = Packet::factory()->create(['name' => 'Paket Vendor Lock']);
+        $pivot = ItemPacket::factory()->forPacketVendor($vendorA)->create([
+            'packet_id' => $packet->id,
+            'item_id' => $vendorItemId,
+            'quantity' => 2,
+        ]);
+
+        $this->patchJson("/api/v1/modules/cpo/items/{$vendorItemId}", [
+            'company_id' => $company->id,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['company_id']);
+
+        // After soft-deleting ItemPacket, switching PacketVendor -> Company (omitting packet_vendor_id) succeeds and clears packet_vendor_id
+        $pivot->delete();
+        $this->patchJson("/api/v1/modules/cpo/items/{$vendorItemId}", [
+            'company_id' => $company->id,
+            'code' => 'CMP-SWITCH-01',
+            'name' => 'Switched Owner Item',
+        ])->assertOk()
+            ->assertJsonPath('data.company_id', $company->id)
+            ->assertJsonPath('data.packet_vendor_id', null)
+            ->assertJsonPath('data.packet_vendor', null);
+
+        // Switching Company -> PacketVendor (with explicit company_id: null) clears company_id
+        $this->patchJson("/api/v1/modules/cpo/items/{$vendorItemId}", [
+            'company_id' => null,
+            'packet_vendor_id' => $vendorA->id,
+        ])->assertOk()
+            ->assertJsonPath('data.company_id', null)
+            ->assertJsonPath('data.packet_vendor_id', $vendorA->id)
+            ->assertJsonPath('data.company', null);
+
+        // Soft delete frees (packet_vendor_id, code) and (packet_vendor_id, name) for re-creation
+        $this->deleteJson("/api/v1/modules/cpo/items/{$vendorItemId}")->assertOk();
+        $this->postJson('/api/v1/modules/cpo/items', [
+            'packet_vendor_id' => $vendorA->id,
+            'code' => 'CMP-SWITCH-01',
+            'name' => 'Switched Owner Item',
+        ])->assertCreated();
     });
 });

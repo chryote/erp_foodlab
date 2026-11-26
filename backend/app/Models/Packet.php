@@ -31,7 +31,7 @@ class Packet extends Model
     {
         return $this->belongsToMany(Item::class, 'item_packet')
             ->wherePivotNull('deleted_at')
-            ->withPivot(['id', 'company_id', 'quantity', 'deleted_at'])
+            ->withPivot(['id', 'company_id', 'packet_vendor_id', 'quantity', 'deleted_at'])
             ->withTimestamps();
     }
 }

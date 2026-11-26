@@ -2,10 +2,10 @@
 
 namespace App\Modules\CPO\Services;
 
-use App\Models\Company;
 use App\Models\Item;
 use App\Models\ItemPacket;
 use App\Models\Packet;
+use App\Support\ExclusiveOwner;
 use App\Support\IndexQuery;
 use App\Support\WriteGuard;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -14,7 +14,6 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -26,7 +25,7 @@ class ItemPacketService
     /**
      * @var array<int, string>
      */
-    private const RELATIONS = ['company', 'packet', 'item'];
+    private const RELATIONS = ['company', 'packetVendor', 'packet', 'item'];
 
     /**
      * @return LengthAwarePaginator|Collection<int, ItemPacket>
@@ -53,16 +52,18 @@ class ItemPacketService
      */
     public function createItemPacket(array $attributes): ItemPacket
     {
-        $attributes['company_id'] = (int) $attributes['company_id'];
         $attributes['quantity'] = (int) ($attributes['quantity'] ?? 1);
+        $resolved = ExclusiveOwner::resolveForService($attributes);
+        $companyId = $resolved['company_id'];
+        $vendorId = $resolved['packet_vendor_id'];
+        $attributes = $resolved['attributes'];
 
-        $itemPacket = DB::transaction(function () use ($attributes): ItemPacket {
-            $companyId = (int) $attributes['company_id'];
+        $itemPacket = DB::transaction(function () use ($attributes, $companyId, $vendorId): ItemPacket {
             $packetId = (int) $attributes['packet_id'];
             $itemId = (int) $attributes['item_id'];
 
-            $this->assertActiveParents($companyId, $packetId, $itemId);
-            $this->assertPairUnique($companyId, $packetId, $itemId);
+            $this->assertActiveParents($companyId, $vendorId, $packetId, $itemId);
+            $this->assertPairUnique($companyId, $vendorId, $packetId, $itemId);
 
             return ItemPacket::query()->create($attributes);
         });
@@ -77,19 +78,19 @@ class ItemPacketService
      */
     public function updateItemPacket(ItemPacket $itemPacket, array $attributes): ItemPacket
     {
-        if (array_key_exists('company_id', $attributes)) {
-            $attributes['company_id'] = (int) $attributes['company_id'];
-        }
-
         $updated = DB::transaction(function () use ($itemPacket, $attributes): ItemPacket {
             $locked = ItemPacket::query()->lockForUpdate()->findOrFail($itemPacket->getKey());
 
-            $targetCompanyId = (int) ($attributes['company_id'] ?? $locked->company_id);
+            $resolved = ExclusiveOwner::resolveForService($attributes, $locked);
+            $targetCompanyId = $resolved['company_id'];
+            $targetVendorId = $resolved['packet_vendor_id'];
+            $attributes = $resolved['attributes'];
+
             $targetPacketId = (int) ($attributes['packet_id'] ?? $locked->packet_id);
             $targetItemId = (int) ($attributes['item_id'] ?? $locked->item_id);
 
-            $this->assertActiveParents($targetCompanyId, $targetPacketId, $targetItemId);
-            $this->assertPairUnique($targetCompanyId, $targetPacketId, $targetItemId, $locked->getKey());
+            $this->assertActiveParents($targetCompanyId, $targetVendorId, $targetPacketId, $targetItemId);
+            $this->assertPairUnique($targetCompanyId, $targetVendorId, $targetPacketId, $targetItemId, $locked->getKey());
 
             $locked->update($attributes);
 
@@ -117,6 +118,7 @@ class ItemPacketService
         return IndexQuery::make(ItemPacket::class, $request)
             ->allowedFilters([
                 AllowedFilter::exact('company_id'),
+                AllowedFilter::exact('packet_vendor_id'),
                 AllowedFilter::exact('packet_id'),
                 AllowedFilter::exact('item_id'),
                 AllowedFilter::callback('item_type', function (Builder $query, mixed $value): void {
@@ -173,24 +175,14 @@ class ItemPacketService
                     $query->where('quantity', '<=', (int) $trimmed);
                 }),
             ])
-            ->allowedSorts(['id', 'company_id', 'packet_id', 'item_id', 'quantity', 'created_at', 'updated_at'])
+            ->allowedSorts(['id', 'company_id', 'packet_vendor_id', 'packet_id', 'item_id', 'quantity', 'created_at', 'updated_at'])
             ->allowedIncludes([...self::RELATIONS, ...(class_exists('App\\Models\\DefaultPackage') ? ['defaultPackages'] : [])])
             ->defaultSort('id');
     }
 
-    private function assertActiveParents(int $companyId, int $packetId, int $itemId): void
+    private function assertActiveParents(?int $companyId, ?int $packetVendorId, int $packetId, int $itemId): void
     {
-        $companyExists = Company::query()
-            ->whereNull('deleted_at')
-            ->sharedLock()
-            ->whereKey($companyId)
-            ->exists();
-
-        if (! $companyExists) {
-            throw ValidationException::withMessages([
-                'company_id' => ['The selected company is invalid or has been deleted.'],
-            ]);
-        }
+        ExclusiveOwner::assertActiveOwner($companyId, $packetVendorId);
 
         $packetExists = Packet::query()
             ->whereNull('deleted_at')
@@ -215,25 +207,36 @@ class ItemPacketService
             ]);
         }
 
-        if ((int) $item->company_id !== $companyId) {
+        $itemCompanyId = $item->company_id !== null ? (int) $item->company_id : null;
+        $itemVendorId = $item->packet_vendor_id !== null ? (int) $item->packet_vendor_id : null;
+
+        if ($companyId !== null && ($itemCompanyId !== $companyId || $itemVendorId !== null)) {
             throw ValidationException::withMessages([
                 'item_id' => ['The selected item does not belong to the selected company.'],
             ]);
         }
+
+        if ($packetVendorId !== null && ($itemVendorId !== $packetVendorId || $itemCompanyId !== null)) {
+            throw ValidationException::withMessages([
+                'item_id' => ['The selected item does not belong to the selected packet vendor.'],
+            ]);
+        }
     }
 
-    private function assertPairUnique(int $companyId, int $packetId, int $itemId, mixed $ignoreKey = null): void
+    private function assertPairUnique(?int $companyId, ?int $packetVendorId, int $packetId, int $itemId, mixed $ignoreKey = null): void
     {
+        $ownerLabel = $companyId !== null ? 'perusahaan' : 'vendor paket';
+
         WriteGuard::assertUniqueActive(
             ItemPacket::query(),
             'item_id',
             (string) $itemId,
             [
-                'company_id' => $companyId,
+                ...ExclusiveOwner::scopeFilters($companyId, $packetVendorId),
                 'packet_id' => $packetId,
             ],
             'item_id',
-            'Item sudah terdaftar pada paket ini untuk perusahaan ini.',
+            "Item sudah terdaftar pada paket ini untuk {$ownerLabel} ini.",
             $ignoreKey,
             true
         );
@@ -243,6 +246,7 @@ class ItemPacketService
     {
         Cache::forget(self::CACHE_KEY_LIST);
         Cache::forget(PacketService::CACHE_KEY_LIST);
+        Cache::forget(PacketVendorService::CACHE_KEY_LIST);
         Cache::forget(ItemService::CACHE_KEY_LIST);
         Cache::forget(DefaultPackageService::CACHE_KEY_LIST);
         Cache::forget('erp_foodlab:cpo:ingredients:list');

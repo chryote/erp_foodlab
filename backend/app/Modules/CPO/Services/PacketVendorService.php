@@ -2,6 +2,11 @@
 
 namespace App\Modules\CPO\Services;
 
+use App\Enums\PacketVendorType;
+use App\Models\DefaultPackage;
+use App\Models\Ingredient;
+use App\Models\Item;
+use App\Models\ItemPacket;
 use App\Models\PacketVendor;
 use App\Support\IndexQuery;
 use App\Support\InputNormalizer;
@@ -13,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -53,6 +59,7 @@ class PacketVendorService
     public function createPacketVendor(array $attributes): PacketVendor
     {
         $attributes['name'] = InputNormalizer::text((string) $attributes['name']) ?? '';
+        $attributes['type'] = $this->resolveTypeValue($attributes['type'] ?? PacketVendorType::Bahan->value);
 
         $packetVendor = DB::transaction(function () use ($attributes): PacketVendor {
             $this->assertNameUnique($attributes['name']);
@@ -72,6 +79,10 @@ class PacketVendorService
     {
         if (array_key_exists('name', $attributes)) {
             $attributes['name'] = InputNormalizer::text((string) $attributes['name']) ?? '';
+        }
+
+        if (array_key_exists('type', $attributes)) {
+            $attributes['type'] = $this->resolveTypeValue($attributes['type']);
         }
 
         $updated = DB::transaction(function () use ($packetVendor, $attributes): PacketVendor {
@@ -95,28 +106,54 @@ class PacketVendorService
         DB::transaction(function () use ($packetVendor): void {
             $locked = PacketVendor::query()->lockForUpdate()->findOrFail($packetVendor->getKey());
 
-            // Deferred until DefaultPackage / Ingredient models and tables are created.
             if (
-                class_exists('App\\Models\\DefaultPackage')
+                class_exists(DefaultPackage::class)
                 && Schema::hasTable('default_packages')
                 && method_exists($locked, 'defaultPackages')
             ) {
                 $defaultPackages = $locked->defaultPackages()->lockForUpdate()->get();
 
                 if ($defaultPackages->isNotEmpty()) {
-                    if (
-                        class_exists('App\\Models\\Ingredient')
-                        && Schema::hasTable('ingredients')
-                    ) {
+                    if (class_exists(Ingredient::class) && Schema::hasTable('ingredients')) {
                         foreach ($defaultPackages as $defaultPackage) {
-                            if (method_exists($defaultPackage, 'ingredients')) {
-                                $defaultPackage->ingredients()->delete();
-                            }
+                            $defaultPackage->ingredients()->delete();
                         }
                     }
 
                     $locked->defaultPackages()->delete();
                 }
+            }
+
+            if (
+                class_exists(ItemPacket::class)
+                && Schema::hasTable('item_packet')
+                && method_exists($locked, 'itemPackets')
+            ) {
+                $itemPacketIds = $locked->itemPackets()->lockForUpdate()->pluck('id')->all();
+                DefaultPackageService::softDeleteForItemPacketIds(array_map('intval', $itemPacketIds));
+                $locked->itemPackets()->delete();
+            }
+
+            if (
+                class_exists(Item::class)
+                && Schema::hasTable('items')
+                && method_exists($locked, 'items')
+            ) {
+                $vendorItems = $locked->items()->lockForUpdate()->get();
+
+                foreach ($vendorItems as $vendorItem) {
+                    if (class_exists(ItemPacket::class) && Schema::hasTable('item_packet')) {
+                        $vendorItemPacketIds = $vendorItem->itemPackets()->lockForUpdate()->pluck('id')->all();
+                        DefaultPackageService::softDeleteForItemPacketIds(array_map('intval', $vendorItemPacketIds));
+                        $vendorItem->itemPackets()->delete();
+                    }
+
+                    if (class_exists(Ingredient::class) && Schema::hasTable('ingredients')) {
+                        $vendorItem->ingredients()->delete();
+                    }
+                }
+
+                $locked->items()->delete();
             }
 
             $locked->delete();
@@ -129,6 +166,7 @@ class PacketVendorService
     {
         $query = IndexQuery::make(PacketVendor::class, $request)
             ->allowedFilters([
+                AllowedFilter::exact('type'),
                 AllowedFilter::callback('name', function (Builder $query, mixed $value): void {
                     $escaped = IndexQuery::escapeLike($value);
                     if ($escaped === null) {
@@ -146,11 +184,13 @@ class PacketVendorService
                     IndexQuery::whereLike($query, 'name', $escaped);
                 }),
             ])
-            ->allowedSorts(['id', 'name', 'created_at', 'updated_at'])
+            ->allowedSorts(['id', 'name', 'type', 'created_at', 'updated_at'])
             ->defaultSort('name', 'id');
 
         $availableIncludes = array_values(array_filter([
-            class_exists('App\\Models\\DefaultPackage') ? 'defaultPackages' : null,
+            class_exists(Item::class) ? 'items' : null,
+            class_exists(ItemPacket::class) ? 'itemPackets' : null,
+            class_exists(DefaultPackage::class) ? 'defaultPackages' : null,
         ]));
 
         if ($availableIncludes !== []) {
@@ -158,6 +198,21 @@ class PacketVendorService
         }
 
         return $query;
+    }
+
+    private function resolveTypeValue(mixed $rawType): string
+    {
+        $typeValue = $rawType instanceof PacketVendorType
+            ? $rawType->value
+            : (string) $rawType;
+
+        if (PacketVendorType::tryFrom($typeValue) === null) {
+            throw ValidationException::withMessages([
+                'type' => ['The selected type is invalid.'],
+            ]);
+        }
+
+        return $typeValue;
     }
 
     private function assertNameUnique(string $name, mixed $ignoreKey = null): void
@@ -178,6 +233,9 @@ class PacketVendorService
     {
         Cache::forget(self::CACHE_KEY_LIST);
         Cache::forget(CpoService::CACHE_KEY);
+        Cache::forget(ItemService::CACHE_KEY_LIST);
+        Cache::forget(ItemPacketService::CACHE_KEY_LIST);
+        Cache::forget(PacketService::CACHE_KEY_LIST);
         Cache::forget(self::CACHE_KEY_DEFAULT_PACKAGES_LIST);
         Cache::forget(self::CACHE_KEY_INGREDIENTS_LIST);
     }

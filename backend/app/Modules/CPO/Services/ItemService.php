@@ -3,9 +3,9 @@
 namespace App\Modules\CPO\Services;
 
 use App\Enums\ItemType;
-use App\Models\Company;
 use App\Models\Item;
 use App\Support\ActiveCompany;
+use App\Support\ExclusiveOwner;
 use App\Support\IndexQuery;
 use App\Support\InputNormalizer;
 use App\Support\WriteGuard;
@@ -31,7 +31,7 @@ class ItemService
     /**
      * @var array<int, string>
      */
-    private const RELATIONS = ['company'];
+    private const RELATIONS = ['company', 'packetVendor'];
 
     /**
      * @return LengthAwarePaginator|Collection<int, Item>
@@ -58,7 +58,6 @@ class ItemService
      */
     public function createItem(array $attributes): Item
     {
-        $attributes['company_id'] = (int) $attributes['company_id'];
         if (array_key_exists('code', $attributes)) {
             $attributes['code'] = $attributes['code'] !== null
                 ? InputNormalizer::nullableText((string) $attributes['code'])
@@ -78,17 +77,23 @@ class ItemService
 
         $attributes['type'] = $typeValue;
 
-        $item = DB::transaction(function () use ($attributes): Item {
-            $this->assertActiveCompany($attributes['company_id']);
+        $resolved = ExclusiveOwner::resolveForService($attributes);
+        $companyId = $resolved['company_id'];
+        $vendorId = $resolved['packet_vendor_id'];
+        $attributes = $resolved['attributes'];
+
+        $item = DB::transaction(function () use ($attributes, $companyId, $vendorId): Item {
+            ExclusiveOwner::assertActiveOwner($companyId, $vendorId);
+
             if (($attributes['code'] ?? null) !== null && $attributes['code'] !== '') {
-                $this->assertCodeUnique($attributes['company_id'], (string) $attributes['code']);
+                $this->assertCodeUnique($companyId, $vendorId, (string) $attributes['code']);
             }
-            $this->assertNameUnique($attributes['company_id'], $attributes['name']);
+            $this->assertNameUnique($companyId, $vendorId, $attributes['name']);
 
             return Item::query()->create($attributes);
         });
 
-        $this->forgetDependentCaches($attributes['company_id']);
+        $this->forgetDependentCaches($companyId);
 
         return $item->load(self::RELATIONS);
     }
@@ -98,10 +103,6 @@ class ItemService
      */
     public function updateItem(Item $item, array $attributes): Item
     {
-        if (array_key_exists('company_id', $attributes)) {
-            $attributes['company_id'] = (int) $attributes['company_id'];
-        }
-
         if (array_key_exists('code', $attributes)) {
             $attributes['code'] = $attributes['code'] !== null
                 ? InputNormalizer::nullableText((string) $attributes['code'])
@@ -125,40 +126,59 @@ class ItemService
             $attributes['type'] = $typeValue;
         }
 
+        $oldCompanyId = $item->company_id !== null ? (int) $item->company_id : null;
+
         $updated = DB::transaction(function () use ($item, $attributes): Item {
             $locked = Item::query()->lockForUpdate()->findOrFail($item->getKey());
 
-            $targetCompanyId = (int) ($attributes['company_id'] ?? $locked->company_id);
+            $resolved = ExclusiveOwner::resolveForService($attributes, $locked);
+            $targetCompanyId = $resolved['company_id'];
+            $targetVendorId = $resolved['packet_vendor_id'];
+            $attributes = $resolved['attributes'];
 
-            if ($targetCompanyId !== (int) $locked->company_id && $locked->itemPackets()->lockForUpdate()->exists()) {
+            $lockedCompanyId = $locked->company_id !== null ? (int) $locked->company_id : null;
+            $lockedVendorId = $locked->packet_vendor_id !== null ? (int) $locked->packet_vendor_id : null;
+
+            if (
+                ($targetCompanyId !== $lockedCompanyId || $targetVendorId !== $lockedVendorId)
+                && $locked->itemPackets()->lockForUpdate()->exists()
+            ) {
+                $errorField = $targetVendorId !== null && $lockedVendorId !== $targetVendorId
+                    ? 'packet_vendor_id'
+                    : 'company_id';
+
                 throw ValidationException::withMessages([
-                    'company_id' => ['Tidak dapat mengubah perusahaan karena item masih terhubung dengan paket aktif.'],
+                    $errorField => ['Tidak dapat mengubah pemilik karena item masih terhubung dengan paket aktif.'],
                 ]);
             }
 
-            $this->assertActiveCompany($targetCompanyId);
+            ExclusiveOwner::assertActiveOwner($targetCompanyId, $targetVendorId);
 
             $targetCode = array_key_exists('code', $attributes) ? $attributes['code'] : $locked->code;
             if ($targetCode !== null && $targetCode !== '') {
-                $this->assertCodeUnique($targetCompanyId, (string) $targetCode, $locked->getKey());
+                $this->assertCodeUnique($targetCompanyId, $targetVendorId, (string) $targetCode, $locked->getKey());
             }
 
             $targetName = (string) ($attributes['name'] ?? $locked->name);
-            $this->assertNameUnique($targetCompanyId, $targetName, $locked->getKey());
+            $this->assertNameUnique($targetCompanyId, $targetVendorId, $targetName, $locked->getKey());
 
             $locked->update($attributes);
 
             return $locked;
         });
 
-        $this->forgetDependentCaches($updated->company_id);
+        $newCompanyId = $updated->company_id !== null ? (int) $updated->company_id : null;
+        $this->forgetDependentCaches($oldCompanyId);
+        if ($newCompanyId !== $oldCompanyId) {
+            $this->forgetDependentCaches($newCompanyId);
+        }
 
         return $updated->refresh()->load(self::RELATIONS);
     }
 
     public function deleteItem(Item $item): void
     {
-        $companyId = DB::transaction(function () use ($item): int {
+        $companyId = DB::transaction(function () use ($item): ?int {
             $locked = Item::query()->lockForUpdate()->findOrFail($item->getKey());
 
             if (
@@ -179,7 +199,7 @@ class ItemService
                 $locked->ingredients()->delete();
             }
 
-            $companyId = (int) $locked->company_id;
+            $companyId = $locked->company_id !== null ? (int) $locked->company_id : null;
             $locked->delete();
 
             return $companyId;
@@ -193,6 +213,7 @@ class ItemService
         $query = IndexQuery::make(Item::class, $request)
             ->allowedFilters([
                 AllowedFilter::exact('company_id'),
+                AllowedFilter::exact('packet_vendor_id'),
                 AllowedFilter::exact('type'),
                 AllowedFilter::callback('code', function (Builder $query, mixed $value): void {
                     $escaped = IndexQuery::escapeLike($value);
@@ -222,11 +243,12 @@ class ItemService
                     });
                 }),
             ])
-            ->allowedSorts(['id', 'code', 'name', 'type', 'company_id', 'created_at', 'updated_at'])
+            ->allowedSorts(['id', 'code', 'name', 'type', 'company_id', 'packet_vendor_id', 'created_at', 'updated_at'])
             ->defaultSort('name', 'id');
 
         $availableIncludes = array_values(array_filter([
             'company',
+            'packetVendor',
             class_exists('App\\Models\\ItemPacket') ? 'itemPackets' : null,
             class_exists('App\\Models\\Packet') ? 'packets' : null,
             class_exists('App\\Models\\Ingredient') ? 'ingredients' : null,
@@ -239,44 +261,33 @@ class ItemService
         return $query;
     }
 
-    private function assertActiveCompany(int $companyId): void
+    private function assertCodeUnique(?int $companyId, ?int $vendorId, string $code, mixed $ignoreKey = null): void
     {
-        $companyExists = Company::query()
-            ->whereNull('deleted_at')
-            ->sharedLock()
-            ->whereKey($companyId)
-            ->exists();
+        $ownerLabel = $companyId !== null ? 'perusahaan' : 'vendor paket';
 
-        if (! $companyExists) {
-            throw ValidationException::withMessages([
-                'company_id' => ['The selected company is invalid or has been deleted.'],
-            ]);
-        }
-    }
-
-    private function assertCodeUnique(int $companyId, string $code, mixed $ignoreKey = null): void
-    {
         WriteGuard::assertUniqueActive(
             Item::query(),
             'code',
             $code,
-            ['company_id' => $companyId],
+            ExclusiveOwner::scopeFilters($companyId, $vendorId),
             'code',
-            'Item dengan kode yang sama sudah terdaftar pada perusahaan ini.',
+            "Item dengan kode yang sama sudah terdaftar pada {$ownerLabel} ini.",
             $ignoreKey,
             true
         );
     }
 
-    private function assertNameUnique(int $companyId, string $name, mixed $ignoreKey = null): void
+    private function assertNameUnique(?int $companyId, ?int $vendorId, string $name, mixed $ignoreKey = null): void
     {
+        $ownerLabel = $companyId !== null ? 'perusahaan' : 'vendor paket';
+
         WriteGuard::assertUniqueActive(
             Item::query(),
             'name',
             $name,
-            ['company_id' => $companyId],
+            ExclusiveOwner::scopeFilters($companyId, $vendorId),
             'name',
-            'Item dengan nama yang sama sudah terdaftar pada perusahaan ini.',
+            "Item dengan nama yang sama sudah terdaftar pada {$ownerLabel} ini.",
             $ignoreKey,
             true
         );

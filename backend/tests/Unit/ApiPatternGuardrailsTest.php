@@ -1031,6 +1031,54 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'code' => 'itm-tap-01',
             'name' => 'Tepung Beras',
         ]))->toThrow(ValidationException::class);
+
+        // 7. PacketVendor-owned items enforce bounded mixed-owner queries, DB unique indexes, and Service-level XOR guardrails
+        $vendor = PacketVendor::factory()->create(['name' => 'Vendor Guardrail Item']);
+        $vendorItem = Item::factory()->forPacketVendor($vendor)->create([
+            'code' => 'VND-GRD-01',
+            'name' => 'Kemasan Guardrail',
+        ]);
+
+        Cache::flush();
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->getJson('/api/v1/modules/cpo/items')->assertOk()->assertJsonCount(7, 'data');
+        $mixedColdQueries = collect(DB::getQueryLog())
+            ->reject(fn ($q) => str_contains($q['query'], 'personal_access_tokens'));
+        DB::disableQueryLog();
+
+        // 1 items select + 1 companies eager load + 1 packet_vendors eager load = <= 3 queries
+        expect($mixedColdQueries->count())->toBeLessThanOrEqual(3);
+
+        expect(fn () => Item::factory()->create([
+            'company_id' => null,
+            'packet_vendor_id' => $vendor->id,
+            'name' => 'Kemasan Guardrail',
+        ]))->toThrow(QueryException::class);
+
+        expect(fn () => Item::factory()->create([
+            'company_id' => null,
+            'packet_vendor_id' => $vendor->id,
+            'code' => 'VND-GRD-01',
+            'name' => 'Kemasan Lain',
+        ]))->toThrow(QueryException::class);
+
+        expect(fn () => app(ItemService::class)->createItem([
+            'company_id' => $companyA->id,
+            'packet_vendor_id' => $vendor->id,
+            'name' => 'Invalid Dual Owner',
+        ]))->toThrow(ValidationException::class);
+
+        expect(fn () => app(ItemService::class)->createItem([
+            'name' => 'Invalid Missing Owner',
+        ]))->toThrow(ValidationException::class);
+
+        expect(fn () => app(ItemService::class)->createItem([
+            'packet_vendor_id' => $vendor->id,
+            'name' => 'kemasan guardrail',
+        ]))->toThrow(ValidationException::class);
+
+        expect($vendorItem->company_id)->toBeNull();
     });
 
     it('enforces CPO Packets speed, cache, pagination, and anti-duplication guardrails', function () {
@@ -1221,6 +1269,47 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'packet_id' => $packetA->id,
             'item_id' => $newItem->id,
             'quantity' => 2,
+        ]))->toThrow(ValidationException::class);
+
+        // 7. PacketVendor-owned ItemPackets enforce bounded mixed-owner queries, DB unique index, and Service-level XOR + cross-owner guardrails
+        $vendor = PacketVendor::factory()->create(['name' => 'Vendor Guardrail Pivot']);
+        $vendorItem = Item::factory()->forPacketVendor($vendor)->create(['name' => 'Vendor Guardrail Item']);
+        ItemPacket::factory()->forPacketVendor($vendor)->create([
+            'packet_id' => $packetA->id,
+            'item_id' => $vendorItem->id,
+            'quantity' => 2,
+        ]);
+
+        Cache::flush();
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->getJson('/api/v1/modules/cpo/item-packets')->assertOk()->assertJsonCount(7, 'data');
+        $mixedPivotQueries = collect(DB::getQueryLog())
+            ->reject(fn ($q) => str_contains($q['query'], 'personal_access_tokens'));
+        DB::disableQueryLog();
+
+        // 1 item_packet select + 4 eager loads (company, packetVendor, packet, item) = <= 5 queries
+        expect($mixedPivotQueries->count())->toBeLessThanOrEqual(5);
+
+        expect(fn () => ItemPacket::factory()->create([
+            'company_id' => null,
+            'packet_vendor_id' => $vendor->id,
+            'packet_id' => $packetA->id,
+            'item_id' => $vendorItem->id,
+            'quantity' => 1,
+        ]))->toThrow(QueryException::class);
+
+        expect(fn () => app(ItemPacketService::class)->createItemPacket([
+            'company_id' => $companyA->id,
+            'packet_vendor_id' => $vendor->id,
+            'packet_id' => $packetB->id,
+            'item_id' => $vendorItem->id,
+        ]))->toThrow(ValidationException::class);
+
+        expect(fn () => app(ItemPacketService::class)->createItemPacket([
+            'packet_vendor_id' => $vendor->id,
+            'packet_id' => $packetB->id,
+            'item_id' => $newItem->id,
         ]))->toThrow(ValidationException::class);
     });
 

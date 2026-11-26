@@ -39,6 +39,8 @@ export const COMPANY_CRUD_FIELDS: CrudFieldConfig<Company>[] = [
     key: 'type',
     label: 'Tipe Perusahaan',
     type: 'select',
+    hideInForm: true,
+    hideInTable: true,
     placeholder: 'Pilih tipe perusahaan...',
     defaultValue: DEFAULT_CFO_ENUMS.company_type[0]?.value ?? 'Utama',
     options: DEFAULT_CFO_ENUMS.company_type.map((opt) => ({
@@ -230,6 +232,8 @@ export const CompanyCrudModal: React.FC<CompanyCrudModalProps> = ({
         key: 'type',
         label: 'Tipe Perusahaan',
         type: 'select',
+        hideInForm: true,
+        hideInTable: true,
         placeholder: 'Pilih tipe perusahaan...',
         defaultValue: defaultCompanyType,
         options: companyTypeOptions,

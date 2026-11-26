@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\Item;
 use App\Models\ItemPacket;
 use App\Models\Packet;
+use App\Models\PacketVendor;
 use App\Modules\CPO\Services\CpoService;
 use App\Modules\CPO\Services\ItemPacketService;
 use App\Modules\CPO\Services\ItemService;
@@ -480,8 +481,9 @@ describe('ItemPacket CPO module', function () {
 
         $unloaded = (new ItemPacketResource($itemPacket))->resolve(Request::create('/'));
         expect($unloaded)
-            ->toHaveKeys(['id', 'company_id', 'packet_id', 'item_id', 'quantity', 'created_at', 'updated_at', 'deleted_at'])
+            ->toHaveKeys(['id', 'company_id', 'packet_vendor_id', 'packet_id', 'item_id', 'quantity', 'created_at', 'updated_at', 'deleted_at'])
             ->not->toHaveKey('company')
+            ->not->toHaveKey('packet_vendor')
             ->not->toHaveKey('packet')
             ->not->toHaveKey('item');
 
@@ -494,5 +496,134 @@ describe('ItemPacket CPO module', function () {
         $this->getJson('/docs/api.json')
             ->assertOk()
             ->assertJsonPath('openapi', fn ($v) => is_string($v) && $v !== '');
+    });
+
+    it('supports exclusive PacketVendor ownership on ItemPacket, enforces owner-matching Item validation, and cascades soft deletes', function () {
+        $company = Company::factory()->create(['name' => 'PT. Pivot Owner']);
+        $vendorA = PacketVendor::factory()->create(['name' => 'Vendor Pivot Alpha']);
+        $vendorB = PacketVendor::factory()->create(['name' => 'Vendor Pivot Beta']);
+        $packetA = Packet::factory()->create(['name' => 'Paket Exclusive A']);
+        $packetB = Packet::factory()->create(['name' => 'Paket Exclusive B']);
+
+        $companyItem = Item::factory()->create(['company_id' => $company->id, 'name' => 'Company Owned Item']);
+        $vendorAItem = Item::factory()->forPacketVendor($vendorA)->create(['name' => 'Vendor A Owned Item']);
+        $vendorBItem = Item::factory()->forPacketVendor($vendorB)->create(['name' => 'Vendor B Owned Item']);
+
+        // Dual owner or missing owner on POST fails with 422
+        $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'company_id' => $company->id,
+            'packet_vendor_id' => $vendorA->id,
+            'packet_id' => $packetA->id,
+            'item_id' => $vendorAItem->id,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['company_id', 'packet_vendor_id']);
+
+        $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'packet_id' => $packetA->id,
+            'item_id' => $vendorAItem->id,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['company_id', 'packet_vendor_id']);
+
+        // Cross-owner item mismatch fails with 422 (Company -> Vendor item, Vendor -> Company item, Vendor A -> Vendor B item)
+        $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'company_id' => $company->id,
+            'packet_id' => $packetA->id,
+            'item_id' => $vendorAItem->id,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['item_id']);
+
+        $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'packet_vendor_id' => $vendorA->id,
+            'packet_id' => $packetA->id,
+            'item_id' => $companyItem->id,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['item_id']);
+
+        $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'packet_vendor_id' => $vendorA->id,
+            'packet_id' => $packetA->id,
+            'item_id' => $vendorBItem->id,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['item_id']);
+
+        // Soft-deleted PacketVendor fails with 422
+        $deletedVendor = PacketVendor::factory()->create(['name' => 'Vendor Terhapus']);
+        $deletedVendor->delete();
+
+        $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'packet_vendor_id' => $deletedVendor->id,
+            'packet_id' => $packetA->id,
+            'item_id' => $vendorAItem->id,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['packet_vendor_id']);
+
+        // Create valid PacketVendor-owned ItemPacket
+        $created = $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'packet_vendor_id' => $vendorA->id,
+            'packet_id' => $packetA->id,
+            'item_id' => $vendorAItem->id,
+            'quantity' => 4,
+        ])->assertCreated()
+            ->assertJsonPath('data.company_id', null)
+            ->assertJsonPath('data.packet_vendor_id', $vendorA->id)
+            ->assertJsonPath('data.company', null)
+            ->assertJsonPath('data.packet_vendor.id', $vendorA->id)
+            ->assertJsonPath('data.quantity', 4);
+
+        $vendorPivotId = $created->json('data.id');
+
+        // Duplicate (packet_vendor_id, packet_id, item_id) fails with 422
+        $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'packet_vendor_id' => $vendorA->id,
+            'packet_id' => $packetA->id,
+            'item_id' => $vendorAItem->id,
+            'quantity' => 10,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['item_id']);
+
+        // Filtering by packet_vendor_id & ?active_company=1 exclusion
+        $this->getJson("/api/v1/modules/cpo/item-packets?filter[packet_vendor_id]={$vendorA->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $vendorPivotId);
+
+        $this->getJson("/api/v1/modules/cpo/item-packets?packet_vendor_id={$vendorA->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data');
+
+        $this->getJson('/api/v1/modules/cpo/item-packets?active_company=1', [
+            'X-Active-Company-Id' => (string) $company->id,
+        ])->assertOk()->assertJsonCount(0, 'data');
+
+        // Switching ItemPacket owner on PATCH without updating item_id fails cross-owner check
+        $this->patchJson("/api/v1/modules/cpo/item-packets/{$vendorPivotId}", [
+            'company_id' => $company->id,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['item_id']);
+
+        // Switching ItemPacket owner together with matching item_id succeeds and clears packet_vendor_id
+        $this->patchJson("/api/v1/modules/cpo/item-packets/{$vendorPivotId}", [
+            'company_id' => $company->id,
+            'packet_id' => $packetB->id,
+            'item_id' => $companyItem->id,
+        ])->assertOk()
+            ->assertJsonPath('data.company_id', $company->id)
+            ->assertJsonPath('data.packet_vendor_id', null)
+            ->assertJsonPath('data.packet_vendor', null);
+
+        // Switching back to PacketVendor + vendorAItem succeeds and clears company_id
+        $this->patchJson("/api/v1/modules/cpo/item-packets/{$vendorPivotId}", [
+            'packet_vendor_id' => $vendorA->id,
+            'item_id' => $vendorAItem->id,
+        ])->assertOk()
+            ->assertJsonPath('data.company_id', null)
+            ->assertJsonPath('data.packet_vendor_id', $vendorA->id)
+            ->assertJsonPath('data.company', null);
+
+        // Soft-deleting vendorPivot frees (packet_vendor_id, packet_id, item_id) for re-creation
+        $this->deleteJson("/api/v1/modules/cpo/item-packets/{$vendorPivotId}")->assertOk();
+        $recreated = $this->postJson('/api/v1/modules/cpo/item-packets', [
+            'packet_vendor_id' => $vendorA->id,
+            'packet_id' => $packetB->id,
+            'item_id' => $vendorAItem->id,
+            'quantity' => 6,
+        ])->assertCreated();
+
+        // Soft-deleting PacketVendor cascades to its items and item_packet rows
+        $this->deleteJson("/api/v1/modules/cpo/packet-vendors/{$vendorA->id}")->assertOk();
+        $this->assertSoftDeleted('items', ['id' => $vendorAItem->id]);
+        $this->assertSoftDeleted('item_packet', ['id' => $recreated->json('data.id')]);
     });
 });

@@ -313,18 +313,15 @@ describe('App ERP Main Menu integration', () => {
       screen.queryByLabelText('Nama Stakeholder')
     ).not.toBeInTheDocument();
 
-    // Create company with Nama Perusahaan, Seri, and Tipe Perusahaan (requires confirmation dialog)
+    // Create company with Nama Perusahaan and Seri (Tipe Perusahaan is hidden in form and table)
     const nameInput = screen.getByLabelText('Nama Perusahaan');
     const seriesInput = screen.getByLabelText('Seri');
-    const typeSelect = screen.getByLabelText(
-      'Tipe Perusahaan'
-    ) as HTMLSelectElement;
+    expect(screen.queryByLabelText('Tipe Perusahaan')).not.toBeInTheDocument();
     expect(
-      Array.from(typeSelect.options).map((opt) => opt.value)
-    ).toEqual(['', 'Utama', 'Packing', 'Kelengkapan', 'Sarpras', 'Bahan']);
+      screen.queryByRole('columnheader', { name: 'Tipe Perusahaan' })
+    ).not.toBeInTheDocument();
     fireEvent.change(nameInput, { target: { value: 'PT. Pangan Nusantara' } });
     fireEvent.change(seriesInput, { target: { value: '2' } });
-    fireEvent.change(typeSelect, { target: { value: 'Packing' } });
     fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
     expect(apiClient.createCompany).not.toHaveBeenCalled();
     expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
@@ -334,7 +331,7 @@ describe('App ERP Main Menu integration', () => {
       expect(apiClient.createCompany).toHaveBeenCalledWith({
         name: 'PT. Pangan Nusantara',
         series: 2,
-        type: 'Packing',
+        type: 'Utama',
       });
       expect(screen.getByText('PT. Pangan Nusantara')).toBeInTheDocument();
       expect(screen.getByTestId('series-tab-1')).toHaveTextContent('Seri 1');
@@ -347,7 +344,6 @@ describe('App ERP Main Menu integration', () => {
       target: { value: 'PT. Pangan Nusantara Baru' },
     });
     fireEvent.change(seriesInput, { target: { value: '2' } });
-    fireEvent.change(typeSelect, { target: { value: 'Sarpras' } });
     fireEvent.click(screen.getByRole('button', { name: 'Perbarui' }));
     expect(apiClient.updateCompany).not.toHaveBeenCalled();
     expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
@@ -357,7 +353,7 @@ describe('App ERP Main Menu integration', () => {
       expect(apiClient.updateCompany).toHaveBeenCalledWith(2, {
         name: 'PT. Pangan Nusantara Baru',
         series: 2,
-        type: 'Sarpras',
+        type: 'Utama',
       });
       expect(screen.getByText('PT. Pangan Nusantara Baru')).toBeInTheDocument();
     });

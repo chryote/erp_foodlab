@@ -52,7 +52,7 @@ CREATE TABLE `companies` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `series` int unsigned NOT NULL DEFAULT '1',
-  `type` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Utama',
+  `type` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Utama',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
@@ -409,7 +409,8 @@ DROP TABLE IF EXISTS `item_packet`;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `item_packet` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `company_id` bigint unsigned NOT NULL,
+  `company_id` bigint unsigned DEFAULT NULL,
+  `packet_vendor_id` bigint unsigned DEFAULT NULL,
   `packet_id` bigint unsigned NOT NULL,
   `item_id` bigint unsigned NOT NULL,
   `quantity` int unsigned NOT NULL DEFAULT '1',
@@ -419,15 +420,19 @@ CREATE TABLE `item_packet` (
   `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `item_packet_comp_packet_item_active_unique` (`company_id`,`packet_id`,`item_id`,`active_flag`),
+  UNIQUE KEY `item_packet_vendor_packet_item_active_unique` (`packet_vendor_id`,`packet_id`,`item_id`,`active_flag`),
   KEY `item_packet_item_id_foreign` (`item_id`),
   KEY `item_packet_del_packet_id_idx` (`deleted_at`,`packet_id`,`id`),
   KEY `item_packet_del_item_id_idx` (`deleted_at`,`item_id`,`id`),
   KEY `item_packet_packet_id_foreign` (`packet_id`),
   KEY `item_packet_comp_del_packet_id_idx` (`company_id`,`deleted_at`,`packet_id`,`id`),
   KEY `item_packet_comp_del_item_id_idx` (`company_id`,`deleted_at`,`item_id`,`id`),
+  KEY `item_packet_vendor_del_packet_id_idx` (`packet_vendor_id`,`deleted_at`,`packet_id`,`id`),
+  KEY `item_packet_vendor_del_item_id_idx` (`packet_vendor_id`,`deleted_at`,`item_id`,`id`),
   CONSTRAINT `item_packet_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `item_packet_item_id_foreign` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`) ON DELETE RESTRICT,
-  CONSTRAINT `item_packet_packet_id_foreign` FOREIGN KEY (`packet_id`) REFERENCES `packets` (`id`) ON DELETE RESTRICT
+  CONSTRAINT `item_packet_packet_id_foreign` FOREIGN KEY (`packet_id`) REFERENCES `packets` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `item_packet_packet_vendor_id_foreign` FOREIGN KEY (`packet_vendor_id`) REFERENCES `packet_vendors` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `items`;
@@ -435,7 +440,8 @@ DROP TABLE IF EXISTS `items`;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `items` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `company_id` bigint unsigned NOT NULL,
+  `company_id` bigint unsigned DEFAULT NULL,
+  `packet_vendor_id` bigint unsigned DEFAULT NULL,
   `code` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `type` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Bahan',
@@ -446,13 +452,19 @@ CREATE TABLE `items` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `items_company_name_active_unique` (`company_id`,`name`,`active_flag`),
   UNIQUE KEY `items_company_code_active_unique` (`company_id`,`code`,`active_flag`),
+  UNIQUE KEY `items_vendor_name_active_unique` (`packet_vendor_id`,`name`,`active_flag`),
+  UNIQUE KEY `items_vendor_code_active_unique` (`packet_vendor_id`,`code`,`active_flag`),
   KEY `items_name_index` (`name`),
   KEY `items_del_name_id_idx` (`deleted_at`,`name`,`id`),
   KEY `items_comp_del_name_id_idx` (`company_id`,`deleted_at`,`name`,`id`),
   KEY `items_comp_del_type_idx` (`company_id`,`deleted_at`,`type`),
   KEY `items_comp_del_code_id_idx` (`company_id`,`deleted_at`,`code`,`id`),
   KEY `items_del_code_id_idx` (`deleted_at`,`code`,`id`),
-  CONSTRAINT `items_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT
+  KEY `items_vendor_del_name_id_idx` (`packet_vendor_id`,`deleted_at`,`name`,`id`),
+  KEY `items_vendor_del_code_id_idx` (`packet_vendor_id`,`deleted_at`,`code`,`id`),
+  KEY `items_vendor_del_type_idx` (`packet_vendor_id`,`deleted_at`,`type`),
+  CONSTRAINT `items_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `items_packet_vendor_id_foreign` FOREIGN KEY (`packet_vendor_id`) REFERENCES `packet_vendors` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `lab_samples`;
@@ -522,13 +534,15 @@ DROP TABLE IF EXISTS `packet_vendors`;
 CREATE TABLE `packet_vendors` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Bahan',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
   `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `packet_vendors_name_active_unique` (`name`,`active_flag`),
-  KEY `packet_vendors_del_name_id_idx` (`deleted_at`,`name`,`id`)
+  KEY `packet_vendors_del_name_id_idx` (`deleted_at`,`name`,`id`),
+  KEY `packet_vendors_del_type_name_id_idx` (`deleted_at`,`type`,`name`,`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `packets`;
@@ -774,5 +788,7 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (55,'2026_11_24_170
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (56,'2026_11_24_180000_create_default_packages_table',41);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (57,'2026_11_24_190000_create_ingredients_table',42);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (58,'2026_11_25_100000_add_type_to_companies_table',43);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (59,'2026_11_26_100000_add_type_to_packet_vendors_table',44);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (60,'2026_11_26_110000_add_packet_vendor_ownership_to_items_and_item_packet',44);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;

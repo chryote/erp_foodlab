@@ -1,8 +1,14 @@
 <?php
 
+use App\Enums\PacketVendorType;
 use App\Http\Resources\PacketVendorResource;
+use App\Models\Item;
+use App\Models\ItemPacket;
+use App\Models\Packet;
 use App\Models\PacketVendor;
 use App\Modules\CPO\Services\CpoService;
+use App\Modules\CPO\Services\ItemPacketService;
+use App\Modules\CPO\Services\ItemService;
 use App\Modules\CPO\Services\PacketVendorService;
 use App\Support\IndexQuery;
 use Illuminate\Http\Request;
@@ -29,6 +35,7 @@ describe('PacketVendor CPO module', function () {
                 'data' => [
                     'id',
                     'name',
+                    'type',
                     'created_at',
                     'updated_at',
                     'deleted_at',
@@ -37,13 +44,14 @@ describe('PacketVendor CPO module', function () {
             ->assertJsonMissingPath('data.active_flag')
             ->assertJsonMissingPath('data.company_id')
             ->assertJsonMissingPath('data.default_packages')
-            ->assertJsonPath('data.name', 'Vendor 100% Hemat');
+            ->assertJsonPath('data.name', 'Vendor 100% Hemat')
+            ->assertJsonPath('data.type', PacketVendorType::Bahan->value);
 
         expect(Cache::has(CpoService::CACHE_KEY))->toBeFalse();
 
         $vendorHematId = $createRes->json('data.id');
-        $vendorA = PacketVendor::factory()->create(['name' => 'Vendor Alpha_Lab']);
-        $vendorB = PacketVendor::factory()->create(['name' => 'Vendor Beta']);
+        $vendorA = PacketVendor::factory()->create(['name' => 'Vendor Alpha_Lab', 'type' => PacketVendorType::Kelengkapan]);
+        $vendorB = PacketVendor::factory()->create(['name' => 'Vendor Beta', 'type' => PacketVendorType::Sarpras]);
 
         // Unfiltered list uses defaultSort('name', 'id') and populates cache
         expect(Cache::has(PacketVendorService::CACHE_KEY_LIST))->toBeFalse();
@@ -78,6 +86,16 @@ describe('PacketVendor CPO module', function () {
             ->assertOk()
             ->assertJsonCount(3, 'data');
 
+        $this->getJson('/api/v1/modules/cpo/packet-vendors?filter[type]=Kelengkapan')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $vendorA->id);
+
+        $this->getJson('/api/v1/modules/cpo/packet-vendors?type=Sarpras')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $vendorB->id);
+
         // Sort & pagination + per_page cap
         $this->getJson('/api/v1/modules/cpo/packet-vendors?sort=-name&per_page=2&page=1')
             ->assertOk()
@@ -110,22 +128,27 @@ describe('PacketVendor CPO module', function () {
 
         expect(Cache::has(PacketVendorService::CACHE_KEY_LIST))->toBeFalse();
 
-        // PUT update changing name
+        // PUT update changing name and type
         $this->putJson("/api/v1/modules/cpo/packet-vendors/{$vendorHematId}", [
             'name' => 'Vendor Reguler',
+            'type' => PacketVendorType::Kelengkapan->value,
         ])->assertOk()
-            ->assertJsonPath('data.name', 'Vendor Reguler');
+            ->assertJsonPath('data.name', 'Vendor Reguler')
+            ->assertJsonPath('data.type', 'Kelengkapan');
 
         // Partial PATCH with empty payload keeps existing values
         $this->patchJson("/api/v1/modules/cpo/packet-vendors/{$vendorHematId}", [])
             ->assertOk()
-            ->assertJsonPath('data.name', 'Vendor Reguler');
+            ->assertJsonPath('data.name', 'Vendor Reguler')
+            ->assertJsonPath('data.type', 'Kelengkapan');
 
-        // Partial PATCH updating name
+        // Partial PATCH updating name and type
         $this->patchJson("/api/v1/modules/cpo/packet-vendors/{$vendorHematId}", [
             'name' => '  Vendor   Premium  ',
+            'type' => PacketVendorType::Sarpras->value,
         ])->assertOk()
-            ->assertJsonPath('data.name', 'Vendor Premium');
+            ->assertJsonPath('data.name', 'Vendor Premium')
+            ->assertJsonPath('data.type', 'Sarpras');
 
         // Soft delete (cascading soft delete to default_packages & ingredients activates when those models exist)
         $this->getJson('/api/v1/modules/cpo/packet-vendors')->assertOk();
@@ -205,12 +228,18 @@ describe('PacketVendor CPO module', function () {
     });
 
     it('renders PacketVendorResource conditional relations cleanly and serves OpenAPI docs', function () {
-        $packetVendor = PacketVendor::factory()->create(['name' => 'Vendor Nama Resource Test']);
+        $packetVendor = PacketVendor::factory()->create([
+            'name' => 'Vendor Nama Resource Test',
+            'type' => PacketVendorType::Sarpras,
+        ]);
 
         $unloaded = (new PacketVendorResource($packetVendor))->resolve(Request::create('/'));
         expect($unloaded)
-            ->toHaveKeys(['id', 'name', 'created_at', 'updated_at', 'deleted_at'])
+            ->toHaveKeys(['id', 'name', 'type', 'created_at', 'updated_at', 'deleted_at'])
+            ->not->toHaveKey('items')
+            ->not->toHaveKey('item_packets')
             ->not->toHaveKey('default_packages');
+        expect($unloaded['type'])->toBe('Sarpras');
 
         $packetVendor->setRelation('defaultPackages', collect([['id' => 1, 'name' => 'Sample Package']]));
         $loaded = (new PacketVendorResource($packetVendor))->resolve(Request::create('/'));
@@ -219,5 +248,41 @@ describe('PacketVendor CPO module', function () {
         $this->getJson('/docs/api.json')
             ->assertOk()
             ->assertJsonPath('openapi', fn ($v) => is_string($v) && $v !== '');
+    });
+
+    it('exposes PacketVendorType enum options, rejects invalid type, and cascades soft delete to vendor items and item_packets', function () {
+        $this->getJson('/api/v1/modules/cpo/enums')
+            ->assertOk()
+            ->assertJsonPath('data.packet_vendor_type', PacketVendorType::options());
+
+        $this->postJson('/api/v1/modules/cpo/packet-vendors', [
+            'name' => 'Vendor Invalid Type',
+            'type' => 'InvalidVendorType',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['type']);
+
+        $vendor = PacketVendor::factory()->create([
+            'name' => 'Vendor Cascade',
+            'type' => PacketVendorType::Kelengkapan,
+        ]);
+        $packet = Packet::factory()->create(['name' => 'Paket Vendor Cascade']);
+        $vendorItem = Item::factory()->forPacketVendor($vendor)->create(['name' => 'Item Vendor Cascade']);
+        $vendorPivot = ItemPacket::factory()->forPacketVendor($vendor)->create([
+            'packet_id' => $packet->id,
+            'item_id' => $vendorItem->id,
+            'quantity' => 2,
+        ]);
+
+        $this->getJson('/api/v1/modules/cpo/items')->assertOk();
+        $this->getJson('/api/v1/modules/cpo/item-packets')->assertOk();
+        expect(Cache::has(ItemService::CACHE_KEY_LIST))->toBeTrue();
+        expect(Cache::has(ItemPacketService::CACHE_KEY_LIST))->toBeTrue();
+
+        $this->deleteJson("/api/v1/modules/cpo/packet-vendors/{$vendor->id}")->assertOk();
+
+        $this->assertSoftDeleted('packet_vendors', ['id' => $vendor->id]);
+        $this->assertSoftDeleted('items', ['id' => $vendorItem->id]);
+        $this->assertSoftDeleted('item_packet', ['id' => $vendorPivot->id]);
+        expect(Cache::has(ItemService::CACHE_KEY_LIST))->toBeFalse();
+        expect(Cache::has(ItemPacketService::CACHE_KEY_LIST))->toBeFalse();
     });
 });

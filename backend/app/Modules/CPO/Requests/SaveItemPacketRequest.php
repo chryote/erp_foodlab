@@ -2,10 +2,10 @@
 
 namespace App\Modules\CPO\Requests;
 
-use App\Models\Company;
 use App\Models\Item;
 use App\Models\ItemPacket;
 use App\Models\Packet;
+use App\Support\ExclusiveOwner;
 use App\Support\InputNormalizer;
 use App\Support\WriteGuard;
 use Illuminate\Foundation\Http\FormRequest;
@@ -23,7 +23,7 @@ class SaveItemPacketRequest extends FormRequest
     {
         $normalized = [];
 
-        foreach (['company_id', 'packet_id', 'item_id', 'quantity'] as $field) {
+        foreach (['company_id', 'packet_vendor_id', 'packet_id', 'item_id', 'quantity'] as $field) {
             if ($this->has($field) && is_string($this->input($field))) {
                 $normalized[$field] = InputNormalizer::text($this->input($field));
             }
@@ -43,9 +43,16 @@ class SaveItemPacketRequest extends FormRequest
 
         return [
             'company_id' => [
-                ...$presence,
+                'sometimes',
+                'nullable',
                 'integer',
                 Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
+            'packet_vendor_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists('packet_vendors', 'id')->whereNull('deleted_at'),
             ],
             'packet_id' => [
                 ...$presence,
@@ -76,10 +83,26 @@ class SaveItemPacketRequest extends FormRequest
             function (Validator $validator): void {
                 /** @var ItemPacket|null $routeItemPacket */
                 $routeItemPacket = $this->route('itemPacket');
+                $owner = ExclusiveOwner::resolveForRequest($this, $routeItemPacket);
 
-                $effectiveCompanyId = $this->filled('company_id')
-                    ? (int) $this->input('company_id')
-                    : (int) ($routeItemPacket?->company_id ?? 0);
+                if ($owner['both_submitted']) {
+                    $message = 'Item paket tidak boleh terhubung ke perusahaan dan vendor paket secara bersamaan.';
+                    $validator->errors()->add('company_id', $message);
+                    $validator->errors()->add('packet_vendor_id', $message);
+
+                    return;
+                }
+
+                $effectiveCompanyId = $owner['company_id'];
+                $effectiveVendorId = $owner['packet_vendor_id'];
+
+                if (! $validator->errors()->hasAny(['company_id', 'packet_vendor_id']) && ($effectiveCompanyId === null) === ($effectiveVendorId === null)) {
+                    $message = 'Item paket harus terhubung ke tepat satu: perusahaan atau vendor paket.';
+                    $validator->errors()->add('company_id', $message);
+                    $validator->errors()->add('packet_vendor_id', $message);
+
+                    return;
+                }
 
                 $effectivePacketId = $this->filled('packet_id')
                     ? (int) $this->input('packet_id')
@@ -88,20 +111,6 @@ class SaveItemPacketRequest extends FormRequest
                 $effectiveItemId = $this->filled('item_id')
                     ? (int) $this->input('item_id')
                     : (int) ($routeItemPacket?->item_id ?? 0);
-
-                if (! $validator->errors()->has('company_id') && $effectiveCompanyId > 0) {
-                    $companyExists = Company::query()
-                        ->whereNull('deleted_at')
-                        ->whereKey($effectiveCompanyId)
-                        ->exists();
-
-                    if (! $companyExists) {
-                        $validator->errors()->add(
-                            'company_id',
-                            'The selected company is invalid or has been deleted.'
-                        );
-                    }
-                }
 
                 if (! $validator->errors()->has('packet_id') && $effectivePacketId > 0) {
                     $packetExists = Packet::query()
@@ -127,21 +136,27 @@ class SaveItemPacketRequest extends FormRequest
                             'item_id',
                             'The selected item is invalid or has been deleted.'
                         );
-                    } elseif (
-                        ! $validator->errors()->has('company_id')
-                        && $effectiveCompanyId > 0
-                        && (int) $item->company_id !== $effectiveCompanyId
-                    ) {
-                        $validator->errors()->add(
-                            'item_id',
-                            'The selected item does not belong to the selected company.'
-                        );
+                    } elseif (! $validator->errors()->hasAny(['company_id', 'packet_vendor_id'])) {
+                        $itemCompanyId = $item->company_id !== null ? (int) $item->company_id : null;
+                        $itemVendorId = $item->packet_vendor_id !== null ? (int) $item->packet_vendor_id : null;
+
+                        if ($effectiveCompanyId !== null && ($itemCompanyId !== $effectiveCompanyId || $itemVendorId !== null)) {
+                            $validator->errors()->add(
+                                'item_id',
+                                'The selected item does not belong to the selected company.'
+                            );
+                        } elseif ($effectiveVendorId !== null && ($itemVendorId !== $effectiveVendorId || $itemCompanyId !== null)) {
+                            $validator->errors()->add(
+                                'item_id',
+                                'The selected item does not belong to the selected packet vendor.'
+                            );
+                        }
                     }
                 }
 
                 if (
-                    ! $validator->errors()->hasAny(['company_id', 'packet_id', 'item_id'])
-                    && $effectiveCompanyId > 0
+                    ! $validator->errors()->hasAny(['company_id', 'packet_vendor_id', 'packet_id', 'item_id'])
+                    && ($effectiveCompanyId !== null || $effectiveVendorId !== null)
                     && $effectivePacketId > 0
                     && $effectiveItemId > 0
                     && WriteGuard::existsCaseInsensitive(
@@ -149,15 +164,16 @@ class SaveItemPacketRequest extends FormRequest
                         'item_id',
                         (string) $effectiveItemId,
                         [
-                            'company_id' => $effectiveCompanyId,
+                            ...ExclusiveOwner::scopeFilters($effectiveCompanyId, $effectiveVendorId),
                             'packet_id' => $effectivePacketId,
                         ],
                         $routeItemPacket?->getKey()
                     )
                 ) {
+                    $ownerLabel = $effectiveCompanyId !== null ? 'perusahaan' : 'vendor paket';
                     $validator->errors()->add(
                         'item_id',
-                        'Item sudah terdaftar pada paket ini untuk perusahaan ini.'
+                        "Item sudah terdaftar pada paket ini untuk {$ownerLabel} ini."
                     );
                 }
             },
@@ -169,12 +185,12 @@ class SaveItemPacketRequest extends FormRequest
      */
     public function payload(): array
     {
-        $validated = $this->validated();
+        $validated = ExclusiveOwner::applyToPayload($this->validated());
         $isPatch = $this->isMethod('PATCH');
         /** @var ItemPacket|null $routeItemPacket */
         $routeItemPacket = $this->route('itemPacket');
 
-        foreach (['company_id', 'packet_id', 'item_id', 'quantity'] as $intField) {
+        foreach (['packet_id', 'item_id', 'quantity'] as $intField) {
             if (array_key_exists($intField, $validated)) {
                 $validated[$intField] = (int) $validated[$intField];
             }

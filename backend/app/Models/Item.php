@@ -18,6 +18,7 @@ class Item extends Model
 
     protected $fillable = [
         'company_id',
+        'packet_vendor_id',
         'code',
         'name',
         'type',
@@ -31,6 +32,7 @@ class Item extends Model
     {
         return [
             'company_id' => 'integer',
+            'packet_vendor_id' => 'integer',
             'type' => ItemType::class,
         ];
     }
@@ -38,6 +40,11 @@ class Item extends Model
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function packetVendor(): BelongsTo
+    {
+        return $this->belongsTo(PacketVendor::class);
     }
 
     public function itemPackets(): HasMany
@@ -54,7 +61,7 @@ class Item extends Model
     {
         return $this->belongsToMany(Packet::class, 'item_packet')
             ->wherePivotNull('deleted_at')
-            ->withPivot(['id', 'company_id', 'quantity', 'deleted_at'])
+            ->withPivot(['id', 'company_id', 'packet_vendor_id', 'quantity', 'deleted_at'])
             ->withTimestamps();
     }
 }

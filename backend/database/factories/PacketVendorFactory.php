@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\PacketVendorType;
 use App\Models\PacketVendor;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -20,6 +21,7 @@ class PacketVendorFactory extends Factory
 
         return [
             'name' => 'Vendor '.ucfirst($this->faker->unique()->words(2, true)).' #'.$seq,
+            'type' => PacketVendorType::Bahan,
         ];
     }
 }

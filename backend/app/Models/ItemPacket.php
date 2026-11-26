@@ -16,6 +16,7 @@ class ItemPacket extends Model
 
     protected $fillable = [
         'company_id',
+        'packet_vendor_id',
         'packet_id',
         'item_id',
         'quantity',
@@ -29,6 +30,7 @@ class ItemPacket extends Model
     {
         return [
             'company_id' => 'integer',
+            'packet_vendor_id' => 'integer',
             'packet_id' => 'integer',
             'item_id' => 'integer',
             'quantity' => 'integer',
@@ -38,6 +40,11 @@ class ItemPacket extends Model
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function packetVendor(): BelongsTo
+    {
+        return $this->belongsTo(PacketVendor::class);
     }
 
     public function packet(): BelongsTo

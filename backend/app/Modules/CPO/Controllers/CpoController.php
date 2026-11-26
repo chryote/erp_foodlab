@@ -3,6 +3,7 @@
 namespace App\Modules\CPO\Controllers;
 
 use App\Enums\ItemType;
+use App\Enums\PacketVendorType;
 use App\Http\Controllers\Controller;
 use App\Modules\CPO\Services\CpoService;
 use Illuminate\Http\JsonResponse;
@@ -25,6 +26,7 @@ class CpoController extends Controller
         return response()->json([
             'data' => [
                 'item_type' => ItemType::options(),
+                'packet_vendor_type' => PacketVendorType::options(),
             ],
         ]);
     }
