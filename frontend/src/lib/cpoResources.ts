@@ -6,6 +6,7 @@ import {
   type CpoEnums,
   type DefaultPackage,
   type DefaultPackagePayload,
+  type DefaultPackageWizardPayload,
   type Ingredient,
   type IngredientPayload,
   type Item,
@@ -21,6 +22,7 @@ import {
   type PacketVendor,
   type PacketVendorPayload,
   createDefaultPackage,
+  createDefaultPackageWizard,
   createIngredient,
   createItem,
   createItemPacket,
@@ -46,6 +48,7 @@ import {
   fetchPacketVendors,
   fetchPackets,
   updateDefaultPackage,
+  updateDefaultPackageWizard,
   updateIngredient,
   updateItem,
   updateItemPacket,
@@ -703,6 +706,15 @@ export function useMasterPaketCrudResource(enabled: boolean) {
     runMutation
   );
 
+  const itemsQuery = useQuery<Item[]>({
+    queryKey: cpoQueryKeys.items,
+    queryFn: async () => {
+      const res = await fetchItems();
+      return res?.data ?? [];
+    },
+    enabled,
+  });
+
   const itemPacketsQuery = useQuery<ItemPacket[]>({
     queryKey: cpoQueryKeys.itemPackets,
     queryFn: async () => {
@@ -719,6 +731,68 @@ export function useMasterPaketCrudResource(enabled: boolean) {
       return res?.data ?? [];
     },
     enabled,
+  });
+
+  const ingredientsQuery = useQuery<Ingredient[]>({
+    queryKey: cpoQueryKeys.ingredients,
+    queryFn: async () => {
+      const res = await fetchIngredients();
+      return res?.data ?? [];
+    },
+    enabled,
+  });
+
+  const invalidateWizardQueries = useCallback(() => {
+    void queryClient.invalidateQueries({
+      queryKey: cpoQueryKeys.defaultPackages,
+    });
+    void queryClient.invalidateQueries({
+      queryKey: cpoQueryKeys.packetNames,
+    });
+    void queryClient.invalidateQueries({
+      queryKey: cpoQueryKeys.packetCategories,
+    });
+    void queryClient.invalidateQueries({
+      queryKey: cpoQueryKeys.packets,
+    });
+    void queryClient.invalidateQueries({
+      queryKey: cpoQueryKeys.itemPackets,
+    });
+    void queryClient.invalidateQueries({
+      queryKey: cpoQueryKeys.ingredients,
+    });
+  }, [queryClient]);
+
+  const createDefaultPackageWizardMutation = useMutation({
+    mutationFn: async (payload: DefaultPackageWizardPayload) => {
+      const res = await createDefaultPackageWizard(payload);
+      return res.data;
+    },
+    onSuccess: (created) => {
+      queryClient.setQueryData<DefaultPackage[]>(
+        cpoQueryKeys.defaultPackages,
+        (prev = []) => [created, ...prev]
+      );
+      invalidateWizardQueries();
+    },
+  });
+
+  const updateDefaultPackageWizardMutation = useMutation({
+    mutationFn: async (input: {
+      id: number;
+      payload: DefaultPackageWizardPayload;
+    }) => {
+      const res = await updateDefaultPackageWizard(input.id, input.payload);
+      return res.data;
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData<DefaultPackage[]>(
+        cpoQueryKeys.defaultPackages,
+        (prev = []) =>
+          prev.map((pkg) => (pkg.id === updated.id ? updated : pkg))
+      );
+      invalidateWizardQueries();
+    },
   });
 
   const createDefaultPackageMutation = useMutation({
@@ -782,6 +856,24 @@ export function useMasterPaketCrudResource(enabled: boolean) {
     [createDefaultPackageMutation, runMutation]
   );
 
+  const addDefaultPackageWizard = useCallback(
+    (payload: DefaultPackageWizardPayload) =>
+      runMutation(
+        () => createDefaultPackageWizardMutation.mutateAsync(payload),
+        'Gagal menyimpan paket awal.'
+      ),
+    [createDefaultPackageWizardMutation, runMutation]
+  );
+
+  const editDefaultPackageWizard = useCallback(
+    (id: number, payload: DefaultPackageWizardPayload) =>
+      runMutation(
+        () => updateDefaultPackageWizardMutation.mutateAsync({ id, payload }),
+        'Gagal memperbarui paket awal.'
+      ),
+    [runMutation, updateDefaultPackageWizardMutation]
+  );
+
   const editDefaultPackage = useCallback(
     (id: number, payload: DefaultPackagePayload) =>
       runMutation(
@@ -804,9 +896,13 @@ export function useMasterPaketCrudResource(enabled: boolean) {
     packetNames.isLoading ||
     packetVendors.isLoading ||
     packetCategories.isLoading ||
+    itemsQuery.isLoading ||
     itemPacketsQuery.isLoading ||
     defaultPackagesQuery.isLoading ||
+    ingredientsQuery.isLoading ||
     createDefaultPackageMutation.isPending ||
+    createDefaultPackageWizardMutation.isPending ||
+    updateDefaultPackageWizardMutation.isPending ||
     updateDefaultPackageMutation.isPending ||
     deleteDefaultPackageMutation.isPending;
 
@@ -814,16 +910,20 @@ export function useMasterPaketCrudResource(enabled: boolean) {
     packetNames.error ??
     packetVendors.error ??
     packetCategories.error ??
+    itemsQuery.error ??
     itemPacketsQuery.error ??
-    defaultPackagesQuery.error;
+    defaultPackagesQuery.error ??
+    ingredientsQuery.error;
 
   return {
     enums: enumsResource.enums,
     allPacketNames: packetNames.items,
     allPacketVendors: packetVendors.items,
     allPacketCategories: packetCategories.items,
+    allItems: itemsQuery.data ?? [],
     allItemPackets: itemPacketsQuery.data ?? [],
     allDefaultPackages: defaultPackagesQuery.data ?? [],
+    allIngredients: ingredientsQuery.data ?? [],
     loading,
     error:
       mutationError ??
@@ -839,6 +939,8 @@ export function useMasterPaketCrudResource(enabled: boolean) {
     updatePacketCategory: packetCategories.update,
     removePacketCategory: packetCategories.remove,
     createDefaultPackage: addDefaultPackage,
+    createDefaultPackageWizard: addDefaultPackageWizard,
+    updateDefaultPackageWizard: editDefaultPackageWizard,
     updateDefaultPackage: editDefaultPackage,
     removeDefaultPackage,
   };

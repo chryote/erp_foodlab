@@ -1,18 +1,28 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type {
   Company,
   DefaultPackage,
-  DefaultPackagePayload,
-  Packet,
   PacketVendor,
   PacketVendorPayload,
   PacketVendorType,
 } from '@/api/client';
-import { type CrudFieldConfig, CrudModal } from '@/components/ui';
-import { DEFAULT_CPO_ENUMS, useMasterPaketCrudResource } from '@/lib/cpoResources';
+import {
+  Button,
+  ConfirmDialog,
+  type CrudFieldConfig,
+  CrudModal,
+  DataTable,
+  type DataTableColumn,
+  Modal,
+  Pagination,
+} from '@/components/ui';
+import {
+  DEFAULT_CPO_ENUMS,
+  useMasterPaketCrudResource,
+} from '@/lib/cpoResources';
 import { cn } from '@/lib/utils';
 import { formatCapitalIdr } from '@/modules/CFO/CapitalCompanyCrudModal';
-import { groupItemPacketsByCompanyAndPacket } from './packingGrouping';
+import { DefaultPackageWizardPanel } from './DefaultPackageWizardPanel';
 
 export type MasterPaketTabKey = 'vendor' | 'default-package';
 
@@ -24,56 +34,53 @@ export const MASTER_PAKET_TABS: Array<{
   { key: 'default-package', label: 'Paket Awal' },
 ];
 
-function formatCompanyPacketLabel(
-  company: Company | null | undefined,
-  companyId: number | null,
-  packet: Packet | null | undefined,
-  packetId: number,
-  packetVendor?: PacketVendor | null,
-  packetVendorId?: number | null
-): string {
-  const ownerName =
-    company?.name ??
-    packetVendor?.name ??
-    (companyId != null
-      ? `Perusahaan #${companyId}`
-      : `Vendor #${packetVendorId ?? '-'}`);
-  const packetName = packet?.name ?? `Paket #${packetId}`;
-  return `${ownerName} — ${packetName}`;
-}
-
 export interface MasterPaketCrudModalProps {
   isOpen: boolean;
+  companies?: Company[];
   onClose: () => void;
 }
 
 export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
   isOpen,
+  companies = [],
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<MasterPaketTabKey>('vendor');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [editingDefaultPackage, setEditingDefaultPackage] =
+    useState<DefaultPackage | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<DefaultPackage | null>(
+    null
+  );
+
+  const pageSize = 10;
 
   const {
     enums,
     allPacketNames,
     allPacketVendors,
     allPacketCategories,
+    allItems,
     allItemPackets,
     allDefaultPackages,
+    allIngredients,
     loading,
     error,
     clearError,
     createPacketVendor,
     updatePacketVendor,
     removePacketVendor,
-    createDefaultPackage,
-    updateDefaultPackage,
+    createDefaultPackageWizard,
+    updateDefaultPackageWizard,
     removeDefaultPackage,
   } = useMasterPaketCrudResource(isOpen);
 
   useEffect(() => {
     if (!isOpen) {
       setActiveTab('vendor');
+      setCurrentPage(1);
+      setEditingDefaultPackage(null);
+      setPendingDelete(null);
       clearError();
     }
   }, [isOpen, clearError]);
@@ -140,131 +147,67 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
     return { name, type };
   };
 
-  const packetNameOptions = useMemo(
-    () =>
-      allPacketNames.map((item) => ({
-        value: String(item.id),
-        label: item.name,
-      })),
-    [allPacketNames]
+  const totalPages = Math.max(
+    1,
+    Math.ceil(allDefaultPackages.length / pageSize)
   );
+  const safeCurrentPage = Math.min(currentPage, totalPages);
 
-  const packetVendorOptions = useMemo(
-    () =>
-      allPacketVendors.map((item) => ({
-        value: String(item.id),
-        label: item.name,
-      })),
-    [allPacketVendors]
-  );
+  const paginatedDefaultPackages = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return allDefaultPackages.slice(start, start + pageSize);
+  }, [allDefaultPackages, safeCurrentPage]);
 
-  const packetCategoryOptions = useMemo(
-    () =>
-      allPacketCategories.map((item) => ({
-        value: String(item.id),
-        label: item.name,
-      })),
-    [allPacketCategories]
-  );
-
-  const groupedItemPackets = useMemo(
-    () =>
-      groupItemPacketsByCompanyAndPacket(
-        allItemPackets,
-        new Map(),
-        new Map()
-      ),
-    [allItemPackets]
-  );
-
-  const getItemPacketOptions = useCallback(
-    (values: Record<string, string>) => {
-      const selectedId = Number(values.item_packet_id);
-      const hasSelected =
-        Boolean(values.item_packet_id) && Number.isFinite(selectedId);
-
-      let matchedGroup = false;
-      const options = groupedItemPackets.map((group) => {
-        const matchesSelected =
-          hasSelected &&
-          group.item_packets.some((ip) => Number(ip.id) === selectedId);
-        if (matchesSelected) {
-          matchedGroup = true;
-        }
-        return {
-          value: matchesSelected ? String(selectedId) : String(group.id),
-          label: formatCompanyPacketLabel(
-            group.company,
-            group.company_id,
-            group.packet,
-            group.packet_id
-          ),
-        };
-      });
-
-      if (hasSelected && !matchedGroup) {
-        const fallback =
-          allDefaultPackages.find(
-            (dp) => Number(dp.item_packet_id) === selectedId
-          )?.item_packet ?? null;
-        if (fallback) {
-          options.push({
-            value: String(selectedId),
-            label: formatCompanyPacketLabel(
-              fallback.company,
-              fallback.company_id,
-              fallback.packet,
-              fallback.packet_id,
-              fallback.packet_vendor,
-              fallback.packet_vendor_id
-            ),
-          });
-        }
-      }
-
-      return options;
-    },
-    [allDefaultPackages, groupedItemPackets]
-  );
-
-  const defaultPackageFields = useMemo<CrudFieldConfig<DefaultPackage>[]>(
+  const defaultPackageColumns: DataTableColumn<DefaultPackage>[] = useMemo(
     () => [
       {
+        key: 'no',
+        header: 'No',
+        render: (_row, index) => (
+          <code>{(safeCurrentPage - 1) * pageSize + index + 1}</code>
+        ),
+      },
+      {
         key: 'brand_name',
-        label: 'Nama Brand',
-        placeholder: 'Contoh: Brand Hemat',
+        header: 'Nama Brand',
+        render: (row) => row.brand_name,
       },
       {
         key: 'packet_name_id',
-        label: 'Nama Paket',
-        type: 'select',
-        placeholder: 'Pilih nama paket...',
-        options: packetNameOptions,
-        renderValue: (row) =>
+        header: 'Nama Paket',
+        render: (row) =>
           allPacketNames.find((p) => p.id === Number(row.packet_name_id))
             ?.name ??
           row.packet_name?.name ??
           String(row.packet_name_id),
       },
       {
-        key: 'packet_vendor_id',
-        label: 'Vendor Paket',
-        type: 'select',
-        placeholder: 'Pilih vendor paket...',
-        options: packetVendorOptions,
-        renderValue: (row) =>
-          allPacketVendors.find((v) => v.id === Number(row.packet_vendor_id))
-            ?.name ??
-          row.packet_vendor?.name ??
-          String(row.packet_vendor_id),
+        key: 'owner',
+        header: 'Vendor Paket',
+        render: (row) => {
+          if (row.company_id != null) {
+            return (
+              companies.find((c) => c.id === Number(row.company_id))?.name ??
+              row.company?.name ??
+              `Perusahaan #${row.company_id}`
+            );
+          }
+          if (row.packet_vendor_id != null) {
+            return (
+              allPacketVendors.find(
+                (v) => v.id === Number(row.packet_vendor_id)
+              )?.name ??
+              row.packet_vendor?.name ??
+              `Vendor #${row.packet_vendor_id}`
+            );
+          }
+          return '-';
+        },
       },
       {
         key: 'packet_category_id',
-        label: 'Kategori Paket',
-        type: 'select',
-        placeholder: 'Pilih kategori paket...',
-        options: packetCategoryOptions,
-        renderValue: (row) =>
+        header: 'Kategori Paket',
+        render: (row) =>
           allPacketCategories.find(
             (c) => c.id === Number(row.packet_category_id)
           )?.name ??
@@ -272,85 +215,46 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
           String(row.packet_category_id),
       },
       {
-        key: 'item_packet_id',
-        label: 'Item Paket',
-        type: 'select',
-        placeholder: 'Pilih item paket...',
-        options: getItemPacketOptions,
-        renderValue: (row) => {
-          const matched =
-            allItemPackets.find((ip) => ip.id === Number(row.item_packet_id)) ??
-            row.item_packet;
-          if (!matched) {
-            return String(row.item_packet_id);
-          }
-          const group = groupedItemPackets.find(
-            (g) =>
-              g.company_id === Number(matched.company_id) &&
-              g.packet_id === Number(matched.packet_id)
-          );
-          return formatCompanyPacketLabel(
-            matched.company ?? group?.company,
-            matched.company_id,
-            matched.packet ?? group?.packet,
-            Number(matched.packet_id),
-            matched.packet_vendor,
-            matched.packet_vendor_id
-          );
-        },
+        key: 'price',
+        header: 'Harga (Rp)',
+        render: (row) => formatCapitalIdr(Number(row.price ?? 0)),
       },
       {
-        key: 'price',
-        label: 'Harga (Rp)',
-        type: 'decimal',
-        optional: true,
-        defaultValue: '0',
-        placeholder: 'Contoh: 150.000',
-        renderValue: (row) => formatCapitalIdr(Number(row.price ?? 0)),
+        key: 'actions',
+        header: 'Aksi',
+        render: (row) => (
+          <div className="flex flex-nowrap items-center gap-1.5 whitespace-nowrap">
+            <Button
+              variant="secondary"
+              className="h-7 px-2.5 py-1 text-xs"
+              data-testid={`edit-row-${row.id}`}
+              onClick={() => {
+                clearError();
+                setEditingDefaultPackage(row);
+              }}
+            >
+              Edit
+            </Button>
+            <Button
+              variant="ghost"
+              className="h-7 px-2.5 py-1 text-xs"
+              data-testid={`delete-row-${row.id}`}
+              onClick={() => setPendingDelete(row)}
+            >
+              Hapus
+            </Button>
+          </div>
+        ),
       },
     ],
     [
-      allItemPackets,
       allPacketCategories,
       allPacketNames,
       allPacketVendors,
-      getItemPacketOptions,
-      groupedItemPackets,
-      packetCategoryOptions,
-      packetNameOptions,
-      packetVendorOptions,
+      companies,
+      safeCurrentPage,
     ]
   );
-
-  const parseDefaultPackagePayload = (
-    values: Record<string, string>
-  ): DefaultPackagePayload | null => {
-    const brandName = (values.brand_name ?? '').trim();
-    const packetNameId = parseInt(values.packet_name_id ?? '', 10);
-    const packetVendorId = parseInt(values.packet_vendor_id ?? '', 10);
-    const packetCategoryId = parseInt(values.packet_category_id ?? '', 10);
-    const itemPacketId = parseInt(values.item_packet_id ?? '', 10);
-    const price = values.price ? parseFloat(values.price) : 0;
-    if (
-      !brandName ||
-      !Number.isFinite(packetNameId) ||
-      !Number.isFinite(packetVendorId) ||
-      !Number.isFinite(packetCategoryId) ||
-      !Number.isFinite(itemPacketId) ||
-      !Number.isFinite(price) ||
-      price < 0
-    ) {
-      return null;
-    }
-    return {
-      brand_name: brandName,
-      packet_name_id: packetNameId,
-      packet_vendor_id: packetVendorId,
-      packet_category_id: packetCategoryId,
-      item_packet_id: itemPacketId,
-      price: Math.round(price * 100) / 100,
-    };
-  };
 
   const tabsBar = (
     <div
@@ -386,51 +290,122 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
     </div>
   );
 
-  const commonCrudProps = {
-    isOpen,
-    title: 'Master Paket',
-    subtitle: 'Kelola vendor paket dan paket awal',
-    testId: 'master-paket-crud-modal',
-    tabs: tabsBar,
-    layout: 'split' as const,
-    labelPlacement: 'left' as const,
-    modalSize: 'expanded' as const,
-    pageSize: 10,
-    loading,
-    error,
-    onClose,
-  };
-
   if (activeTab === 'default-package') {
     return (
-      <CrudModal
-        {...commonCrudProps}
-        resetKey="default-package"
-        fields={defaultPackageFields}
-        emptyMessage="Belum ada data paket awal."
-        items={allDefaultPackages}
-        onCreate={async (values) => {
-          const payload = parseDefaultPackagePayload(values);
-          if (payload) {
-            await createDefaultPackage(payload);
-          }
-        }}
-        onUpdate={async (id, values) => {
-          const payload = parseDefaultPackagePayload(values);
-          if (payload) {
-            await updateDefaultPackage(id, payload);
-          }
-        }}
-        onDelete={async (id) => {
-          await removeDefaultPackage(id);
-        }}
-      />
+      <>
+        <Modal
+          isOpen={isOpen}
+          title="Master Paket"
+          subtitle="Kelola vendor paket dan paket awal"
+          testId="master-paket-crud-modal"
+          maxWidthClass="max-w-[95vw]"
+          dialogClassName="h-[92vh] max-h-[92vh]"
+          bodyClassName="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden"
+          onClose={onClose}
+        >
+          {tabsBar}
+
+          {error && (
+            <div
+              role="alert"
+              className="shrink-0 rounded-lg border border-primary/30 bg-primary/5 px-3.5 py-2.5 text-sm text-primary"
+            >
+              {error}
+            </div>
+          )}
+
+          <div
+            data-testid="master-paket-crud-modal-split-layout"
+            className="grid min-h-0 flex-1 grid-cols-1 gap-6 lg:grid-cols-[440px_minmax(0,1fr)] xl:grid-cols-[480px_minmax(0,1fr)]"
+          >
+            <div
+              data-testid="master-paket-crud-modal-form-panel"
+              className="flex min-h-0 flex-col rounded-xl border border-border bg-muted/25 p-4 lg:overflow-y-auto"
+            >
+              <DefaultPackageWizardPanel
+                allPacketNames={allPacketNames}
+                allPacketCategories={allPacketCategories}
+                allPacketVendors={allPacketVendors}
+                companies={companies}
+                allItems={allItems}
+                allItemPackets={allItemPackets}
+                allIngredients={allIngredients}
+                editingPackage={editingDefaultPackage}
+                loading={loading}
+                onCancelEdit={() => setEditingDefaultPackage(null)}
+                onClearExternalError={clearError}
+                onSubmitWizard={async (payload, editingId) =>
+                  editingId !== undefined
+                    ? (await updateDefaultPackageWizard(editingId, payload)) !==
+                      null
+                    : (await createDefaultPackageWizard(payload)) !== null
+                }
+              />
+            </div>
+
+            <div
+              data-testid="master-paket-crud-modal-table-panel"
+              className="flex min-h-0 min-w-0 flex-col justify-between gap-4 rounded-xl border border-border bg-card p-4"
+            >
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto">
+                <DataTable
+                  columns={defaultPackageColumns}
+                  data={paginatedDefaultPackages}
+                  emptyMessage="Belum ada data paket awal."
+                  rowKey={(row) => row.id}
+                />
+              </div>
+
+              <div className="shrink-0 border-t border-border pt-3">
+                <Pagination
+                  currentPage={safeCurrentPage}
+                  totalPages={totalPages}
+                  totalItems={allDefaultPackages.length}
+                  testId="master-paket-crud-modal-pagination"
+                  onPageChange={setCurrentPage}
+                />
+              </div>
+            </div>
+          </div>
+        </Modal>
+
+        <ConfirmDialog
+          isOpen={pendingDelete !== null}
+          title="Konfirmasi Hapus Data"
+          message={`Apakah Anda yakin ingin menghapus paket awal "${pendingDelete?.brand_name ?? ''}"?`}
+          confirmLabel="Ya, Hapus"
+          cancelLabel="Batal"
+          loading={loading}
+          onConfirm={async () => {
+            if (pendingDelete) {
+              const deletedId = pendingDelete.id;
+              const ok = await removeDefaultPackage(deletedId);
+              if (ok && editingDefaultPackage?.id === deletedId) {
+                setEditingDefaultPackage(null);
+              }
+              setPendingDelete(null);
+            }
+          }}
+          onCancel={() => setPendingDelete(null)}
+        />
+      </>
     );
   }
 
   return (
     <CrudModal
-      {...commonCrudProps}
+      isOpen={isOpen}
+      title="Master Paket"
+      subtitle="Kelola vendor paket dan paket awal"
+      testId="master-paket-crud-modal"
+      tabs={tabsBar}
+      layout="split"
+      labelPlacement="left"
+      modalSize="expanded"
+      pageSize={pageSize}
+      loading={loading}
+      error={error}
+      onClose={onClose}
       resetKey="vendor"
       fields={vendorFields}
       emptyMessage="Belum ada data vendor."

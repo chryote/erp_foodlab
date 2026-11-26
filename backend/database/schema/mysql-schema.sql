@@ -94,9 +94,11 @@ CREATE TABLE `default_packages` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `brand_name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `packet_name_id` bigint unsigned NOT NULL,
-  `packet_vendor_id` bigint unsigned NOT NULL,
+  `company_id` bigint unsigned DEFAULT NULL,
+  `packet_vendor_id` bigint unsigned DEFAULT NULL,
   `packet_category_id` bigint unsigned NOT NULL,
-  `item_packet_id` bigint unsigned NOT NULL,
+  `packet_id` bigint unsigned DEFAULT NULL,
+  `item_packet_id` bigint unsigned DEFAULT NULL,
   `price` decimal(18,2) NOT NULL DEFAULT '0.00',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
@@ -104,14 +106,23 @@ CREATE TABLE `default_packages` (
   `active_flag` tinyint unsigned GENERATED ALWAYS AS ((case when (`deleted_at` is null) then 1 else NULL end)) VIRTUAL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `default_packages_brand_pkt_vend_cat_ip_active_unique` (`brand_name`,`packet_name_id`,`packet_vendor_id`,`packet_category_id`,`item_packet_id`,`active_flag`),
+  UNIQUE KEY `default_packages_brand_comp_cat_ip_active_unique` (`brand_name`,`packet_name_id`,`company_id`,`packet_category_id`,`item_packet_id`,`active_flag`),
+  UNIQUE KEY `default_packages_brand_vend_cat_pkt_active_unique` (`brand_name`,`packet_name_id`,`packet_vendor_id`,`packet_category_id`,`packet_id`,`active_flag`),
+  UNIQUE KEY `default_packages_brand_comp_cat_pkt_active_unique` (`brand_name`,`packet_name_id`,`company_id`,`packet_category_id`,`packet_id`,`active_flag`),
   KEY `default_packages_packet_name_id_foreign` (`packet_name_id`),
   KEY `default_packages_packet_vendor_id_foreign` (`packet_vendor_id`),
   KEY `default_packages_packet_category_id_foreign` (`packet_category_id`),
   KEY `default_packages_item_packet_id_foreign` (`item_packet_id`),
   KEY `default_packages_del_brand_id_idx` (`deleted_at`,`brand_name`,`id`),
   KEY `default_packages_del_cat_vendor_idx` (`deleted_at`,`packet_category_id`,`packet_vendor_id`),
+  KEY `default_packages_company_id_foreign` (`company_id`),
+  KEY `default_packages_packet_id_foreign` (`packet_id`),
+  KEY `default_packages_del_cat_comp_idx` (`deleted_at`,`packet_category_id`,`company_id`),
+  KEY `default_packages_del_pkt_id_idx` (`deleted_at`,`packet_id`,`id`),
+  CONSTRAINT `default_packages_company_id_foreign` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `default_packages_item_packet_id_foreign` FOREIGN KEY (`item_packet_id`) REFERENCES `item_packet` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `default_packages_packet_category_id_foreign` FOREIGN KEY (`packet_category_id`) REFERENCES `packet_categories` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `default_packages_packet_id_foreign` FOREIGN KEY (`packet_id`) REFERENCES `packets` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `default_packages_packet_name_id_foreign` FOREIGN KEY (`packet_name_id`) REFERENCES `packet_names` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `default_packages_packet_vendor_id_foreign` FOREIGN KEY (`packet_vendor_id`) REFERENCES `packet_vendors` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -790,5 +801,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (57,'2026_11_24_190
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (58,'2026_11_25_100000_add_type_to_companies_table',43);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (59,'2026_11_26_100000_add_type_to_packet_vendors_table',44);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (60,'2026_11_26_110000_add_packet_vendor_ownership_to_items_and_item_packet',44);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (61,'2026_11_26_120000_update_default_packages_for_wizard_and_exclusive_owner',45);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;

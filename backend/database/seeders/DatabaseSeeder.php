@@ -1748,9 +1748,9 @@ class DatabaseSeeder extends Seeder
             ->keyBy(fn (DefaultPackage $dp): string => implode('|', [
                 $dp->brand_name,
                 $dp->packet_name_id,
-                $dp->packet_vendor_id,
+                $dp->company_id !== null ? 'c'.$dp->company_id : 'v'.$dp->packet_vendor_id,
                 $dp->packet_category_id,
-                $dp->item_packet_id,
+                $dp->item_packet_id ?? $dp->packet_id ?? '',
             ]));
 
         $canonicalName = $packetNames->firstWhere('name', 'Paket A') ?? $packetNames->firstOrFail();
@@ -1766,10 +1766,24 @@ class DatabaseSeeder extends Seeder
             $existingByKey,
             'Brand A',
             $canonicalName->id,
+            null,
             $canonicalVendor->id,
             $canonicalCategory->id,
+            $canonicalItemPacket->packet_id,
             $canonicalItemPacket->id,
             15000.00
+        ));
+
+        $seeded->push($this->upsertDefaultPackage(
+            $existingByKey,
+            'Brand Internal A',
+            $canonicalName->id,
+            $primaryCompany->id,
+            null,
+            $canonicalCategory->id,
+            $canonicalItemPacket->packet_id,
+            $canonicalItemPacket->id,
+            18000.00
         ));
 
         $nameList = $packetNames->values();
@@ -1791,8 +1805,10 @@ class DatabaseSeeder extends Seeder
                 $existingByKey,
                 sprintf('Brand Paket %03d', $i),
                 $pktName->id,
+                null,
                 $pktVendor->id,
                 $pktCategory->id,
+                $itemPacket->packet_id,
                 $itemPacket->id,
                 round(10000.00 + ($i * 2500.00), 2)
             ));
@@ -1808,27 +1824,35 @@ class DatabaseSeeder extends Seeder
         EloquentCollection $existingByKey,
         string $brandName,
         int $packetNameId,
-        int $packetVendorId,
+        ?int $companyId,
+        ?int $packetVendorId,
         int $packetCategoryId,
-        int $itemPacketId,
+        ?int $packetId,
+        ?int $itemPacketId,
         float $price
     ): DefaultPackage {
+        $ownerKey = $companyId !== null ? 'c'.$companyId : 'v'.$packetVendorId;
         $key = implode('|', [
             $brandName,
             $packetNameId,
-            $packetVendorId,
+            $ownerKey,
             $packetCategoryId,
-            $itemPacketId,
+            $itemPacketId ?? $packetId ?? '',
         ]);
 
         /** @var DefaultPackage $defaultPackage */
         $defaultPackage = $existingByKey->get($key) ?? new DefaultPackage([
             'brand_name' => $brandName,
             'packet_name_id' => $packetNameId,
+            'company_id' => $companyId,
             'packet_vendor_id' => $packetVendorId,
             'packet_category_id' => $packetCategoryId,
+            'packet_id' => $packetId,
             'item_packet_id' => $itemPacketId,
         ]);
+        $defaultPackage->company_id = $companyId;
+        $defaultPackage->packet_vendor_id = $packetVendorId;
+        $defaultPackage->packet_id = $packetId;
         $defaultPackage->price = $price;
         $defaultPackage->deleted_at = null;
         $defaultPackage->save();

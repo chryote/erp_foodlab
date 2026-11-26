@@ -900,13 +900,17 @@ export interface DefaultPackage {
   id: number;
   brand_name: string;
   packet_name_id: number;
-  packet_vendor_id: number;
+  company_id?: number | null;
+  packet_vendor_id?: number | null;
   packet_category_id: number;
-  item_packet_id: number;
+  packet_id?: number | null;
+  item_packet_id?: number | null;
   price: number;
   packet_name?: PacketName | null;
+  company?: Company | null;
   packet_vendor?: PacketVendor | null;
   packet_category?: PacketCategory | null;
+  packet?: Packet | null;
   item_packet?: ItemPacket | null;
   created_at?: string;
   updated_at?: string;
@@ -916,10 +920,27 @@ export interface DefaultPackage {
 export interface DefaultPackagePayload {
   brand_name: string;
   packet_name_id: number;
-  packet_vendor_id: number;
+  company_id?: number | null;
+  packet_vendor_id?: number | null;
   packet_category_id: number;
-  item_packet_id: number;
+  packet_id?: number | null;
+  item_packet_id?: number | null;
   price?: number;
+}
+
+export interface DefaultPackageWizardItemPayload {
+  item_id: number;
+  quantity: number;
+  price: number;
+}
+
+export interface DefaultPackageWizardPayload {
+  packet_name: string;
+  packet_category: string;
+  brand_name: string;
+  company_id?: number | null;
+  packet_vendor_id?: number | null;
+  items: DefaultPackageWizardItemPayload[];
 }
 
 export interface DefaultPackagesListResponse {
@@ -2208,6 +2229,35 @@ export async function createDefaultPackage(
       body: JSON.stringify(payload),
     },
     'Failed to create default package'
+  );
+}
+
+export async function createDefaultPackageWizard(
+  payload: DefaultPackageWizardPayload
+): Promise<{ data: DefaultPackage }> {
+  return requestJson<{ data: DefaultPackage }>(
+    '/v1/modules/cpo/default-packages/wizard',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to save default package wizard'
+  );
+}
+
+export async function updateDefaultPackageWizard(
+  id: number,
+  payload: DefaultPackageWizardPayload
+): Promise<{ data: DefaultPackage }> {
+  return requestJson<{ data: DefaultPackage }>(
+    `/v1/modules/cpo/default-packages/${id}/wizard`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update default package wizard'
   );
 }
 

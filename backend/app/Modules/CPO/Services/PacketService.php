@@ -104,6 +104,8 @@ class PacketService
                 $locked->itemPackets()->delete();
             }
 
+            DefaultPackageService::softDeleteForPacketIds([(int) $locked->getKey()]);
+
             $locked->delete();
         });
 

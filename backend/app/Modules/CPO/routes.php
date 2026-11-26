@@ -59,6 +59,9 @@ Route::prefix('cpo')->group(function () {
 
     Route::get('/default-packages', [DefaultPackageController::class, 'index'])->name('api.modules.cpo.default-packages.index');
     Route::post('/default-packages', [DefaultPackageController::class, 'store'])->name('api.modules.cpo.default-packages.store');
+    Route::post('/default-packages/wizard', [DefaultPackageController::class, 'storeWizard'])->name('api.modules.cpo.default-packages.wizard');
+    Route::put('/default-packages/{defaultPackage}/wizard', [DefaultPackageController::class, 'updateWizard'])->name('api.modules.cpo.default-packages.wizard.update');
+    Route::patch('/default-packages/{defaultPackage}/wizard', [DefaultPackageController::class, 'updateWizard'])->name('api.modules.cpo.default-packages.wizard.patch');
     Route::get('/default-packages/{defaultPackage}', [DefaultPackageController::class, 'show'])->name('api.modules.cpo.default-packages.show');
     Route::put('/default-packages/{defaultPackage}', [DefaultPackageController::class, 'update'])->name('api.modules.cpo.default-packages.update');
     Route::patch('/default-packages/{defaultPackage}', [DefaultPackageController::class, 'update'])->name('api.modules.cpo.default-packages.patch');

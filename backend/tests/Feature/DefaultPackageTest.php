@@ -3,6 +3,7 @@
 use App\Http\Resources\DefaultPackageResource;
 use App\Models\Company;
 use App\Models\DefaultPackage;
+use App\Models\Ingredient;
 use App\Models\Item;
 use App\Models\ItemPacket;
 use App\Models\Packet;
@@ -11,9 +12,11 @@ use App\Models\PacketName;
 use App\Models\PacketVendor;
 use App\Modules\CPO\Services\CpoService;
 use App\Modules\CPO\Services\DefaultPackageService;
+use App\Modules\CPO\Services\IngredientService;
 use App\Modules\CPO\Services\ItemPacketService;
 use App\Modules\CPO\Services\PacketCategoryService;
 use App\Modules\CPO\Services\PacketNameService;
+use App\Modules\CPO\Services\PacketService;
 use App\Modules\CPO\Services\PacketVendorService;
 use App\Support\IndexQuery;
 use Illuminate\Http\Request;
@@ -277,9 +280,9 @@ describe('DefaultPackage CPO module', function () {
             ->assertJsonValidationErrors([
                 'brand_name',
                 'packet_name_id',
+                'company_id',
                 'packet_vendor_id',
                 'packet_category_id',
-                'item_packet_id',
             ]);
 
         // Whitespace-only & >150-char brand_name fail with 422
@@ -511,5 +514,244 @@ describe('DefaultPackage CPO module', function () {
         $this->getJson('/docs/api.json')
             ->assertOk()
             ->assertJsonPath('openapi', fn ($v) => is_string($v) && $v !== '');
+    });
+
+    it('supports exclusive Company vs PacketVendor ownership on DefaultPackage and atomic 3-screen wizard persistence with rollback on failure', function () {
+        $company = Company::factory()->create(['name' => 'PT. Wizard Company']);
+        $vendorA = PacketVendor::factory()->create(['name' => 'CV. Wizard Vendor A']);
+        $vendorB = PacketVendor::factory()->create(['name' => 'CV. Wizard Vendor B']);
+
+        $companyItem1 = Item::factory()->create([
+            'company_id' => $company->id,
+            'code' => 'CMP-01',
+            'name' => 'Tepung Internal',
+        ]);
+        $companyItem2 = Item::factory()->create([
+            'company_id' => $company->id,
+            'code' => 'CMP-02',
+            'name' => 'Gula Internal',
+        ]);
+        $vendorAItem1 = Item::factory()->forPacketVendor($vendorA)->create([
+            'code' => 'VND-01',
+            'name' => 'Kopi Vendor A',
+        ]);
+        $vendorAItem2 = Item::factory()->forPacketVendor($vendorA)->create([
+            'code' => 'VND-02',
+            'name' => 'Krimer Vendor A',
+        ]);
+        $vendorBItem = Item::factory()->forPacketVendor($vendorB)->create([
+            'code' => 'VND-B1',
+            'name' => 'Susu Vendor B',
+        ]);
+
+        // Warm all dependent caches to confirm wizard clears them
+        $this->getJson('/api/v1/modules/cpo')->assertOk();
+        $this->getJson('/api/v1/modules/cpo/packet-names')->assertOk();
+        $this->getJson('/api/v1/modules/cpo/packet-categories')->assertOk();
+        $this->getJson('/api/v1/modules/cpo/packets')->assertOk();
+        $this->getJson('/api/v1/modules/cpo/item-packets')->assertOk();
+        $this->getJson('/api/v1/modules/cpo/default-packages')->assertOk();
+        $this->getJson('/api/v1/modules/cpo/ingredients')->assertOk();
+
+        // 1. Cross-owner item in wizard fails with 422 and rolls back PacketName/PacketCategory/Packet cleanly
+        $this->postJson('/api/v1/modules/cpo/default-packages/wizard', [
+            'packet_name' => 'Paket Rollback Uji',
+            'packet_category' => 'Kategori Rollback Uji',
+            'brand_name' => 'Brand Rollback',
+            'company_id' => $company->id,
+            'items' => [
+                ['item_id' => $companyItem1->id, 'quantity' => 2, 'price' => 5000],
+                ['item_id' => $vendorAItem1->id, 'quantity' => 1, 'price' => 3000],
+            ],
+        ])->assertUnprocessable()->assertJsonValidationErrors(['items.1.item_id']);
+
+        expect(PacketName::query()->where('name', 'Paket Rollback Uji')->exists())->toBeFalse();
+        expect(PacketCategory::query()->where('name', 'Kategori Rollback Uji')->exists())->toBeFalse();
+        expect(Packet::query()->where('name', 'Paket Rollback Uji')->exists())->toBeFalse();
+        expect(DefaultPackage::query()->where('brand_name', 'Brand Rollback')->exists())->toBeFalse();
+
+        // 2. Dual owner, missing owner, empty items, duplicate item_id, and invalid price fail with 422
+        $this->postJson('/api/v1/modules/cpo/default-packages/wizard', [
+            'packet_name' => 'Paket Invalid',
+            'packet_category' => 'Kategori Invalid',
+            'brand_name' => 'Brand Invalid',
+            'company_id' => $company->id,
+            'packet_vendor_id' => $vendorA->id,
+            'items' => [['item_id' => $companyItem1->id, 'quantity' => 1, 'price' => 1000]],
+        ])->assertUnprocessable()->assertJsonValidationErrors(['company_id', 'packet_vendor_id']);
+
+        $this->postJson('/api/v1/modules/cpo/default-packages/wizard', [
+            'packet_name' => 'Paket Invalid',
+            'packet_category' => 'Kategori Invalid',
+            'brand_name' => 'Brand Invalid',
+            'items' => [],
+        ])->assertUnprocessable()->assertJsonValidationErrors(['company_id', 'packet_vendor_id', 'items']);
+
+        $this->postJson('/api/v1/modules/cpo/default-packages/wizard', [
+            'packet_name' => 'Paket Invalid',
+            'packet_category' => 'Kategori Invalid',
+            'brand_name' => 'Brand Invalid',
+            'packet_vendor_id' => $vendorA->id,
+            'items' => [
+                ['item_id' => $vendorAItem1->id, 'quantity' => 1, 'price' => 1000],
+                ['item_id' => $vendorAItem1->id, 'quantity' => 2, 'price' => 2000],
+            ],
+        ])->assertUnprocessable()->assertJsonValidationErrors(['items.0.item_id', 'items.1.item_id']);
+
+        $this->postJson('/api/v1/modules/cpo/default-packages/wizard', [
+            'packet_name' => 'Paket Invalid',
+            'packet_category' => 'Kategori Invalid',
+            'brand_name' => 'Brand Invalid',
+            'packet_vendor_id' => $vendorB->id,
+            'items' => [['item_id' => $vendorBItem->id, 'quantity' => 1, 'price' => -5]],
+        ])->assertUnprocessable()->assertJsonValidationErrors(['items.0.price']);
+
+        // 3. Company-owned wizard submission creates PacketName, PacketCategory, Packet, ItemPackets, DefaultPackage, and Ingredients atomically
+        $idemHeaders = ['Idempotency-Key' => 'idem-wizard-company-001'];
+        $companyWizardPayload = [
+            'packet_name' => '  Paket   Internal Hemat  ',
+            'packet_category' => '  Kategori   Internal  ',
+            'brand_name' => '  Brand   Internal Prima  ',
+            'company_id' => $company->id,
+            'items' => [
+                ['item_id' => $companyItem1->id, 'quantity' => 2, 'price' => 12500.50],
+                ['item_id' => $companyItem2->id, 'quantity' => 3, 'price' => 7499.50],
+            ],
+        ];
+
+        $companyWizardRes = $this->postJson('/api/v1/modules/cpo/default-packages/wizard', $companyWizardPayload, $idemHeaders);
+        $companyWizardRes->assertCreated()
+            ->assertJsonPath('data.brand_name', 'Brand Internal Prima')
+            ->assertJsonPath('data.company_id', $company->id)
+            ->assertJsonPath('data.packet_vendor_id', null)
+            ->assertJsonPath('data.price', 20000)
+            ->assertJsonPath('data.packet_name.name', 'Paket Internal Hemat')
+            ->assertJsonPath('data.packet_category.name', 'Kategori Internal')
+            ->assertJsonPath('data.packet.name', 'Paket Internal Hemat')
+            ->assertJsonCount(2, 'data.ingredients');
+
+        // Idempotency-Key replay returns same record without duplicating
+        $replayWizardRes = $this->postJson('/api/v1/modules/cpo/default-packages/wizard', $companyWizardPayload, $idemHeaders)
+            ->assertCreated();
+        expect($replayWizardRes->json('data.id'))->toBe($companyWizardRes->json('data.id'));
+
+        expect(Cache::has(CpoService::CACHE_KEY))->toBeFalse();
+        expect(Cache::has(PacketNameService::CACHE_KEY_LIST))->toBeFalse();
+        expect(Cache::has(PacketCategoryService::CACHE_KEY_LIST))->toBeFalse();
+        expect(Cache::has(PacketService::CACHE_KEY_LIST))->toBeFalse();
+        expect(Cache::has(ItemPacketService::CACHE_KEY_LIST))->toBeFalse();
+        expect(Cache::has(DefaultPackageService::CACHE_KEY_LIST))->toBeFalse();
+        expect(Cache::has(IngredientService::CACHE_KEY_LIST))->toBeFalse();
+
+        $companyDpId = $companyWizardRes->json('data.id');
+        expect(ItemPacket::query()->where('company_id', $company->id)->count())->toBe(2);
+        expect(Ingredient::query()->where('default_package_id', $companyDpId)->count())->toBe(2);
+
+        // 4. PacketVendor wizard submission reuses existing PacketName & PacketCategory (case-insensitive) and creates vendor ItemPackets + Ingredients
+        $existingVendorName = PacketName::factory()->create(['name' => 'Paket Vendor Kopi']);
+        $existingVendorCat = PacketCategory::factory()->create(['name' => 'Kategori Minuman']);
+
+        $vendorWizardRes = $this->postJson('/api/v1/modules/cpo/default-packages/wizard', [
+            'packet_name' => '  paket   vendor kopi  ',
+            'packet_category' => 'KATEGORI MINUMAN',
+            'brand_name' => 'Brand Kopi Nusantara',
+            'packet_vendor_id' => $vendorA->id,
+            'items' => [
+                ['item_id' => $vendorAItem1->id, 'quantity' => 4, 'price' => 15000],
+                ['item_id' => $vendorAItem2->id, 'quantity' => 2, 'price' => 10000],
+            ],
+        ])->assertCreated()
+            ->assertJsonPath('data.company_id', null)
+            ->assertJsonPath('data.packet_vendor_id', $vendorA->id)
+            ->assertJsonPath('data.packet_name_id', $existingVendorName->id)
+            ->assertJsonPath('data.packet_category_id', $existingVendorCat->id)
+            ->assertJsonPath('data.price', 25000)
+            ->assertJsonCount(2, 'data.ingredients');
+
+        expect(PacketName::query()->whereRaw('LOWER(name) = ?', ['paket vendor kopi'])->count())->toBe(1);
+        expect(PacketCategory::query()->whereRaw('LOWER(name) = ?', ['kategori minuman'])->count())->toBe(1);
+        expect(ItemPacket::query()->where('packet_vendor_id', $vendorA->id)->count())->toBe(2);
+
+        // 5. Duplicate wizard combination (same brand + packet_name + owner + category + packet) fails with 422
+        $this->postJson('/api/v1/modules/cpo/default-packages/wizard', [
+            'packet_name' => 'paket vendor kopi',
+            'packet_category' => 'kategori minuman',
+            'brand_name' => '  BRAND   KOPI NUSANTARA ',
+            'packet_vendor_id' => $vendorA->id,
+            'items' => [
+                ['item_id' => $vendorAItem1->id, 'quantity' => 1, 'price' => 5000],
+            ],
+        ])->assertUnprocessable()->assertJsonValidationErrors(['brand_name']);
+
+        // 6. Edit existing wizard (update brand/name/category/items/qty/price, remove item & prune unused ItemPacket, allow same tuple, reject collision & owner mismatch)
+        $vendorDpId = $vendorWizardRes->json('data.id');
+        $vendorPacketId = $vendorWizardRes->json('data.packet_id');
+
+        // 6a. Re-saving with identical tuple on same record succeeds (no self-collision)
+        $this->putJson("/api/v1/modules/cpo/default-packages/{$companyDpId}/wizard", [
+            'packet_name' => 'Paket Internal Hemat',
+            'packet_category' => 'Kategori Internal',
+            'brand_name' => 'Brand Internal Prima',
+            'company_id' => $company->id,
+            'items' => [
+                ['item_id' => $companyItem1->id, 'quantity' => 5, 'price' => 15000],
+            ],
+        ])->assertOk()
+            ->assertJsonPath('data.brand_name', 'Brand Internal Prima')
+            ->assertJsonPath('data.price', 15000)
+            ->assertJsonCount(1, 'data.ingredients');
+
+        // Removed $companyItem2 Ingredient is gone and unused ItemPacket is soft-deleted
+        expect(Ingredient::query()->where('default_package_id', $companyDpId)->count())->toBe(1);
+        expect(ItemPacket::query()->where('company_id', $company->id)->where('item_id', $companyItem2->id)->count())->toBe(0);
+        expect(ItemPacket::withTrashed()->where('company_id', $company->id)->where('item_id', $companyItem2->id)->first()?->trashed())->toBeTrue();
+
+        // 6b. Colliding with ANOTHER active DefaultPackage fails 422 and rolls back changes
+        $this->putJson("/api/v1/modules/cpo/default-packages/{$companyDpId}/wizard", [
+            'packet_name' => 'paket vendor kopi',
+            'packet_category' => 'kategori minuman',
+            'brand_name' => 'BRAND KOPI NUSANTARA',
+            'packet_vendor_id' => $vendorA->id,
+            'items' => [
+                ['item_id' => $vendorAItem1->id, 'quantity' => 1, 'price' => 5000],
+            ],
+        ])->assertUnprocessable()->assertJsonValidationErrors(['brand_name']);
+
+        expect(DefaultPackage::query()->find($companyDpId)?->brand_name)->toBe('Brand Internal Prima');
+        expect(DefaultPackage::query()->find($companyDpId)?->company_id)->toBe($company->id);
+
+        // 6c. Mismatched owner vs items fails 422 and rolls back
+        $this->putJson("/api/v1/modules/cpo/default-packages/{$companyDpId}/wizard", [
+            'packet_name' => 'Paket Switch Invalid',
+            'packet_category' => 'Kategori Switch',
+            'brand_name' => 'Brand Switch Invalid',
+            'packet_vendor_id' => $vendorA->id,
+            'items' => [
+                ['item_id' => $companyItem1->id, 'quantity' => 1, 'price' => 5000],
+            ],
+        ])->assertUnprocessable()->assertJsonValidationErrors(['items.0.item_id']);
+
+        // 6d. Switching owner from Company to PacketVendor with matching items updates cleanly and prunes old company ItemPacket
+        $this->putJson("/api/v1/modules/cpo/default-packages/{$companyDpId}/wizard", [
+            'packet_name' => 'Paket Edited Vendor',
+            'packet_category' => 'Kategori Edited',
+            'brand_name' => 'Brand Edited Vendor',
+            'packet_vendor_id' => $vendorA->id,
+            'items' => [
+                ['item_id' => $vendorAItem1->id, 'quantity' => 7, 'price' => 30000],
+            ],
+        ])->assertOk()
+            ->assertJsonPath('data.brand_name', 'Brand Edited Vendor')
+            ->assertJsonPath('data.company_id', null)
+            ->assertJsonPath('data.packet_vendor_id', $vendorA->id)
+            ->assertJsonPath('data.price', 30000)
+            ->assertJsonCount(1, 'data.ingredients');
+
+        expect(ItemPacket::query()->where('company_id', $company->id)->where('item_id', $companyItem1->id)->count())->toBe(0);
+
+        // 7. Deleting Packet cascades to DefaultPackage linked via packet_id (and its Ingredients)
+        $this->deleteJson("/api/v1/modules/cpo/packets/{$vendorPacketId}")->assertOk();
+        $this->assertSoftDeleted('default_packages', ['id' => $vendorDpId]);
+        expect(Ingredient::query()->where('default_package_id', $vendorDpId)->count())->toBe(0);
     });
 });

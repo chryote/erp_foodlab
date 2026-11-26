@@ -96,4 +96,9 @@ class Company extends Model
     {
         return $this->hasMany(ItemPacket::class);
     }
+
+    public function defaultPackages(): HasMany
+    {
+        return $this->hasMany(DefaultPackage::class);
+    }
 }

@@ -179,6 +179,18 @@ class CompanyService
                         ->delete();
                 }
             }
+            if (Schema::hasTable('default_packages')) {
+                $companyDefaultPackages = $locked->defaultPackages()->lockForUpdate()->get();
+                if ($companyDefaultPackages->isNotEmpty()) {
+                    if (class_exists(Ingredient::class) && Schema::hasTable('ingredients')) {
+                        foreach ($companyDefaultPackages as $defaultPackage) {
+                            $defaultPackage->ingredients()->delete();
+                        }
+                    }
+
+                    $locked->defaultPackages()->delete();
+                }
+            }
             $locked->itemPackets()->delete();
             $companyItemIds = $locked->items()->lockForUpdate()->pluck('id')->all();
             if ($companyItemIds !== [] && class_exists(Ingredient::class) && Schema::hasTable('ingredients')) {

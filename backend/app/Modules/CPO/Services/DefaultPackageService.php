@@ -4,9 +4,10 @@ namespace App\Modules\CPO\Services;
 
 use App\Models\DefaultPackage;
 use App\Models\ItemPacket;
+use App\Models\Packet;
 use App\Models\PacketCategory;
 use App\Models\PacketName;
-use App\Models\PacketVendor;
+use App\Support\ExclusiveOwner;
 use App\Support\IndexQuery;
 use App\Support\InputNormalizer;
 use App\Support\WriteGuard;
@@ -30,7 +31,14 @@ class DefaultPackageService
     /**
      * @var array<int, string>
      */
-    private const RELATIONS = ['packetName', 'packetVendor', 'packetCategory', 'itemPacket'];
+    private const RELATIONS = [
+        'packetName',
+        'company',
+        'packetVendor',
+        'packetCategory',
+        'packet',
+        'itemPacket',
+    ];
 
     /**
      * @return LengthAwarePaginator|Collection<int, DefaultPackage>
@@ -57,24 +65,35 @@ class DefaultPackageService
     {
         $attributes['brand_name'] = InputNormalizer::text((string) $attributes['brand_name']) ?? '';
         $attributes['packet_name_id'] = (int) $attributes['packet_name_id'];
-        $attributes['packet_vendor_id'] = (int) $attributes['packet_vendor_id'];
         $attributes['packet_category_id'] = (int) $attributes['packet_category_id'];
-        $attributes['item_packet_id'] = (int) $attributes['item_packet_id'];
+        $attributes['packet_id'] = isset($attributes['packet_id']) ? (int) $attributes['packet_id'] : null;
+        $attributes['item_packet_id'] = isset($attributes['item_packet_id']) ? (int) $attributes['item_packet_id'] : null;
         $attributes['price'] = round((float) ($attributes['price'] ?? 0), 2);
 
-        $defaultPackage = DB::transaction(function () use ($attributes): DefaultPackage {
-            $this->assertActiveParents(
+        $resolved = ExclusiveOwner::resolveForService($attributes);
+        $companyId = $resolved['company_id'];
+        $vendorId = $resolved['packet_vendor_id'];
+        $attributes = $resolved['attributes'];
+
+        $defaultPackage = DB::transaction(function () use ($attributes, $companyId, $vendorId): DefaultPackage {
+            $resolvedPacketId = $this->assertActiveParents(
                 $attributes['packet_name_id'],
-                $attributes['packet_vendor_id'],
+                $companyId,
+                $vendorId,
                 $attributes['packet_category_id'],
+                $attributes['packet_id'],
                 $attributes['item_packet_id']
             );
+
+            $attributes['packet_id'] = $resolvedPacketId;
 
             $this->assertCombinationUnique(
                 $attributes['brand_name'],
                 $attributes['packet_name_id'],
-                $attributes['packet_vendor_id'],
+                $companyId,
+                $vendorId,
                 $attributes['packet_category_id'],
+                $resolvedPacketId,
                 $attributes['item_packet_id']
             );
 
@@ -95,9 +114,17 @@ class DefaultPackageService
             $attributes['brand_name'] = InputNormalizer::text((string) $attributes['brand_name']) ?? '';
         }
 
-        foreach (['packet_name_id', 'packet_vendor_id', 'packet_category_id', 'item_packet_id'] as $intField) {
+        foreach (['packet_name_id', 'packet_category_id'] as $intField) {
             if (array_key_exists($intField, $attributes)) {
                 $attributes[$intField] = (int) $attributes[$intField];
+            }
+        }
+
+        foreach (['packet_id', 'item_packet_id'] as $nullableIntField) {
+            if (array_key_exists($nullableIntField, $attributes)) {
+                $attributes[$nullableIntField] = $attributes[$nullableIntField] !== null
+                    ? (int) $attributes[$nullableIntField]
+                    : null;
             }
         }
 
@@ -108,24 +135,41 @@ class DefaultPackageService
         $updated = DB::transaction(function () use ($defaultPackage, $attributes): DefaultPackage {
             $locked = DefaultPackage::query()->lockForUpdate()->findOrFail($defaultPackage->getKey());
 
+            $resolved = ExclusiveOwner::resolveForService($attributes, $locked);
+            $targetCompanyId = $resolved['company_id'];
+            $targetVendorId = $resolved['packet_vendor_id'];
+            $attributes = $resolved['attributes'];
+
             $targetBrandName = (string) ($attributes['brand_name'] ?? $locked->brand_name);
             $targetPacketNameId = (int) ($attributes['packet_name_id'] ?? $locked->packet_name_id);
-            $targetPacketVendorId = (int) ($attributes['packet_vendor_id'] ?? $locked->packet_vendor_id);
             $targetPacketCategoryId = (int) ($attributes['packet_category_id'] ?? $locked->packet_category_id);
-            $targetItemPacketId = (int) ($attributes['item_packet_id'] ?? $locked->item_packet_id);
+            $targetPacketId = array_key_exists('packet_id', $attributes)
+                ? $attributes['packet_id']
+                : ($locked->packet_id !== null ? (int) $locked->packet_id : null);
+            $targetItemPacketId = array_key_exists('item_packet_id', $attributes)
+                ? $attributes['item_packet_id']
+                : ($locked->item_packet_id !== null ? (int) $locked->item_packet_id : null);
 
-            $this->assertActiveParents(
+            $resolvedPacketId = $this->assertActiveParents(
                 $targetPacketNameId,
-                $targetPacketVendorId,
+                $targetCompanyId,
+                $targetVendorId,
                 $targetPacketCategoryId,
+                $targetPacketId,
                 $targetItemPacketId
             );
+
+            if ($resolvedPacketId !== null) {
+                $attributes['packet_id'] = $resolvedPacketId;
+            }
 
             $this->assertCombinationUnique(
                 $targetBrandName,
                 $targetPacketNameId,
-                $targetPacketVendorId,
+                $targetCompanyId,
+                $targetVendorId,
                 $targetPacketCategoryId,
+                $resolvedPacketId,
                 $targetItemPacketId,
                 $locked->getKey()
             );
@@ -164,6 +208,33 @@ class DefaultPackageService
 
         $defaultPackages = DefaultPackage::query()
             ->whereIn('item_packet_id', $itemPacketIds)
+            ->lockForUpdate()
+            ->get();
+
+        if ($defaultPackages->isEmpty()) {
+            return;
+        }
+
+        self::cascadeIngredientsFor($defaultPackages->all());
+
+        DefaultPackage::query()
+            ->whereIn('id', $defaultPackages->pluck('id')->all())
+            ->delete();
+    }
+
+    /**
+     * Soft-delete active default packages (and their ingredients if present) for given packet IDs.
+     *
+     * @param  array<int, int>  $packetIds
+     */
+    public static function softDeleteForPacketIds(array $packetIds): void
+    {
+        if ($packetIds === [] || ! Schema::hasTable('default_packages')) {
+            return;
+        }
+
+        $defaultPackages = DefaultPackage::query()
+            ->whereIn('packet_id', $packetIds)
             ->lockForUpdate()
             ->get();
 
@@ -227,6 +298,10 @@ class DefaultPackageService
                             fn (Builder $q) => IndexQuery::whereLike($q, 'name', $escaped)
                         );
                         $searchQuery->orWhereHas(
+                            'company',
+                            fn (Builder $q) => IndexQuery::whereLike($q, 'name', $escaped)
+                        );
+                        $searchQuery->orWhereHas(
                             'packetVendor',
                             fn (Builder $q) => IndexQuery::whereLike($q, 'name', $escaped)
                         );
@@ -237,8 +312,10 @@ class DefaultPackageService
                     });
                 }),
                 AllowedFilter::exact('packet_name_id'),
+                AllowedFilter::exact('company_id'),
                 AllowedFilter::exact('packet_vendor_id'),
                 AllowedFilter::exact('packet_category_id'),
+                AllowedFilter::exact('packet_id'),
                 AllowedFilter::exact('item_packet_id'),
                 AllowedFilter::callback('min_price', function (Builder $query, mixed $value): void {
                     if (is_array($value)) {
@@ -265,13 +342,16 @@ class DefaultPackageService
                     $query->where('price', '<=', round((float) $trimmed, 2));
                 }),
             ])
-            ->allowedSorts(['id', 'brand_name', 'price', 'created_at'])
+            ->allowedSorts(['id', 'brand_name', 'company_id', 'packet_vendor_id', 'packet_id', 'price', 'created_at'])
             ->defaultSort('brand_name', 'id');
 
         $availableIncludes = array_values(array_filter([
             'packetName',
+            'company',
             'packetVendor',
             'packetCategory',
+            'packet',
+            'packet.itemPackets',
             'itemPacket',
             'itemPacket.packet',
             'itemPacket.item',
@@ -286,70 +366,106 @@ class DefaultPackageService
 
     private function assertActiveParents(
         int $packetNameId,
-        int $packetVendorId,
+        ?int $companyId,
+        ?int $packetVendorId,
         int $packetCategoryId,
-        int $itemPacketId
-    ): void {
-        $checks = [
-            'packet_name_id' => [
-                PacketName::query()->whereNull('deleted_at')->sharedLock()->whereKey($packetNameId)->exists(),
-                'The selected packet name is invalid or has been deleted.',
-            ],
-            'packet_vendor_id' => [
-                PacketVendor::query()->whereNull('deleted_at')->sharedLock()->whereKey($packetVendorId)->exists(),
-                'The selected packet vendor is invalid or has been deleted.',
-            ],
-            'packet_category_id' => [
-                PacketCategory::query()->whereNull('deleted_at')->sharedLock()->whereKey($packetCategoryId)->exists(),
-                'The selected packet category is invalid or has been deleted.',
-            ],
-            'item_packet_id' => [
-                ItemPacket::query()->whereNull('deleted_at')->sharedLock()->whereKey($itemPacketId)->exists(),
-                'The selected item packet is invalid or has been deleted.',
-            ],
-        ];
+        ?int $packetId,
+        ?int $itemPacketId
+    ): ?int {
+        ExclusiveOwner::assertActiveOwner($companyId, $packetVendorId);
 
-        foreach ($checks as $field => [$exists, $message]) {
-            if (! $exists) {
+        if ($packetId === null && $itemPacketId === null) {
+            throw ValidationException::withMessages([
+                'item_packet_id' => ['Paket atau item paket wajib dipilih.'],
+            ]);
+        }
+
+        if (! PacketName::query()->whereNull('deleted_at')->sharedLock()->whereKey($packetNameId)->exists()) {
+            throw ValidationException::withMessages([
+                'packet_name_id' => ['The selected packet name is invalid or has been deleted.'],
+            ]);
+        }
+
+        if (! PacketCategory::query()->whereNull('deleted_at')->sharedLock()->whereKey($packetCategoryId)->exists()) {
+            throw ValidationException::withMessages([
+                'packet_category_id' => ['The selected packet category is invalid or has been deleted.'],
+            ]);
+        }
+
+        if ($packetId !== null && ! Packet::query()->whereNull('deleted_at')->sharedLock()->whereKey($packetId)->exists()) {
+            throw ValidationException::withMessages([
+                'packet_id' => ['The selected packet is invalid or has been deleted.'],
+            ]);
+        }
+
+        $derivedPacketId = $packetId;
+        if ($itemPacketId !== null) {
+            $itemPacket = ItemPacket::query()->whereNull('deleted_at')->sharedLock()->find($itemPacketId);
+            if ($itemPacket === null) {
                 throw ValidationException::withMessages([
-                    $field => [$message],
+                    'item_packet_id' => ['The selected item packet is invalid or has been deleted.'],
                 ]);
             }
+
+            if ($derivedPacketId === null) {
+                $derivedPacketId = (int) $itemPacket->packet_id;
+            }
         }
+
+        return $derivedPacketId;
     }
 
     private function assertCombinationUnique(
         string $brandName,
         int $packetNameId,
-        int $packetVendorId,
+        ?int $companyId,
+        ?int $packetVendorId,
         int $packetCategoryId,
-        int $itemPacketId,
+        ?int $packetId,
+        ?int $itemPacketId,
         mixed $ignoreKey = null
     ): void {
-        WriteGuard::assertUniqueActive(
-            DefaultPackage::query(),
-            'brand_name',
-            $brandName,
-            [
-                'packet_name_id' => $packetNameId,
-                'packet_vendor_id' => $packetVendorId,
-                'packet_category_id' => $packetCategoryId,
-                'item_packet_id' => $itemPacketId,
-            ],
-            'brand_name',
-            'Paket default dengan kombinasi merek, nama paket, vendor, kategori, dan item paket yang sama sudah terdaftar.',
-            $ignoreKey,
-            true
-        );
+        $baseScope = [
+            'packet_name_id' => $packetNameId,
+            ...ExclusiveOwner::scopeFilters($companyId, $packetVendorId),
+            'packet_category_id' => $packetCategoryId,
+        ];
+
+        if ($itemPacketId !== null) {
+            WriteGuard::assertUniqueActive(
+                DefaultPackage::query(),
+                'brand_name',
+                $brandName,
+                [...$baseScope, 'item_packet_id' => $itemPacketId],
+                'brand_name',
+                'Paket default dengan kombinasi merek, nama paket, pemilik, kategori, dan item paket yang sama sudah terdaftar.',
+                $ignoreKey,
+                true
+            );
+        }
+
+        if ($packetId !== null) {
+            WriteGuard::assertUniqueActive(
+                DefaultPackage::query(),
+                'brand_name',
+                $brandName,
+                [...$baseScope, 'packet_id' => $packetId],
+                'brand_name',
+                'Paket default dengan kombinasi merek, nama paket, pemilik, kategori, dan item paket yang sama sudah terdaftar.',
+                $ignoreKey,
+                true
+            );
+        }
     }
 
-    private function forgetDependentCaches(): void
+    public function forgetDependentCaches(): void
     {
         Cache::forget(self::CACHE_KEY_LIST);
         Cache::forget(CpoService::CACHE_KEY);
         Cache::forget(PacketNameService::CACHE_KEY_LIST);
         Cache::forget(PacketVendorService::CACHE_KEY_LIST);
         Cache::forget(PacketCategoryService::CACHE_KEY_LIST);
+        Cache::forget(PacketService::CACHE_KEY_LIST);
         Cache::forget(ItemPacketService::CACHE_KEY_LIST);
         Cache::forget(self::CACHE_KEY_INGREDIENTS_LIST);
     }

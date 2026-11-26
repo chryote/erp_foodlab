@@ -228,6 +228,15 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
             expect($seededItemPacket->company_id)->toBe($seededItemPacket->item?->company_id);
             expect($seededItemPacket->packet_vendor_id)->toBe($seededItemPacket->item?->packet_vendor_id);
         }
+
+        $seededDefaultPackages = DefaultPackage::query()->get();
+        expect($seededDefaultPackages)->not->toBeEmpty();
+        expect($seededDefaultPackages->whereNotNull('company_id'))->not->toBeEmpty();
+        expect($seededDefaultPackages->whereNotNull('packet_vendor_id'))->not->toBeEmpty();
+        foreach ($seededDefaultPackages as $seededDefaultPackage) {
+            expect(($seededDefaultPackage->company_id === null) !== ($seededDefaultPackage->packet_vendor_id === null))->toBeTrue();
+            expect($seededDefaultPackage->packet_id)->not->toBeNull();
+        }
     });
 
     it('verifies all registered GET API endpoints return 200 OK with CORS headers after seeding', function () {

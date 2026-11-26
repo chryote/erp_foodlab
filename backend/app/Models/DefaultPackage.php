@@ -17,8 +17,10 @@ class DefaultPackage extends Model
     protected $fillable = [
         'brand_name',
         'packet_name_id',
+        'company_id',
         'packet_vendor_id',
         'packet_category_id',
+        'packet_id',
         'item_packet_id',
         'price',
     ];
@@ -31,8 +33,10 @@ class DefaultPackage extends Model
     {
         return [
             'packet_name_id' => 'integer',
+            'company_id' => 'integer',
             'packet_vendor_id' => 'integer',
             'packet_category_id' => 'integer',
+            'packet_id' => 'integer',
             'item_packet_id' => 'integer',
             'price' => 'float',
         ];
@@ -43,6 +47,11 @@ class DefaultPackage extends Model
         return $this->belongsTo(PacketName::class);
     }
 
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
+    }
+
     public function packetVendor(): BelongsTo
     {
         return $this->belongsTo(PacketVendor::class);
@@ -51,6 +60,11 @@ class DefaultPackage extends Model
     public function packetCategory(): BelongsTo
     {
         return $this->belongsTo(PacketCategory::class);
+    }
+
+    public function packet(): BelongsTo
+    {
+        return $this->belongsTo(Packet::class);
     }
 
     public function itemPacket(): BelongsTo

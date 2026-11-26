@@ -27,6 +27,11 @@ class Packet extends Model
         return $this->hasMany(ItemPacket::class);
     }
 
+    public function defaultPackages(): HasMany
+    {
+        return $this->hasMany(DefaultPackage::class);
+    }
+
     public function items(): BelongsToMany
     {
         return $this->belongsToMany(Item::class, 'item_packet')

@@ -4,9 +4,10 @@ namespace App\Modules\CPO\Requests;
 
 use App\Models\DefaultPackage;
 use App\Models\ItemPacket;
+use App\Models\Packet;
 use App\Models\PacketCategory;
 use App\Models\PacketName;
-use App\Models\PacketVendor;
+use App\Support\ExclusiveOwner;
 use App\Support\InputNormalizer;
 use App\Support\WriteGuard;
 use Illuminate\Foundation\Http\FormRequest;
@@ -28,7 +29,7 @@ class SaveDefaultPackageRequest extends FormRequest
             $normalized['brand_name'] = InputNormalizer::text($this->input('brand_name'));
         }
 
-        foreach (['packet_name_id', 'packet_vendor_id', 'packet_category_id', 'item_packet_id', 'price'] as $field) {
+        foreach (['packet_name_id', 'company_id', 'packet_vendor_id', 'packet_category_id', 'packet_id', 'item_packet_id', 'price'] as $field) {
             if ($this->has($field) && is_string($this->input($field))) {
                 $normalized[$field] = InputNormalizer::text($this->input($field));
             }
@@ -53,8 +54,15 @@ class SaveDefaultPackageRequest extends FormRequest
                 'integer',
                 Rule::exists('packet_names', 'id')->whereNull('deleted_at'),
             ],
+            'company_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
             'packet_vendor_id' => [
-                ...$presence,
+                'sometimes',
+                'nullable',
                 'integer',
                 Rule::exists('packet_vendors', 'id')->whereNull('deleted_at'),
             ],
@@ -63,8 +71,15 @@ class SaveDefaultPackageRequest extends FormRequest
                 'integer',
                 Rule::exists('packet_categories', 'id')->whereNull('deleted_at'),
             ],
+            'packet_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists('packets', 'id')->whereNull('deleted_at'),
+            ],
             'item_packet_id' => [
-                ...$presence,
+                'sometimes',
+                'nullable',
                 'integer',
                 Rule::exists('item_packet', 'id')->whereNull('deleted_at'),
             ],
@@ -88,6 +103,27 @@ class SaveDefaultPackageRequest extends FormRequest
             function (Validator $validator): void {
                 /** @var DefaultPackage|null $routeDefaultPackage */
                 $routeDefaultPackage = $this->route('defaultPackage');
+                $owner = ExclusiveOwner::resolveForRequest($this, $routeDefaultPackage);
+
+                if ($owner['both_submitted']) {
+                    $message = 'Paket default tidak boleh terhubung ke perusahaan dan vendor paket secara bersamaan.';
+                    $validator->errors()->add('company_id', $message);
+                    $validator->errors()->add('packet_vendor_id', $message);
+
+                    return;
+                }
+
+                $effectiveCompanyId = $owner['company_id'];
+                $effectiveVendorId = $owner['packet_vendor_id'];
+
+                if (
+                    ! $validator->errors()->hasAny(['company_id', 'packet_vendor_id'])
+                    && ($effectiveCompanyId === null) === ($effectiveVendorId === null)
+                ) {
+                    $message = 'Paket default harus terhubung ke tepat satu: perusahaan atau vendor paket.';
+                    $validator->errors()->add('company_id', $message);
+                    $validator->errors()->add('packet_vendor_id', $message);
+                }
 
                 $effectiveBrandName = $this->has('brand_name')
                     ? InputNormalizer::text((string) $this->input('brand_name'))
@@ -97,23 +133,34 @@ class SaveDefaultPackageRequest extends FormRequest
                     ? (int) $this->input('packet_name_id')
                     : (int) ($routeDefaultPackage?->packet_name_id ?? 0);
 
-                $effectivePacketVendorId = $this->filled('packet_vendor_id')
-                    ? (int) $this->input('packet_vendor_id')
-                    : (int) ($routeDefaultPackage?->packet_vendor_id ?? 0);
-
                 $effectivePacketCategoryId = $this->filled('packet_category_id')
                     ? (int) $this->input('packet_category_id')
                     : (int) ($routeDefaultPackage?->packet_category_id ?? 0);
 
-                $effectiveItemPacketId = $this->filled('item_packet_id')
-                    ? (int) $this->input('item_packet_id')
-                    : (int) ($routeDefaultPackage?->item_packet_id ?? 0);
+                $effectivePacketId = $this->has('packet_id')
+                    ? ($this->input('packet_id') !== null ? (int) $this->input('packet_id') : null)
+                    : ($routeDefaultPackage?->packet_id !== null ? (int) $routeDefaultPackage->packet_id : null);
+
+                $effectiveItemPacketId = $this->has('item_packet_id')
+                    ? ($this->input('item_packet_id') !== null ? (int) $this->input('item_packet_id') : null)
+                    : ($routeDefaultPackage?->item_packet_id !== null ? (int) $routeDefaultPackage->item_packet_id : null);
+
+                if (
+                    ! $validator->errors()->hasAny(['packet_id', 'item_packet_id'])
+                    && $effectivePacketId === null
+                    && $effectiveItemPacketId === null
+                ) {
+                    $validator->errors()->add(
+                        'item_packet_id',
+                        'Paket atau item paket wajib dipilih.'
+                    );
+                }
 
                 $parentChecks = [
                     'packet_name_id' => [PacketName::class, $effectivePacketNameId, 'The selected packet name is invalid or has been deleted.'],
-                    'packet_vendor_id' => [PacketVendor::class, $effectivePacketVendorId, 'The selected packet vendor is invalid or has been deleted.'],
                     'packet_category_id' => [PacketCategory::class, $effectivePacketCategoryId, 'The selected packet category is invalid or has been deleted.'],
-                    'item_packet_id' => [ItemPacket::class, $effectiveItemPacketId, 'The selected item packet is invalid or has been deleted.'],
+                    'packet_id' => [Packet::class, $effectivePacketId ?? 0, 'The selected packet is invalid or has been deleted.'],
+                    'item_packet_id' => [ItemPacket::class, $effectiveItemPacketId ?? 0, 'The selected item packet is invalid or has been deleted.'],
                 ];
 
                 foreach ($parentChecks as $field => [$modelClass, $parentId, $message]) {
@@ -133,33 +180,56 @@ class SaveDefaultPackageRequest extends FormRequest
                     ! $validator->errors()->hasAny([
                         'brand_name',
                         'packet_name_id',
+                        'company_id',
                         'packet_vendor_id',
                         'packet_category_id',
+                        'packet_id',
                         'item_packet_id',
                     ])
                     && $effectiveBrandName !== null
                     && $effectiveBrandName !== ''
                     && $effectivePacketNameId > 0
-                    && $effectivePacketVendorId > 0
+                    && ($effectiveCompanyId !== null || $effectiveVendorId !== null)
                     && $effectivePacketCategoryId > 0
-                    && $effectiveItemPacketId > 0
-                    && WriteGuard::existsCaseInsensitive(
+                ) {
+                    $derivedPacketId = $effectivePacketId;
+                    if ($derivedPacketId === null && $effectiveItemPacketId !== null) {
+                        $derivedPacketId = ItemPacket::query()
+                            ->whereNull('deleted_at')
+                            ->whereKey($effectiveItemPacketId)
+                            ->value('packet_id');
+                        $derivedPacketId = $derivedPacketId !== null ? (int) $derivedPacketId : null;
+                    }
+
+                    $ownerScope = ExclusiveOwner::scopeFilters($effectiveCompanyId, $effectiveVendorId);
+                    $baseScope = [
+                        'packet_name_id' => $effectivePacketNameId,
+                        ...$ownerScope,
+                        'packet_category_id' => $effectivePacketCategoryId,
+                    ];
+
+                    $duplicateByItemPacket = $effectiveItemPacketId !== null && WriteGuard::existsCaseInsensitive(
                         DefaultPackage::query(),
                         'brand_name',
                         $effectiveBrandName,
-                        [
-                            'packet_name_id' => $effectivePacketNameId,
-                            'packet_vendor_id' => $effectivePacketVendorId,
-                            'packet_category_id' => $effectivePacketCategoryId,
-                            'item_packet_id' => $effectiveItemPacketId,
-                        ],
+                        [...$baseScope, 'item_packet_id' => $effectiveItemPacketId],
                         $routeDefaultPackage?->getKey()
-                    )
-                ) {
-                    $validator->errors()->add(
-                        'brand_name',
-                        'Paket default dengan kombinasi merek, nama paket, vendor, kategori, dan item paket yang sama sudah terdaftar.'
                     );
+
+                    $duplicateByPacket = $derivedPacketId !== null && WriteGuard::existsCaseInsensitive(
+                        DefaultPackage::query(),
+                        'brand_name',
+                        $effectiveBrandName,
+                        [...$baseScope, 'packet_id' => $derivedPacketId],
+                        $routeDefaultPackage?->getKey()
+                    );
+
+                    if ($duplicateByItemPacket || $duplicateByPacket) {
+                        $validator->errors()->add(
+                            'brand_name',
+                            'Paket default dengan kombinasi merek, nama paket, pemilik, kategori, dan item paket yang sama sudah terdaftar.'
+                        );
+                    }
                 }
             },
         ];
@@ -170,7 +240,7 @@ class SaveDefaultPackageRequest extends FormRequest
      */
     public function payload(): array
     {
-        $validated = $this->validated();
+        $validated = ExclusiveOwner::applyToPayload($this->validated());
         $isPatch = $this->isMethod('PATCH');
         /** @var DefaultPackage|null $routeDefaultPackage */
         $routeDefaultPackage = $this->route('defaultPackage');
@@ -179,9 +249,17 @@ class SaveDefaultPackageRequest extends FormRequest
             $validated['brand_name'] = InputNormalizer::text((string) $validated['brand_name']) ?? '';
         }
 
-        foreach (['packet_name_id', 'packet_vendor_id', 'packet_category_id', 'item_packet_id'] as $intField) {
+        foreach (['packet_name_id', 'packet_category_id'] as $intField) {
             if (array_key_exists($intField, $validated)) {
                 $validated[$intField] = (int) $validated[$intField];
+            }
+        }
+
+        foreach (['packet_id', 'item_packet_id'] as $nullableIntField) {
+            if (array_key_exists($nullableIntField, $validated)) {
+                $validated[$nullableIntField] = $validated[$nullableIntField] !== null
+                    ? (int) $validated[$nullableIntField]
+                    : null;
             }
         }
 

@@ -1673,6 +1673,27 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'item_packet_id' => $itemPacket->id,
             'price' => 15000,
         ]))->toThrow(ValidationException::class);
+
+        // 6. Company-owned DefaultPackage works exclusively and rejects dual/missing owner
+        $companyDp = app(DefaultPackageService::class)->createDefaultPackage([
+            'brand_name' => 'Brand Internal Guardrail',
+            'packet_name_id' => $packetName->id,
+            'company_id' => $company->id,
+            'packet_category_id' => $packetCategory->id,
+            'packet_id' => $packet->id,
+            'price' => 22000,
+        ]);
+        expect($companyDp->company_id)->toBe($company->id);
+        expect($companyDp->packet_vendor_id)->toBeNull();
+
+        expect(fn () => app(DefaultPackageService::class)->createDefaultPackage([
+            'brand_name' => 'Brand Dual Owner',
+            'packet_name_id' => $packetName->id,
+            'company_id' => $company->id,
+            'packet_vendor_id' => $packetVendor->id,
+            'packet_category_id' => $packetCategory->id,
+            'packet_id' => $packet->id,
+        ]))->toThrow(ValidationException::class);
     });
 
     it('enforces CPO Ingredients speed, cache, pagination, and anti-duplication guardrails', function () {
