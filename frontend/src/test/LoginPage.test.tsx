@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { LoginPage } from '../Pages/LoginPage';
+import { LoginPage } from '../pages/LoginPage';
 import * as apiClient from '../api/client';
 
 vi.mock('../api/client');

@@ -398,8 +398,8 @@ export interface ConfirmDialogProps {
   isOpen: boolean;
   title: string;
   message: React.ReactNode;
-  confirmLabel?: string;
-  cancelLabel?: string;
+  confirmLabel?: React.ReactNode;
+  cancelLabel?: React.ReactNode;
   confirmVariant?: ButtonVariant;
   testId?: string;
   loading?: boolean;

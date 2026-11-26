@@ -34,6 +34,55 @@ describe('App ERP Main Menu integration', () => {
     window.localStorage.clear();
   });
 
+  it('loads a menu placeholder when opened through its direct route', async () => {
+    vi.mocked(apiClient.fetchCurrentUser).mockResolvedValue({
+      data: {
+        id: 1,
+        name: 'ERP Administrator',
+        email: 'admin@foodlab.test',
+      },
+    });
+    vi.mocked(apiClient.fetchErpModules).mockResolvedValue({
+      data: [],
+      meta: { count: 0 },
+    });
+    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
+      data: [{ id: 21, name: 'FoodLab Route Company', series: 1 }],
+      meta: { count: 1 },
+    });
+    vi.mocked(apiClient.fetchCapitalCompanies).mockResolvedValue({
+      data: [],
+      meta: { count: 0 },
+    });
+    vi.mocked(apiClient.fetchCompanyAssets).mockResolvedValue({
+      data: [],
+      meta: { count: 0 },
+    });
+    vi.mocked(apiClient.fetchExpenseCategories).mockResolvedValue({
+      data: [],
+      meta: { count: 0 },
+    });
+    vi.mocked(apiClient.fetchExpenseTypes).mockResolvedValue({
+      data: [],
+      meta: { count: 0 },
+    });
+    vi.mocked(apiClient.fetchExpenseItems).mockResolvedValue({
+      data: [],
+      meta: { count: 0 },
+    });
+
+    renderApp('/dashboard/company/21/menu/CHO/INPUT_SDM/master-karyawan');
+
+    expect(await screen.findByText('Master Karyawan')).toBeInTheDocument();
+    expect(await screen.findByTestId('dashboard-company-tab-21')).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    await waitFor(() => {
+      expect(apiClient.syncActiveCompany).toHaveBeenCalledWith(21);
+    });
+  });
+
   it('redirects to the login page after logout', async () => {
     vi.mocked(apiClient.fetchErpModules).mockResolvedValue({
       data: [],
@@ -88,7 +137,9 @@ describe('App ERP Main Menu integration', () => {
     await waitFor(() => {
       expect(screen.getByTestId('current-path')).toHaveTextContent(/^\/$/);
     });
-    expect(await screen.findByText('Dashboard')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('img', { name: 'Dashboard Illustration' })
+    ).toBeInTheDocument();
   });
 
   it('opens the flow simulator after login when development mode is enabled', async () => {

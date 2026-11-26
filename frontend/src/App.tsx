@@ -10,10 +10,10 @@ import {
 } from '@/lib/authStorage';
 import { createAppQueryClient } from '@/lib/cfoResources';
 import { Route, Routes, Navigate, useNavigate } from 'react-router-dom';
-import DashboardFlowSimulator from './Pages/DashboardFlowSimulator';
-import Dashboard from './Pages/Dashboard';
-import PageNotFound from './Pages/PageNotFound';
-import { LoginPage } from './Pages/LoginPage';
+import DashboardFlowSimulator from './pages/DashboardFlowSimulator';
+import Dashboard from './pages/Dashboard';
+import PageNotFound from './pages/PageNotFound';
+import { LoginPage } from './pages/LoginPage';
 
 export interface AppProps {
   queryClient?: QueryClient;
@@ -76,6 +76,16 @@ export const App: React.FC<AppProps> = ({ queryClient: providedClient }) => {
             element={<Navigate to="/login" state={{ from: '/dashboard' }} replace />}
           />
           <Route
+            path="/dashboard/company/:companyId/menu/*"
+            element={
+              <Navigate
+                to="/login"
+                state={{ from: '/dashboard' }}
+                replace
+              />
+            }
+          />
+          <Route
             path="/dashboard-flow-simulator"
             element={
               <Navigate to="/login" state={{ from: '/dashboard-flow-simulator' }} replace />
@@ -105,6 +115,16 @@ export const App: React.FC<AppProps> = ({ queryClient: providedClient }) => {
           <Route path="/login" element={<Navigate to="/" replace />} />
           <Route
             path="/dashboard"
+            element={
+              developmentMode ? (
+                <Navigate to="/dashboard-flow-simulator" replace />
+              ) : (
+                <Dashboard onLogout={handleLogout} />
+              )
+            }
+          />
+          <Route
+            path="/dashboard/company/:companyId/menu/*"
             element={
               developmentMode ? (
                 <Navigate to="/dashboard-flow-simulator" replace />

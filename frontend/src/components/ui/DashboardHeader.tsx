@@ -21,16 +21,23 @@ import {
   MenubarTrigger,
 } from './shadcn/menubar';
 import type { HorizontalMenuItem } from './HorizontalMenuCard';
-import { DEFAULT_CFO_MODULE } from '@/modules/CFO/CfoModuleCard';
-import { DEFAULT_CHO_MODULE } from '@/modules/CHO/ChoModuleCard';
+import {
+  CFO_MENU_ITEMS,
+  DEFAULT_CFO_MODULE,
+} from '@/modules/CFO/CfoModuleCard';
+import {
+  CHO_MENU_ITEMS,
+  DEFAULT_CHO_MODULE,
+} from '@/modules/CHO/ChoModuleCard';
 import { DEFAULT_CPO_MODULE } from '@/modules/CPO/CpoModuleCard';
 import { DEFAULT_CDO_MODULE } from '@/modules/CDO/CdoModuleCard';
 import { DEFAULT_CMO_MODULE } from '@/modules/CMO/CmoModuleCard';
+import { useTheme } from '@/lib/theme';
 
 const COMPANY_MENU_ITEMS: HorizontalMenuItem[] = [
   {
     code: 'INPUT_MODAL',
-    title: 'Input Modal',
+    title: 'Input',
     children: [
       { code: 'PERUSAHAAN', title: 'Master Modal' },
       { code: 'DAFTAR_KAPITAL_PERUSAHAAN', title: 'View Modal' },
@@ -40,16 +47,17 @@ const COMPANY_MENU_ITEMS: HorizontalMenuItem[] = [
     code: 'INPUT_OPERASIONAL',
     title: 'Input Operasional',
     children: [
-      { code: 'MASTER_OPERASIONAL', title: 'Master Modal' },
-      { code: 'VIEW_OPERASIONAL', title: 'View Modal' },
+      { code: 'MASTER_OPERASIONAL', title: 'Master Operasional' },
+      { code: 'ITEM_OPERASIONAL', title: 'Item Operasional' },
+      { code: 'VIEW_OPERASIONAL', title: 'View Operasional' },
     ],
   },
   {
     code: 'INPUT_ASET',
     title: 'Input Aset',
     children: [
-      { code: 'MASTER_ASET', title: 'Master Modal' },
-      { code: 'VIEW_ASET', title: 'View Modal' },
+      { code: 'MASTER_ASET', title: 'Master Aset' },
+      { code: 'VIEW_ASET', title: 'View Aset' },
     ],
   },
   {
@@ -70,13 +78,13 @@ const COMPANY_MENU_ITEMS: HorizontalMenuItem[] = [
   },
 ];
 
-const COMPANY_MENU_MODULES: Array<{
+export const COMPANY_MENU_MODULES: Array<{
   code: ErpModuleCode;
   fallback: ErpModuleOverview;
   items: HorizontalMenuItem[];
 }> = [
-  { code: 'CFO', fallback: DEFAULT_CFO_MODULE, items: COMPANY_MENU_ITEMS },
-  { code: 'CHO', fallback: DEFAULT_CHO_MODULE, items: COMPANY_MENU_ITEMS },
+  { code: 'CFO', fallback: DEFAULT_CFO_MODULE, items: CFO_MENU_ITEMS },
+  { code: 'CHO', fallback: DEFAULT_CHO_MODULE, items: CHO_MENU_ITEMS },
   { code: 'CPO', fallback: DEFAULT_CPO_MODULE, items: COMPANY_MENU_ITEMS },
   { code: 'CDO', fallback: DEFAULT_CDO_MODULE, items: COMPANY_MENU_ITEMS },
   { code: 'CMO', fallback: DEFAULT_CMO_MODULE, items: COMPANY_MENU_ITEMS },
@@ -97,6 +105,12 @@ export interface DashboardHeaderProps {
   onSelectModule?: (module: ErpModuleOverview) => void;
   onSelectSubMenu?: (item: HorizontalMenuItem) => void;
   onSelectChildSubMenu?: (item: HorizontalMenuItem) => void;
+  onSelectItem?: (
+    company: Company,
+    moduleCode: ErpModuleCode,
+    menuItem: HorizontalMenuItem,
+    childItem?: HorizontalMenuItem
+  ) => void;
   onLogout?: () => void | Promise<void>;
 }
 
@@ -115,8 +129,10 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   onSelectModule,
   onSelectSubMenu,
   onSelectChildSubMenu,
+  onSelectItem,
   onLogout,
 }) => {
+  const theme = useTheme();
   const [logoutConfirmationOpen, setLogoutConfirmationOpen] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
   const seriesList = useMemo(
@@ -254,7 +270,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     aria-current={isSelected ? 'page' : undefined}
                     data-testid={`dashboard-company-tab-${company.id}`}
                     className={cn(
-                      'relative h-12 shrink-0 rounded-none px-3 text-xs font-semibold transition-colors sm:px-4',
+                      'relative h-12 shrink-0 rounded-sm px-3 text-xs font-semibold transition-colors sm:px-4',
                       isSelected
                         ? 'after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-primary'
                         : ''
@@ -262,7 +278,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   >
                     {company.name}
                   </MenubarTrigger>
-                  <MenubarContent>
+                  <MenubarContent className={theme === "dark" ?'border-gray-800' : 'border-gray-200'}>
                     {COMPANY_MENU_MODULES.map((moduleConfig) => {
                       const module =
                         modulesMap[moduleConfig.code] ?? moduleConfig.fallback;
@@ -270,6 +286,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                       return (
                         <MenubarSub key={moduleConfig.code}>
                           <MenubarSubTrigger
+                            className="border-b last:border-none border-border"
                             aria-current={
                               selectedModuleCode === moduleConfig.code
                                 ? 'page'
@@ -278,39 +295,67 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                           >
                             {moduleConfig.code}
                           </MenubarSubTrigger>
-                          <MenubarSubContent>
+                          <MenubarSubContent className={theme === "dark" ?'border-gray-800' : 'border-gray-200'}>
                             {moduleConfig.items.map((menuItem) => (
-                              <MenubarSub key={menuItem.code}>
-                                <MenubarSubTrigger
+                              menuItem.children?.length ? (
+                                <MenubarSub key={menuItem.code}>
+                                  <MenubarSubTrigger
+                                    className="border-b last:border-none border-border"
+                                    aria-current={
+                                      selectedSubMenuCode === menuItem.code
+                                        ? 'page'
+                                        : undefined
+                                    }
+                                  >
+                                    {menuItem.title}
+                                  </MenubarSubTrigger>
+                                  <MenubarSubContent className={theme === "dark" ?'border-gray-800' : 'border-gray-200'}>
+                                    {menuItem.children.map((childItem, index) => (
+                                      <MenubarItem
+                                        key={`${childItem.code}-${index}`}
+                                        className="border-b last:border-none border-border"
+                                        aria-current={
+                                          selectedChildSubMenuCode === childItem.code
+                                            ? 'page'
+                                            : undefined
+                                        }
+                                        onSelect={() => {
+                                          onSelectCompany?.(company);
+                                          onSelectModule?.(module);
+                                          onSelectSubMenu?.(menuItem);
+                                          onSelectChildSubMenu?.(childItem);
+                                          onSelectItem?.(
+                                            company,
+                                            moduleConfig.code,
+                                            menuItem,
+                                            childItem
+                                          );
+                                        }}
+                                      >
+                                        {childItem.title}
+                                      </MenubarItem>
+                                    ))}
+                                  </MenubarSubContent>
+                                </MenubarSub>
+                              ) : (
+                                <MenubarItem
+                                  key={menuItem.code}
+                                  className="border-b last:border-none border-border"
                                   aria-current={
                                     selectedSubMenuCode === menuItem.code
                                       ? 'page'
                                       : undefined
                                   }
+                                  onSelect={() => {
+                                    onSelectCompany?.(company);
+                                    onSelectModule?.(module);
+                                    onSelectSubMenu?.(menuItem);
+                                    onSelectItem?.(company, moduleConfig.code, menuItem);
+                                  }}
                                 >
                                   {menuItem.title}
-                                </MenubarSubTrigger>
-                                <MenubarSubContent>
-                                  {menuItem.children?.map((childItem, index) => (
-                                    <MenubarItem
-                                      key={`${childItem.code}-${index}`}
-                                      aria-current={
-                                        selectedChildSubMenuCode === childItem.code
-                                          ? 'page'
-                                          : undefined
-                                      }
-                                      onSelect={() => {
-                                        onSelectCompany?.(company);
-                                        onSelectModule?.(module);
-                                        onSelectSubMenu?.(menuItem);
-                                        onSelectChildSubMenu?.(childItem);
-                                      }}
-                                    >
-                                      {childItem.title}
-                                    </MenubarItem>
-                                  ))}
-                                </MenubarSubContent>
-                              </MenubarSub>
+                                </MenubarItem>
+                              )
                             ))}
                           </MenubarSubContent>
                         </MenubarSub>
