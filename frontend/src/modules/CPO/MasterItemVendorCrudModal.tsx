@@ -4,24 +4,28 @@ import type {
   Item,
   ItemPayload,
   ItemType,
+  PacketVendor,
 } from '@/api/client';
 import { type CrudFieldConfig, CrudModal } from '@/components/ui';
 import { DEFAULT_CPO_ENUMS, useItemCrudResource } from '@/lib/cpoResources';
 import { cn } from '@/lib/utils';
 
+const HIDDEN_ITEM_VENDOR_TYPES = new Set<string>(['Kelengkapan', 'Sarpras']);
+
 export interface MasterItemVendorCrudModalProps {
   isOpen: boolean;
-  company: Company | null;
+  company?: Company | null;
   companies?: Company[];
   onClose: () => void;
 }
 
 export const MasterItemVendorCrudModal: React.FC<
   MasterItemVendorCrudModalProps
-> = ({ isOpen, company, companies, onClose }) => {
+> = ({ isOpen, onClose }) => {
   const {
     enums,
     allItems,
+    allPacketVendors,
     loading,
     error,
     clearError,
@@ -30,13 +34,16 @@ export const MasterItemVendorCrudModal: React.FC<
     removeItem,
   } = useItemCrudResource(isOpen);
 
-  const tabs = useMemo(
-    () =>
+  const tabs = useMemo(() => {
+    const source =
       enums.item_type.length > 0
         ? enums.item_type
-        : DEFAULT_CPO_ENUMS.item_type,
-    [enums.item_type]
-  );
+        : DEFAULT_CPO_ENUMS.item_type;
+    const visible = source.filter(
+      (tab) => !HIDDEN_ITEM_VENDOR_TYPES.has(tab.value)
+    );
+    return visible.length > 0 ? visible : [{ value: 'Bahan', nama: 'Bahan' }];
+  }, [enums.item_type]);
 
   const defaultTab = tabs[0]?.value ?? 'Bahan';
   const [activeTab, setActiveTab] = useState<ItemType>(defaultTab);
@@ -55,40 +62,41 @@ export const MasterItemVendorCrudModal: React.FC<
     }
   }, [isOpen, defaultTab, clearError]);
 
-  const availableCompanies = useMemo<Company[]>(() => {
-    if (companies && companies.length > 0) {
-      return companies;
+  const packetVendorsById = useMemo(() => {
+    const map = new Map<number, PacketVendor>();
+    for (const vendor of allPacketVendors) {
+      map.set(Number(vendor.id), vendor);
     }
-    return company ? [company] : [];
-  }, [companies, company]);
+    return map;
+  }, [allPacketVendors]);
 
-  const vendorCompanies = useMemo<Company[]>(
-    () => availableCompanies.filter((c) => c.type === activeItemType),
-    [availableCompanies, activeItemType]
-  );
-
-  const defaultCompanyId = useMemo(() => {
-    if (company && vendorCompanies.some((c) => c.id === company.id)) {
-      return String(company.id);
-    }
-    return '';
-  }, [company, vendorCompanies]);
-
-  const companyOptions = useMemo(
+  const matchingVendors = useMemo<PacketVendor[]>(
     () =>
-      vendorCompanies.map((c) => ({
-        value: String(c.id),
-        label: c.name,
-      })),
-    [vendorCompanies]
+      allPacketVendors.filter(
+        (vendor) => (vendor.type ?? 'Bahan') === activeItemType
+      ),
+    [allPacketVendors, activeItemType]
   );
 
-  const renderCompanyName = useMemo(
-    () => (companyId: number | undefined, fallbackCompany?: Company | null) =>
-      availableCompanies.find((c) => c.id === Number(companyId))?.name ??
-      fallbackCompany?.name ??
-      String(companyId ?? ''),
-    [availableCompanies]
+  const vendorOptions = useMemo(
+    () =>
+      matchingVendors.map((vendor) => ({
+        value: String(vendor.id),
+        label: vendor.name,
+      })),
+    [matchingVendors]
+  );
+
+  const renderVendorName = useMemo(
+    () =>
+      (
+        packetVendorId: number | null | undefined,
+        fallbackVendor?: PacketVendor | null
+      ) =>
+        packetVendorsById.get(Number(packetVendorId))?.name ??
+        fallbackVendor?.name ??
+        String(packetVendorId ?? ''),
+    [packetVendorsById]
   );
 
   const itemTypeOptions = useMemo(
@@ -111,28 +119,29 @@ export const MasterItemVendorCrudModal: React.FC<
   const filteredItems = useMemo<Item[]>(
     () =>
       allItems.filter((item) => {
-        if (item.type !== activeItemType) {
+        if (item.type !== activeItemType || item.packet_vendor_id == null) {
           return false;
         }
-        const companyType =
-          availableCompanies.find(
-            (c) => Number(c.id) === Number(item.company_id)
-          )?.type ?? item.company?.type;
-        return companyType === activeItemType;
+        const vendorType =
+          packetVendorsById.get(Number(item.packet_vendor_id))?.type ??
+          item.packet_vendor?.type ??
+          'Bahan';
+        return vendorType === activeItemType;
       }),
-    [activeItemType, allItems, availableCompanies]
+    [activeItemType, allItems, packetVendorsById]
   );
 
   const itemFields = useMemo<CrudFieldConfig<Item>[]>(
     () => [
       {
-        key: 'company_id',
+        key: 'packet_vendor_id',
         label: 'Pilih Vendor',
         type: 'select',
         placeholder: 'Pilih vendor...',
-        defaultValue: defaultCompanyId,
-        options: companyOptions,
-        renderValue: (row) => renderCompanyName(row.company_id, row.company),
+        defaultValue: '',
+        options: vendorOptions,
+        renderValue: (row) =>
+          renderVendorName(row.packet_vendor_id, row.packet_vendor),
       },
       {
         key: 'type',
@@ -149,8 +158,6 @@ export const MasterItemVendorCrudModal: React.FC<
         key: 'code',
         label: 'Kode Item',
         optional: true,
-        hideInForm: activeItemType === 'Sarpras',
-        hideInTable: activeItemType === 'Sarpras',
         placeholder: 'Contoh: ITM-001',
         renderValue: (row) => row.code || '-',
       },
@@ -162,25 +169,24 @@ export const MasterItemVendorCrudModal: React.FC<
     ],
     [
       activeItemType,
-      companyOptions,
-      defaultCompanyId,
       itemTypeLabelMap,
       itemTypeOptions,
-      renderCompanyName,
+      renderVendorName,
+      vendorOptions,
     ]
   );
 
   const parseItemPayload = (
     values: Record<string, string>
   ): ItemPayload | null => {
-    const companyId = parseInt(values.company_id ?? '', 10);
+    const packetVendorId = parseInt(values.packet_vendor_id ?? '', 10);
     const code = (values.code ?? '').trim();
     const name = (values.name ?? '').trim();
-    if (!Number.isFinite(companyId) || !name) {
+    if (!Number.isFinite(packetVendorId) || !name) {
       return null;
     }
     return {
-      company_id: companyId,
+      packet_vendor_id: packetVendorId,
       code: code || null,
       name,
       type: activeItemType,
@@ -225,10 +231,10 @@ export const MasterItemVendorCrudModal: React.FC<
     <CrudModal
       isOpen={isOpen}
       title="Master Item Vendor"
-      subtitle="Kelola item vendor berdasarkan tipe item dan perusahaan vendor"
+      subtitle="Kelola item vendor berdasarkan tipe item dan vendor paket"
       testId="master-item-vendor-crud-modal"
       tabs={tabsBar}
-      resetKey={`${activeItemType}-${company?.id ?? 0}`}
+      resetKey={activeItemType}
       layout="split"
       labelPlacement="left"
       modalSize="expanded"

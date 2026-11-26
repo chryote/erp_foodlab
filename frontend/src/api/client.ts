@@ -717,24 +717,34 @@ export interface EmployeeAttendancesListResponse {
 
 export type ItemType = 'Bahan' | 'Kelengkapan' | 'Sarpras' | (string & {});
 
+export type PacketVendorType =
+  | 'Bahan'
+  | 'Kelengkapan'
+  | 'Sarpras'
+  | (string & {});
+
 export interface CpoEnums {
   item_type: EnumOption[];
+  packet_vendor_type?: EnumOption[];
 }
 
 export interface Item {
   id: number;
-  company_id: number;
+  company_id: number | null;
+  packet_vendor_id?: number | null;
   code?: string | null;
   name: string;
   type: ItemType;
   company?: Company | null;
+  packet_vendor?: PacketVendor | null;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
 }
 
 export interface ItemPayload {
-  company_id: number;
+  company_id?: number | null;
+  packet_vendor_id?: number | null;
   code?: string | null;
   name: string;
   type: ItemType;
@@ -778,11 +788,13 @@ export interface PacketsListResponse {
 
 export interface ItemPacket {
   id: number;
-  company_id: number;
+  company_id: number | null;
+  packet_vendor_id?: number | null;
   packet_id: number;
   item_id: number;
   quantity: number;
   company?: Company | null;
+  packet_vendor?: PacketVendor | null;
   packet?: Packet | null;
   item?: Item | null;
   created_at?: string;
@@ -791,7 +803,8 @@ export interface ItemPacket {
 }
 
 export interface ItemPacketPayload {
-  company_id: number;
+  company_id?: number | null;
+  packet_vendor_id?: number | null;
   packet_id: number;
   item_id: number;
   quantity: number;
@@ -836,6 +849,7 @@ export interface PacketNamesListResponse {
 export interface PacketVendor {
   id: number;
   name: string;
+  type?: PacketVendorType;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
@@ -843,6 +857,7 @@ export interface PacketVendor {
 
 export interface PacketVendorPayload {
   name: string;
+  type?: PacketVendorType;
 }
 
 export interface PacketVendorsListResponse {

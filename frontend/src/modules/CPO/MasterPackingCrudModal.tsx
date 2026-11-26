@@ -81,10 +81,11 @@ export const MasterPackingCrudModal: React.FC<
   );
 
   const renderCompanyName = useMemo(
-    () => (companyId: number | undefined, fallbackCompany?: Company | null) =>
-      availableCompanies.find((c) => c.id === Number(companyId))?.name ??
-      fallbackCompany?.name ??
-      String(companyId ?? ''),
+    () =>
+      (companyId: number | null | undefined, fallbackCompany?: Company | null) =>
+        availableCompanies.find((c) => c.id === Number(companyId))?.name ??
+        fallbackCompany?.name ??
+        String(companyId ?? ''),
     [availableCompanies]
   );
 
@@ -202,7 +203,10 @@ export const MasterPackingCrudModal: React.FC<
             return [];
           }
           return allItems
-            .filter((item) => Number(item.company_id) === companyId)
+            .filter(
+              (item) =>
+                item.company_id !== null && Number(item.company_id) === companyId
+            )
             .map((item) => ({
               value: String(item.id),
               label: `${item.name} (${item.type})`,

@@ -4,45 +4,42 @@ import type {
   DefaultPackage,
   DefaultPackagePayload,
   Packet,
-  PacketCategory,
-  PacketName,
   PacketVendor,
+  PacketVendorPayload,
+  PacketVendorType,
 } from '@/api/client';
 import { type CrudFieldConfig, CrudModal } from '@/components/ui';
-import { useMasterPaketCrudResource } from '@/lib/cpoResources';
+import { DEFAULT_CPO_ENUMS, useMasterPaketCrudResource } from '@/lib/cpoResources';
 import { cn } from '@/lib/utils';
 import { formatCapitalIdr } from '@/modules/CFO/CapitalCompanyCrudModal';
 import { groupItemPacketsByCompanyAndPacket } from './packingGrouping';
 
-export type MasterPaketTabKey = 'paket' | 'default-package';
+export type MasterPaketTabKey = 'vendor' | 'default-package';
 
 export const MASTER_PAKET_TABS: Array<{
   key: MasterPaketTabKey;
   label: string;
 }> = [
-  { key: 'paket', label: 'Paket' },
+  { key: 'vendor', label: 'Vendor' },
   { key: 'default-package', label: 'Paket Awal' },
 ];
 
-interface CombinedPaketRow {
-  id: number;
-  packet_name: string;
-  packet_vendor: string;
-  packet_category: string;
-  packetNameRecord: PacketName | null;
-  packetVendorRecord: PacketVendor | null;
-  packetCategoryRecord: PacketCategory | null;
-}
-
 function formatCompanyPacketLabel(
   company: Company | null | undefined,
-  companyId: number,
+  companyId: number | null,
   packet: Packet | null | undefined,
-  packetId: number
+  packetId: number,
+  packetVendor?: PacketVendor | null,
+  packetVendorId?: number | null
 ): string {
-  const companyName = company?.name ?? `Perusahaan #${companyId}`;
+  const ownerName =
+    company?.name ??
+    packetVendor?.name ??
+    (companyId != null
+      ? `Perusahaan #${companyId}`
+      : `Vendor #${packetVendorId ?? '-'}`);
   const packetName = packet?.name ?? `Paket #${packetId}`;
-  return `${companyName} — ${packetName}`;
+  return `${ownerName} — ${packetName}`;
 }
 
 export interface MasterPaketCrudModalProps {
@@ -54,9 +51,10 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const [activeTab, setActiveTab] = useState<MasterPaketTabKey>('paket');
+  const [activeTab, setActiveTab] = useState<MasterPaketTabKey>('vendor');
 
   const {
+    enums,
     allPacketNames,
     allPacketVendors,
     allPacketCategories,
@@ -65,15 +63,9 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
     loading,
     error,
     clearError,
-    createPacketName,
-    updatePacketName,
-    removePacketName,
     createPacketVendor,
     updatePacketVendor,
     removePacketVendor,
-    createPacketCategory,
-    updatePacketCategory,
-    removePacketCategory,
     createDefaultPackage,
     updateDefaultPackage,
     removeDefaultPackage,
@@ -81,61 +73,72 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) {
-      setActiveTab('paket');
+      setActiveTab('vendor');
       clearError();
     }
   }, [isOpen, clearError]);
 
-  const combinedPaketRows = useMemo<CombinedPaketRow[]>(() => {
-    const rowCount = Math.max(
-      allPacketNames.length,
-      allPacketVendors.length,
-      allPacketCategories.length
-    );
-    const rows: CombinedPaketRow[] = [];
-    for (let index = 0; index < rowCount; index += 1) {
-      const packetNameRecord = allPacketNames[index] ?? null;
-      const packetVendorRecord = allPacketVendors[index] ?? null;
-      const packetCategoryRecord = allPacketCategories[index] ?? null;
-      rows.push({
-        id: index + 1,
-        packet_name: packetNameRecord?.name ?? '',
-        packet_vendor: packetVendorRecord?.name ?? '',
-        packet_category: packetCategoryRecord?.name ?? '',
-        packetNameRecord,
-        packetVendorRecord,
-        packetCategoryRecord,
-      });
-    }
-    return rows;
-  }, [allPacketCategories, allPacketNames, allPacketVendors]);
+  const packetVendorTypes = useMemo(
+    () =>
+      enums.packet_vendor_type && enums.packet_vendor_type.length > 0
+        ? enums.packet_vendor_type
+        : (DEFAULT_CPO_ENUMS.packet_vendor_type ?? []),
+    [enums.packet_vendor_type]
+  );
 
-  const paketFields = useMemo<CrudFieldConfig<CombinedPaketRow>[]>(
+  const vendorTypeOptions = useMemo(
+    () =>
+      packetVendorTypes.map((opt) => ({
+        value: opt.value,
+        label: opt.nama,
+      })),
+    [packetVendorTypes]
+  );
+
+  const vendorTypeLabelMap = useMemo(
+    () => new Map(packetVendorTypes.map((opt) => [opt.value, opt.nama])),
+    [packetVendorTypes]
+  );
+
+  const defaultVendorType: PacketVendorType =
+    packetVendorTypes[0]?.value ?? 'Bahan';
+
+  const vendorFields = useMemo<CrudFieldConfig<PacketVendor>[]>(
     () => [
       {
-        key: 'packet_name',
-        label: 'Nama Paket',
-        optional: true,
-        placeholder: 'Contoh: Paket Hemat',
-        renderValue: (row) => row.packet_name || '-',
+        key: 'name',
+        label: 'Nama Vendor',
+        placeholder: 'Contoh: PT. Vendor Utama',
       },
       {
-        key: 'packet_vendor',
-        label: 'Vendor Paket',
-        optional: true,
-        placeholder: 'Contoh: Vendor Utama',
-        renderValue: (row) => row.packet_vendor || '-',
-      },
-      {
-        key: 'packet_category',
-        label: 'Kategori Paket',
-        optional: true,
-        placeholder: 'Contoh: Kategori Reguler',
-        renderValue: (row) => row.packet_category || '-',
+        key: 'type',
+        label: 'Tipe Vendor',
+        type: 'select',
+        placeholder: 'Pilih tipe vendor...',
+        defaultValue: defaultVendorType,
+        options: vendorTypeOptions,
+        renderValue: (row) => {
+          const typeValue = row.type ?? defaultVendorType;
+          return vendorTypeLabelMap.get(typeValue) ?? typeValue;
+        },
       },
     ],
-    []
+    [defaultVendorType, vendorTypeLabelMap, vendorTypeOptions]
   );
+
+  const parseVendorPayload = (
+    values: Record<string, string>
+  ): PacketVendorPayload | null => {
+    const name = (values.name ?? '').trim();
+    const rawType = (values.type ?? '').trim();
+    const type: PacketVendorType =
+      packetVendorTypes.find((opt) => opt.value === rawType)?.value ??
+      defaultVendorType;
+    if (!name) {
+      return null;
+    }
+    return { name, type };
+  };
 
   const packetNameOptions = useMemo(
     () =>
@@ -211,7 +214,9 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
               fallback.company,
               fallback.company_id,
               fallback.packet,
-              fallback.packet_id
+              fallback.packet_id,
+              fallback.packet_vendor,
+              fallback.packet_vendor_id
             ),
           });
         }
@@ -286,9 +291,11 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
           );
           return formatCompanyPacketLabel(
             matched.company ?? group?.company,
-            Number(matched.company_id),
+            matched.company_id,
             matched.packet ?? group?.packet,
-            Number(matched.packet_id)
+            Number(matched.packet_id),
+            matched.packet_vendor,
+            matched.packet_vendor_id
           );
         },
       },
@@ -382,7 +389,7 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
   const commonCrudProps = {
     isOpen,
     title: 'Master Paket',
-    subtitle: 'Kelola nama paket, vendor paket, kategori paket, dan paket awal',
+    subtitle: 'Kelola vendor paket dan paket awal',
     testId: 'master-paket-crud-modal',
     tabs: tabsBar,
     layout: 'split' as const,
@@ -424,114 +431,24 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
   return (
     <CrudModal
       {...commonCrudProps}
-      resetKey="paket"
-      fields={paketFields}
-      emptyMessage="Belum ada data nama, vendor, atau kategori paket."
-      items={combinedPaketRows}
+      resetKey="vendor"
+      fields={vendorFields}
+      emptyMessage="Belum ada data vendor."
+      items={allPacketVendors}
       onCreate={async (values) => {
-        const packetName = (values.packet_name ?? '').trim();
-        const packetVendor = (values.packet_vendor ?? '').trim();
-        const packetCategory = (values.packet_category ?? '').trim();
-
-        if (packetName) {
-          const created = await createPacketName({ name: packetName });
-          if (!created) {
-            return;
-          }
-        }
-        if (packetVendor) {
-          const created = await createPacketVendor({ name: packetVendor });
-          if (!created) {
-            return;
-          }
-        }
-        if (packetCategory) {
-          await createPacketCategory({ name: packetCategory });
+        const payload = parseVendorPayload(values);
+        if (payload) {
+          await createPacketVendor(payload);
         }
       }}
       onUpdate={async (id, values) => {
-        const matched = combinedPaketRows.find((row) => row.id === id);
-        if (!matched) {
-          return;
-        }
-
-        const packetName = (values.packet_name ?? '').trim();
-        const packetVendor = (values.packet_vendor ?? '').trim();
-        const packetCategory = (values.packet_category ?? '').trim();
-
-        if (packetName) {
-          if (matched.packetNameRecord) {
-            if (packetName !== matched.packetNameRecord.name) {
-              const updated = await updatePacketName(
-                matched.packetNameRecord.id,
-                { name: packetName }
-              );
-              if (!updated) {
-                return;
-              }
-            }
-          } else {
-            const created = await createPacketName({ name: packetName });
-            if (!created) {
-              return;
-            }
-          }
-        }
-
-        if (packetVendor) {
-          if (matched.packetVendorRecord) {
-            if (packetVendor !== matched.packetVendorRecord.name) {
-              const updated = await updatePacketVendor(
-                matched.packetVendorRecord.id,
-                { name: packetVendor }
-              );
-              if (!updated) {
-                return;
-              }
-            }
-          } else {
-            const created = await createPacketVendor({ name: packetVendor });
-            if (!created) {
-              return;
-            }
-          }
-        }
-
-        if (packetCategory) {
-          if (matched.packetCategoryRecord) {
-            if (packetCategory !== matched.packetCategoryRecord.name) {
-              await updatePacketCategory(matched.packetCategoryRecord.id, {
-                name: packetCategory,
-              });
-            }
-          } else {
-            await createPacketCategory({ name: packetCategory });
-          }
+        const payload = parseVendorPayload(values);
+        if (payload) {
+          await updatePacketVendor(id, payload);
         }
       }}
       onDelete={async (id) => {
-        const matched = combinedPaketRows.find((row) => row.id === id);
-        if (!matched) {
-          return;
-        }
-
-        if (matched.packetNameRecord) {
-          const removed = await removePacketName(matched.packetNameRecord.id);
-          if (!removed) {
-            return;
-          }
-        }
-        if (matched.packetVendorRecord) {
-          const removed = await removePacketVendor(
-            matched.packetVendorRecord.id
-          );
-          if (!removed) {
-            return;
-          }
-        }
-        if (matched.packetCategoryRecord) {
-          await removePacketCategory(matched.packetCategoryRecord.id);
-        }
+        await removePacketVendor(id);
       }}
     />
   );

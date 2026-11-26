@@ -17,26 +17,22 @@ export const CPO_INPUT_PAKET_ITEMS: HorizontalMenuItem[] = [
   { code: 'VIEW_BAHAN_BAKU', title: 'View Bahan Baku' },
 ];
 
-export const CPO_INPUT_ITEM_VENDOR_ITEMS: HorizontalMenuItem[] = [
+export const CPO_INPUT_ITEM_ITEMS: HorizontalMenuItem[] = [
   { code: 'MASTER_ITEM_VENDOR', title: 'Master Item Vendor' },
+  { code: 'MASTER_ITEM_INTERNAL', title: 'Master Item Internal' },
 ];
 
 export const CPO_MENU_ITEMS: HorizontalMenuItem[] = [
   {
-    code: 'INPUT_ITEM_VENDOR',
-    title: 'Input Item vendor',
-    children: CPO_INPUT_ITEM_VENDOR_ITEMS,
-  },
-  {
-    code: 'INPUT_PACKING',
-    title: 'Input Packing',
-    children: CPO_INPUT_PACKING_ITEMS,
+    code: 'INPUT_ITEM',
+    title: 'Input Item',
+    children: CPO_INPUT_ITEM_ITEMS,
   },
   {
     code: 'INPUT_PAKET',
     title: 'Input Paket',
     children: CPO_INPUT_PAKET_ITEMS,
-  }
+  },
 ];
 
 export const DEFAULT_CPO_MODULE: ErpModuleOverview = {

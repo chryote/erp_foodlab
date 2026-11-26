@@ -61,6 +61,11 @@ export const DEFAULT_CPO_ENUMS: CpoEnums = {
     { value: 'Kelengkapan', nama: 'Kelengkapan' },
     { value: 'Sarpras', nama: 'Sarpras' },
   ],
+  packet_vendor_type: [
+    { value: 'Bahan', nama: 'Bahan' },
+    { value: 'Kelengkapan', nama: 'Kelengkapan' },
+    { value: 'Sarpras', nama: 'Sarpras' },
+  ],
 };
 
 export const cpoQueryKeys = {
@@ -215,6 +220,15 @@ export function useItemCrudResource(enabled: boolean) {
   const [mutationError, setMutationError] = useState<string | null>(null);
   const enumsResource = useCpoEnumsResource(enabled);
 
+  const packetVendorsQuery = useQuery<PacketVendor[]>({
+    queryKey: cpoQueryKeys.packetVendors,
+    queryFn: async () => {
+      const res = await fetchPacketVendors();
+      return res?.data ?? [];
+    },
+    enabled,
+  });
+
   const runMutation = useCallback(
     async <T>(fn: () => Promise<T>, fallbackError: string): Promise<T | null> => {
       setMutationError(null);
@@ -233,10 +247,12 @@ export function useItemCrudResource(enabled: boolean) {
   return {
     enums: enumsResource.enums,
     allItems: itemsCore.allItems,
-    loading: itemsCore.isLoading,
+    allPacketVendors: packetVendorsQuery.data ?? [],
+    loading: itemsCore.isLoading || packetVendorsQuery.isLoading,
     error:
       mutationError ??
-      getErrorMessage(itemsCore.error, 'Gagal memuat data item vendor.'),
+      getErrorMessage(itemsCore.error, 'Gagal memuat data item vendor.') ??
+      getErrorMessage(packetVendorsQuery.error, 'Gagal memuat data vendor.'),
     clearError: useCallback(() => setMutationError(null), []),
     createItem: itemsCore.createItem,
     updateItem: itemsCore.updateItem,
@@ -293,7 +309,10 @@ export function useMasterPackingCrudResource(
     if (!company) {
       return allItems;
     }
-    return allItems.filter((item) => Number(item.company_id) === company.id);
+    return allItems.filter(
+      (item) =>
+        item.company_id !== null && Number(item.company_id) === company.id
+    );
   }, [allItems, company]);
 
   const itemPackets = useMemo<ItemPacket[]>(() => {
@@ -301,7 +320,9 @@ export function useMasterPackingCrudResource(
       return allItemPackets;
     }
     return allItemPackets.filter(
-      (assignment) => Number(assignment.company_id) === company.id
+      (assignment) =>
+        assignment.company_id !== null &&
+        Number(assignment.company_id) === company.id
     );
   }, [allItemPackets, company]);
 
@@ -614,6 +635,7 @@ function useNamedCpoEntity<T extends { id: number; name: string }>(
 export function useMasterPaketCrudResource(enabled: boolean) {
   const queryClient = useQueryClient();
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const enumsResource = useCpoEnumsResource(enabled);
 
   const runMutation = useCallback(
     async <T>(fn: () => Promise<T>, fallbackError: string): Promise<T | null> => {
@@ -796,6 +818,7 @@ export function useMasterPaketCrudResource(enabled: boolean) {
     defaultPackagesQuery.error;
 
   return {
+    enums: enumsResource.enums,
     allPacketNames: packetNames.items,
     allPacketVendors: packetVendors.items,
     allPacketCategories: packetCategories.items,

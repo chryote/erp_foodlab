@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import {
   fireEvent,
   render,
@@ -10,11 +12,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 import * as apiClient from '../api/client';
 import { clearActiveCompanyId } from '../lib/activeCompanyStorage';
+import { createAppQueryClient } from '../lib/cfoResources';
 import { DEFAULT_CDO_MODULE } from '../modules/CDO/CdoModuleCard';
 import { DEFAULT_CFO_MODULE } from '../modules/CFO/CfoModuleCard';
 import { DEFAULT_CHO_MODULE } from '../modules/CHO/ChoModuleCard';
 import { DEFAULT_CMO_MODULE } from '../modules/CMO/CmoModuleCard';
 import { DEFAULT_CPO_MODULE } from '../modules/CPO/CpoModuleCard';
+import { MasterPackingCrudModal } from '../modules/CPO/MasterPackingCrudModal';
+import { ViewPackingModal } from '../modules/CPO/ViewPackingModal';
 
 vi.mock('../api/client');
 
@@ -24,6 +29,48 @@ function renderApp() {
       <App />
     </MemoryRouter>
   );
+}
+
+function renderMasterPackingModal(
+  company: apiClient.Company,
+  companies: apiClient.Company[]
+) {
+  const queryClient = createAppQueryClient();
+  const Harness = () => {
+    const [open, setOpen] = useState(true);
+    return (
+      <QueryClientProvider client={queryClient}>
+        <MasterPackingCrudModal
+          isOpen={open}
+          company={company}
+          companies={companies}
+          onClose={() => setOpen(false)}
+        />
+      </QueryClientProvider>
+    );
+  };
+  return render(<Harness />);
+}
+
+function renderViewPackingModal(
+  company: apiClient.Company,
+  companies: apiClient.Company[]
+) {
+  const queryClient = createAppQueryClient();
+  const Harness = () => {
+    const [open, setOpen] = useState(true);
+    return (
+      <QueryClientProvider client={queryClient}>
+        <ViewPackingModal
+          isOpen={open}
+          company={company}
+          companies={companies}
+          onClose={() => setOpen(false)}
+        />
+      </QueryClientProvider>
+    );
+  };
+  return render(<Harness />);
 }
 
 describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', () => {
@@ -101,7 +148,8 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
     vi.mocked(apiClient.createItem).mockImplementation(async (payload) => {
       const created: apiClient.Item = {
         id: 12,
-        company_id: payload.company_id,
+        company_id: payload.company_id ?? null,
+        packet_vendor_id: payload.packet_vendor_id ?? null,
         code: payload.code ?? null,
         name: payload.name,
         type: payload.type,
@@ -115,7 +163,8 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
     vi.mocked(apiClient.updateItem).mockImplementation(async (id, payload) => {
       const updated: apiClient.Item = {
         id,
-        company_id: payload.company_id,
+        company_id: payload.company_id ?? null,
+        packet_vendor_id: payload.packet_vendor_id ?? null,
         code: payload.code ?? null,
         name: payload.name,
         type: payload.type,
@@ -192,7 +241,8 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
       async (payload) => {
         const created: apiClient.ItemPacket = {
           id: 31,
-          company_id: payload.company_id,
+          company_id: payload.company_id ?? null,
+          packet_vendor_id: payload.packet_vendor_id ?? null,
           packet_id: payload.packet_id,
           item_id: payload.item_id,
           quantity: payload.quantity,
@@ -211,7 +261,8 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
       async (id, payload) => {
         const updated: apiClient.ItemPacket = {
           id,
-          company_id: payload.company_id,
+          company_id: payload.company_id ?? null,
+          packet_vendor_id: payload.packet_vendor_id ?? null,
           packet_id: payload.packet_id,
           item_id: payload.item_id,
           quantity: payload.quantity,
@@ -237,35 +288,16 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
 
     renderApp();
 
-    // 1. Select company & open CPO module
+    // 1. Select company & open CPO module -> Input Packing horizontal menu card is hidden
     fireEvent.click(await screen.findByTestId('company-tab-1'));
     fireEvent.click(screen.getByTestId('module-card-CPO'));
 
     const cpoMenu = await screen.findByTestId('cpo-horizontal-menu');
-    const inputPackingCard = within(cpoMenu).getByTestId(
-      'horizontal-menu-card-INPUT_PACKING'
-    );
-    expect(inputPackingCard).toHaveTextContent('Input Packing');
     expect(
-      screen.queryByTestId('horizontal-submenu-INPUT_PACKING')
+      within(cpoMenu).queryByTestId('horizontal-menu-card-INPUT_PACKING')
     ).not.toBeInTheDocument();
 
-    // 2. Click Input Packing -> shows Master Packing child menu
-    fireEvent.click(inputPackingCard);
-    const packingSubmenu = screen.getByTestId(
-      'horizontal-submenu-INPUT_PACKING'
-    );
-    const masterPackingCard = within(packingSubmenu).getByTestId(
-      'horizontal-menu-card-MASTER_PACKING'
-    );
-    expect(masterPackingCard).toHaveTextContent('Master Packing');
-    const viewPackingCard = within(packingSubmenu).getByTestId(
-      'horizontal-menu-card-VIEW_PACKING'
-    );
-    expect(viewPackingCard).toHaveTextContent('View Packing');
-
-    // 3. Click Master Packing -> shows Master Packing modal with Master Operasional style
-    fireEvent.click(masterPackingCard);
+    renderMasterPackingModal(companiesStore[0], companiesStore);
     const modal = await screen.findByTestId('master-packing-crud-modal');
     expect(modal).toBeInTheDocument();
     expect(modal).toHaveClass('max-w-[95vw]', 'h-[92vh]', 'max-h-[92vh]');
@@ -605,22 +637,7 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
       meta: { count: itemPacketsStore.length },
     });
 
-    renderApp();
-
-    fireEvent.click(await screen.findByTestId('company-tab-1'));
-    fireEvent.click(screen.getByTestId('module-card-CPO'));
-
-    const cpoMenu = await screen.findByTestId('cpo-horizontal-menu');
-    fireEvent.click(
-      within(cpoMenu).getByTestId('horizontal-menu-card-INPUT_PACKING')
-    );
-
-    const packingSubmenu = screen.getByTestId(
-      'horizontal-submenu-INPUT_PACKING'
-    );
-    fireEvent.click(
-      within(packingSubmenu).getByTestId('horizontal-menu-card-VIEW_PACKING')
-    );
+    renderViewPackingModal(companiesStore[0], companiesStore);
 
     const viewModal = await screen.findByTestId('view-packing-modal');
     expect(viewModal).toBeInTheDocument();
@@ -750,19 +767,7 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
       },
     });
 
-    renderApp();
-
-    fireEvent.click(await screen.findByTestId('company-tab-1'));
-    fireEvent.click(screen.getByTestId('module-card-CPO'));
-
-    const cpoMenu = await screen.findByTestId('cpo-horizontal-menu');
-    fireEvent.click(
-      within(cpoMenu).getByTestId('horizontal-menu-card-INPUT_PACKING')
-    );
-    const submenu = screen.getByTestId('horizontal-submenu-INPUT_PACKING');
-    fireEvent.click(
-      within(submenu).getByTestId('horizontal-menu-card-MASTER_PACKING')
-    );
+    renderMasterPackingModal(companiesStore[0], companiesStore);
 
     const modal = await screen.findByTestId('master-packing-crud-modal');
     const typeSelect = within(modal).getByLabelText('Tipe Item') as HTMLSelectElement;
@@ -908,19 +913,7 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
       meta: { count: 3 },
     });
 
-    renderApp();
-
-    fireEvent.click(await screen.findByTestId('company-tab-1'));
-    fireEvent.click(screen.getByTestId('module-card-CPO'));
-
-    const cpoMenu = await screen.findByTestId('cpo-horizontal-menu');
-    fireEvent.click(
-      within(cpoMenu).getByTestId('horizontal-menu-card-INPUT_PACKING')
-    );
-    const submenu = screen.getByTestId('horizontal-submenu-INPUT_PACKING');
-    fireEvent.click(
-      within(submenu).getByTestId('horizontal-menu-card-MASTER_PACKING')
-    );
+    renderMasterPackingModal(companiesStore[0], companiesStore);
 
     const modal = await screen.findByTestId('master-packing-crud-modal');
 
