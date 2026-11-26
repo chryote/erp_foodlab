@@ -39,7 +39,7 @@ class ItemPacketController extends Controller
 
     public function show(ItemPacket $itemPacket): JsonResponse
     {
-        return (new ItemPacketResource($itemPacket->load(['company', 'packet', 'item'])))->response();
+        return (new ItemPacketResource($itemPacket->load(['company', 'packetVendor', 'packet', 'item'])))->response();
     }
 
     public function update(SaveItemPacketRequest $request, ItemPacket $itemPacket): JsonResponse

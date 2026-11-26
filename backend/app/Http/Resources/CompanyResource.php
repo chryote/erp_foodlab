@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Enums\CompanyType;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -15,10 +16,15 @@ class CompanyResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $type = $this->type instanceof CompanyType
+            ? $this->type->value
+            : ($this->type ?? CompanyType::Utama->value);
+
         return [
             'id' => (int) $this->id,
             'name' => $this->name,
             'series' => (int) ($this->series ?? 1),
+            'type' => $type,
             'capital_companies' => CapitalCompanyResource::collection($this->whenLoaded('capitalCompanies')),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

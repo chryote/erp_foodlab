@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { CapitalCompany, Company } from '@/api/client';
+import type { CapitalCompany, Company, CompanyType } from '@/api/client';
 import {
   Badge,
   type CrudComputedColumnConfig,
@@ -9,6 +9,7 @@ import {
 } from '@/components/ui';
 import {
   type CompanyCrudResource,
+  DEFAULT_CFO_ENUMS,
   useCompanyCrudResource,
   useStakeholderCrudResource,
 } from '@/lib/cfoResources';
@@ -33,6 +34,20 @@ export const COMPANY_CRUD_FIELDS: CrudFieldConfig<Company>[] = [
     placeholder: 'Contoh: 1',
     renderValue: (row) => `Seri ${row.series ?? 1}`,
     filterText: (row) => `Seri ${row.series ?? 1}`,
+  },
+  {
+    key: 'type',
+    label: 'Tipe Perusahaan',
+    type: 'select',
+    hideInForm: true,
+    hideInTable: true,
+    placeholder: 'Pilih tipe perusahaan...',
+    defaultValue: DEFAULT_CFO_ENUMS.company_type[0]?.value ?? 'Utama',
+    options: DEFAULT_CFO_ENUMS.company_type.map((opt) => ({
+      value: opt.value,
+      label: opt.nama,
+    })),
+    renderValue: (row) => row.type ?? 'Utama',
   },
 ];
 
@@ -158,16 +173,97 @@ export const CompanyCrudModal: React.FC<CompanyCrudModalProps> = ({
   onClose,
 }) => {
   const fallbackResource = useCompanyCrudResource(isOpen && !companyResource);
-  const { companies, loading, error, create, update, remove } =
-    companyResource ?? fallbackResource;
+  const {
+    enums,
+    refetchEnums,
+    companies,
+    loading,
+    error,
+    create,
+    update,
+    remove,
+  } = companyResource ?? fallbackResource;
   const [selectedStakeholderCompany, setSelectedStakeholderCompany] =
     useState<Company | null>(null);
 
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+      void refetchEnums();
+    } else {
       setSelectedStakeholderCompany(null);
     }
-  }, [isOpen]);
+  }, [isOpen, refetchEnums]);
+
+  const companyTypeOptions = useMemo(
+    () =>
+      enums.company_type.map((opt) => ({
+        value: opt.value,
+        label: opt.nama,
+      })),
+    [enums.company_type]
+  );
+
+  const companyTypeLabelMap = useMemo(
+    () => new Map(enums.company_type.map((opt) => [opt.value, opt.nama])),
+    [enums.company_type]
+  );
+
+  const defaultCompanyType = enums.company_type[0]?.value ?? 'Utama';
+
+  const companyFields = useMemo<CrudFieldConfig<Company>[]>(
+    () => [
+      {
+        key: 'name',
+        label: 'Nama Perusahaan',
+        placeholder: 'Contoh: PT. ABC DEF',
+      },
+      {
+        key: 'series',
+        label: 'Seri',
+        type: 'number',
+        min: 1,
+        step: 1,
+        defaultValue: '1',
+        placeholder: 'Contoh: 1',
+        renderValue: (row) => `Seri ${row.series ?? 1}`,
+        filterText: (row) => `Seri ${row.series ?? 1}`,
+      },
+      {
+        key: 'type',
+        label: 'Tipe Perusahaan',
+        type: 'select',
+        hideInForm: true,
+        hideInTable: true,
+        placeholder: 'Pilih tipe perusahaan...',
+        defaultValue: defaultCompanyType,
+        options: companyTypeOptions,
+        renderValue: (row) => {
+          const typeValue = row.type ?? defaultCompanyType;
+          return companyTypeLabelMap.get(typeValue) ?? typeValue;
+        },
+        filterText: (row) => {
+          const typeValue = row.type ?? defaultCompanyType;
+          return companyTypeLabelMap.get(typeValue) ?? typeValue;
+        },
+      },
+    ],
+    [companyTypeLabelMap, companyTypeOptions, defaultCompanyType]
+  );
+
+  const parseCompanyInput = (values: Record<string, string>) => {
+    const parsedSeries = parseInt(values.series ?? '1', 10);
+    const series =
+      Number.isFinite(parsedSeries) && parsedSeries >= 1 ? parsedSeries : 1;
+    const rawType = (values.type ?? '').trim();
+    const type: CompanyType =
+      enums.company_type.find((opt) => opt.value === rawType)?.value ??
+      defaultCompanyType;
+    return {
+      name: values.name ?? '',
+      series,
+      type,
+    };
+  };
 
   return (
     <>
@@ -179,7 +275,7 @@ export const CompanyCrudModal: React.FC<CompanyCrudModalProps> = ({
         layout="split"
         labelPlacement="left"
         modalSize="expanded"
-        fields={COMPANY_CRUD_FIELDS}
+        fields={companyFields}
         rowActions={[
           {
             key: 'stakeholder',
@@ -196,20 +292,17 @@ export const CompanyCrudModal: React.FC<CompanyCrudModalProps> = ({
         error={error}
         onClose={onClose}
         onCreate={async (values) => {
-          const parsedSeries = parseInt(values.series ?? '1', 10);
-          const series =
-            Number.isFinite(parsedSeries) && parsedSeries >= 1
-              ? parsedSeries
-              : 1;
-          await create(values.name ?? '', series);
+          const parsed = parseCompanyInput(values);
+          await create(parsed.name, parsed.series, parsed.type);
         }}
         onUpdate={async (id, values) => {
-          const parsedSeries = parseInt(values.series ?? '1', 10);
-          const series =
-            Number.isFinite(parsedSeries) && parsedSeries >= 1
-              ? parsedSeries
-              : 1;
-          const updated = await update(id, values.name ?? '', series);
+          const parsed = parseCompanyInput(values);
+          const updated = await update(
+            id,
+            parsed.name,
+            parsed.series,
+            parsed.type
+          );
           if (updated) {
             setSelectedStakeholderCompany((prev) =>
               prev?.id === id ? updated : prev

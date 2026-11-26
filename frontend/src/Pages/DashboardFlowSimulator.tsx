@@ -42,7 +42,13 @@ import {
   CpoHorizontalMenu,
   CpoModuleCard,
 } from '@/modules/CPO/CpoModuleCard';
+import { MasterBahanBakuCrudModal } from '@/modules/CPO/MasterBahanBakuCrudModal';
+import { MasterItemInternalCrudModal } from '@/modules/CPO/MasterItemInternalCrudModal';
+import { MasterItemVendorCrudModal } from '@/modules/CPO/MasterItemVendorCrudModal';
 import { MasterPackingCrudModal } from '@/modules/CPO/MasterPackingCrudModal';
+import { MasterPaketCrudModal } from '@/modules/CPO/MasterPaketCrudModal';
+import { ViewBahanBakuModal } from '@/modules/CPO/ViewBahanBakuModal';
+import { ViewPackingModal } from '@/modules/CPO/ViewPackingModal';
 
 export interface DashboardProps {
   onLogout?: () => void | Promise<void>;
@@ -308,6 +314,44 @@ export const DashboardFlowSimulator: React.FC<DashboardProps> = ({ onLogout }) =
 
             <MasterPackingCrudModal
               isOpen={selectedChildSubMenu?.code === 'MASTER_PACKING'}
+              company={selectedCompany}
+              companies={companyResource.companies}
+              onClose={() => setSelectedChildSubMenu(null)}
+            />
+
+            <ViewPackingModal
+              isOpen={selectedChildSubMenu?.code === 'VIEW_PACKING'}
+              company={selectedCompany}
+              companies={companyResource.companies}
+              onClose={() => setSelectedChildSubMenu(null)}
+            />
+
+            <MasterPaketCrudModal
+              isOpen={selectedChildSubMenu?.code === 'MASTER_PAKET'}
+              companies={companyResource.companies}
+              onClose={() => setSelectedChildSubMenu(null)}
+            />
+
+            <MasterBahanBakuCrudModal
+              isOpen={selectedChildSubMenu?.code === 'MASTER_BAHAN_BAKU'}
+              companies={companyResource.companies}
+              onClose={() => setSelectedChildSubMenu(null)}
+            />
+
+            <ViewBahanBakuModal
+              isOpen={selectedChildSubMenu?.code === 'VIEW_BAHAN_BAKU'}
+              onClose={() => setSelectedChildSubMenu(null)}
+            />
+
+            <MasterItemVendorCrudModal
+              isOpen={selectedChildSubMenu?.code === 'MASTER_ITEM_VENDOR'}
+              company={selectedCompany}
+              companies={companyResource.companies}
+              onClose={() => setSelectedChildSubMenu(null)}
+            />
+
+            <MasterItemInternalCrudModal
+              isOpen={selectedChildSubMenu?.code === 'MASTER_ITEM_INTERNAL'}
               company={selectedCompany}
               companies={companyResource.companies}
               onClose={() => setSelectedChildSubMenu(null)}

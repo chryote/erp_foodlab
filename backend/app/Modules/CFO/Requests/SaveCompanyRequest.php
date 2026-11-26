@@ -2,10 +2,12 @@
 
 namespace App\Modules\CFO\Requests;
 
+use App\Enums\CompanyType;
 use App\Models\Company;
 use App\Support\InputNormalizer;
 use App\Support\WriteGuard;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class SaveCompanyRequest extends FormRequest
@@ -17,10 +19,16 @@ class SaveCompanyRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        if ($this->has('name') && is_string($this->input('name'))) {
-            $this->merge([
-                'name' => InputNormalizer::text($this->input('name')),
-            ]);
+        $normalized = [];
+
+        foreach (['name', 'type'] as $field) {
+            if ($this->has($field) && is_string($this->input($field))) {
+                $normalized[$field] = InputNormalizer::text($this->input($field));
+            }
+        }
+
+        if ($normalized !== []) {
+            $this->merge($normalized);
         }
     }
 
@@ -34,6 +42,7 @@ class SaveCompanyRequest extends FormRequest
         return [
             'name' => [...$requiredRule, 'string', 'max:150'],
             'series' => ['sometimes', 'required', 'integer', 'min:1', 'max:999999'],
+            'type' => ['sometimes', 'required', 'string', Rule::enum(CompanyType::class)],
         ];
     }
 
@@ -83,6 +92,9 @@ class SaveCompanyRequest extends FormRequest
     public function payload(): array
     {
         $validated = $this->validated();
+        $isPatch = $this->isMethod('PATCH');
+        /** @var Company|null $routeCompany */
+        $routeCompany = $this->route('company');
 
         if (array_key_exists('name', $validated)) {
             $validated['name'] = InputNormalizer::text((string) $validated['name']);
@@ -90,6 +102,10 @@ class SaveCompanyRequest extends FormRequest
 
         if (array_key_exists('series', $validated)) {
             $validated['series'] = (int) $validated['series'];
+        }
+
+        if (! array_key_exists('type', $validated) && ! $isPatch && ! ($routeCompany instanceof Company)) {
+            $validated['type'] = CompanyType::Utama->value;
         }
 
         return $validated;

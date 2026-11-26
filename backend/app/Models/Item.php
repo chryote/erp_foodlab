@@ -9,15 +9,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Laravel\Scout\Searchable;
 
 class Item extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, Searchable, SoftDeletes;
 
     protected $table = 'items';
 
     protected $fillable = [
         'company_id',
+        'packet_vendor_id',
         'code',
         'name',
         'type',
@@ -31,6 +33,7 @@ class Item extends Model
     {
         return [
             'company_id' => 'integer',
+            'packet_vendor_id' => 'integer',
             'type' => ItemType::class,
         ];
     }
@@ -40,16 +43,41 @@ class Item extends Model
         return $this->belongsTo(Company::class);
     }
 
+    public function packetVendor(): BelongsTo
+    {
+        return $this->belongsTo(PacketVendor::class);
+    }
+
     public function itemPackets(): HasMany
     {
         return $this->hasMany(ItemPacket::class);
+    }
+
+    public function ingredients(): HasMany
+    {
+        return $this->hasMany(Ingredient::class);
     }
 
     public function packets(): BelongsToMany
     {
         return $this->belongsToMany(Packet::class, 'item_packet')
             ->wherePivotNull('deleted_at')
-            ->withPivot(['id', 'company_id', 'quantity', 'deleted_at'])
+            ->withPivot(['id', 'company_id', 'packet_vendor_id', 'quantity', 'deleted_at'])
             ->withTimestamps();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'company_id' => $this->company_id,
+            'packet_vendor_id' => $this->packet_vendor_id,
+            'code' => $this->code,
+            'name' => $this->name,
+            'type' => $this->type instanceof ItemType ? $this->type->value : $this->type,
+        ];
     }
 }
