@@ -167,7 +167,7 @@ export default function ChoViewKaryawanPage() {
             searchValue={search}
             onSearchChange={setSearch}
             searchLabel="Cari karyawan"
-            searchPlaceholder="Cari nama, NIK, kode absensi..."
+            searchPlaceholder="Cari nama, NIK, kode absensi, tanggal lahir, jabatan, atau status..."
             searchTestId="view-karyawan-search"
             onSearchSubmit={submitSearch}
           />

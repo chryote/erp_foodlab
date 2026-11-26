@@ -227,7 +227,7 @@ export default function ChoInputKaryawanPage() {
                 searchValue={search}
                 onSearchChange={setSearch}
                 searchLabel="Cari karyawan"
-                searchPlaceholder="Cari nama, NIK, kode absensi..."
+                searchPlaceholder="Cari nama, NIK, kode absensi, tanggal lahir, jabatan, atau status..."
                 searchTestId="input-karyawan-search"
                 onSearchSubmit={submitSearch}
               />

@@ -534,7 +534,7 @@ export default function CfoItemOperasionalPage() {
                   searchValue={search}
                   onSearchChange={setSearch}
                   searchLabel="Cari item operasional"
-                  searchPlaceholder="Cari nama, tipe, atau keterangan..."
+                  searchPlaceholder="Cari tanggal, tipe, nama item, nominal, atau keterangan..."
                   searchTestId="operasional-item-search"
                   onSearchSubmit={submitSearch}
                 />
