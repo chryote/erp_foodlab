@@ -191,6 +191,54 @@ describe('View Operasional date filter', () => {
     );
   });
 
+  it('offers current and displayed month presets without applying them immediately', () => {
+    const now = new Date();
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const nextMonthEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+    render(
+      <MemoryRouter initialEntries={['/company/1']}>
+        <Routes>
+          <Route
+            path="/company/:companyId"
+            element={<CfoViewOperasionalPage />}
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const dateRangeTrigger = screen.getByTestId('view-operasional-date-range');
+    fireEvent.click(dateRangeTrigger);
+    fireEvent.click(screen.getByRole('button', { name: /next month/i }));
+    fireEvent.click(
+      screen.getByTestId('view-operasional-preset-visible-month')
+    );
+    expect(dateRangeTrigger).toHaveTextContent(
+      formatCurrentMonthDateRange(now)
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Terapkan' }));
+
+    expect(dateRangeTrigger).toHaveTextContent(
+      formatRange(nextMonthStart, nextMonthEnd)
+    );
+    expect(screen.getByTestId('view-operasional-month-total')).toHaveTextContent(
+      '(0)'
+    );
+
+    fireEvent.click(dateRangeTrigger);
+    fireEvent.click(screen.getByTestId('view-operasional-preset-this-month'));
+    expect(dateRangeTrigger).toHaveTextContent(
+      formatRange(nextMonthStart, nextMonthEnd)
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Terapkan' }));
+
+    expect(dateRangeTrigger).toHaveTextContent(
+      formatCurrentMonthDateRange(now)
+    );
+    expect(screen.getByTestId('view-operasional-month-total')).toHaveTextContent(
+      '(3)'
+    );
+  });
+
   it('uses the first clicked date as the new start, even after the previous start', () => {
     const now = new Date();
     const selectedStart = new Date(now.getFullYear(), now.getMonth(), 10);

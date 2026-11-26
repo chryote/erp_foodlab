@@ -14,7 +14,6 @@ import { Calendar } from '@/components/ui/shadcn/calendar';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -212,6 +211,13 @@ export default function CfoViewOperasionalPage() {
     setIsDateRangeDialogOpen(false);
   };
 
+  const selectDatePreset = (range: DateRange, month: Date) => {
+    setDraftDateRange(range);
+    setCalendarMonth(month);
+    setIsSelectingEndDate(false);
+    setDateRangeError('');
+  };
+
   return (
     <div className="flex flex-col gap-5">
       <CardHeader
@@ -243,21 +249,48 @@ export default function CfoViewOperasionalPage() {
           </DialogTrigger>
           <DialogContent
             data-testid="view-operasional-date-range-dialog"
-            className="w-[calc(100%-2rem)] max-w-sm"
+            className="w-[calc(100%-2rem)] max-w-sm p-3"
           >
             <DialogHeader className="flex-col">
               <DialogTitle>Pilih Rentang Tanggal</DialogTitle>
-              <DialogDescription>
-                Pilih tanggal mulai dan akhir. Filter diterapkan setelah Anda
-                menekan Terapkan.
-              </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleDateRangeSubmit}>
+              <div className="mb-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  data-testid="view-operasional-preset-this-month"
+                  onClick={() =>
+                    selectDatePreset(
+                      getMonthDateRange(effectiveDate),
+                      effectiveDate
+                    )
+                  }
+                  className="rounded-md border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
+                >
+                  Pilih bulan ini
+                </button>
+                <button
+                  type="button"
+                  data-testid="view-operasional-preset-visible-month"
+                  onClick={() =>
+                    selectDatePreset(
+                      getMonthDateRange(calendarMonth),
+                      calendarMonth
+                    )
+                  }
+                  className="rounded-md border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
+                >
+                  Pilih bulan yang tampil
+                </button>
+              </div>
               <Calendar
                 mode="range"
                 month={calendarMonth}
                 onMonthChange={setCalendarMonth}
                 selected={draftDateRange}
+                fixedWeeks
+                captionLayout='dropdown'
+                modifiersClassNames={{ today: 'calendar-today' }}
                 disabled={
                   isSelectingEndDate && draftDateRange.from
                     ? { before: draftDateRange.from }
@@ -280,6 +313,7 @@ export default function CfoViewOperasionalPage() {
                   setDateRangeError('');
                 }}
                 showOutsideDays={false}
+                className='view-operasional-calendar p-0 w-full'
               />
               {dateRangeError && (
                 <p className="mt-2 text-sm text-destructive" role="alert">
