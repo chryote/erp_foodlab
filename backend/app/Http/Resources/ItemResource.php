@@ -23,13 +23,16 @@ class ItemResource extends JsonResource
 
         return [
             'id' => (int) $this->id,
-            'company_id' => (int) $this->company_id,
+            'company_id' => $this->company_id !== null ? (int) $this->company_id : null,
+            'packet_vendor_id' => $this->packet_vendor_id !== null ? (int) $this->packet_vendor_id : null,
             'code' => $this->code,
             'name' => $this->name,
             'type' => $type,
             'company' => $this->whenLoaded('company', fn ($company) => $company !== null ? new CompanyResource($company) : null),
+            'packet_vendor' => $this->whenLoaded('packetVendor', fn ($vendor) => $vendor !== null ? new PacketVendorResource($vendor) : null),
             'item_packets' => ItemPacketResource::collection($this->whenLoaded('itemPackets')),
             'packets' => PacketResource::collection($this->whenLoaded('packets')),
+            'ingredients' => IngredientResource::collection($this->whenLoaded('ingredients')),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
             'deleted_at' => $this->deleted_at?->toISOString(),

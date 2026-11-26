@@ -11,10 +11,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
+use Laravel\Scout\Searchable;
 
 class Employee extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, Searchable, SoftDeletes;
 
     protected $table = 'employees';
 
@@ -193,5 +194,26 @@ class Employee extends Model
     public function payrollItems(): HasMany
     {
         return $this->hasMany(PayrollItem::class);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'company_id' => $this->company_id,
+            'employee_position_id' => $this->employee_position_id,
+            'employment_status_id' => $this->employment_status_id,
+            'payroll_grade_id' => $this->payroll_grade_id,
+            'tax_status_id' => $this->tax_status_id,
+            'name' => $this->name,
+            'nickname' => $this->nickname,
+            'nik_ktp' => $this->nik_ktp,
+            'employee_attendance_code' => $this->employee_attendance_code,
+            'email' => $this->email,
+            'phone' => $this->phone,
+        ];
     }
 }

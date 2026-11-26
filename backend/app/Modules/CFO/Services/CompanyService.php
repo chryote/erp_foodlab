@@ -2,7 +2,13 @@
 
 namespace App\Modules\CFO\Services;
 
+use App\Enums\CompanyType;
 use App\Models\Company;
+use App\Models\DefaultPackage;
+use App\Models\Employee;
+use App\Models\ExpenseItem;
+use App\Models\Ingredient;
+use App\Models\Item;
 use App\Modules\CHO\Services\PayrollItemService;
 use App\Modules\CHO\Services\PayrollRunService;
 use App\Support\ActiveCompany;
@@ -15,6 +21,8 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -46,8 +54,18 @@ class CompanyService
     {
         $name = InputNormalizer::text((string) $attributes['name']) ?? '';
         $series = (int) ($attributes['series'] ?? 1);
+        $rawType = $attributes['type'] ?? null;
+        $typeValue = $rawType instanceof CompanyType
+            ? $rawType->value
+            : (string) ($rawType ?? CompanyType::Utama->value);
 
-        $company = DB::transaction(function () use ($name, $series): Company {
+        if (CompanyType::tryFrom($typeValue) === null) {
+            throw ValidationException::withMessages([
+                'type' => ['The selected type is invalid.'],
+            ]);
+        }
+
+        $company = DB::transaction(function () use ($name, $series, $typeValue): Company {
             WriteGuard::assertUniqueActive(
                 Company::query(),
                 'name',
@@ -60,6 +78,7 @@ class CompanyService
             return Company::query()->create([
                 'name' => $name,
                 'series' => $series,
+                'type' => $typeValue,
             ]);
         });
 
@@ -72,6 +91,19 @@ class CompanyService
     {
         if (array_key_exists('name', $attributes)) {
             $attributes['name'] = InputNormalizer::text((string) $attributes['name']) ?? '';
+        }
+
+        if (array_key_exists('type', $attributes)) {
+            $rawType = $attributes['type'];
+            $typeValue = $rawType instanceof CompanyType ? $rawType->value : (string) $rawType;
+
+            if (CompanyType::tryFrom($typeValue) === null) {
+                throw ValidationException::withMessages([
+                    'type' => ['The selected type is invalid.'],
+                ]);
+            }
+
+            $attributes['type'] = $typeValue;
         }
 
         $updated = DB::transaction(function () use ($company, $attributes): Company {
@@ -129,7 +161,46 @@ class CompanyService
             $locked->employees()->delete();
 
             // Soft-delete CPO dependent records so none remain orphaned.
+            $itemPacketIds = $locked->itemPackets()->lockForUpdate()->pluck('id')->all();
+            if ($itemPacketIds !== [] && Schema::hasTable('default_packages')) {
+                $defaultPackages = DefaultPackage::query()
+                    ->whereIn('item_packet_id', $itemPacketIds)
+                    ->lockForUpdate()
+                    ->get();
+
+                if ($defaultPackages->isNotEmpty()) {
+                    if (class_exists('App\\Models\\Ingredient') && Schema::hasTable('ingredients')) {
+                        foreach ($defaultPackages as $defaultPackage) {
+                            if (method_exists($defaultPackage, 'ingredients')) {
+                                $defaultPackage->ingredients()->delete();
+                            }
+                        }
+                    }
+
+                    DefaultPackage::query()
+                        ->whereIn('id', $defaultPackages->pluck('id')->all())
+                        ->delete();
+                }
+            }
+            if (Schema::hasTable('default_packages')) {
+                $companyDefaultPackages = $locked->defaultPackages()->lockForUpdate()->get();
+                if ($companyDefaultPackages->isNotEmpty()) {
+                    if (class_exists(Ingredient::class) && Schema::hasTable('ingredients')) {
+                        foreach ($companyDefaultPackages as $defaultPackage) {
+                            $defaultPackage->ingredients()->delete();
+                        }
+                    }
+
+                    $locked->defaultPackages()->delete();
+                }
+            }
             $locked->itemPackets()->delete();
+            $companyItemIds = $locked->items()->lockForUpdate()->pluck('id')->all();
+            if ($companyItemIds !== [] && class_exists(Ingredient::class) && Schema::hasTable('ingredients')) {
+                Ingredient::query()
+                    ->whereIn('item_id', $companyItemIds)
+                    ->delete();
+            }
             $locked->items()->delete();
 
             $locked->delete();
@@ -148,6 +219,12 @@ class CompanyService
         }
 
         $this->forgetCaches();
+
+        if (in_array((string) config('scout.driver', 'null'), ['meilisearch', 'collection'], true)) {
+            ExpenseItem::onlyTrashed()->where('company_id', $companyId)->unsearchable();
+            Employee::onlyTrashed()->where('company_id', $companyId)->unsearchable();
+            Item::onlyTrashed()->where('company_id', $companyId)->unsearchable();
+        }
     }
 
     private function query(Request $request): QueryBuilder
@@ -163,8 +240,9 @@ class CompanyService
                     IndexQuery::whereLike($query, 'name', $escaped);
                 }),
                 AllowedFilter::exact('series'),
+                AllowedFilter::exact('type'),
             ])
-            ->allowedSorts(['id', 'name', 'series', 'created_at', 'updated_at'])
+            ->allowedSorts(['id', 'name', 'series', 'type', 'created_at', 'updated_at'])
             ->allowedIncludes(['capitalCompanies'])
             ->defaultSort('-id');
     }
@@ -187,6 +265,8 @@ class CompanyService
             'erp_foodlab:cpo:items:list',
             'erp_foodlab:cpo:item_packets:list',
             'erp_foodlab:cpo:packets:list',
+            'erp_foodlab:cpo:default_packages:list',
+            'erp_foodlab:cpo:ingredients:list',
             'erp_foodlab:module:cpo',
         ];
 

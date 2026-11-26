@@ -3,43 +3,65 @@ import {
   ApiRequestError,
   createCapitalCompany,
   createCompany,
+  createDefaultPackage,
   createEmployee,
   createExpenseCategory,
   createExpenseItem,
   createExpenseType,
+  createIngredient,
   createItem,
   createItemPacket,
   createPacket,
+  createPacketCategory,
+  createPacketName,
+  createPacketVendor,
   deleteCapitalCompany,
   deleteCompany,
+  deleteDefaultPackage,
   deleteExpenseCategory,
   deleteExpenseItem,
   deleteExpenseType,
+  deleteIngredient,
   deleteItem,
   deleteItemPacket,
   deletePacket,
+  deletePacketCategory,
+  deletePacketName,
+  deletePacketVendor,
   fetchActiveCompanyEmployees,
   fetchCapitalCompanies,
+  fetchCfoEnums,
   fetchChoEnums,
   fetchCompanies,
+  fetchCpoEnums,
+  fetchDefaultPackages,
   fetchErpModules,
   fetchExpenseCategories,
   fetchExpenseItems,
   fetchExpenseTypes,
   fetchHealthStatus,
+  fetchIngredients,
   fetchItemPackets,
   fetchItems,
   fetchLabSamples,
+  fetchPacketCategories,
+  fetchPacketNames,
   fetchPackets,
+  fetchPacketVendors,
   syncActiveCompany,
   updateCapitalCompany,
   updateCompany,
+  updateDefaultPackage,
   updateExpenseCategory,
   updateExpenseItem,
   updateExpenseType,
+  updateIngredient,
   updateItem,
   updateItemPacket,
   updatePacket,
+  updatePacketCategory,
+  updatePacketName,
+  updatePacketVendor,
 } from '../api/client';
 import {
   clearActiveCompanyId,
@@ -68,9 +90,10 @@ describe('General API Client Contract & Error Handling', () => {
     await fetchHealthStatus();
     await fetchErpModules();
     await fetchLabSamples();
+    await fetchCfoEnums();
     await fetchCompanies();
-    await createCompany({ name: 'PT A' });
-    await updateCompany(1, { name: 'PT A2' });
+    await createCompany({ name: 'PT A', type: 'Packing' });
+    await updateCompany(1, { name: 'PT A2', type: 'Sarpras' });
     await deleteCompany(1);
     await fetchCapitalCompanies();
     await createCapitalCompany({
@@ -85,7 +108,7 @@ describe('General API Client Contract & Error Handling', () => {
     });
     await deleteCapitalCompany(1);
 
-    expect(globalThis.fetch).toHaveBeenCalledTimes(11);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(12);
     for (const call of vi.mocked(globalThis.fetch).mock.calls) {
       const options = call[1] as RequestInit;
       const headers = options?.headers as Record<string, string>;
@@ -252,6 +275,7 @@ describe('General API Client Contract & Error Handling', () => {
       json: async () => ({ data: [] }),
     } as Response);
 
+    await fetchCpoEnums();
     await fetchItems();
     await createItem({ company_id: 1, code: 'ITM-001', name: 'Kardus', type: 'Bahan' });
     await updateItem(5, { company_id: 1, code: null, name: 'Kardus Baru', type: 'Peralatan' });
@@ -268,12 +292,109 @@ describe('General API Client Contract & Error Handling', () => {
     await deleteItemPacket(7);
 
     const calls = vi.mocked(globalThis.fetch).mock.calls;
+    expect(calls).toHaveLength(13);
+    expect(String(calls[0][0])).toContain('/v1/modules/cpo/enums');
+    expect(String(calls[1][0])).toContain('/v1/modules/cpo/items');
+    expect(String(calls[3][0])).toContain('/v1/modules/cpo/items/5');
+    expect(String(calls[5][0])).toContain('/v1/modules/cpo/packets');
+    expect(String(calls[7][0])).toContain('/v1/modules/cpo/packets/6');
+    expect(String(calls[9][0])).toContain('/v1/modules/cpo/item-packets');
+    expect(String(calls[11][0])).toContain('/v1/modules/cpo/item-packets/7');
+  });
+
+  it('calls CPO paket master endpoints for packet-names, packet-vendors, and packet-categories', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: [] }),
+    } as Response);
+
+    await fetchPacketNames();
+    await createPacketName({ name: 'Paket Starter' });
+    await updatePacketName(1, { name: 'Paket Starter Pro' });
+    await deletePacketName(1);
+
+    await fetchPacketVendors();
+    await createPacketVendor({ name: 'Vendor A' });
+    await updatePacketVendor(2, { name: 'Vendor B' });
+    await deletePacketVendor(2);
+
+    await fetchPacketCategories();
+    await createPacketCategory({ name: 'Kategori A' });
+    await updatePacketCategory(3, { name: 'Kategori B' });
+    await deletePacketCategory(3);
+
+    const calls = vi.mocked(globalThis.fetch).mock.calls;
     expect(calls).toHaveLength(12);
-    expect(String(calls[0][0])).toContain('/v1/modules/cpo/items');
-    expect(String(calls[2][0])).toContain('/v1/modules/cpo/items/5');
-    expect(String(calls[4][0])).toContain('/v1/modules/cpo/packets');
-    expect(String(calls[6][0])).toContain('/v1/modules/cpo/packets/6');
-    expect(String(calls[8][0])).toContain('/v1/modules/cpo/item-packets');
-    expect(String(calls[10][0])).toContain('/v1/modules/cpo/item-packets/7');
+    expect(String(calls[0][0])).toContain('/v1/modules/cpo/packet-names');
+    expect(String(calls[2][0])).toContain('/v1/modules/cpo/packet-names/1');
+    expect(String(calls[4][0])).toContain('/v1/modules/cpo/packet-vendors');
+    expect(String(calls[6][0])).toContain('/v1/modules/cpo/packet-vendors/2');
+    expect(String(calls[8][0])).toContain('/v1/modules/cpo/packet-categories');
+    expect(String(calls[10][0])).toContain(
+      '/v1/modules/cpo/packet-categories/3'
+    );
+  });
+
+  it('calls CPO default-packages endpoints for CRUD', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: [] }),
+    } as Response);
+
+    await fetchDefaultPackages();
+    await createDefaultPackage({
+      brand_name: 'Brand Hemat',
+      packet_name_id: 1,
+      packet_vendor_id: 2,
+      packet_category_id: 3,
+      item_packet_id: 4,
+      price: 25000,
+    });
+    await updateDefaultPackage(9, {
+      brand_name: 'Brand Hemat Pro',
+      packet_name_id: 1,
+      packet_vendor_id: 2,
+      packet_category_id: 3,
+      item_packet_id: 4,
+      price: 30000,
+    });
+    await deleteDefaultPackage(9);
+
+    const calls = vi.mocked(globalThis.fetch).mock.calls;
+    expect(calls).toHaveLength(4);
+    expect(String(calls[0][0])).toContain('/v1/modules/cpo/default-packages');
+    expect(String(calls[1][0])).toContain('/v1/modules/cpo/default-packages');
+    expect(String(calls[2][0])).toContain('/v1/modules/cpo/default-packages/9');
+    expect(String(calls[3][0])).toContain('/v1/modules/cpo/default-packages/9');
+  });
+
+  it('calls CPO ingredients endpoints for CRUD', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: [] }),
+    } as Response);
+
+    await fetchIngredients();
+    await createIngredient({
+      default_package_id: 1,
+      item_id: 2,
+      price: 12000,
+    });
+    await updateIngredient(8, {
+      default_package_id: 1,
+      item_id: 2,
+      price: 15000,
+    });
+    await deleteIngredient(8);
+
+    const calls = vi.mocked(globalThis.fetch).mock.calls;
+    expect(calls).toHaveLength(4);
+    expect(String(calls[0][0])).toContain('/v1/modules/cpo/ingredients');
+    expect(String(calls[1][0])).toContain('/v1/modules/cpo/ingredients');
+    expect(String(calls[2][0])).toContain('/v1/modules/cpo/ingredients/8');
+    expect(String(calls[3][0])).toContain('/v1/modules/cpo/ingredients/8');
   });
 });

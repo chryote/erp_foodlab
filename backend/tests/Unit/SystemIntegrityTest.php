@@ -1,9 +1,11 @@
 <?php
 
 use App\Enums\ItemType;
+use App\Enums\PacketVendorType;
 use App\Models\CapitalCompany;
 use App\Models\Company;
 use App\Models\CompanyAsset;
+use App\Models\DefaultPackage;
 use App\Models\Employee;
 use App\Models\EmployeeAttendance;
 use App\Models\EmployeeDocument;
@@ -14,10 +16,14 @@ use App\Models\EmploymentStatus;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseItem;
 use App\Models\ExpenseType;
+use App\Models\Ingredient;
 use App\Models\Item;
 use App\Models\ItemPacket;
 use App\Models\LabSample;
 use App\Models\Packet;
+use App\Models\PacketCategory;
+use App\Models\PacketName;
+use App\Models\PacketVendor;
 use App\Models\PayrollGrade;
 use App\Models\PayrollItem;
 use App\Models\PayrollRun;
@@ -124,7 +130,12 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
             'payroll_items' => PayrollItem::query()->count(),
             'items' => Item::query()->count(),
             'packets' => Packet::query()->count(),
+            'packet_categories' => PacketCategory::query()->count(),
+            'packet_names' => PacketName::query()->count(),
+            'packet_vendors' => PacketVendor::query()->count(),
             'item_packet' => ItemPacket::query()->count(),
+            'default_packages' => DefaultPackage::query()->count(),
+            'ingredients' => Ingredient::query()->count(),
             'lab_samples' => LabSample::query()->count(),
         ];
 
@@ -159,7 +170,12 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
             'payroll_items' => PayrollItem::query()->count(),
             'items' => Item::query()->count(),
             'packets' => Packet::query()->count(),
+            'packet_categories' => PacketCategory::query()->count(),
+            'packet_names' => PacketName::query()->count(),
+            'packet_vendors' => PacketVendor::query()->count(),
             'item_packet' => ItemPacket::query()->count(),
+            'default_packages' => DefaultPackage::query()->count(),
+            'ingredients' => Ingredient::query()->count(),
             'lab_samples' => LabSample::query()->count(),
         ];
 
@@ -171,23 +187,55 @@ describe('General System Integrity, Schema, Storage & API Contract Guardrails', 
         expect($nadia->employee_attendance_code)->toBe('NadiaSTAFFA'.$nadia->id);
         expect($budi->employee_attendance_code)->toBe('BudiSTAFFB'.$budi->id);
 
+        $seededVendors = PacketVendor::query()->get();
+        $vendorIds = $seededVendors->pluck('id')->all();
+        expect($seededVendors)->not->toBeEmpty();
+        foreach ($seededVendors as $seededVendor) {
+            expect($seededVendor->type)->toBeInstanceOf(PacketVendorType::class);
+        }
+
         $seededItems = Item::query()->get();
         $companyIds = Company::query()->pluck('id')->all();
         expect($seededItems)->not->toBeEmpty();
         expect($seededItems->pluck('type')->contains(ItemType::Bahan))->toBeTrue();
-        expect($seededItems->pluck('type')->contains(ItemType::Peralatan))->toBeTrue();
+        expect($seededItems->pluck('type')->contains(ItemType::Kelengkapan))->toBeTrue();
+        expect($seededItems->whereNotNull('company_id'))->not->toBeEmpty();
+        expect($seededItems->whereNotNull('packet_vendor_id'))->not->toBeEmpty();
         foreach ($seededItems as $seededItem) {
-            expect($companyIds)->toContain($seededItem->company_id);
+            if ($seededItem->company_id !== null) {
+                expect($companyIds)->toContain($seededItem->company_id);
+                expect($seededItem->packet_vendor_id)->toBeNull();
+                expect($seededItem->code)->toStartWith('ITM-');
+            } else {
+                expect($vendorIds)->toContain($seededItem->packet_vendor_id);
+                expect($seededItem->code)->toStartWith('VND-ITM-');
+            }
             expect($seededItem->code)->not->toBeNull();
-            expect($seededItem->code)->toStartWith('ITM-');
             expect($seededItem->type)->toBeInstanceOf(ItemType::class);
         }
 
         $seededItemPackets = ItemPacket::query()->with('item')->get();
         expect($seededItemPackets)->not->toBeEmpty();
+        expect($seededItemPackets->whereNotNull('company_id'))->not->toBeEmpty();
+        expect($seededItemPackets->whereNotNull('packet_vendor_id'))->not->toBeEmpty();
         foreach ($seededItemPackets as $seededItemPacket) {
-            expect($companyIds)->toContain($seededItemPacket->company_id);
+            if ($seededItemPacket->company_id !== null) {
+                expect($companyIds)->toContain($seededItemPacket->company_id);
+                expect($seededItemPacket->packet_vendor_id)->toBeNull();
+            } else {
+                expect($vendorIds)->toContain($seededItemPacket->packet_vendor_id);
+            }
             expect($seededItemPacket->company_id)->toBe($seededItemPacket->item?->company_id);
+            expect($seededItemPacket->packet_vendor_id)->toBe($seededItemPacket->item?->packet_vendor_id);
+        }
+
+        $seededDefaultPackages = DefaultPackage::query()->get();
+        expect($seededDefaultPackages)->not->toBeEmpty();
+        expect($seededDefaultPackages->whereNotNull('company_id'))->not->toBeEmpty();
+        expect($seededDefaultPackages->whereNotNull('packet_vendor_id'))->not->toBeEmpty();
+        foreach ($seededDefaultPackages as $seededDefaultPackage) {
+            expect(($seededDefaultPackage->company_id === null) !== ($seededDefaultPackage->packet_vendor_id === null))->toBeTrue();
+            expect($seededDefaultPackage->packet_id)->not->toBeNull();
         }
     });
 

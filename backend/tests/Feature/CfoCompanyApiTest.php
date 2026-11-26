@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\CompanyType;
 use App\Models\CapitalCompany;
 use App\Models\Company;
 use App\Models\CompanyAsset;
@@ -57,27 +58,32 @@ describe('CFO Company CRUD API (/api/v1/modules/cfo/companies)', function () {
         $createRes = $this->postJson('/api/v1/modules/cfo/companies', [
             'name' => 'PT. Slaras Nusa Foodlab',
             'series' => 2,
+            'type' => CompanyType::Packing->value,
         ]);
 
         $createRes->assertCreated()
             ->assertJsonPath('data.name', 'PT. Slaras Nusa Foodlab')
-            ->assertJsonPath('data.series', 2);
+            ->assertJsonPath('data.series', 2)
+            ->assertJsonPath('data.type', CompanyType::Packing->value);
 
         $companyId = $createRes->json('data.id');
         $this->assertDatabaseHas('companies', [
             'id' => $companyId,
             'name' => 'PT. Slaras Nusa Foodlab',
             'series' => 2,
+            'type' => CompanyType::Packing->value,
         ]);
 
         $updateRes = $this->putJson("/api/v1/modules/cfo/companies/{$companyId}", [
             'name' => 'PT. Slaras Nusa Foodlab Internasional',
             'series' => 3,
+            'type' => CompanyType::Sarpras->value,
         ]);
 
         $updateRes->assertOk()
             ->assertJsonPath('data.name', 'PT. Slaras Nusa Foodlab Internasional')
-            ->assertJsonPath('data.series', 3);
+            ->assertJsonPath('data.series', 3)
+            ->assertJsonPath('data.type', CompanyType::Sarpras->value);
 
         $deleteRes = $this->deleteJson("/api/v1/modules/cfo/companies/{$companyId}");
         $deleteRes->assertOk();
@@ -88,13 +94,33 @@ describe('CFO Company CRUD API (/api/v1/modules/cfo/companies)', function () {
         $listRes->assertOk()->assertJsonCount(0, 'data');
     });
 
-    it('validates company name and series when creating or updating', function () {
+    it('validates company name, series, and type enum when creating or updating', function () {
         $this->postJson('/api/v1/modules/cfo/companies', [
             'name' => '',
             'series' => 0,
+            'type' => 'InvalidType',
         ])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['name', 'series']);
+            ->assertJsonValidationErrors(['name', 'series', 'type']);
+    });
+
+    it('exposes CFO CompanyType enum options and defaults company type to Utama when omitted', function () {
+        $this->getJson('/api/v1/modules/cfo/enums')
+            ->assertOk()
+            ->assertJsonPath('data.company_type', CompanyType::options());
+
+        $created = $this->postJson('/api/v1/modules/cfo/companies', [
+            'name' => 'PT. Default Utama',
+            'series' => 1,
+        ]);
+
+        $created->assertCreated()
+            ->assertJsonPath('data.type', CompanyType::Utama->value);
+
+        $this->getJson('/api/v1/modules/cfo/companies?filter[type]=Utama')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $created->json('data.id'));
     });
 
     it('supports QueryBuilder filters, sorts, and includes', function () {

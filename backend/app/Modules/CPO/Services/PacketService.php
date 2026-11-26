@@ -99,8 +99,12 @@ class PacketService
                 && Schema::hasTable('item_packet')
                 && method_exists($locked, 'itemPackets')
             ) {
+                $itemPacketIds = $locked->itemPackets()->lockForUpdate()->pluck('id')->all();
+                DefaultPackageService::softDeleteForItemPacketIds(array_map('intval', $itemPacketIds));
                 $locked->itemPackets()->delete();
             }
+
+            DefaultPackageService::softDeleteForPacketIds([(int) $locked->getKey()]);
 
             $locked->delete();
         });
@@ -120,13 +124,10 @@ class PacketService
 
                     IndexQuery::whereLike($query, 'name', $escaped);
                 }),
-                AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
-                    $escaped = IndexQuery::escapeLike($value);
-                    if ($escaped === null) {
-                        return;
-                    }
-
-                    IndexQuery::whereLike($query, 'name', $escaped);
+                AllowedFilter::callback('search', function (Builder $query, mixed $value) use ($request): void {
+                    IndexQuery::applySearch($query, $value, function (Builder $searchQuery, string $escaped): void {
+                        IndexQuery::whereLike($searchQuery, 'name', $escaped);
+                    }, request: $request);
                 }),
             ])
             ->allowedSorts(['id', 'name', 'created_at', 'updated_at'])
@@ -164,5 +165,7 @@ class PacketService
         Cache::forget(CpoService::CACHE_KEY);
         Cache::forget(self::CACHE_KEY_ITEM_PACKETS_LIST);
         Cache::forget(ItemService::CACHE_KEY_LIST);
+        Cache::forget(DefaultPackageService::CACHE_KEY_LIST);
+        Cache::forget('erp_foodlab:cpo:ingredients:list');
     }
 }

@@ -16,6 +16,8 @@ abstract class TestCase extends BaseTestCase
             'CACHE_STORE' => 'array',
             'SESSION_DRIVER' => 'array',
             'QUEUE_CONNECTION' => 'sync',
+            'SCOUT_DRIVER' => 'null',
+            'SCOUT_QUEUE' => 'false',
         ];
 
         foreach ($overrides as $key => $value) {

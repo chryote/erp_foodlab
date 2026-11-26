@@ -23,10 +23,16 @@ services:
       SESSION_DRIVER: redis
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      SCOUT_DRIVER: ${SCOUT_DRIVER:-meilisearch}
+      SCOUT_QUEUE: ${SCOUT_QUEUE:-true}
+      MEILISEARCH_HOST: ${MEILISEARCH_HOST:-http://meilisearch:7700}
+      MEILISEARCH_KEY: ${MEILISEARCH_KEY:-foodlab_meili_master_key}
     depends_on:
       mysql:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      meilisearch:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "nc -z 127.0.0.1 9000 || exit 1"]
@@ -111,6 +117,66 @@ services:
     networks:
       - foodlab_net
 
+  meilisearch:
+    image: getmeili/meilisearch:v1.12
+    container_name: erp_foodlab_meilisearch
+    restart: unless-stopped
+    ports:
+      - "${MEILISEARCH_PORT:-7700}:7700"
+    environment:
+      MEILI_ENV: development
+      MEILI_MASTER_KEY: ${MEILISEARCH_KEY:-foodlab_meili_master_key}
+      MEILI_NO_ANALYTICS: "true"
+    volumes:
+      - meili_data:/meili_data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:7700/health >/dev/null || wget -qO- http://127.0.0.1:7700/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - foodlab_net
+
+  queue:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: erp_foodlab_queue
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: ["php", "artisan", "queue:work", "redis", "--tries=3", "--sleep=1", "--max-time=3600"]
+    volumes:
+      - ./backend:/var/www/html
+      - /var/www/html/vendor
+      - ./docker/php/php.ini:/usr/local/etc/php/conf.d/custom.ini:ro
+    environment:
+      APP_ENV: local
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ${MYSQL_DATABASE:-erp_foodlab}
+      DB_USERNAME: ${MYSQL_USER:-foodlab}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-secret}
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      SESSION_DRIVER: redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SCOUT_DRIVER: ${SCOUT_DRIVER:-meilisearch}
+      SCOUT_QUEUE: ${SCOUT_QUEUE:-true}
+      MEILISEARCH_HOST: ${MEILISEARCH_HOST:-http://meilisearch:7700}
+      MEILISEARCH_KEY: ${MEILISEARCH_KEY:-foodlab_meili_master_key}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+    networks:
+      - foodlab_net
+
   redis-exporter:
     image: oliver006/redis_exporter:v1.66.0
     container_name: erp_foodlab_redis_exporter
@@ -183,5 +249,6 @@ networks:
 volumes:
   mysql_data:
   redis_data:
+  meili_data:
   prometheus_data:
   grafana_data:

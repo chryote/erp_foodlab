@@ -77,10 +77,23 @@ export interface ErpModulesListResponse {
   };
 }
 
+export type CompanyType =
+  | 'Utama'
+  | 'Packing'
+  | 'Kelengkapan'
+  | 'Sarpras'
+  | 'Bahan'
+  | (string & {});
+
+export interface CfoEnums {
+  company_type: EnumOption[];
+}
+
 export interface Company {
   id: number;
   name: string;
   series?: number;
+  type?: CompanyType;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
@@ -702,22 +715,36 @@ export interface EmployeeAttendancesListResponse {
   };
 }
 
-export type ItemType = 'Bahan' | 'Peralatan';
+export type ItemType = 'Bahan' | 'Kelengkapan' | 'Sarpras' | (string & {});
+
+export type PacketVendorType =
+  | 'Bahan'
+  | 'Kelengkapan'
+  | 'Sarpras'
+  | (string & {});
+
+export interface CpoEnums {
+  item_type: EnumOption[];
+  packet_vendor_type?: EnumOption[];
+}
 
 export interface Item {
   id: number;
-  company_id: number;
+  company_id: number | null;
+  packet_vendor_id?: number | null;
   code?: string | null;
   name: string;
   type: ItemType;
   company?: Company | null;
+  packet_vendor?: PacketVendor | null;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
 }
 
 export interface ItemPayload {
-  company_id: number;
+  company_id?: number | null;
+  packet_vendor_id?: number | null;
   code?: string | null;
   name: string;
   type: ItemType;
@@ -761,11 +788,13 @@ export interface PacketsListResponse {
 
 export interface ItemPacket {
   id: number;
-  company_id: number;
+  company_id: number | null;
+  packet_vendor_id?: number | null;
   packet_id: number;
   item_id: number;
   quantity: number;
   company?: Company | null;
+  packet_vendor?: PacketVendor | null;
   packet?: Packet | null;
   item?: Item | null;
   created_at?: string;
@@ -774,7 +803,8 @@ export interface ItemPacket {
 }
 
 export interface ItemPacketPayload {
-  company_id: number;
+  company_id?: number | null;
+  packet_vendor_id?: number | null;
   packet_id: number;
   item_id: number;
   quantity: number;
@@ -782,6 +812,169 @@ export interface ItemPacketPayload {
 
 export interface ItemPacketsListResponse {
   data: ItemPacket[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
+export interface PacketName {
+  id: number;
+  name: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface PacketNamePayload {
+  name: string;
+}
+
+export interface PacketNamesListResponse {
+  data: PacketName[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
+export interface PacketVendor {
+  id: number;
+  name: string;
+  type?: PacketVendorType;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface PacketVendorPayload {
+  name: string;
+  type?: PacketVendorType;
+}
+
+export interface PacketVendorsListResponse {
+  data: PacketVendor[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
+export interface PacketCategory {
+  id: number;
+  name: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface PacketCategoryPayload {
+  name: string;
+}
+
+export interface PacketCategoriesListResponse {
+  data: PacketCategory[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
+export interface DefaultPackage {
+  id: number;
+  brand_name: string;
+  packet_name_id: number;
+  company_id?: number | null;
+  packet_vendor_id?: number | null;
+  packet_category_id: number;
+  packet_id?: number | null;
+  item_packet_id?: number | null;
+  price: number;
+  packet_name?: PacketName | null;
+  company?: Company | null;
+  packet_vendor?: PacketVendor | null;
+  packet_category?: PacketCategory | null;
+  packet?: Packet | null;
+  item_packet?: ItemPacket | null;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface DefaultPackagePayload {
+  brand_name: string;
+  packet_name_id: number;
+  company_id?: number | null;
+  packet_vendor_id?: number | null;
+  packet_category_id: number;
+  packet_id?: number | null;
+  item_packet_id?: number | null;
+  price?: number;
+}
+
+export interface DefaultPackageWizardItemPayload {
+  item_id: number;
+  quantity: number;
+  price: number;
+}
+
+export interface DefaultPackageWizardPayload {
+  packet_name: string;
+  packet_category: string;
+  brand_name: string;
+  company_id?: number | null;
+  packet_vendor_id?: number | null;
+  items: DefaultPackageWizardItemPayload[];
+}
+
+export interface DefaultPackagesListResponse {
+  data: DefaultPackage[];
+  meta: {
+    count: number;
+    total?: number;
+    page?: number;
+    per_page?: number;
+    last_page?: number;
+    cache_key?: string;
+  };
+}
+
+export interface Ingredient {
+  id: number;
+  default_package_id: number;
+  item_id: number;
+  price: number;
+  default_package?: DefaultPackage | null;
+  item?: Item | null;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface IngredientPayload {
+  default_package_id: number;
+  item_id: number;
+  price?: number;
+}
+
+export interface IngredientsListResponse {
+  data: Ingredient[];
   meta: {
     count: number;
     total?: number;
@@ -909,6 +1102,14 @@ export async function fetchLabSamples(): Promise<SamplesListResponse> {
   );
 }
 
+export async function fetchCfoEnums(): Promise<{ data: CfoEnums }> {
+  return requestJson<{ data: CfoEnums }>(
+    '/v1/modules/cfo/enums',
+    {},
+    'Failed to fetch CFO enums'
+  );
+}
+
 export async function fetchCompanies(): Promise<CompaniesListResponse> {
   return requestJson<CompaniesListResponse>(
     '/v1/modules/cfo/companies',
@@ -920,6 +1121,7 @@ export async function fetchCompanies(): Promise<CompaniesListResponse> {
 export async function createCompany(payload: {
   name: string;
   series?: number;
+  type?: CompanyType;
 }): Promise<{ data: Company }> {
   return requestJson<{ data: Company }>(
     '/v1/modules/cfo/companies',
@@ -934,7 +1136,7 @@ export async function createCompany(payload: {
 
 export async function updateCompany(
   id: number,
-  payload: { name: string; series?: number }
+  payload: { name: string; series?: number; type?: CompanyType }
 ): Promise<{ data: Company }> {
   return requestJson<{ data: Company }>(
     `/v1/modules/cfo/companies/${id}`,
@@ -1722,6 +1924,14 @@ export async function finalizeEmployeePayrollRow(
   );
 }
 
+export async function fetchCpoEnums(): Promise<{ data: CpoEnums }> {
+  return requestJson<{ data: CpoEnums }>(
+    '/v1/modules/cpo/enums',
+    {},
+    'Failed to fetch CPO enums'
+  );
+}
+
 export async function fetchItems(): Promise<ItemsListResponse> {
   return requestJson<ItemsListResponse>(
     '/v1/modules/cpo/items',
@@ -1856,5 +2066,269 @@ export async function deleteItemPacket(
     `/v1/modules/cpo/item-packets/${id}`,
     { method: 'DELETE' },
     'Failed to delete item packet'
+  );
+}
+
+export async function fetchPacketNames(): Promise<PacketNamesListResponse> {
+  return requestJson<PacketNamesListResponse>(
+    '/v1/modules/cpo/packet-names',
+    {},
+    'Failed to fetch packet names'
+  );
+}
+
+export async function createPacketName(
+  payload: PacketNamePayload
+): Promise<{ data: PacketName }> {
+  return requestJson<{ data: PacketName }>(
+    '/v1/modules/cpo/packet-names',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create packet name'
+  );
+}
+
+export async function updatePacketName(
+  id: number,
+  payload: PacketNamePayload
+): Promise<{ data: PacketName }> {
+  return requestJson<{ data: PacketName }>(
+    `/v1/modules/cpo/packet-names/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update packet name'
+  );
+}
+
+export async function deletePacketName(
+  id: number
+): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/cpo/packet-names/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete packet name'
+  );
+}
+
+export async function fetchPacketVendors(): Promise<PacketVendorsListResponse> {
+  return requestJson<PacketVendorsListResponse>(
+    '/v1/modules/cpo/packet-vendors',
+    {},
+    'Failed to fetch packet vendors'
+  );
+}
+
+export async function createPacketVendor(
+  payload: PacketVendorPayload
+): Promise<{ data: PacketVendor }> {
+  return requestJson<{ data: PacketVendor }>(
+    '/v1/modules/cpo/packet-vendors',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create packet vendor'
+  );
+}
+
+export async function updatePacketVendor(
+  id: number,
+  payload: PacketVendorPayload
+): Promise<{ data: PacketVendor }> {
+  return requestJson<{ data: PacketVendor }>(
+    `/v1/modules/cpo/packet-vendors/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update packet vendor'
+  );
+}
+
+export async function deletePacketVendor(
+  id: number
+): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/cpo/packet-vendors/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete packet vendor'
+  );
+}
+
+export async function fetchPacketCategories(): Promise<PacketCategoriesListResponse> {
+  return requestJson<PacketCategoriesListResponse>(
+    '/v1/modules/cpo/packet-categories',
+    {},
+    'Failed to fetch packet categories'
+  );
+}
+
+export async function createPacketCategory(
+  payload: PacketCategoryPayload
+): Promise<{ data: PacketCategory }> {
+  return requestJson<{ data: PacketCategory }>(
+    '/v1/modules/cpo/packet-categories',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create packet category'
+  );
+}
+
+export async function updatePacketCategory(
+  id: number,
+  payload: PacketCategoryPayload
+): Promise<{ data: PacketCategory }> {
+  return requestJson<{ data: PacketCategory }>(
+    `/v1/modules/cpo/packet-categories/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update packet category'
+  );
+}
+
+export async function deletePacketCategory(
+  id: number
+): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/cpo/packet-categories/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete packet category'
+  );
+}
+
+export async function fetchDefaultPackages(): Promise<DefaultPackagesListResponse> {
+  return requestJson<DefaultPackagesListResponse>(
+    '/v1/modules/cpo/default-packages',
+    {},
+    'Failed to fetch default packages'
+  );
+}
+
+export async function createDefaultPackage(
+  payload: DefaultPackagePayload
+): Promise<{ data: DefaultPackage }> {
+  return requestJson<{ data: DefaultPackage }>(
+    '/v1/modules/cpo/default-packages',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create default package'
+  );
+}
+
+export async function createDefaultPackageWizard(
+  payload: DefaultPackageWizardPayload
+): Promise<{ data: DefaultPackage }> {
+  return requestJson<{ data: DefaultPackage }>(
+    '/v1/modules/cpo/default-packages/wizard',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to save default package wizard'
+  );
+}
+
+export async function updateDefaultPackageWizard(
+  id: number,
+  payload: DefaultPackageWizardPayload
+): Promise<{ data: DefaultPackage }> {
+  return requestJson<{ data: DefaultPackage }>(
+    `/v1/modules/cpo/default-packages/${id}/wizard`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update default package wizard'
+  );
+}
+
+export async function updateDefaultPackage(
+  id: number,
+  payload: DefaultPackagePayload
+): Promise<{ data: DefaultPackage }> {
+  return requestJson<{ data: DefaultPackage }>(
+    `/v1/modules/cpo/default-packages/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update default package'
+  );
+}
+
+export async function deleteDefaultPackage(
+  id: number
+): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/cpo/default-packages/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete default package'
+  );
+}
+
+export async function fetchIngredients(): Promise<IngredientsListResponse> {
+  return requestJson<IngredientsListResponse>(
+    '/v1/modules/cpo/ingredients',
+    {},
+    'Failed to fetch ingredients'
+  );
+}
+
+export async function createIngredient(
+  payload: IngredientPayload
+): Promise<{ data: Ingredient }> {
+  return requestJson<{ data: Ingredient }>(
+    '/v1/modules/cpo/ingredients',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create ingredient'
+  );
+}
+
+export async function updateIngredient(
+  id: number,
+  payload: IngredientPayload
+): Promise<{ data: Ingredient }> {
+  return requestJson<{ data: Ingredient }>(
+    `/v1/modules/cpo/ingredients/${id}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update ingredient'
+  );
+}
+
+export async function deleteIngredient(
+  id: number
+): Promise<{ message: string }> {
+  return requestJson<{ message: string }>(
+    `/v1/modules/cpo/ingredients/${id}`,
+    { method: 'DELETE' },
+    'Failed to delete ingredient'
   );
 }

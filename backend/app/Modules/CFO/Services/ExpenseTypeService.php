@@ -127,9 +127,15 @@ class ExpenseTypeService
             return $locked;
         });
 
+        $refreshed = $updated->refresh();
+
+        if ($refreshed->wasChanged(['name', 'expense_category_id']) && in_array((string) config('scout.driver', 'null'), ['meilisearch', 'collection'], true)) {
+            $refreshed->expenseItems()->searchable();
+        }
+
         $this->forgetCaches();
 
-        return $updated->refresh()->load(self::RELATIONS);
+        return $refreshed->load(self::RELATIONS);
     }
 
     public function deleteExpenseType(ExpenseType $expenseType): void

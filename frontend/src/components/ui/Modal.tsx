@@ -570,6 +570,7 @@ export interface CrudFieldConfig<T> {
   pickerOnly?: boolean;
   optional?: boolean;
   hideInTable?: boolean;
+  hideInForm?: boolean;
   step?: string | number;
   min?: string | number;
   options?:
@@ -1160,7 +1161,9 @@ export function CrudModal<T extends CrudEntity>({
                   </div>
 
                   <div className="grid grid-cols-1 gap-3">
-                    {resolvedFields.map((field) => renderFieldControl(field))}
+                    {resolvedFields
+                      .filter((field) => !field.hideInForm)
+                      .map((field) => renderFieldControl(field))}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
@@ -1207,8 +1210,10 @@ export function CrudModal<T extends CrudEntity>({
                         )
                 }
               >
-                {resolvedFields.map((field) => {
-                  const control = renderFieldControl(field);
+                {resolvedFields
+                  .filter((field) => !field.hideInForm)
+                  .map((field) => {
+                    const control = renderFieldControl(field);
                   if (!isSingleRowForm) {
                     return control;
                   }
