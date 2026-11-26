@@ -1,30 +1,45 @@
-## Feature: CHO / PayrollItem
-- **Table:** `payroll_items` (`id` `bigint unsigned` PK, `company_id` `bigint unsigned` FK → `companies.id` `restrictOnDelete()`, `payroll_run_id` `bigint unsigned` FK → `payroll_runs.id` `restrictOnDelete()`, `employee_id` `bigint unsigned` FK → `employees.id` `restrictOnDelete()`, `employee_position_id` `bigint unsigned` nullable FK → `employee_positions.id` `restrictOnDelete()` snapshot of `Jabatan`, `payroll_group` `varchar(30)` default `'office'` (`office | outlet`), `bank_account_number` `varchar(50)` nullable for account number under `Nama` or null when `???`, `base_salary` `decimal(18, 2)` default `0.00` (`Pokok`), `bpjs_kesehatan` `decimal(18, 2)` default `0.00` (`KS`), `bpjs_ketenagakerjaan` `decimal(18, 2)` default `0.00` (`KT`/`KJ`), `bonus` `decimal(18, 2)` default `0.00` (`Bonus`), `overtime` `decimal(18, 2)` default `0.00` (`Lembur`), `deduction` `decimal(18, 2)` default `0.00` (`Potongan`), `thr` `decimal(18, 2)` default `0.00` (`THR`), `pph21` `decimal(18, 2)` default `0.00` (`PPH 21`), `total_net` `decimal(18, 2)` default `0.00` (`Total` — server-computed), `notes` `varchar(500)` nullable, `timestamps`, `softDeletes`, `active_flag` `unsignedTinyInteger` virtual generated)
+# ERP Feature Spec: CPO — Ingredient (`ingredients`)
+
+## Feature: CPO
+- **Table:** `ingredients`
+  - `id` (`bigIncrements`, PK)
+  - `default_package_id` (`foreignId` -> `default_packages.id`, `restrictOnDelete()`)
+  - `item_id` (`foreignId` -> `items.id`, `restrictOnDelete()`)
+  - `price` (`decimal(18, 2)`, default `0.00`)
+  - `created_at`, `updated_at` (`timestamps`)
+  - `deleted_at` (`softDeletes`)
+  - `active_flag` (`unsignedTinyInteger('active_flag')->nullable()->virtualAs('CASE WHEN deleted_at IS NULL THEN 1 ELSE NULL END')`)
+  - **Constraints & Indexes:**
+    - `unique(['default_package_id', 'item_id', 'active_flag'], 'ingredients_pkg_item_active_unique')`
+    - `index(['deleted_at', 'default_package_id', 'id'])`
+    - `index(['deleted_at', 'item_id', 'id'])`
 - **Schema & DB Guardrails:**
-  - **Money / Totals:** Always `decimal(18, 2)` for `base_salary`, `bpjs_kesehatan`, `bpjs_ketenagakerjaan`, `bonus`, `overtime`, `deduction`, `thr`, `pph21`, and `total_net` (never `double` or `float`)
-  - **Tenant & FKs:** Scope to `company_id`; explicit FK constraints on `company_id` → `companies.id`, `payroll_run_id` → `payroll_runs.id`, `employee_id` → `employees.id`, and `employee_position_id` → `employee_positions.id`, all using `restrictOnDelete()` (never `cascadeOnDelete()`)
-  - **Soft-Delete Uniqueness:** Never put `deleted_at` in a `UNIQUE` key; use generated `active_flag` (`unsignedTinyInteger('active_flag')->nullable()->virtualAs('CASE WHEN deleted_at IS NULL THEN 1 ELSE NULL END')`, add `'active_flag'` to `PayrollItem::$hidden`); add `unique(['company_id', 'payroll_run_id', 'employee_id', 'active_flag'])`
-  - **Indexing:** Composite indexes `(company_id, deleted_at, payroll_run_id, id)`, `(payroll_run_id, deleted_at, payroll_group, id)`, `(company_id, deleted_at, employee_id)`, and `(deleted_at, id)` matching `defaultSort` and frequent filters; no standalone indexes on `created_at`, `updated_at`, `deleted_at`, or `payroll_group`
-- **Enum (`app/Enums/`):** `PayrollGroup: office | outlet`
-- **Relations:** `belongsTo(Company::class)`, `belongsTo(PayrollRun::class)`, `belongsTo(Employee::class)`, `belongsTo(EmployeePosition::class)`
-- **Endpoints (`/api/v1/modules/cho/payroll-items`):** `index`, `store`, `show`, `update` (`PUT` + partial `PATCH`), `destroy`
-- **QueryBuilder & Speed Guardrails (`PayrollItemService::list`):**
-  - `filters=[company_id, payroll_run_id, employee_id, employee_position_id, payroll_group, search]`, `sorts=[payroll_group, base_salary, total_net, id]` (`defaultSort: payroll_group, id`), `includes=[company, payrollRun, employee, employeePosition]`
+  - **Money / Totals:** `price` is `decimal(18, 2)` (never `double` or `float`)
+  - **FKs:** Explicit FK constraints with `restrictOnDelete()` on `default_package_id` and `item_id` (existing `items` table from `mysql-schema.sql`[cite: 1])
+  - **Soft-Delete Uniqueness:** Generated `active_flag` virtual column (`'active_flag'` in Model `$hidden`), unique active `(default_package_id, item_id)` so an item cannot be duplicated inside the same active package
+  - **Indexing:** Composite `(deleted_at, default_package_id, id)` and `(deleted_at, item_id, id)` matching `defaultSort` and frequent parent lookups; no standalone indexes on `created_at`, `updated_at`, `deleted_at`
+- **Enum (`app/Enums/`):** None
+- **Relations:**
+  - `belongsTo(DefaultPackage::class)`
+  - `belongsTo(Item::class)`
+- **Endpoints (`/api/v1/modules/cpo/ingredients`):** `index`, `store`, `show`, `update` (`PUT` + partial `PATCH`), `destroy`
+- **QueryBuilder & Speed Guardrails (`IngredientService::list`):**
+  - `filters=['default_package_id', 'item_id', 'min_price', 'max_price']`
+  - `sorts=['id', 'default_package_id', 'item_id', 'price', 'created_at']` (default: `id`)
+  - `includes=['defaultPackage', 'item']`
   - Cap pagination via `IndexQuery::paginate()` (`MAX_PER_PAGE = 100`); never allow unbounded `per_page`
-  - Support `?active_company=1` via `IndexQuery::applyActiveCompanyFilter()`
-  - Use `IndexQuery::escapeLike()` + `IndexQuery::whereLike()` for text search (`bank_account_number`, `employee.name`; skip whitespace-only terms; never use `LIKE` on `decimal` columns — use exact or range comparison)
+  - Never use `LIKE` on `decimal`/numeric columns (`price`, IDs) — use exact or range comparison
   - Never run a duplicate uncached aggregate query (`SUM`/`COUNT`) on `index()` when an unpaginated collection is already fetched or cached
-  - Eager-load default relations via `IndexQuery::withDefaultRelations()` (zero N+1 queries)
-- **Validation & Safety Rules (`FormRequest` + `Service`):**
-  - Normalize `bank_account_number` and `notes` via `App\Support\InputNormalizer` in `prepareForValidation()` and `payload()` (`trim` + collapse spaces)
-  - Validate active uniqueness (`company_id`, `payroll_run_id`, `employee_id`) in `FormRequest::after()` (`WriteGuard::existsCaseInsensitive()`, with partial `PATCH` fallback to route model values) AND inside `DB::transaction()` via `WriteGuard::assertUniqueActive(..., sharedLock: true)`
-  - Support partial `PATCH` updates (`sometimes` on `PATCH`) and fallback to existing model values when server-computing `total_net = (base_salary + bonus + overtime + thr) - (bpjs_kesehatan + bpjs_ketenagakerjaan + deduction + pph21)`
-  - Enforce numeric bounds (`min:0`, `max:9999999999999999.99`, `decimal:0,2` for all `decimal(18, 2)` fields; check computed `total_net` bounds in `after()`)
-  - Enforce cross-field hierarchy & parent status rules in `FormRequest::after()`: `payroll_run_id`, `employee_id`, and `employee_position_id` must belong to the submitted `company_id` and be active (`whereNull('deleted_at')`); reject mutations (`422`) when parent `payroll_run.status` is `approved` or `void`
-  - `DB::transaction()` on all writes; `lockForUpdate()` on target `PayrollItem` and parent `PayrollRun` when recalculating `payroll_runs.total_*` rollups on `store`, `update`, and `destroy`; re-verify active parent rows (`company`, `payroll_run`, `employee`, `employee_position`) inside the transaction using `->whereNull('deleted_at')->sharedLock()`
+  - Eager-load default relations (`defaultPackage`, `item`) via `IndexQuery::withDefaultRelations()` (zero N+1 queries)
+- **Validation & Safety Rules (`IngredientRequest` + `IngredientService`):**
+  - Validate active uniqueness in `FormRequest::after()` (`WriteGuard::existsCaseInsensitive()` on `['default_package_id', 'item_id']`, with partial `PATCH` fallback to route model values) AND inside `DB::transaction()` via `WriteGuard::assertUniqueActive(..., sharedLock: true)`
+  - Support partial `PATCH` updates (`sometimes` on `PATCH`) and fallback to existing model values
+  - Enforce numeric bounds on `price`: `numeric`, `min:0`, `max:9999999999999999.99`, `decimal:0,2`
+  - `DB::transaction()` on all writes; `lockForUpdate()` on row updates/deletes; re-verify active parent rows (`default_packages`, `items`) inside the transaction using `->whereNull('deleted_at')->sharedLock()`
+  - On `destroy`, soft-delete row and forget all dependent caches
   - Transactional `POST`s rely on global `EnforceIdempotencyKey` middleware (`Idempotency-Key` header) to deduplicate client retries
-- **Seeder (`database/seeders/DatabaseSeeder.php`):** idempotent sample data (`updateOrCreate` / `withTrashed()` on unique keys inside `DB::transaction()`, end with `Cache::flush()`): seed sample `office` (`Kepala Area`, `SPV`, `Lokasi` with `KS`, `KT`, `Bonus`, `Potongan`, `PPH 21`) and `outlet` (`Outlet`, base salary only, including a null `bank_account_number` case) `PayrollItem` rows linked to the `CV Area 31` `2025-12-01` `PayrollRun`; assert `payroll_items` populated in `SystemIntegrityTest`
+- **Seeder (`database/seeders/DatabaseSeeder.php`):** Idempotent sample data (`default_package_id: 1`, `item_id: 1`, `price: 1.00` from reference[cite: 2] via `updateOrCreate` / `withTrashed()` on `['default_package_id', 'item_id']` inside `DB::transaction()`, end with `Cache::flush()`); assert table populated in `SystemIntegrityTest`
 - **Pest Tests:**
-  - Feature test (`tests/Feature/PayrollItemTest.php`): CRUD (`PUT` + partial `PATCH`), server-computed `total_net` and parent `payroll_runs.total_*` rollup updates, filters/sorts/includes, 422 validation (numeric bounds, cross-company FK mismatch, mutating items under `approved`/`void` run), soft delete, active-duplicate rejection + re-create after soft delete
+  - Feature test (`tests/Feature/IngredientTest.php`): CRUD (`PUT` + partial `PATCH`), filters/sorts/includes, 422 validation (decimal bounds, inactive/missing parent FKs), soft delete, active-duplicate rejection + re-create after soft delete
   - Guardrail test (`tests/Unit/ApiPatternGuardrailsTest.php`): query-count/N+1 bounds, cache hit 0-query checks, `per_page` cap, schema/model `active_flag` & `$hidden`, Request/Service anti-duplication & `Idempotency-Key` checks
-- **Verify:** `php artisan migrate:fresh --seed` (and repeat `db:seed`), `make schema-dump`, `make test-filter FILTER=PayrollItemTest`, `make test-filter FILTER=ApiPatternGuardrailsTest`
+- **Verify:** `php artisan migrate:fresh --seed` (and repeat `db:seed`), `make schema-dump`, `make test-filter FILTER=IngredientTest`, `make test-filter FILTER=ApiPatternGuardrailsTest`

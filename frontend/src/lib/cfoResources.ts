@@ -8,9 +8,11 @@ import {
 } from '@tanstack/react-query';
 import {
   type CapitalCompany,
+  type CfoEnums,
   type Company,
   type CompanyAsset,
   type CompanyAssetPayload,
+  type CompanyType,
   type ErpModuleCode,
   type ErpModuleOverview,
   type ExpenseCategory,
@@ -29,6 +31,7 @@ import {
   deleteExpenseItem,
   deleteExpenseType,
   fetchCapitalCompanies,
+  fetchCfoEnums,
   fetchCompanies,
   fetchCompanyAssets,
   fetchErpModules,
@@ -43,8 +46,19 @@ import {
   updateExpenseType,
 } from '@/api/client';
 
+export const DEFAULT_CFO_ENUMS: CfoEnums = {
+  company_type: [
+    { value: 'Utama', nama: 'Utama' },
+    { value: 'Packing', nama: 'Packing' },
+    { value: 'Kelengkapan', nama: 'Kelengkapan' },
+    { value: 'Sarpras', nama: 'Sarpras' },
+    { value: 'Bahan', nama: 'Bahan' },
+  ],
+};
+
 export const cfoQueryKeys = {
   modules: ['erp', 'modules'] as const,
+  enums: ['cfo', 'enums'] as const,
   companies: ['cfo', 'companies'] as const,
   capitalCompanies: ['cfo', 'capital-companies'] as const,
   expenseCategories: ['cfo', 'expense-categories'] as const,
@@ -331,9 +345,28 @@ export function useErpModulesQuery() {
   };
 }
 
+export function useCfoEnumsResource(enabled = true) {
+  const enumsQuery = useQuery<CfoEnums>({
+    queryKey: cfoQueryKeys.enums,
+    queryFn: async () => {
+      const res = await fetchCfoEnums();
+      return res?.data ?? DEFAULT_CFO_ENUMS;
+    },
+    enabled,
+    staleTime: 0,
+  });
+
+  return {
+    enums: enumsQuery.data ?? DEFAULT_CFO_ENUMS,
+    loading: enumsQuery.isLoading,
+    refetch: enumsQuery.refetch,
+  };
+}
+
 export function useCompanyCrudResource(enabled = true) {
   const queryClient = useQueryClient();
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const enumsResource = useCfoEnumsResource(enabled);
 
   const companiesQuery = useQuery<Company[]>({
     queryKey: cfoQueryKeys.companies,
@@ -345,7 +378,11 @@ export function useCompanyCrudResource(enabled = true) {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (input: { name: string; series: number }) => {
+    mutationFn: async (input: {
+      name: string;
+      series: number;
+      type?: CompanyType;
+    }) => {
       const res = await createCompany(input);
       return res.data;
     },
@@ -359,10 +396,16 @@ export function useCompanyCrudResource(enabled = true) {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (input: { id: number; name: string; series: number }) => {
+    mutationFn: async (input: {
+      id: number;
+      name: string;
+      series: number;
+      type?: CompanyType;
+    }) => {
       const res = await updateCompany(input.id, {
         name: input.name,
         series: input.series,
+        type: input.type,
       });
       return res.data;
     },
@@ -418,10 +461,14 @@ export function useCompanyCrudResource(enabled = true) {
   });
 
   const create = useCallback(
-    async (name: string, series = 1): Promise<Company | null> => {
+    async (
+      name: string,
+      series = 1,
+      type: CompanyType = 'Utama'
+    ): Promise<Company | null> => {
       setMutationError(null);
       try {
-        return await createMutation.mutateAsync({ name, series });
+        return await createMutation.mutateAsync({ name, series, type });
       } catch (err) {
         setMutationError(getErrorMessage(err, 'Gagal menambahkan perusahaan.'));
         return null;
@@ -431,10 +478,15 @@ export function useCompanyCrudResource(enabled = true) {
   );
 
   const update = useCallback(
-    async (id: number, name: string, series = 1): Promise<Company | null> => {
+    async (
+      id: number,
+      name: string,
+      series = 1,
+      type: CompanyType = 'Utama'
+    ): Promise<Company | null> => {
       setMutationError(null);
       try {
-        return await updateMutation.mutateAsync({ id, name, series });
+        return await updateMutation.mutateAsync({ id, name, series, type });
       } catch (err) {
         setMutationError(getErrorMessage(err, 'Gagal memperbarui perusahaan.'));
         return null;
@@ -458,6 +510,8 @@ export function useCompanyCrudResource(enabled = true) {
   );
 
   return {
+    enums: enumsResource.enums,
+    refetchEnums: enumsResource.refetch,
     companies: companiesQuery.data ?? [],
     loading:
       companiesQuery.isLoading ||

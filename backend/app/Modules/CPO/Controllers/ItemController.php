@@ -39,7 +39,7 @@ class ItemController extends Controller
 
     public function show(Item $item): JsonResponse
     {
-        return (new ItemResource($item->load(['company'])))->response();
+        return (new ItemResource($item->load(['company', 'packetVendor'])))->response();
     }
 
     public function update(SaveItemRequest $request, Item $item): JsonResponse

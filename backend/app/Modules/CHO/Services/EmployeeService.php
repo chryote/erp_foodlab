@@ -119,20 +119,17 @@ class EmployeeService
                 AllowedFilter::exact('gender'),
                 AllowedFilter::exact('religion'),
                 AllowedFilter::exact('blood_type'),
-                AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
-                    $escaped = IndexQuery::escapeLike($value);
-                    if ($escaped === null) {
-                        return;
-                    }
-
-                    $query->where(function (Builder $searchQuery) use ($escaped): void {
-                        IndexQuery::whereLike($searchQuery, 'name', $escaped);
-                        IndexQuery::orWhereLike($searchQuery, 'nickname', $escaped);
-                        IndexQuery::orWhereLike($searchQuery, 'nik_ktp', $escaped);
-                        IndexQuery::orWhereLike($searchQuery, 'employee_attendance_code', $escaped);
-                        IndexQuery::orWhereLike($searchQuery, 'email', $escaped);
-                        IndexQuery::orWhereLike($searchQuery, 'phone', $escaped);
-                    });
+                AllowedFilter::callback('search', function (Builder $query, mixed $value) use ($request): void {
+                    IndexQuery::applySearch($query, $value, function (Builder $searchQuery, string $escaped): void {
+                        $searchQuery->where(function (Builder $likeQuery) use ($escaped): void {
+                            IndexQuery::whereLike($likeQuery, 'name', $escaped);
+                            IndexQuery::orWhereLike($likeQuery, 'nickname', $escaped);
+                            IndexQuery::orWhereLike($likeQuery, 'nik_ktp', $escaped);
+                            IndexQuery::orWhereLike($likeQuery, 'employee_attendance_code', $escaped);
+                            IndexQuery::orWhereLike($likeQuery, 'email', $escaped);
+                            IndexQuery::orWhereLike($likeQuery, 'phone', $escaped);
+                        });
+                    }, request: $request);
                 }),
             ])
             ->allowedSorts(['id', 'name', 'nik_ktp', 'employee_attendance_code', 'birth_date', 'created_at'])

@@ -4,6 +4,7 @@ namespace App\Modules\CPO\Requests;
 
 use App\Enums\ItemType;
 use App\Models\Item;
+use App\Support\ExclusiveOwner;
 use App\Support\InputNormalizer;
 use App\Support\WriteGuard;
 use Illuminate\Foundation\Http\FormRequest;
@@ -25,7 +26,7 @@ class SaveItemRequest extends FormRequest
             $normalized['code'] = InputNormalizer::nullableText($this->input('code'));
         }
 
-        foreach (['company_id', 'name', 'type'] as $field) {
+        foreach (['company_id', 'packet_vendor_id', 'name', 'type'] as $field) {
             if ($this->has($field) && is_string($this->input($field))) {
                 $normalized[$field] = InputNormalizer::text($this->input($field));
             }
@@ -46,9 +47,16 @@ class SaveItemRequest extends FormRequest
 
         return [
             'company_id' => [
-                ...$presence,
+                'sometimes',
+                'nullable',
                 'integer',
                 Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
+            'packet_vendor_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists('packet_vendors', 'id')->whereNull('deleted_at'),
             ],
             'code' => [...$codePresence, 'nullable', 'string', 'max:50'],
             'name' => [...$presence, 'string', 'max:150'],
@@ -65,31 +73,54 @@ class SaveItemRequest extends FormRequest
             function (Validator $validator): void {
                 /** @var Item|null $item */
                 $item = $this->route('item');
+                $owner = ExclusiveOwner::resolveForRequest($this, $item);
 
-                if (
-                    $item instanceof Item
-                    && $this->filled('company_id')
-                    && ! $validator->errors()->has('company_id')
-                    && (int) $this->input('company_id') !== (int) $item->company_id
-                    && $item->itemPackets()->exists()
-                ) {
-                    $validator->errors()->add(
-                        'company_id',
-                        'Tidak dapat mengubah perusahaan karena item masih terhubung dengan paket aktif.'
-                    );
-                }
+                if ($owner['both_submitted']) {
+                    $message = 'Item tidak boleh terhubung ke perusahaan dan vendor paket secara bersamaan.';
+                    $validator->errors()->add('company_id', $message);
+                    $validator->errors()->add('packet_vendor_id', $message);
 
-                if ($validator->errors()->has('company_id')) {
                     return;
                 }
 
-                $effectiveCompanyId = $this->filled('company_id')
-                    ? (int) $this->input('company_id')
-                    : (int) ($item?->company_id ?? 0);
-
-                if ($effectiveCompanyId <= 0) {
+                if ($validator->errors()->hasAny(['company_id', 'packet_vendor_id'])) {
                     return;
                 }
+
+                $effectiveCompanyId = $owner['company_id'];
+                $effectiveVendorId = $owner['packet_vendor_id'];
+
+                if (($effectiveCompanyId === null) === ($effectiveVendorId === null)) {
+                    $message = 'Item harus terhubung ke tepat satu: perusahaan atau vendor paket.';
+                    $validator->errors()->add('company_id', $message);
+                    $validator->errors()->add('packet_vendor_id', $message);
+
+                    return;
+                }
+
+                if ($item instanceof Item) {
+                    $oldCompanyId = $item->company_id !== null ? (int) $item->company_id : null;
+                    $oldVendorId = $item->packet_vendor_id !== null ? (int) $item->packet_vendor_id : null;
+
+                    if (
+                        ($effectiveCompanyId !== $oldCompanyId || $effectiveVendorId !== $oldVendorId)
+                        && $item->itemPackets()->exists()
+                    ) {
+                        $errorField = $this->filled('packet_vendor_id') && ! $this->filled('company_id')
+                            ? 'packet_vendor_id'
+                            : 'company_id';
+
+                        $validator->errors()->add(
+                            $errorField,
+                            'Tidak dapat mengubah pemilik karena item masih terhubung dengan paket aktif.'
+                        );
+
+                        return;
+                    }
+                }
+
+                $scopeFilters = ExclusiveOwner::scopeFilters($effectiveCompanyId, $effectiveVendorId);
+                $ownerLabel = $effectiveCompanyId !== null ? 'perusahaan' : 'vendor paket';
 
                 if (! $validator->errors()->has('code')) {
                     $effectiveCode = $this->has('code')
@@ -102,10 +133,10 @@ class SaveItemRequest extends FormRequest
                         Item::query(),
                         'code',
                         $effectiveCode,
-                        ['company_id' => $effectiveCompanyId],
+                        $scopeFilters,
                         $item?->getKey()
                     )) {
-                        $validator->errors()->add('code', 'Item dengan kode yang sama sudah terdaftar pada perusahaan ini.');
+                        $validator->errors()->add('code', "Item dengan kode yang sama sudah terdaftar pada {$ownerLabel} ini.");
                     }
                 }
 
@@ -118,10 +149,10 @@ class SaveItemRequest extends FormRequest
                         Item::query(),
                         'name',
                         $effectiveName,
-                        ['company_id' => $effectiveCompanyId],
+                        $scopeFilters,
                         $item?->getKey()
                     )) {
-                        $validator->errors()->add('name', 'Item dengan nama yang sama sudah terdaftar pada perusahaan ini.');
+                        $validator->errors()->add('name', "Item dengan nama yang sama sudah terdaftar pada {$ownerLabel} ini.");
                     }
                 }
             },
@@ -133,14 +164,10 @@ class SaveItemRequest extends FormRequest
      */
     public function payload(): array
     {
-        $validated = $this->validated();
+        $validated = ExclusiveOwner::applyToPayload($this->validated());
         $isPatch = $this->isMethod('PATCH');
         /** @var Item|null $routeItem */
         $routeItem = $this->route('item');
-
-        if (array_key_exists('company_id', $validated)) {
-            $validated['company_id'] = (int) $validated['company_id'];
-        }
 
         if (array_key_exists('code', $validated)) {
             $validated['code'] = $validated['code'] !== null

@@ -221,6 +221,17 @@ describe('App ERP Main Menu integration', () => {
       },
     ];
 
+    vi.mocked(apiClient.fetchCfoEnums).mockResolvedValue({
+      data: {
+        company_type: [
+          { value: 'Utama', nama: 'Utama' },
+          { value: 'Packing', nama: 'Packing' },
+          { value: 'Kelengkapan', nama: 'Kelengkapan' },
+          { value: 'Sarpras', nama: 'Sarpras' },
+          { value: 'Bahan', nama: 'Bahan' },
+        ],
+      },
+    });
     vi.mocked(apiClient.fetchCompanies).mockImplementation(async () => ({
       data: [...companiesStore],
       meta: { count: companiesStore.length },
@@ -230,6 +241,7 @@ describe('App ERP Main Menu integration', () => {
         id: 2,
         name: payload.name,
         series: payload.series ?? 1,
+        type: payload.type ?? 'Utama',
       };
       companiesStore = [created, ...companiesStore];
       return { data: created };
@@ -240,6 +252,7 @@ describe('App ERP Main Menu integration', () => {
           id,
           name: payload.name,
           series: payload.series ?? 1,
+          type: payload.type ?? 'Utama',
         };
         companiesStore = companiesStore.map((c) => (c.id === id ? updated : c));
         return { data: updated };
@@ -351,9 +364,13 @@ describe('App ERP Main Menu integration', () => {
       screen.queryByLabelText('Nama Stakeholder')
     ).not.toBeInTheDocument();
 
-    // Create company with Nama Perusahaan and Seri (requires confirmation dialog)
+    // Create company with Nama Perusahaan and Seri (Tipe Perusahaan is hidden in form and table)
     const nameInput = screen.getByLabelText('Nama Perusahaan');
     const seriesInput = screen.getByLabelText('Seri');
+    expect(screen.queryByLabelText('Tipe Perusahaan')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('columnheader', { name: 'Tipe Perusahaan' })
+    ).not.toBeInTheDocument();
     fireEvent.change(nameInput, { target: { value: 'PT. Pangan Nusantara' } });
     fireEvent.change(seriesInput, { target: { value: '2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Tambah' }));
@@ -365,6 +382,7 @@ describe('App ERP Main Menu integration', () => {
       expect(apiClient.createCompany).toHaveBeenCalledWith({
         name: 'PT. Pangan Nusantara',
         series: 2,
+        type: 'Utama',
       });
       expect(screen.getByText('PT. Pangan Nusantara')).toBeInTheDocument();
       expect(screen.getByTestId('series-tab-1')).toHaveTextContent('Seri 1');
@@ -386,6 +404,7 @@ describe('App ERP Main Menu integration', () => {
       expect(apiClient.updateCompany).toHaveBeenCalledWith(2, {
         name: 'PT. Pangan Nusantara Baru',
         series: 2,
+        type: 'Utama',
       });
       expect(screen.getByText('PT. Pangan Nusantara Baru')).toBeInTheDocument();
     });
