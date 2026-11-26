@@ -598,21 +598,22 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
       screen.queryByTestId('horizontal-submenu-INPUT_PAKET')
     ).not.toBeInTheDocument();
 
-    // 2. Click Input Paket -> shows Master Paket, Master Bahan Baku, and View Bahan Baku child cards
+    // 2. Click Input Paket -> shows Master Paket and View Paket Awal child cards (Master Bahan Baku deprecated)
     fireEvent.click(inputPaketCard);
     const paketSubmenu = screen.getByTestId('horizontal-submenu-INPUT_PAKET');
     const masterPaketCard = within(paketSubmenu).getByTestId(
       'horizontal-menu-card-MASTER_PAKET'
     );
-    const masterBahanBakuCard = within(paketSubmenu).getByTestId(
-      'horizontal-menu-card-MASTER_BAHAN_BAKU'
-    );
-    const viewBahanBakuCard = within(paketSubmenu).getByTestId(
-      'horizontal-menu-card-VIEW_BAHAN_BAKU'
+    const viewPaketAwalCard = within(paketSubmenu).getByTestId(
+      'horizontal-menu-card-VIEW_PAKET_AWAL'
     );
     expect(masterPaketCard).toHaveTextContent('Master Paket');
-    expect(masterBahanBakuCard).toHaveTextContent('Master Bahan Baku');
-    expect(viewBahanBakuCard).toHaveTextContent('View Bahan Baku');
+    expect(
+      within(paketSubmenu).queryByTestId(
+        'horizontal-menu-card-MASTER_BAHAN_BAKU'
+      )
+    ).not.toBeInTheDocument();
+    expect(viewPaketAwalCard).toHaveTextContent('View Paket Awal');
 
     // 3. Click Master Paket -> shows Master Paket modal with Master Karyawan split style
     fireEvent.click(masterPaketCard);
@@ -963,7 +964,7 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows Input Paket -> Master Bahan Baku modal, displays all Bahan and Kelengkapan items across companies with company.name, supports dynamic + rows and full CRUD', async () => {
+  it('shows Input Paket -> View Paket Awal strictly read-only DefaultPackage datatable with Detail inspection modal', async () => {
     vi.mocked(apiClient.fetchErpModules).mockResolvedValue({
       data: [
         DEFAULT_CFO_MODULE,
@@ -978,7 +979,6 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
     const companiesStore: apiClient.Company[] = [
       { id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1 },
       { id: 2, name: 'PT. Pangan Nusantara', series: 1 },
-      { id: 3, name: 'PT. Kuliner Mandiri', series: 1 },
     ];
 
     vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
@@ -1007,450 +1007,68 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
       },
       {
         id: 104,
-        company_id: 1,
-        code: 'BHN-03',
-        name: 'Mentega',
-        type: 'Bahan',
-      },
-      {
-        id: 103,
-        company_id: 1,
-        code: 'SRP-01',
-        name: 'Booth Gerobak',
-        type: 'Sarpras',
-      },
-      {
-        id: 201,
-        company_id: 2,
-        code: 'BHN-201',
-        name: 'Susu Bubuk Cabang 2',
-        type: 'Bahan',
-      },
-      {
-        id: 202,
-        company_id: 2,
-        code: 'BHN-202',
-        name: 'Coklat Bubuk Cabang 2',
-        type: 'Bahan',
-      },
-      {
-        id: 105,
-        company_id: 3,
-        code: 'KLP-01',
-        name: 'Cup Sealer',
-        type: 'Kelengkapan',
-      },
-    ];
-
-    let itemPacketsStore: apiClient.ItemPacket[] = [
-      {
-        id: 10,
-        company_id: 1,
-        packet_id: 20,
-        item_id: 103,
-        quantity: 1,
-        company: companiesStore[0],
-        packet: { id: 20, name: 'Paket Dasar' },
-        item: itemsStore[3],
-      },
-      {
-        id: 11,
-        company_id: 2,
-        packet_id: 21,
-        item_id: 201,
-        quantity: 1,
-        company: companiesStore[1],
-        packet: { id: 21, name: 'Paket Cabang 2' },
-        item: itemsStore[4],
-      },
-      {
-        id: 12,
-        company_id: 3,
-        packet_id: 22,
-        item_id: 201,
-        quantity: 1,
-        company: companiesStore[2],
-        packet: { id: 22, name: 'Paket Kosong' },
-        item: null,
-      },
-    ];
-
-    const defaultPackagesStore: apiClient.DefaultPackage[] = [
-      {
-        id: 50,
-        brand_name: 'Brand Satu',
-        packet_name_id: 1,
         packet_vendor_id: 1,
-        packet_category_id: 1,
-        item_packet_id: 10,
-        price: 100000,
-        packet_name: { id: 1, name: 'Paket Starter' },
-        item_packet: itemPacketsStore[0],
-      },
-      {
-        id: 51,
-        brand_name: 'Brand Dua',
-        packet_name_id: 1,
-        packet_vendor_id: 1,
-        packet_category_id: 1,
-        item_packet_id: 11,
-        price: 150000,
-        packet_name: { id: 1, name: 'Paket Cabang' },
-        item_packet: itemPacketsStore[1],
-      },
-      {
-        id: 52,
-        brand_name: 'Brand Tiga',
-        packet_name_id: 1,
-        packet_vendor_id: 1,
-        packet_category_id: 1,
-        item_packet_id: 12,
-        price: 175000,
-        packet_name: { id: 1, name: 'Paket Kosong' },
-        item_packet: itemPacketsStore[2],
-      },
-    ];
-
-    let ingredientsStore: apiClient.Ingredient[] = [
-      {
-        id: 300,
-        default_package_id: 51,
-        item_id: 201,
-        price: 15000,
-        default_package: defaultPackagesStore[1],
-        item: itemsStore[4],
-      },
-      {
-        id: 301,
-        default_package_id: 51,
-        item_id: 202,
-        price: 25000,
-        default_package: defaultPackagesStore[1],
-        item: itemsStore[5],
-      },
-    ];
-    let nextIngredientId = 302;
-
-    vi.mocked(apiClient.fetchItems).mockImplementation(async () => ({
-      data: [...itemsStore],
-      meta: { count: itemsStore.length },
-    }));
-    vi.mocked(apiClient.fetchItemPackets).mockImplementation(async () => ({
-      data: [...itemPacketsStore],
-      meta: { count: itemPacketsStore.length },
-    }));
-    vi.mocked(apiClient.fetchDefaultPackages).mockImplementation(async () => ({
-      data: [...defaultPackagesStore],
-      meta: { count: defaultPackagesStore.length },
-    }));
-    vi.mocked(apiClient.fetchIngredients).mockImplementation(async () => ({
-      data: [...ingredientsStore],
-      meta: { count: ingredientsStore.length },
-    }));
-    vi.mocked(apiClient.createIngredient).mockImplementation(
-      async (payload) => {
-        const created: apiClient.Ingredient = {
-          id: nextIngredientId++,
-          default_package_id: payload.default_package_id,
-          item_id: payload.item_id,
-          price: payload.price ?? 0,
-          default_package:
-            defaultPackagesStore.find(
-              (dp) => dp.id === payload.default_package_id
-            ) ?? null,
-          item: itemsStore.find((it) => it.id === payload.item_id) ?? null,
-        };
-        ingredientsStore = [created, ...ingredientsStore];
-        return { data: created };
-      }
-    );
-    vi.mocked(apiClient.updateIngredient).mockImplementation(
-      async (id, payload) => {
-        const updated: apiClient.Ingredient = {
-          id,
-          default_package_id: payload.default_package_id,
-          item_id: payload.item_id,
-          price: payload.price ?? 0,
-          default_package:
-            defaultPackagesStore.find(
-              (dp) => dp.id === payload.default_package_id
-            ) ?? null,
-          item: itemsStore.find((it) => it.id === payload.item_id) ?? null,
-        };
-        ingredientsStore = ingredientsStore.map((row) =>
-          row.id === id ? updated : row
-        );
-        return { data: updated };
-      }
-    );
-    vi.mocked(apiClient.deleteIngredient).mockImplementation(async (id) => {
-      ingredientsStore = ingredientsStore.filter((row) => row.id !== id);
-      return { message: 'Ingredient deleted successfully.' };
-    });
-
-    renderApp();
-
-    fireEvent.click(await screen.findByTestId('company-tab-1'));
-    fireEvent.click(screen.getByTestId('module-card-CPO'));
-    const cpoMenu = await screen.findByTestId('cpo-horizontal-menu');
-    fireEvent.click(
-      within(cpoMenu).getByTestId('horizontal-menu-card-INPUT_PAKET')
-    );
-
-    const paketSubmenu = screen.getByTestId('horizontal-submenu-INPUT_PAKET');
-    fireEvent.click(
-      within(paketSubmenu).getByTestId('horizontal-menu-card-MASTER_BAHAN_BAKU')
-    );
-
-    const modal = await screen.findByTestId('master-bahan-baku-crud-modal');
-    expect(modal).toBeInTheDocument();
-    expect(modal).toHaveClass('max-w-[95vw]', 'h-[92vh]', 'max-h-[92vh]');
-    expect(
-      screen.getByTestId('master-bahan-baku-crud-modal-split-layout')
-    ).toContainElement(
-      screen.getByTestId('master-bahan-baku-crud-modal-form-panel')
-    );
-    expect(
-      screen.getByTestId('master-bahan-baku-crud-modal-split-layout')
-    ).toContainElement(
-      screen.getByTestId('master-bahan-baku-crud-modal-table-panel')
-    );
-
-    // Existing Brand Dua ingredients are grouped into one row with comma concatenation & summed price
-    expect(
-      await within(modal).findByText(
-        'Susu Bubuk Cabang 2 (BHN-201), Coklat Bubuk Cabang 2 (BHN-202)'
-      )
-    ).toBeInTheDocument();
-    expect(within(modal).getByText('Rp 40.000')).toBeInTheDocument();
-
-    // Select Nama Brand (company 1) -> shows all Bahan and Kelengkapan items across all companies with company.name (excluding Sarpras)
-    const brandSelect = within(modal).getByLabelText(
-      'Nama Brand'
-    ) as HTMLSelectElement;
-    fireEvent.change(brandSelect, { target: { value: '50' } });
-
-    const row0 = within(modal).getByTestId('ingredient-item-row-0');
-    const row0Select = within(row0).getByLabelText(
-      'Bahan Baku'
-    ) as HTMLSelectElement;
-    const row0OptionLabels = Array.from(row0Select.options).map(
-      (opt) => opt.textContent
-    );
-    expect(row0OptionLabels).toContain(
-      'Tepung Terigu (BHN-01) - PT. Slaras Nusa Foodlab'
-    );
-    expect(row0OptionLabels).toContain(
-      'Gula Pasir (BHN-02) - PT. Slaras Nusa Foodlab'
-    );
-    expect(row0OptionLabels).toContain(
-      'Mentega (BHN-03) - PT. Slaras Nusa Foodlab'
-    );
-    expect(row0OptionLabels).toContain(
-      'Cup Sealer (KLP-01) - PT. Kuliner Mandiri'
-    );
-    expect(row0OptionLabels).toContain(
-      'Susu Bubuk Cabang 2 (BHN-201) - PT. Pangan Nusantara'
-    );
-    expect(row0OptionLabels).not.toContain(
-      'Booth Gerobak (SRP-01) - PT. Slaras Nusa Foodlab'
-    );
-
-    // Switching brand keeps non-persisted items from any company, while clearing items already persisted on the target brand
-    fireEvent.change(row0Select, { target: { value: '101' } });
-    fireEvent.change(brandSelect, { target: { value: '51' } });
-    expect(row0Select.value).toBe('101');
-    fireEvent.change(brandSelect, { target: { value: '50' } });
-    fireEvent.change(row0Select, { target: { value: '201' } });
-    expect(row0Select.value).toBe('201');
-    fireEvent.change(brandSelect, { target: { value: '51' } });
-    expect(row0Select.value).toBe('');
-
-    // Switch back to Brand Satu (company 1), fill row 0 and click "+" to add row 1 dynamically
-    fireEvent.change(brandSelect, { target: { value: '50' } });
-    fireEvent.change(row0Select, { target: { value: '101' } });
-    fireEvent.change(within(row0).getByLabelText('Harga (Rp)'), {
-      target: { value: '12000' },
-    });
-
-    const plusBtn = within(modal).getByRole('button', { name: '+' });
-    fireEvent.click(plusBtn);
-
-    const row1 = within(modal).getByTestId('ingredient-item-row-1');
-    const row1Select = within(row1).getByLabelText(
-      'Bahan Baku'
-    ) as HTMLSelectElement;
-    // Row 1 excludes item already picked in row 0
-    const row1OptionLabels = Array.from(row1Select.options).map(
-      (opt) => opt.textContent
-    );
-    expect(row1OptionLabels).toContain(
-      'Gula Pasir (BHN-02) - PT. Slaras Nusa Foodlab'
-    );
-    expect(row1OptionLabels).not.toContain(
-      'Tepung Terigu (BHN-01) - PT. Slaras Nusa Foodlab'
-    );
-
-    fireEvent.change(row1Select, { target: { value: '102' } });
-    fireEvent.change(within(row1).getByLabelText('Harga (Rp)'), {
-      target: { value: '18500' },
-    });
-
-    fireEvent.click(within(modal).getByRole('button', { name: 'Tambah' }));
-    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
-
-    await waitFor(() => {
-      expect(apiClient.createIngredient).toHaveBeenCalledTimes(2);
-      expect(apiClient.createIngredient).toHaveBeenNthCalledWith(1, {
-        default_package_id: 50,
-        item_id: 101,
-        price: 12000,
-      });
-      expect(apiClient.createIngredient).toHaveBeenNthCalledWith(2, {
-        default_package_id: 50,
-        item_id: 102,
-        price: 18500,
-      });
-      expect(
-        within(modal).getByText('Tepung Terigu (BHN-01), Gula Pasir (BHN-02)')
-      ).toBeInTheDocument();
-      expect(within(modal).getByText('Rp 30.500')).toBeInTheDocument();
-    });
-
-    // Edit grouped row for Brand Satu (50): update price on row 0 AND click "+" to add Mentega dynamically
-    fireEvent.click(within(modal).getByTestId('edit-row-50'));
-    const editRow0 = within(modal).getByTestId('ingredient-item-row-0');
-    fireEvent.change(within(editRow0).getByLabelText('Harga (Rp)'), {
-      target: { value: '15000' },
-    });
-
-    fireEvent.click(within(modal).getByRole('button', { name: '+' }));
-    const editRow2 = within(modal).getByTestId('ingredient-item-row-2');
-    fireEvent.change(within(editRow2).getByLabelText('Bahan Baku'), {
-      target: { value: '104' },
-    });
-    fireEvent.change(within(editRow2).getByLabelText('Harga (Rp)'), {
-      target: { value: '5000' },
-    });
-
-    fireEvent.click(within(modal).getByRole('button', { name: 'Perbarui' }));
-    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
-
-    await waitFor(() => {
-      expect(apiClient.updateIngredient).toHaveBeenCalledWith(302, {
-        default_package_id: 50,
-        item_id: 101,
-        price: 15000,
-      });
-      expect(apiClient.createIngredient).toHaveBeenCalledWith({
-        default_package_id: 50,
-        item_id: 104,
-        price: 5000,
-      });
-      expect(
-        within(modal).getByText(
-          'Tepung Terigu (BHN-01), Gula Pasir (BHN-02), Mentega (BHN-03)'
-        )
-      ).toBeInTheDocument();
-      expect(within(modal).getByText('Rp 38.500')).toBeInTheDocument();
-    });
-
-    // Delete grouped row for Brand Satu (50) -> deletes all ingredients in that brand group
-    fireEvent.click(within(modal).getByTestId('delete-row-50'));
-    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
-
-    await waitFor(() => {
-      expect(apiClient.deleteIngredient).toHaveBeenCalledTimes(3);
-      expect(
-        within(modal).queryByText(
-          'Tepung Terigu (BHN-01), Gula Pasir (BHN-02), Mentega (BHN-03)'
-        )
-      ).not.toBeInTheDocument();
-    });
-
-    fireEvent.click(
-      within(modal).getByRole('button', { name: 'Tutup Modal' })
-    );
-    expect(
-      screen.queryByTestId('master-bahan-baku-crud-modal')
-    ).not.toBeInTheDocument();
-  });
-
-  it('shows Input Paket -> View Bahan Baku strictly read-only datatable grouped by default_package_id with Detail inspection modal', async () => {
-    vi.mocked(apiClient.fetchErpModules).mockResolvedValue({
-      data: [
-        DEFAULT_CFO_MODULE,
-        DEFAULT_CHO_MODULE,
-        DEFAULT_CPO_MODULE,
-        DEFAULT_CDO_MODULE,
-        DEFAULT_CMO_MODULE,
-      ],
-      meta: { count: 5 },
-    });
-
-    const companiesStore: apiClient.Company[] = [
-      { id: 1, name: 'PT. Slaras Nusa Foodlab', series: 1 },
-      { id: 2, name: 'PT. Pangan Nusantara', series: 1 },
-      { id: 3, name: 'PT. Kuliner Mandiri', series: 1 },
-    ];
-
-    vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
-      data: [...companiesStore],
-      meta: { count: companiesStore.length },
-    });
-
-    vi.mocked(apiClient.syncActiveCompany).mockImplementation(async (id) => ({
-      data: companiesStore.find((c) => c.id === id) ?? null,
-    }));
-
-    const itemsStore: apiClient.Item[] = [
-      {
-        id: 101,
-        company_id: 1,
-        code: 'BHN-01',
-        name: 'Tepung Terigu',
-        type: 'Bahan',
-      },
-      {
-        id: 102,
-        company_id: 1,
-        code: 'BHN-02',
-        name: 'Gula Pasir',
-        type: 'Bahan',
-      },
-      {
-        id: 104,
-        company_id: 1,
+        company_id: null,
         code: null,
         name: 'Garam Halus',
         type: 'Bahan',
       },
     ];
 
+    const itemPacketsStore: apiClient.ItemPacket[] = [
+      {
+        id: 10,
+        company_id: 1,
+        packet_id: 20,
+        item_id: 101,
+        quantity: 2,
+        company: companiesStore[0],
+        packet: { id: 20, name: 'Paket Starter Pack' },
+        item: itemsStore[0],
+      },
+      {
+        id: 11,
+        company_id: 1,
+        packet_id: 20,
+        item_id: 102,
+        quantity: 3,
+        company: companiesStore[0],
+        packet: { id: 20, name: 'Paket Starter Pack' },
+        item: itemsStore[1],
+      },
+    ];
+
     const defaultPackagesStore: apiClient.DefaultPackage[] = [
       {
         id: 50,
         brand_name: 'Brand Satu',
         packet_name_id: 1,
-        packet_vendor_id: 1,
+        company_id: 1,
+        packet_vendor_id: null,
         packet_category_id: 1,
+        packet_id: 20,
         item_packet_id: 10,
         price: 100000,
         packet_name: { id: 1, name: 'Paket Starter' },
-        packet_vendor: { id: 1, name: 'Vendor Utama' },
+        company: companiesStore[0],
         packet_category: { id: 1, name: 'Kategori Reguler' },
+        packet: { id: 20, name: 'Paket Starter Pack' },
+        item_packet: itemPacketsStore[0],
       },
       {
         id: 51,
         brand_name: 'Brand Dua',
         packet_name_id: 2,
+        company_id: null,
         packet_vendor_id: 1,
         packet_category_id: 2,
-        item_packet_id: 10,
+        packet_id: 21,
+        item_packet_id: 12,
         price: 150000,
         packet_name: { id: 2, name: 'Paket Pro' },
         packet_vendor: { id: 1, name: 'Vendor Utama' },
         packet_category: { id: 2, name: 'Kategori Premium' },
+        packet: { id: 21, name: 'Paket Pro Pack' },
       },
     ];
 
@@ -1486,8 +1104,8 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
       meta: { count: itemsStore.length },
     });
     vi.mocked(apiClient.fetchItemPackets).mockResolvedValue({
-      data: [],
-      meta: { count: 0 },
+      data: itemPacketsStore,
+      meta: { count: itemPacketsStore.length },
     });
     vi.mocked(apiClient.fetchDefaultPackages).mockResolvedValue({
       data: defaultPackagesStore,
@@ -1509,15 +1127,15 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
 
     const paketSubmenu = screen.getByTestId('horizontal-submenu-INPUT_PAKET');
     fireEvent.click(
-      within(paketSubmenu).getByTestId('horizontal-menu-card-VIEW_BAHAN_BAKU')
+      within(paketSubmenu).getByTestId('horizontal-menu-card-VIEW_PAKET_AWAL')
     );
 
-    const viewModal = await screen.findByTestId('view-bahan-baku-modal');
+    const viewModal = await screen.findByTestId('view-paket-awal-modal');
     expect(viewModal).toBeInTheDocument();
 
     // Strictly read-only: no form panel, no Tambah/Edit/Hapus buttons
     expect(
-      screen.queryByTestId('view-bahan-baku-modal-form-panel')
+      screen.queryByTestId('view-paket-awal-modal-form-panel')
     ).not.toBeInTheDocument();
     expect(
       within(viewModal).queryByRole('button', { name: 'Tambah' })
@@ -1529,40 +1147,49 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
       within(viewModal).queryByRole('button', { name: 'Hapus' })
     ).not.toBeInTheDocument();
 
-    // Grouped rows & total summary banner
+    // DefaultPackage rows & total summary banner
+    expect(await within(viewModal).findByText('Brand Satu')).toBeInTheDocument();
+    expect(within(viewModal).getByText('Paket Starter')).toBeInTheDocument();
+    expect(within(viewModal).getByText('Kategori Reguler')).toBeInTheDocument();
     expect(
-      await within(viewModal).findByText(
-        'Tepung Terigu (BHN-01), Gula Pasir (BHN-02)'
-      )
+      within(viewModal).getByText('PT. Slaras Nusa Foodlab')
     ).toBeInTheDocument();
-    expect(within(viewModal).getByText('Rp 30.500')).toBeInTheDocument();
     expect(within(viewModal).getByText('2 item')).toBeInTheDocument();
-    expect(within(viewModal).getByText('Garam Halus')).toBeInTheDocument();
-    expect(within(viewModal).getByText('Rp 5.000')).toBeInTheDocument();
+    expect(within(viewModal).getByText('Rp 100.000')).toBeInTheDocument();
+
+    expect(within(viewModal).getByText('Brand Dua')).toBeInTheDocument();
+    expect(within(viewModal).getByText('Vendor Utama')).toBeInTheDocument();
+    expect(within(viewModal).getByText('1 item')).toBeInTheDocument();
+    expect(within(viewModal).getByText('Rp 150.000')).toBeInTheDocument();
+
     expect(
-      screen.getByTestId('view-bahan-baku-total-banner-value')
-    ).toHaveTextContent('Rp 35.500');
+      screen.getByTestId('view-paket-awal-total-banner-value')
+    ).toHaveTextContent('Rp 250.000');
 
     // Click Detail button on Brand Satu (50)
-    fireEvent.click(within(viewModal).getByTestId('detail-bahan-baku-row-50'));
+    fireEvent.click(within(viewModal).getByTestId('detail-paket-awal-row-50'));
 
     const detailModal = await screen.findByTestId(
-      'view-bahan-baku-detail-modal'
+      'view-paket-awal-detail-modal'
     );
     expect(detailModal).toBeInTheDocument();
     expect(
       within(detailModal).getByRole('heading', { name: 'Brand Satu' })
     ).toBeInTheDocument();
-    expect(within(detailModal).getByText('Vendor Utama')).toBeInTheDocument();
+    expect(
+      within(detailModal).getByText('PT. Slaras Nusa Foodlab')
+    ).toBeInTheDocument();
     expect(
       within(detailModal).getByText('Kategori Reguler')
     ).toBeInTheDocument();
-    expect(within(detailModal).getByText('Rp 100.000')).toBeInTheDocument();
     expect(
-      screen.getByTestId('view-bahan-baku-detail-total-banner-value')
-    ).toHaveTextContent('Rp 30.500');
+      within(detailModal).getByText('Paket Starter Pack')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('view-paket-awal-detail-total-banner-value')
+    ).toHaveTextContent('Rp 100.000');
 
-    // Individual Ingredient rows in Detail modal
+    // Individual item rows with Qty & Price in Detail modal
     expect(within(detailModal).getByText('BHN-01')).toBeInTheDocument();
     expect(within(detailModal).getByText('Tepung Terigu')).toBeInTheDocument();
     expect(within(detailModal).getByText('Rp 12.000')).toBeInTheDocument();
@@ -1575,14 +1202,14 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
       within(detailModal).getByRole('button', { name: 'Tutup Modal' })
     );
     expect(
-      screen.queryByTestId('view-bahan-baku-detail-modal')
+      screen.queryByTestId('view-paket-awal-detail-modal')
     ).not.toBeInTheDocument();
 
     fireEvent.click(
       within(viewModal).getByRole('button', { name: 'Tutup Modal' })
     );
     expect(
-      screen.queryByTestId('view-bahan-baku-modal')
+      screen.queryByTestId('view-paket-awal-modal')
     ).not.toBeInTheDocument();
   });
 });
