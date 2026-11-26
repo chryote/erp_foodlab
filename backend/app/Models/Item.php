@@ -9,10 +9,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Laravel\Scout\Searchable;
 
 class Item extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, Searchable, SoftDeletes;
 
     protected $table = 'items';
 
@@ -63,5 +64,20 @@ class Item extends Model
             ->wherePivotNull('deleted_at')
             ->withPivot(['id', 'company_id', 'packet_vendor_id', 'quantity', 'deleted_at'])
             ->withTimestamps();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'company_id' => $this->company_id,
+            'packet_vendor_id' => $this->packet_vendor_id,
+            'code' => $this->code,
+            'name' => $this->name,
+            'type' => $this->type instanceof ItemType ? $this->type->value : $this->type,
+        ];
     }
 }

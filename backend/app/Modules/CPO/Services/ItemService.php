@@ -231,16 +231,13 @@ class ItemService
 
                     IndexQuery::whereLike($query, 'name', $escaped);
                 }),
-                AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
-                    $escaped = IndexQuery::escapeLike($value);
-                    if ($escaped === null) {
-                        return;
-                    }
-
-                    $query->where(function (Builder $searchQuery) use ($escaped): void {
-                        IndexQuery::whereLike($searchQuery, 'code', $escaped);
-                        IndexQuery::orWhereLike($searchQuery, 'name', $escaped);
-                    });
+                AllowedFilter::callback('search', function (Builder $query, mixed $value) use ($request): void {
+                    IndexQuery::applySearch($query, $value, function (Builder $searchQuery, string $escaped): void {
+                        $searchQuery->where(function (Builder $likeQuery) use ($escaped): void {
+                            IndexQuery::whereLike($likeQuery, 'code', $escaped);
+                            IndexQuery::orWhereLike($likeQuery, 'name', $escaped);
+                        });
+                    }, request: $request);
                 }),
             ])
             ->allowedSorts(['id', 'code', 'name', 'type', 'company_id', 'packet_vendor_id', 'created_at', 'updated_at'])

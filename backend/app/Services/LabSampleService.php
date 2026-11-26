@@ -104,14 +104,13 @@ class LabSampleService
             ->allowedFilters([
                 AllowedFilter::exact('status'),
                 AllowedFilter::exact('category'),
-                AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
-                    $term = '%'.trim((string) $value).'%';
-
-                    $query->where(function (Builder $searchQuery) use ($term): void {
-                        $searchQuery
-                            ->where('batch_code', 'like', $term)
-                            ->orWhere('product_name', 'like', $term);
-                    });
+                AllowedFilter::callback('search', function (Builder $query, mixed $value) use ($request): void {
+                    IndexQuery::applySearch($query, $value, function (Builder $searchQuery, string $escaped): void {
+                        $searchQuery->where(function (Builder $likeQuery) use ($escaped): void {
+                            IndexQuery::whereLike($likeQuery, 'batch_code', $escaped);
+                            IndexQuery::orWhereLike($likeQuery, 'product_name', $escaped);
+                        });
+                    }, request: $request);
                 }),
             ])
             ->allowedSorts(['id', 'batch_code', 'product_name', 'category', 'status', 'created_at'])

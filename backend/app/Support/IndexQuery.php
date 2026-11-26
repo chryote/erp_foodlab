@@ -5,6 +5,7 @@ namespace App\Support;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Laravel\Scout\Searchable;
 use Spatie\QueryBuilder\QueryBuilder;
 
 /**
@@ -132,6 +133,80 @@ final class IndexQuery
     public static function orWhereLike(Builder $query, string $column, string $escapedTerm): Builder
     {
         return self::whereLike($query, $column, $escapedTerm, 'or');
+    }
+
+    /**
+     * Apply text search using Laravel Scout (Meilisearch / Collection) when enabled
+     * on a Searchable model, falling back to SQL LIKE when Scout is disabled or when
+     * the search term contains SQL wildcard/literal punctuation (`%`, `_`).
+     *
+     * @param  callable(Builder, string): void  $likeFallback
+     * @param  array<string, int|string|bool>  $scoutFilters
+     */
+    public static function applySearch(
+        Builder $query,
+        mixed $value,
+        callable $likeFallback,
+        array $scoutFilters = [],
+        ?Request $request = null
+    ): void {
+        if (is_array($value)) {
+            return;
+        }
+
+        $escaped = self::escapeLike($value);
+        if ($escaped === null) {
+            return;
+        }
+
+        $trimmed = trim((string) $value);
+        $model = $query->getModel();
+        $driver = (string) config('scout.driver', 'null');
+
+        $shouldUseScout = in_array($driver, ['meilisearch', 'collection'], true)
+            && in_array(Searchable::class, class_uses_recursive($model), true)
+            && strpbrk($trimmed, '%_') === false;
+
+        if (! $shouldUseScout) {
+            $likeFallback($query, $escaped);
+
+            return;
+        }
+
+        $searchBuilder = $model::search($trimmed)->take(1000);
+
+        $effectiveRequest = $request ?? request();
+        if ($effectiveRequest instanceof Request && in_array('company_id', $model->getFillable(), true)) {
+            if ($effectiveRequest->boolean('active_company')) {
+                $activeCompanyId = active_company_id();
+                if ($activeCompanyId === null) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+
+                $scoutFilters['company_id'] = $activeCompanyId;
+            } elseif (! array_key_exists('company_id', $scoutFilters)) {
+                $requestedCompanyId = $effectiveRequest->input('filter.company_id', $effectiveRequest->query('company_id'));
+                if (is_numeric($requestedCompanyId) && (int) $requestedCompanyId > 0) {
+                    $scoutFilters['company_id'] = (int) $requestedCompanyId;
+                }
+            }
+        }
+
+        foreach ($scoutFilters as $field => $filterValue) {
+            $searchBuilder->where($field, $filterValue);
+        }
+
+        $ids = $searchBuilder->keys()->all();
+
+        if ($ids === []) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->whereIn($model->getQualifiedKeyName(), $ids);
     }
 
     public static function applyActiveCompanyFilter(Builder $query, Request $request, string $column = 'company_id'): Builder

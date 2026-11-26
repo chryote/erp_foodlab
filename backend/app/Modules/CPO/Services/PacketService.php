@@ -124,13 +124,10 @@ class PacketService
 
                     IndexQuery::whereLike($query, 'name', $escaped);
                 }),
-                AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
-                    $escaped = IndexQuery::escapeLike($value);
-                    if ($escaped === null) {
-                        return;
-                    }
-
-                    IndexQuery::whereLike($query, 'name', $escaped);
+                AllowedFilter::callback('search', function (Builder $query, mixed $value) use ($request): void {
+                    IndexQuery::applySearch($query, $value, function (Builder $searchQuery, string $escaped): void {
+                        IndexQuery::whereLike($searchQuery, 'name', $escaped);
+                    }, request: $request);
                 }),
             ])
             ->allowedSorts(['id', 'name', 'created_at', 'updated_at'])

@@ -1,4 +1,4 @@
-.PHONY: help setup up down restart ps logs test test-backend test-filter test-frontend k6-smoke k6-load k6-stress migrate schema-dump seed
+.PHONY: help setup up down restart ps logs test test-backend test-filter test-frontend k6-smoke k6-load k6-stress migrate schema-dump seed scout-sync scout-import
 
 help: ## Show available Make targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -33,6 +33,16 @@ schema-dump: ## Dump MySQL schema into database/schema/mysql-schema.sql
 
 seed: ## Seed Laravel database with sample FoodLab data
 	docker compose exec app php artisan db:seed
+
+scout-sync: ## Sync Meilisearch index settings from config/scout.php
+	docker compose exec app php artisan scout:sync-index-settings
+
+scout-import: ## Import all Searchable models into Meilisearch
+	docker compose exec app php artisan scout:import "App\Models\ExpenseItem"
+	docker compose exec app php artisan scout:import "App\Models\Item"
+	docker compose exec app php artisan scout:import "App\Models\Packet"
+	docker compose exec app php artisan scout:import "App\Models\Employee"
+	docker compose exec app php artisan scout:import "App\Models\LabSample"
 
 test: test-backend test-frontend ## Run both Backend (Pest) and Frontend (Vitest) unit tests
 

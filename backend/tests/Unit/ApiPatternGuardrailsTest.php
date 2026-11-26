@@ -131,8 +131,13 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
                 expect($contents)->not->toContain('IndexQuery::applyActiveCompanyFilter(');
             }
 
+            $usesStandardizedSearch = str_contains($contents, 'IndexQuery::escapeLike(')
+                || str_contains($contents, 'IndexQuery::applySearch(');
+            expect($usesStandardizedSearch)->toBeTrue(
+                "{$servicePath} must use IndexQuery::escapeLike() or IndexQuery::applySearch()"
+            );
+
             expect($contents)
-                ->toContain('IndexQuery::escapeLike(')
                 ->not->toMatch('/->(?:or)?[wW]here\(\s*[\'"](?:capital|amount|price_per_unit|total_price|grade|base_salary|position_allowance|total_gross|total_company_cost|net_employee_received|bpjs_kesehatan|bpjs_ketenagakerjaan|bonus|overtime|deduction|thr|pph21|total_net)[\'"]\s*,\s*[\'"]like[\'"]/');
         }
 
@@ -1786,5 +1791,27 @@ describe('API Pattern, Speed & Correctness Guardrails', function () {
             'item_id' => $newItem->id,
             'price' => 9999,
         ]))->toThrow(ValidationException::class);
+    });
+
+    it('enforces Scout configuration and Searchable model guardrails without breaking IndexQuery', function () {
+        expect(config('scout.after_commit'))->toBeTrue();
+        expect(config('scout.soft_delete'))->toBeTrue();
+
+        $searchableModels = [
+            ExpenseItem::class,
+            Item::class,
+            Packet::class,
+            Employee::class,
+            LabSample::class,
+        ];
+
+        $indexSettings = config('scout.meilisearch.index-settings', []);
+
+        foreach ($searchableModels as $modelClass) {
+            $traits = class_uses_recursive($modelClass);
+            expect($traits)->toContain(\Laravel\Scout\Searchable::class);
+            expect(method_exists($modelClass, 'toSearchableArray'))->toBeTrue();
+            expect($indexSettings)->toHaveKey($modelClass);
+        }
     });
 });

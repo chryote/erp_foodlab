@@ -5,7 +5,10 @@ namespace App\Modules\CFO\Services;
 use App\Enums\CompanyType;
 use App\Models\Company;
 use App\Models\DefaultPackage;
+use App\Models\Employee;
+use App\Models\ExpenseItem;
 use App\Models\Ingredient;
+use App\Models\Item;
 use App\Modules\CHO\Services\PayrollItemService;
 use App\Modules\CHO\Services\PayrollRunService;
 use App\Support\ActiveCompany;
@@ -216,6 +219,12 @@ class CompanyService
         }
 
         $this->forgetCaches();
+
+        if (in_array((string) config('scout.driver', 'null'), ['meilisearch', 'collection'], true)) {
+            ExpenseItem::onlyTrashed()->where('company_id', $companyId)->unsearchable();
+            Employee::onlyTrashed()->where('company_id', $companyId)->unsearchable();
+            Item::onlyTrashed()->where('company_id', $companyId)->unsearchable();
+        }
     }
 
     private function query(Request $request): QueryBuilder

@@ -89,24 +89,21 @@ class ExpenseItemService
                 AllowedFilter::exact('company_id'),
                 AllowedFilter::exact('expense_category_id'),
                 AllowedFilter::exact('expense_type_id'),
-                AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
-                    $escaped = IndexQuery::escapeLike($value);
-                    if ($escaped === null) {
-                        return;
-                    }
-
-                    $query->where(function (Builder $searchQuery) use ($escaped): void {
-                        IndexQuery::whereLike($searchQuery, 'name', $escaped);
-                        IndexQuery::orWhereLike($searchQuery, 'detail', $escaped);
-                        $searchQuery->orWhereHas(
-                            'expenseCategory',
-                            fn (Builder $categoryQuery) => IndexQuery::whereLike($categoryQuery, 'name', $escaped)
-                        );
-                        $searchQuery->orWhereHas(
-                            'expenseType',
-                            fn (Builder $typeQuery) => IndexQuery::whereLike($typeQuery, 'name', $escaped)
-                        );
-                    });
+                AllowedFilter::callback('search', function (Builder $query, mixed $value) use ($request): void {
+                    IndexQuery::applySearch($query, $value, function (Builder $searchQuery, string $escaped): void {
+                        $searchQuery->where(function (Builder $likeQuery) use ($escaped): void {
+                            IndexQuery::whereLike($likeQuery, 'name', $escaped);
+                            IndexQuery::orWhereLike($likeQuery, 'detail', $escaped);
+                            $likeQuery->orWhereHas(
+                                'expenseCategory',
+                                fn (Builder $categoryQuery) => IndexQuery::whereLike($categoryQuery, 'name', $escaped)
+                            );
+                            $likeQuery->orWhereHas(
+                                'expenseType',
+                                fn (Builder $typeQuery) => IndexQuery::whereLike($typeQuery, 'name', $escaped)
+                            );
+                        });
+                    }, request: $request);
                 }),
             ])
             ->allowedSorts(['id', 'name', 'amount', 'purchased_on', 'closing_date', 'created_at'])

@@ -160,6 +160,10 @@ class PacketVendorService
         });
 
         $this->forgetDependentCaches();
+
+        if (in_array((string) config('scout.driver', 'null'), ['meilisearch', 'collection'], true)) {
+            Item::onlyTrashed()->where('packet_vendor_id', $packetVendor->getKey())->unsearchable();
+        }
     }
 
     private function query(Request $request): QueryBuilder
