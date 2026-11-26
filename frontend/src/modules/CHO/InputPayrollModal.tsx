@@ -68,6 +68,7 @@ function formatRawDecimal(value: number): string {
 
 export interface InputPayrollModalProps {
   isOpen: boolean;
+  pageMode?: boolean;
   company: Company | null;
   companies?: Company[];
   onClose: () => void;
@@ -75,6 +76,7 @@ export interface InputPayrollModalProps {
 
 export const InputPayrollModal: React.FC<InputPayrollModalProps> = ({
   isOpen,
+  pageMode = false,
   company,
   companies,
   onClose,
@@ -170,9 +172,12 @@ export const InputPayrollModal: React.FC<InputPayrollModalProps> = ({
   const safeCurrentPage = Math.min(currentPage, totalPages);
 
   const paginatedRows = useMemo(() => {
+    if (pageMode) {
+      return filteredRows;
+    }
     const start = (safeCurrentPage - 1) * pageSize;
     return filteredRows.slice(start, start + pageSize);
-  }, [filteredRows, safeCurrentPage]);
+  }, [filteredRows, pageMode, safeCurrentPage]);
 
   const getRowAmounts = (row: PayrollWorkspaceRow) => {
     const isFinalized = row.status === 'finalized';
@@ -389,6 +394,7 @@ export const InputPayrollModal: React.FC<InputPayrollModalProps> = ({
     <>
       <Modal
         isOpen={isOpen}
+        pageMode={pageMode}
         title="Input Payroll"
         subtitle="Kelola input bonus, lembur, potongan, THR, kalkulasi PPh 21, dan finalisasi payroll karyawan per periode"
         testId="input-payroll-modal"
@@ -408,7 +414,13 @@ export const InputPayrollModal: React.FC<InputPayrollModalProps> = ({
           </div>
         )}
 
-        <div className="grid shrink-0 grid-cols-1 gap-3 rounded-xl border border-border bg-muted/25 p-4 md:grid-cols-3 md:items-end">
+        <div
+          className={
+            pageMode
+              ? 'grid shrink-0 grid-cols-1 gap-3 md:grid-cols-3 md:items-end'
+              : 'grid shrink-0 grid-cols-1 gap-3 rounded-xl border border-border bg-muted/25 p-4 md:grid-cols-3 md:items-end'
+          }
+        >
           <SelectInput
             id="input-payroll-company-id"
             label="Pilih Perusahaan"
@@ -476,7 +488,13 @@ export const InputPayrollModal: React.FC<InputPayrollModalProps> = ({
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col justify-between gap-4 rounded-xl border border-border bg-card p-4">
+        <div
+          className={
+            pageMode
+              ? 'flex min-h-0 flex-1 flex-col justify-between gap-4'
+              : 'flex min-h-0 flex-1 flex-col justify-between gap-4 rounded-xl border border-border bg-card p-4'
+          }
+        >
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
             <SummaryBanner
               label={`Total Net Payroll (${totalsSummary.finalizedCount}/${totalsSummary.totalEmployees} Karyawan Final • PPh 21: ${formatCapitalIdr(totalsSummary.totalPph21)})`}
@@ -741,7 +759,7 @@ export const InputPayrollModal: React.FC<InputPayrollModalProps> = ({
             </div>
           </div>
 
-          <div className="shrink-0 border-t border-border pt-3">
+          {!pageMode && <div className="shrink-0 border-t border-border pt-3">
             <Pagination
               currentPage={safeCurrentPage}
               totalPages={totalPages}
@@ -749,7 +767,7 @@ export const InputPayrollModal: React.FC<InputPayrollModalProps> = ({
               testId="input-payroll-modal-pagination"
               onPageChange={setCurrentPage}
             />
-          </div>
+          </div>}
         </div>
       </Modal>
 

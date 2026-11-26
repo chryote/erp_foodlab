@@ -29,7 +29,10 @@ import {
   CHO_MENU_ITEMS,
   DEFAULT_CHO_MODULE,
 } from '@/modules/CHO/ChoModuleCard';
-import { DEFAULT_CPO_MODULE } from '@/modules/CPO/CpoModuleCard';
+import {
+  CPO_MENU_ITEMS,
+  DEFAULT_CPO_MODULE,
+} from '@/modules/CPO/CpoModuleCard';
 import { DEFAULT_CDO_MODULE } from '@/modules/CDO/CdoModuleCard';
 import { DEFAULT_CMO_MODULE } from '@/modules/CMO/CmoModuleCard';
 import { useTheme } from '@/lib/theme';
@@ -85,7 +88,7 @@ export const COMPANY_MENU_MODULES: Array<{
 }> = [
   { code: 'CFO', fallback: DEFAULT_CFO_MODULE, items: CFO_MENU_ITEMS },
   { code: 'CHO', fallback: DEFAULT_CHO_MODULE, items: CHO_MENU_ITEMS },
-  { code: 'CPO', fallback: DEFAULT_CPO_MODULE, items: COMPANY_MENU_ITEMS },
+  { code: 'CPO', fallback: DEFAULT_CPO_MODULE, items: CPO_MENU_ITEMS },
   { code: 'CDO', fallback: DEFAULT_CDO_MODULE, items: COMPANY_MENU_ITEMS },
   { code: 'CMO', fallback: DEFAULT_CMO_MODULE, items: COMPANY_MENU_ITEMS },
 ];

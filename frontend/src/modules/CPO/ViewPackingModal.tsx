@@ -19,6 +19,7 @@ import {
 
 export interface ViewPackingModalProps {
   isOpen: boolean;
+  pageMode?: boolean;
   company?: Company | null;
   companies?: Company[];
   onClose: () => void;
@@ -26,6 +27,7 @@ export interface ViewPackingModalProps {
 
 export const ViewPackingModal: React.FC<ViewPackingModalProps> = ({
   isOpen,
+  pageMode = false,
   company = null,
   companies,
   onClose,
@@ -222,6 +224,7 @@ export const ViewPackingModal: React.FC<ViewPackingModalProps> = ({
     <>
       <CrudModal
         isOpen={isOpen}
+        pageMode={pageMode}
         title="View Packing"
         subtitle="Daftar item packing dikelompokkan berdasarkan Perusahaan dan Paket"
         testId="view-packing-modal"

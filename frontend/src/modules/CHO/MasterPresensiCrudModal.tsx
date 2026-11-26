@@ -9,6 +9,11 @@ import type {
 import { type CrudFieldConfig, CrudModal } from '@/components/ui';
 import { useMasterPresensiCrudResource } from '@/lib/choResources';
 import { cn } from '@/lib/utils';
+import {
+  useInfiniteEmployeeShiftAssignmentsQuery,
+  useInfiniteEmployeeShiftsQuery,
+} from '@/lib/choResources';
+import { useDebouncedSearch } from '@/lib/useDebouncedValue';
 
 export type MasterPresensiTabKey = 'shift' | 'assignment';
 
@@ -46,6 +51,7 @@ function formatShiftLabel(shift: EmployeeShift): string {
 
 export interface MasterPresensiCrudModalProps {
   isOpen: boolean;
+  pageMode?: boolean;
   company: Company | null;
   companies?: Company[];
   onClose: () => void;
@@ -53,8 +59,14 @@ export interface MasterPresensiCrudModalProps {
 
 export const MasterPresensiCrudModal: React.FC<
   MasterPresensiCrudModalProps
-> = ({ isOpen, company, companies, onClose }) => {
+> = ({ isOpen, pageMode = false, company, companies, onClose }) => {
   const [activeTab, setActiveTab] = useState<MasterPresensiTabKey>('shift');
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, submitSearch] = useDebouncedSearch(search);
+  const [sort, setSort] = useState<{
+    key: string;
+    direction: 'asc' | 'desc';
+  } | null>({ key: 'start_time', direction: 'asc' });
 
   const {
     allShifts,
@@ -69,7 +81,33 @@ export const MasterPresensiCrudModal: React.FC<
     createAssignment,
     updateAssignment,
     removeAssignment,
-  } = useMasterPresensiCrudResource(isOpen, company);
+  } = useMasterPresensiCrudResource(isOpen, company, !pageMode);
+  const shiftSort = sort?.key ?? 'start_time';
+  const assignmentSort = sort?.key ?? 'effective_date';
+  const shiftSortParam = `${sort?.direction === 'desc' ? '-' : ''}${shiftSort},-id`;
+  const assignmentSortParam = `${sort?.direction === 'asc' ? '' : '-'}${assignmentSort},-id`;
+  const shiftsQuery = useInfiniteEmployeeShiftsQuery(
+    company?.id ?? null,
+    shiftSortParam,
+    debouncedSearch,
+    pageMode
+  );
+  const assignmentsQuery = useInfiniteEmployeeShiftAssignmentsQuery(
+    company?.id ?? null,
+    assignmentSortParam,
+    pageMode
+  );
+  const shiftsForPage =
+    shiftsQuery.data?.pages.flatMap((page) => page.data) ?? [];
+  const assignmentsForPage =
+    assignmentsQuery.data?.pages.flatMap((page) => page.data) ?? [];
+  const shiftOptions = pageMode ? shiftsForPage : allShifts;
+  const pageItems =
+    activeTab === 'shift'
+      ? shiftsQuery.data?.pages.flatMap((page) => page.data) ?? []
+      : assignmentsQuery.data?.pages.flatMap((page) => page.data) ?? [];
+  const activeListQuery =
+    activeTab === 'shift' ? shiftsQuery : assignmentsQuery;
 
   useEffect(() => {
     if (!isOpen) {
@@ -119,6 +157,7 @@ export const MasterPresensiCrudModal: React.FC<
       {
         key: 'code',
         label: 'Kode Shift',
+        sortable: true,
         optional: true,
         placeholder: 'Contoh: SHIFT-PAGI',
         renderValue: (row) => row.code || '-',
@@ -126,11 +165,13 @@ export const MasterPresensiCrudModal: React.FC<
       {
         key: 'name',
         label: 'Nama Shift',
+        sortable: true,
         placeholder: 'Contoh: Shift Pagi',
       },
       {
         key: 'start_time',
         label: 'Jam Masuk',
+        sortable: true,
         type: 'time',
         placeholder: '08:00',
         renderValue: (row) =>
@@ -247,7 +288,7 @@ export const MasterPresensiCrudModal: React.FC<
           if (!Number.isFinite(companyId)) {
             return [];
           }
-          return allShifts
+          return shiftOptions
             .filter((s) => Number(s.company_id) === companyId)
             .map((s) => ({
               value: String(s.id),
@@ -256,7 +297,7 @@ export const MasterPresensiCrudModal: React.FC<
         },
         renderValue: (row) => {
           const matched =
-            allShifts.find((s) => s.id === Number(row.employee_shift_id)) ??
+            shiftOptions.find((s) => s.id === Number(row.employee_shift_id)) ??
             row.employee_shift;
           return matched
             ? formatShiftLabel(matched)
@@ -266,6 +307,7 @@ export const MasterPresensiCrudModal: React.FC<
       {
         key: 'effective_date',
         label: 'Tanggal Mulai',
+        sortable: true,
         type: 'date',
         defaultValue: todayDate,
         renderValue: (row) =>
@@ -274,6 +316,7 @@ export const MasterPresensiCrudModal: React.FC<
       {
         key: 'end_date',
         label: 'Tanggal Berakhir',
+        sortable: true,
         type: 'date',
         optional: true,
         renderValue: (row) =>
@@ -291,7 +334,7 @@ export const MasterPresensiCrudModal: React.FC<
     ],
     [
       allEmployees,
-      allShifts,
+      shiftOptions,
       companyOptions,
       defaultCompanyId,
       renderCompanyName,
@@ -317,6 +360,11 @@ export const MasterPresensiCrudModal: React.FC<
             data-testid={`master-presensi-tab-${tab.key}`}
             onClick={() => {
               clearError();
+              setSort(
+                tab.key === 'shift'
+                  ? { key: 'start_time', direction: 'asc' }
+                  : { key: 'effective_date', direction: 'desc' }
+              );
               setActiveTab(tab.key);
             }}
             className={cn(
@@ -335,6 +383,7 @@ export const MasterPresensiCrudModal: React.FC<
 
   const commonCrudProps = {
     isOpen,
+    pageMode,
     title: 'Master Presensi',
     subtitle: 'Kelola master shift kerja dan penugasan shift karyawan',
     testId: 'master-presensi-crud-modal',
@@ -343,8 +392,54 @@ export const MasterPresensiCrudModal: React.FC<
     labelPlacement: 'left' as const,
     modalSize: 'expanded' as const,
     pageSize: 10,
-    loading,
-    error,
+    loading: pageMode ? activeListQuery.isLoading || loading : loading,
+    error:
+      (pageMode ? activeListQuery.error : null) instanceof Error
+        ? (activeListQuery.error as Error).message
+        : error,
+    displayItems: pageMode ? pageItems : undefined,
+    hasMore: pageMode && Boolean(activeListQuery.hasNextPage),
+    onLoadMore: pageMode
+      ? () => {
+          if (activeListQuery.hasNextPage && !activeListQuery.isFetchingNextPage) {
+            void activeListQuery.fetchNextPage();
+          }
+        }
+      : undefined,
+    isLoadingMore: pageMode && activeListQuery.isFetchingNextPage,
+    loadMoreError: activeListQuery.isFetchNextPageError
+      ? 'Gagal memuat data berikutnya.'
+      : null,
+    onRetryLoadMore: pageMode
+      ? () => {
+          if (activeListQuery.isFetchNextPageError) {
+            void activeListQuery.fetchNextPage();
+          }
+        }
+      : undefined,
+    sortKey: sort?.key ?? (activeTab === 'shift' ? 'start_time' : 'effective_date'),
+    sortDirection: sort?.direction ?? (activeTab === 'shift' ? 'asc' : 'desc'),
+    onSort: pageMode
+      ? (key: string) => {
+          if (
+            !['code', 'name', 'start_time', 'effective_date', 'end_date'].includes(
+              key
+            )
+          ) {
+            return;
+          }
+          setSort((current) =>
+            current?.key === key
+              ? { key, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+              : { key, direction: 'asc' }
+          );
+        }
+      : undefined,
+    searchValue: pageMode && activeTab === 'shift' ? search : undefined,
+    onSearchChange:
+      pageMode && activeTab === 'shift' ? setSearch : undefined,
+    onSearchSubmit:
+      pageMode && activeTab === 'shift' ? submitSearch : undefined,
     onClose,
   };
 
@@ -423,6 +518,7 @@ export const MasterPresensiCrudModal: React.FC<
         fields={assignmentFields}
         emptyMessage="Belum ada data penugasan shift."
         items={allAssignments}
+        displayItems={pageMode ? assignmentsForPage : undefined}
         onCreate={async (values) => {
           const payload = parseAssignmentPayload(values);
           if (payload) {
@@ -449,6 +545,7 @@ export const MasterPresensiCrudModal: React.FC<
       fields={shiftFields}
       emptyMessage="Belum ada data shift kerja."
       items={allShifts}
+      displayItems={pageMode ? shiftsForPage : undefined}
       onCreate={async (values) => {
         const payload = parseShiftPayload(values);
         if (payload) {

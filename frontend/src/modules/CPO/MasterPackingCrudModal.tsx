@@ -12,6 +12,11 @@ import type {
 import { type CrudFieldConfig, CrudModal } from '@/components/ui';
 import { useMasterPackingCrudResource } from '@/lib/cpoResources';
 import { cn } from '@/lib/utils';
+import {
+  useInfiniteItemPacketsQuery,
+  useInfiniteItemsQuery,
+  useInfinitePacketsQuery,
+} from '@/lib/cpoResources';
 
 export type MasterPackingTabKey = 'item' | 'packet' | 'assignment';
 
@@ -26,6 +31,7 @@ export const MASTER_PACKING_TABS: Array<{
 
 export interface MasterPackingCrudModalProps {
   isOpen: boolean;
+  pageMode?: boolean;
   company: Company | null;
   companies?: Company[];
   onClose: () => void;
@@ -33,8 +39,12 @@ export interface MasterPackingCrudModalProps {
 
 export const MasterPackingCrudModal: React.FC<
   MasterPackingCrudModalProps
-> = ({ isOpen, company, companies, onClose }) => {
+> = ({ isOpen, pageMode = false, company, companies, onClose }) => {
   const [activeTab, setActiveTab] = useState<MasterPackingTabKey>('item');
+  const [sort, setSort] = useState<{
+    key: string;
+    direction: 'asc' | 'desc';
+  } | null>({ key: 'name', direction: 'asc' });
 
   const {
     enums,
@@ -53,7 +63,44 @@ export const MasterPackingCrudModal: React.FC<
     createItemPacket,
     updateItemPacket,
     removeItemPacket,
-  } = useMasterPackingCrudResource(isOpen, company);
+  } = useMasterPackingCrudResource(isOpen, company, !pageMode);
+  const itemSortParam = `${sort?.direction === 'desc' ? '-' : ''}${sort?.key ?? 'name'},id`;
+  const packetSortParam = `${sort?.direction === 'desc' ? '-' : ''}${sort?.key ?? 'name'},id`;
+  const itemPacketSortParam = `${sort?.direction === 'desc' ? '-' : ''}${sort?.key ?? 'id'}`;
+  const itemsPageQuery = useInfiniteItemsQuery(
+    company?.id ?? null,
+    itemSortParam,
+    pageMode
+  );
+  const packetsPageQuery = useInfinitePacketsQuery(
+    packetSortParam,
+    pageMode
+  );
+  const itemPacketsPageQuery = useInfiniteItemPacketsQuery(
+    company?.id ?? null,
+    itemPacketSortParam,
+    pageMode
+  );
+  const activeListQuery =
+    activeTab === 'item'
+      ? itemsPageQuery
+      : activeTab === 'packet'
+        ? packetsPageQuery
+        : itemPacketsPageQuery;
+  const itemPageItems =
+    itemsPageQuery.data?.pages.flatMap((page) => page.data) ?? [];
+  const packetPageItems =
+    packetsPageQuery.data?.pages.flatMap((page) => page.data) ?? [];
+  const itemPacketPageItems =
+    itemPacketsPageQuery.data?.pages.flatMap((page) => page.data) ?? [];
+  const itemsForForm = pageMode ? itemPageItems : allItems;
+  const packetsForForm = pageMode ? packetPageItems : allPackets;
+  const pageItems =
+    activeTab === 'item'
+      ? itemPageItems
+      : activeTab === 'packet'
+        ? packetPageItems
+        : itemPacketPageItems;
 
   useEffect(() => {
     if (!isOpen) {
@@ -110,6 +157,7 @@ export const MasterPackingCrudModal: React.FC<
       {
         key: 'company_id',
         label: 'Pilih Vendor',
+        sortable: true,
         type: 'select',
         placeholder: 'Pilih vendor...',
         defaultValue: defaultCompanyId,
@@ -119,6 +167,7 @@ export const MasterPackingCrudModal: React.FC<
       {
         key: 'type',
         label: 'Tipe Item',
+        sortable: true,
         type: 'select',
         placeholder: 'Pilih tipe item...',
         defaultValue: defaultItemType,
@@ -128,6 +177,7 @@ export const MasterPackingCrudModal: React.FC<
       {
         key: 'code',
         label: 'Kode Item',
+        sortable: true,
         optional: true,
         placeholder: 'Contoh: ITM-001',
         renderValue: (row) => row.code || '-',
@@ -135,6 +185,7 @@ export const MasterPackingCrudModal: React.FC<
       {
         key: 'name',
         label: 'Nama Item',
+        sortable: true,
         placeholder: 'Contoh: Kardus Kemasan 30x20',
       },
     ],
@@ -153,6 +204,7 @@ export const MasterPackingCrudModal: React.FC<
       {
         key: 'name',
         label: 'Nama Paket',
+        sortable: true,
         placeholder: 'Contoh: Paket Hemat Pemula',
       },
     ],
@@ -161,11 +213,11 @@ export const MasterPackingCrudModal: React.FC<
 
   const packetOptions = useMemo(
     () =>
-      allPackets.map((packet) => ({
+      packetsForForm.map((packet) => ({
         value: String(packet.id),
         label: packet.name,
       })),
-    [allPackets]
+    [packetsForForm]
   );
 
   const assignmentFields = useMemo<CrudFieldConfig<ItemPacket>[]>(
@@ -173,6 +225,7 @@ export const MasterPackingCrudModal: React.FC<
       {
         key: 'company_id',
         label: 'Pilih Vendor',
+        sortable: true,
         type: 'select',
         placeholder: 'Pilih vendor...',
         defaultValue: defaultCompanyId,
@@ -183,17 +236,19 @@ export const MasterPackingCrudModal: React.FC<
       {
         key: 'packet_id',
         label: 'Pilih Paket',
+        sortable: true,
         type: 'select',
         placeholder: 'Pilih paket...',
         options: packetOptions,
         renderValue: (row) =>
-          allPackets.find((p) => p.id === Number(row.packet_id))?.name ??
+          packetsForForm.find((p) => p.id === Number(row.packet_id))?.name ??
           row.packet?.name ??
           String(row.packet_id),
       },
       {
         key: 'item_id',
         label: 'Pilih Item',
+        sortable: true,
         type: 'select',
         placeholder: 'Pilih item...',
         disabled: (values) => !values.company_id,
@@ -202,7 +257,7 @@ export const MasterPackingCrudModal: React.FC<
           if (!Number.isFinite(companyId)) {
             return [];
           }
-          return allItems
+          return itemsForForm
             .filter(
               (item) =>
                 item.company_id !== null && Number(item.company_id) === companyId
@@ -214,7 +269,7 @@ export const MasterPackingCrudModal: React.FC<
         },
         renderValue: (row) => {
           const matched =
-            allItems.find((item) => item.id === Number(row.item_id)) ?? row.item;
+            itemsForForm.find((item) => item.id === Number(row.item_id)) ?? row.item;
           return matched
             ? `${matched.name} (${matched.type})`
             : String(row.item_id);
@@ -223,6 +278,7 @@ export const MasterPackingCrudModal: React.FC<
       {
         key: 'quantity',
         label: 'Jumlah',
+        sortable: true,
         type: 'number',
         min: 1,
         step: 1,
@@ -232,8 +288,8 @@ export const MasterPackingCrudModal: React.FC<
       },
     ],
     [
-      allItems,
-      allPackets,
+      itemsForForm,
+      packetsForForm,
       companyOptions,
       defaultCompanyId,
       packetOptions,
@@ -259,6 +315,13 @@ export const MasterPackingCrudModal: React.FC<
             data-testid={`master-packing-tab-${tab.key}`}
             onClick={() => {
               clearError();
+              setSort(
+                tab.key === 'item'
+                  ? { key: 'name', direction: 'asc' }
+                  : tab.key === 'packet'
+                    ? { key: 'name', direction: 'asc' }
+                    : { key: 'id', direction: 'asc' }
+              );
               setActiveTab(tab.key);
             }}
             className={cn(
@@ -277,6 +340,7 @@ export const MasterPackingCrudModal: React.FC<
 
   const commonCrudProps = {
     isOpen,
+    pageMode,
     title: 'Master Packing',
     subtitle: 'Kelola item, paket, dan komposisi item paket perusahaan',
     testId: 'master-packing-crud-modal',
@@ -285,8 +349,50 @@ export const MasterPackingCrudModal: React.FC<
     labelPlacement: 'left' as const,
     modalSize: 'expanded' as const,
     pageSize: 10,
-    loading,
-    error,
+    loading: pageMode ? activeListQuery.isLoading || loading : loading,
+    error:
+      pageMode && activeListQuery.error instanceof Error
+        ? activeListQuery.error.message
+        : error,
+    hasMore: pageMode && Boolean(activeListQuery.hasNextPage),
+    onLoadMore: pageMode
+      ? () => {
+          if (activeListQuery.hasNextPage && !activeListQuery.isFetchingNextPage) {
+            void activeListQuery.fetchNextPage();
+          }
+        }
+      : undefined,
+    isLoadingMore: pageMode && activeListQuery.isFetchingNextPage,
+    loadMoreError: activeListQuery.isFetchNextPageError
+      ? 'Gagal memuat data berikutnya.'
+      : null,
+    onRetryLoadMore: pageMode
+      ? () => {
+          if (activeListQuery.isFetchNextPageError) {
+            void activeListQuery.fetchNextPage();
+          }
+        }
+      : undefined,
+    sortKey: sort?.key ?? (activeTab === 'assignment' ? 'id' : 'name'),
+    sortDirection: sort?.direction ?? 'asc',
+    onSort: pageMode
+      ? (key: string) => {
+          const allowed =
+            activeTab === 'item'
+              ? ['code', 'name', 'type', 'company_id']
+              : activeTab === 'packet'
+                ? ['name']
+                : ['company_id', 'packet_id', 'item_id', 'quantity'];
+          if (!allowed.includes(key)) {
+            return;
+          }
+          setSort((current) =>
+            current?.key === key
+              ? { key, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+              : { key, direction: 'asc' }
+          );
+        }
+      : undefined,
     onClose,
   };
 
@@ -353,6 +459,7 @@ export const MasterPackingCrudModal: React.FC<
         fields={packetFields}
         emptyMessage="Belum ada data paket."
         items={allPackets}
+        displayItems={pageMode ? pageItems as Packet[] : undefined}
         onCreate={async (values) => {
           const payload = parsePacketPayload(values);
           if (payload) {
@@ -380,6 +487,7 @@ export const MasterPackingCrudModal: React.FC<
         fields={assignmentFields}
         emptyMessage="Belum ada data item paket."
         items={allItemPackets}
+        displayItems={pageMode ? pageItems as ItemPacket[] : undefined}
         onCreate={async (values) => {
           const payload = parseItemPacketPayload(values);
           if (payload) {
@@ -406,6 +514,7 @@ export const MasterPackingCrudModal: React.FC<
       fields={itemFields}
       emptyMessage="Belum ada data item."
       items={allItems}
+      displayItems={pageMode ? pageItems as Item[] : undefined}
       onCreate={async (values) => {
         const payload = parseItemPayload(values);
         if (payload) {
