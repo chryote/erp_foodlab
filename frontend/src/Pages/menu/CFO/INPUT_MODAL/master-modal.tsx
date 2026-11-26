@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Eye, Pencil, Trash2, X } from 'lucide-react';
 import type { CapitalCompany, Company } from '@/api/client';
 import {
@@ -7,17 +7,20 @@ import {
   CardHeader,
   ConfirmDialog,
   DataTable,
+  DataTableSearch,
   TextInput,
   type DataTableColumn,
 } from '@/components/ui';
 import { formatCapitalIdr } from '@/modules/CFO/CapitalCompanyCrudModal';
 import {
+  useInfiniteCompaniesQuery,
+  useInfiniteStakeholdersQuery,
+  useStakeholdersTotalCapitalQuery,
   useCompanyCrudResource,
   useStakeholderCrudResource,
 } from '@/lib/cfoResources';
-import { useDebouncedValue } from '@/lib/useDebouncedValue';
-
-const LAZY_LOAD_BATCH_SIZE = 10;
+import { useDebouncedSearch } from '@/lib/useDebouncedValue';
+import { formatCapitalInput } from '@/lib/utils';
 
 type SortDirection = 'asc' | 'desc';
 type CompanySortKey = 'name' | 'series';
@@ -33,37 +36,22 @@ type StakeholderPendingAction =
   | { type: 'update'; id: number; name: string; capital: number }
   | { type: 'delete'; id: number; name: string };
 
-function formatCapitalInput(value: string): string {
-  const [integerPart, ...fractionParts] = value
-    .replace(/[^\d,]/g, '')
-    .split(',');
-  const normalizedInteger = integerPart.replace(/^0+(?=\d)/, '');
-  const groupedInteger = normalizedInteger.replace(
-    /\B(?=(\d{3})+(?!\d))/g,
-    '.'
-  );
-  if (fractionParts.length === 0) {
-    return groupedInteger;
-  }
-
-  return `${groupedInteger || '0'},${fractionParts.join('').slice(0, 2)}`;
-}
-
 export default function CfoMasterModalPage() {
   const {
-    companies,
     loading,
     error,
     create,
     update,
     remove,
-  } = useCompanyCrudResource(true);
+  } = useCompanyCrudResource(false);
   const [companyName, setCompanyName] = useState('');
   const [companySeries, setCompanySeries] = useState('1');
-  const [companySearch, setCompanySearch] = useState('');
-  const [companyVisibleCount, setCompanyVisibleCount] =
-    useState(LAZY_LOAD_BATCH_SIZE);
-  const debouncedCompanySearch = useDebouncedValue(companySearch);
+  const [companyNameSearch, setCompanyNameSearch] = useState('');
+  const [companySeriesSearch, setCompanySeriesSearch] = useState('');
+  const [debouncedCompanyNameSearch, submitCompanyNameSearch] =
+    useDebouncedSearch(companyNameSearch);
+  const [debouncedCompanySeriesSearch, submitCompanySeriesSearch] =
+    useDebouncedSearch(companySeriesSearch);
   const [companySort, setCompanySort] = useState<{
     key: CompanySortKey;
     direction: SortDirection;
@@ -74,37 +62,21 @@ export default function CfoMasterModalPage() {
   const [companyPendingAction, setCompanyPendingAction] =
     useState<CompanyPendingAction | null>(null);
   const [companyActionLoading, setCompanyActionLoading] = useState(false);
-  const filteredCompanies = useMemo(() => {
-    const query = debouncedCompanySearch.trim().toLowerCase();
-    const matchingCompanies = query
-      ? companies.filter(
-          (company) =>
-            company.name.toLowerCase().includes(query) ||
-            String(company.series ?? 1).includes(query)
-        )
-      : companies;
-    if (!companySort) return matchingCompanies;
-
-    return [...matchingCompanies].sort((a, b) => {
-      const comparison =
-        companySort.key === 'name'
-          ? a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
-          : (a.series ?? 1) - (b.series ?? 1);
-      return companySort.direction === 'asc' ? comparison : -comparison;
-    });
-  }, [companies, companySort, debouncedCompanySearch]);
-  const visibleCompanies = useMemo(
-    () => filteredCompanies.slice(0, companyVisibleCount),
-    [companyVisibleCount, filteredCompanies]
+  const companySortParam = companySort
+    ? `${companySort.direction === 'desc' ? '-' : ''}${companySort.key}`
+    : '-id';
+  const companyListQuery = useInfiniteCompaniesQuery(
+    debouncedCompanyNameSearch,
+    debouncedCompanySeriesSearch,
+    companySortParam
   );
-
-  useEffect(() => {
-    setCompanyVisibleCount(LAZY_LOAD_BATCH_SIZE);
-  }, [debouncedCompanySearch]);
+  const companies = useMemo(
+    () => companyListQuery.data?.pages.flatMap((page) => page.data) ?? [],
+    [companyListQuery.data]
+  );
 
   const selectCompany = (company: Company) => {
     setSelectedCompany(company);
-    setStakeholderVisibleCount(LAZY_LOAD_BATCH_SIZE);
     setIsStakeholderModalOpen(true);
   };
 
@@ -232,13 +204,12 @@ export default function CfoMasterModalPage() {
   );
 
   const {
-    stakeholders,
-    loading: stakeholderLoading,
+    loading: stakeholderMutationLoading,
     error: stakeholderError,
     create: createStakeholder,
     update: updateStakeholder,
     remove: removeStakeholder,
-  } = useStakeholderCrudResource(true, selectedCompany);
+  } = useStakeholderCrudResource(false, selectedCompany);
   const [stakeholderName, setStakeholderName] = useState('');
   const [stakeholderCapital, setStakeholderCapital] = useState('');
   const [editingStakeholder, setEditingStakeholder] =
@@ -248,45 +219,38 @@ export default function CfoMasterModalPage() {
   const [stakeholderActionLoading, setStakeholderActionLoading] =
     useState(false);
   const [stakeholderSearch, setStakeholderSearch] = useState('');
-  const [stakeholderVisibleCount, setStakeholderVisibleCount] =
-    useState(LAZY_LOAD_BATCH_SIZE);
-  const debouncedStakeholderSearch = useDebouncedValue(stakeholderSearch);
+  const [debouncedStakeholderSearch, submitStakeholderSearch] =
+    useDebouncedSearch(stakeholderSearch);
   const [stakeholderSort, setStakeholderSort] = useState<{
     key: StakeholderSortKey;
     direction: SortDirection;
   } | null>(null);
-  const filteredStakeholders = useMemo(() => {
-    const query = debouncedStakeholderSearch.trim().toLowerCase();
-    const matchingStakeholders = query
-      ? stakeholders.filter((stakeholder) => {
-          const capital = Number(stakeholder.capital);
-          return (
-            stakeholder.stakeholder_name.toLowerCase().includes(query) ||
-            String(stakeholder.capital).includes(query) ||
-            formatCapitalIdr(capital).toLowerCase().includes(query)
-          );
-        })
-      : stakeholders;
-    if (!stakeholderSort) return matchingStakeholders;
-
-    return [...matchingStakeholders].sort((a, b) => {
-      const comparison =
-        stakeholderSort.key === 'stakeholder_name'
-          ? a.stakeholder_name.localeCompare(b.stakeholder_name, undefined, {
-              sensitivity: 'base',
-            })
-          : (Number(a.capital) || 0) - (Number(b.capital) || 0);
-      return stakeholderSort.direction === 'asc' ? comparison : -comparison;
-    });
-  }, [debouncedStakeholderSearch, stakeholderSort, stakeholders]);
-  const visibleStakeholders = useMemo(
-    () => filteredStakeholders.slice(0, stakeholderVisibleCount),
-    [filteredStakeholders, stakeholderVisibleCount]
+  const stakeholderSortParam = stakeholderSort
+    ? `${stakeholderSort.direction === 'desc' ? '-' : ''}${stakeholderSort.key}`
+    : '-id';
+  const stakeholderListQuery = useInfiniteStakeholdersQuery(
+    selectedCompany?.id ?? null,
+    debouncedStakeholderSearch,
+    stakeholderSortParam
   );
-
-  useEffect(() => {
-    setStakeholderVisibleCount(LAZY_LOAD_BATCH_SIZE);
-  }, [debouncedStakeholderSearch]);
+  const stakeholderTotalCapitalQuery = useStakeholdersTotalCapitalQuery(
+    selectedCompany?.id ?? null
+  );
+  const stakeholders = useMemo(
+    () =>
+      stakeholderListQuery.data?.pages.flatMap((page) => page.data) ?? [],
+    [stakeholderListQuery.data]
+  );
+  const stakeholderLoading =
+    stakeholderListQuery.isLoading || stakeholderMutationLoading;
+  const stakeholderListError =
+    stakeholderListQuery.error ?? stakeholderTotalCapitalQuery.error;
+  const stakeholderListErrorMessage =
+    stakeholderListError instanceof Error
+      ? stakeholderListError.message
+      : stakeholderListError
+        ? 'Gagal memuat data pemegang saham.'
+        : null;
 
   const resetStakeholderForm = () => {
     setEditingStakeholder(null);
@@ -342,11 +306,14 @@ export default function CfoMasterModalPage() {
 
   const totalCapital = useMemo(
     () =>
-      stakeholders.reduce(
-        (sum, item) => sum + (Number(item.capital) || 0),
-        0
-      ),
-    [stakeholders]
+      stakeholderTotalCapitalQuery.data ??
+      stakeholderListQuery.data?.pages[0]?.meta.total_capital ??
+      stakeholders.reduce((sum, item) => sum + (Number(item.capital) || 0), 0),
+    [
+      stakeholderListQuery.data,
+      stakeholderTotalCapitalQuery.data,
+      stakeholders,
+    ]
   );
 
   const stakeholderColumns = useMemo<DataTableColumn<CapitalCompany>[]>(
@@ -546,36 +513,72 @@ export default function CfoMasterModalPage() {
                   )}
                 </div>
               </form>
-              {loading ? (
+              <div className="mt-2">
+                <DataTableSearch
+                  searchValue={companyNameSearch}
+                  searchLabel="Cari nama perusahaan"
+                  searchPlaceholder="Cari nama perusahaan..."
+                  searchTestId="perusahaan-table-search"
+                  secondarySearchValue={companySeriesSearch}
+                  onSecondarySearchChange={setCompanySeriesSearch}
+                  secondarySearchLabel="Cari seri perusahaan"
+                  secondarySearchPlaceholder="Cari seri..."
+                  secondarySearchTestId="perusahaan-series-search"
+                  secondarySearchType="number"
+                  onSearchChange={setCompanyNameSearch}
+                  onSearchSubmit={() => {
+                    submitCompanyNameSearch();
+                    submitCompanySeriesSearch();
+                  }}
+                />
+              </div>
+              {loading || companyListQuery.isLoading ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">
                   Memuat data perusahaan...
                 </p>
               ) : (
                 <DataTable
                   columns={companyColumns}
-                  data={visibleCompanies}
+                  data={companies}
                   rowKey={(row) => row.id}
                   stickyHeader
-                  searchValue={companySearch}
-                  searchLabel="Cari perusahaan"
-                  searchPlaceholder="Cari perusahaan..."
-                  searchTestId="perusahaan-table-search"
+                  showSearch={false}
+                  searchValue={companyNameSearch}
+                  onSearchChange={setCompanyNameSearch}
+                  secondarySearchValue={companySeriesSearch}
+                  onSecondarySearchChange={setCompanySeriesSearch}
                   scrollTestId="perusahaan-table-scroll"
-                  onSearchChange={(value) => {
-                    setCompanySearch(value);
-                    setCompanyVisibleCount(LAZY_LOAD_BATCH_SIZE);
-                  }}
-                  hasMore={visibleCompanies.length < filteredCompanies.length}
-                  onLoadMore={() =>
-                    setCompanyVisibleCount(
-                      (count) => count + LAZY_LOAD_BATCH_SIZE
-                    )
+                  hasMore={
+                    Boolean(companyListQuery.hasNextPage) &&
+                    !companyListQuery.isFetchNextPageError
                   }
+                  onLoadMore={() => {
+                    if (
+                      companyListQuery.hasNextPage &&
+                      !companyListQuery.isFetchingNextPage
+                    ) {
+                      void companyListQuery.fetchNextPage();
+                    }
+                  }}
+                  isLoadingMore={companyListQuery.isFetchingNextPage}
+                  loadMoreError={
+                    companyListQuery.error instanceof Error
+                      ? companyListQuery.error.message
+                      : companyListQuery.error
+                        ? 'Gagal memuat data perusahaan.'
+                        : null
+                  }
+                  onRetryLoadMore={() => {
+                    if (companyListQuery.isFetchNextPageError) {
+                      void companyListQuery.fetchNextPage();
+                    } else {
+                      void companyListQuery.refetch();
+                    }
+                  }}
                   sortKey={companySort?.key ?? null}
                   sortDirection={companySort?.direction}
                   onSort={(key) => {
                     if (key !== 'name' && key !== 'series') return;
-                    setCompanyVisibleCount(LAZY_LOAD_BATCH_SIZE);
                     setCompanySort((current) =>
                       current?.key === key
                         ? {
@@ -587,7 +590,8 @@ export default function CfoMasterModalPage() {
                     );
                   }}
                   emptyMessage={
-                    debouncedCompanySearch.trim()
+                    debouncedCompanyNameSearch.trim() ||
+                    debouncedCompanySeriesSearch.trim()
                       ? 'Tidak ada perusahaan yang cocok dengan pencarian.'
                       : 'Belum ada data perusahaan.'
                   }
@@ -690,6 +694,16 @@ export default function CfoMasterModalPage() {
                       )}
                     </div>
                   </form>
+                  <div className="mt-2">
+                    <DataTableSearch
+                      searchValue={stakeholderSearch}
+                      searchLabel="Cari pemegang saham"
+                      searchPlaceholder="Cari pemegang saham..."
+                      searchTestId="pemegang-saham-table-search"
+                      onSearchChange={setStakeholderSearch}
+                      onSearchSubmit={submitStakeholderSearch}
+                    />
+                  </div>
                   {stakeholderLoading ? (
                     <p className="py-8 text-center text-sm text-muted-foreground">
                       Memuat data pemegang saham...
@@ -697,26 +711,36 @@ export default function CfoMasterModalPage() {
                   ) : (
                     <DataTable
                       columns={stakeholderColumns}
-                      data={visibleStakeholders}
+                      data={stakeholders}
                       rowKey={(row) => row.id}
                       stickyHeader
+                      showSearch={false}
                       searchValue={stakeholderSearch}
-                      searchLabel="Cari pemegang saham"
-                      searchPlaceholder="Cari pemegang saham..."
-                      searchTestId="pemegang-saham-table-search"
+                      onSearchChange={setStakeholderSearch}
                       scrollTestId="pemegang-saham-table-scroll"
-                      onSearchChange={(value) => {
-                        setStakeholderSearch(value);
-                        setStakeholderVisibleCount(LAZY_LOAD_BATCH_SIZE);
-                      }}
                       hasMore={
-                        visibleStakeholders.length < filteredStakeholders.length
+                        Boolean(stakeholderListQuery.hasNextPage) &&
+                        !stakeholderListQuery.isFetchNextPageError
                       }
-                      onLoadMore={() =>
-                        setStakeholderVisibleCount(
-                          (count) => count + LAZY_LOAD_BATCH_SIZE
-                        )
-                      }
+                      onLoadMore={() => {
+                        if (
+                          stakeholderListQuery.hasNextPage &&
+                          !stakeholderListQuery.isFetchingNextPage
+                        ) {
+                          void stakeholderListQuery.fetchNextPage();
+                        }
+                      }}
+                      isLoadingMore={stakeholderListQuery.isFetchingNextPage}
+                      loadMoreError={stakeholderListErrorMessage}
+                      onRetryLoadMore={() => {
+                        if (stakeholderTotalCapitalQuery.isError) {
+                          void stakeholderTotalCapitalQuery.refetch();
+                        } else if (stakeholderListQuery.isFetchNextPageError) {
+                          void stakeholderListQuery.fetchNextPage();
+                        } else {
+                          void stakeholderListQuery.refetch();
+                        }
+                      }}
                       sortKey={stakeholderSort?.key ?? null}
                       sortDirection={stakeholderSort?.direction}
                       onSort={(key) => {
@@ -726,7 +750,6 @@ export default function CfoMasterModalPage() {
                         ) {
                           return;
                         }
-                        setStakeholderVisibleCount(LAZY_LOAD_BATCH_SIZE);
                         setStakeholderSort((current) =>
                           current?.key === key
                             ? {

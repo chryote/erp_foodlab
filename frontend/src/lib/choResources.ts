@@ -1,5 +1,10 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import {
   ApiRequestError,
   type ChoEnums,
@@ -113,6 +118,161 @@ export const choQueryKeys = {
   payrollWorkspace: (companyId: number | null, period: string) =>
     ['cho', 'payroll', 'workspace', companyId, period] as const,
 };
+
+export const CHO_LIST_PAGE_SIZE = 10;
+
+type ChoListPage<T> = {
+  data: T[];
+  meta: { last_page?: number };
+};
+
+async function requireChoListPage<T>(
+  request: Promise<ChoListPage<T>>,
+  resourceName: string
+): Promise<ChoListPage<T>> {
+  const response = await request;
+  if (!response || !Array.isArray(response.data) || !response.meta) {
+    throw new Error(`Respons daftar ${resourceName} tidak valid.`);
+  }
+  return response;
+}
+
+function getNextChoListPage<T>(
+  response: ChoListPage<T>,
+  page: number
+): number | undefined {
+  if (response.meta.last_page !== undefined) {
+    return page < response.meta.last_page ? page + 1 : undefined;
+  }
+  return response.data.length === CHO_LIST_PAGE_SIZE ? page + 1 : undefined;
+}
+
+export function useInfiniteEmployeesQuery(
+  companyId: number | null,
+  search: string,
+  sort: string
+) {
+  return useInfiniteQuery({
+    queryKey: [
+      ...choQueryKeys.employees,
+      'infinite',
+      companyId,
+      search,
+      sort,
+    ],
+    queryFn: ({ pageParam }) =>
+      requireChoListPage(
+        fetchEmployees({
+          page: pageParam,
+          per_page: CHO_LIST_PAGE_SIZE,
+          company_id: companyId ?? undefined,
+          search: search.trim() || undefined,
+          sort,
+        }),
+        'karyawan'
+      ),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      getNextChoListPage(lastPage, lastPageParam),
+    enabled: companyId !== null,
+  });
+}
+
+export function useInfiniteEmployeePositionsQuery(
+  search: string,
+  sort: string,
+  enabled = true
+) {
+  return useInfiniteQuery({
+    queryKey: [...choQueryKeys.employeePositions, 'infinite', search, sort],
+    queryFn: ({ pageParam }) =>
+      requireChoListPage(
+        fetchEmployeePositions({
+          page: pageParam,
+          per_page: CHO_LIST_PAGE_SIZE,
+          search: search.trim() || undefined,
+          sort,
+        }),
+        'jabatan'
+      ),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      getNextChoListPage(lastPage, lastPageParam),
+    enabled,
+  });
+}
+
+export function useInfiniteEmploymentStatusesQuery(
+  search: string,
+  sort: string,
+  enabled = true
+) {
+  return useInfiniteQuery({
+    queryKey: [...choQueryKeys.employmentStatuses, 'infinite', search, sort],
+    queryFn: ({ pageParam }) =>
+      requireChoListPage(
+        fetchEmploymentStatuses({
+          page: pageParam,
+          per_page: CHO_LIST_PAGE_SIZE,
+          search: search.trim() || undefined,
+          sort,
+        }),
+        'status karyawan'
+      ),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      getNextChoListPage(lastPage, lastPageParam),
+    enabled,
+  });
+}
+
+export function useInfinitePayrollGradesQuery(
+  search: string,
+  sort: string,
+  enabled = true
+) {
+  return useInfiniteQuery({
+    queryKey: [...choQueryKeys.payrollGrades, 'infinite', search, sort],
+    queryFn: ({ pageParam }) =>
+      requireChoListPage(
+        fetchPayrollGrades({
+          page: pageParam,
+          per_page: CHO_LIST_PAGE_SIZE,
+          search: search.trim() || undefined,
+          sort,
+        }),
+        'payroll grade'
+      ),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      getNextChoListPage(lastPage, lastPageParam),
+    enabled,
+  });
+}
+
+export function useInfiniteTaxStatusesQuery(
+  search: string,
+  sort: string,
+  enabled = true
+) {
+  return useInfiniteQuery({
+    queryKey: [...choQueryKeys.taxStatuses, 'infinite', search, sort],
+    queryFn: ({ pageParam }) =>
+      requireChoListPage(
+        fetchTaxStatuses({
+          page: pageParam,
+          per_page: CHO_LIST_PAGE_SIZE,
+          search: search.trim() || undefined,
+          sort,
+        }),
+        'status pajak'
+      ),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      getNextChoListPage(lastPage, lastPageParam),
+    enabled,
+  });
+}
 
 export interface ApiErrorInfo {
   id: number;
@@ -640,7 +800,8 @@ export function useMasterKaryawanCrudResource(enabled: boolean) {
 
 export function useEmployeeCrudResource(
   enabled: boolean,
-  _company: Company | null
+  _company: Company | null,
+  loadEmployees = true
 ) {
   const queryClient = useQueryClient();
   const [mutationError, setMutationError] = useState<string | null>(null);
@@ -657,7 +818,7 @@ export function useEmployeeCrudResource(
       const res = await fetchEmployees();
       return res?.data ?? [];
     },
-    enabled,
+    enabled: enabled && loadEmployees,
   });
 
   const allEmployees = employeesQuery.data ?? [];

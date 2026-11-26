@@ -93,3 +93,37 @@ body {
 :root[data-theme='dark'] .dashboard-header-logo--dark {
   display: block;
 }
+
+.view-operasional-calendar .rdp-button_previous,
+.view-operasional-calendar .rdp-button_next {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.view-operasional-calendar .rdp-button_previous > svg,
+.view-operasional-calendar .rdp-button_next > svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.view-operasional-calendar {
+  background-color: var(--card);
+  color: var(--card-foreground);
+}
+
+.view-operasional-calendar select {
+  min-height: 2.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background-color: var(--card);
+  color: var(--card-foreground);
+  padding-inline: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.view-operasional-calendar .calendar-today,
+.view-operasional-calendar .calendar-today > button,
+.view-operasional-calendar button.calendar-today {
+  font-weight: 700;
+}
