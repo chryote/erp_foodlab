@@ -89,6 +89,27 @@ class ExpenseItemService
                 AllowedFilter::exact('company_id'),
                 AllowedFilter::exact('expense_category_id'),
                 AllowedFilter::exact('expense_type_id'),
+                AllowedFilter::callback('date_from', function (Builder $query, mixed $value): void {
+                    $date = $this->parseDateFilter($value, 'date_from');
+                    if ($date !== null) {
+                        $query->whereDate('purchased_on', '>=', $date);
+                    }
+                }),
+                AllowedFilter::callback('date_to', function (Builder $query, mixed $value): void {
+                    $date = $this->parseDateFilter($value, 'date_to');
+                    if ($date !== null) {
+                        $query->whereDate('purchased_on', '<=', $date);
+                    }
+                }),
+                AllowedFilter::callback('daterange', function (Builder $query, mixed $value): void {
+                    [$from, $to] = $this->parseDateRangeFilter($value);
+                    if ($from !== null) {
+                        $query->whereDate('purchased_on', '>=', $from);
+                    }
+                    if ($to !== null) {
+                        $query->whereDate('purchased_on', '<=', $to);
+                    }
+                }),
                 AllowedFilter::callback('search', function (Builder $query, mixed $value) use ($request): void {
                     IndexQuery::applySearch($query, $value, function (Builder $searchQuery, string $escaped): void {
                         $searchQuery->where(function (Builder $likeQuery) use ($escaped): void {
@@ -197,5 +218,69 @@ class ExpenseItemService
         }
 
         return $attributes;
+    }
+
+    private function parseDateFilter(mixed $value, string $field): ?string
+    {
+        if (is_array($value)) {
+            throw ValidationException::withMessages([
+                $field => ["The {$field} filter must be a valid date in YYYY-MM-DD format."],
+            ]);
+        }
+
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return null;
+        }
+
+        $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $raw);
+        if ($parsed === false || $parsed->format('Y-m-d') !== $raw) {
+            throw ValidationException::withMessages([
+                $field => ["The {$field} filter must match the format YYYY-MM-DD."],
+            ]);
+        }
+
+        return $raw;
+    }
+
+    /**
+     * @return array{0: ?string, 1: ?string}
+     */
+    private function parseDateRangeFilter(mixed $value): array
+    {
+        if (is_array($value)) {
+            if (array_key_exists('from', $value) || array_key_exists('to', $value) || array_key_exists('start', $value) || array_key_exists('end', $value)) {
+                $from = $this->parseDateFilter($value['from'] ?? $value['start'] ?? null, 'daterange');
+                $to = $this->parseDateFilter($value['to'] ?? $value['end'] ?? null, 'daterange');
+
+                return [$from, $to];
+            }
+
+            $parts = array_values($value);
+        } else {
+            $raw = trim((string) $value);
+            if ($raw === '') {
+                return [null, null];
+            }
+
+            $parts = preg_split('/\s*(?:\.\.|\/|,|\s+-\s+|\s+to\s+)\s*/i', $raw) ?: [];
+        }
+
+        if (count($parts) === 1) {
+            $single = $this->parseDateFilter($parts[0], 'daterange');
+
+            return [$single, $single];
+        }
+
+        if (count($parts) === 2) {
+            return [
+                $this->parseDateFilter($parts[0], 'daterange'),
+                $this->parseDateFilter($parts[1], 'daterange'),
+            ];
+        }
+
+        throw ValidationException::withMessages([
+            'daterange' => ['The daterange filter must be a YYYY-MM-DD date or a pair of YYYY-MM-DD dates.'],
+        ]);
     }
 }

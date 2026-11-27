@@ -931,7 +931,7 @@ export interface DefaultPackagePayload {
 export interface DefaultPackageWizardItemPayload {
   item_id: number;
   quantity: number;
-  price: number;
+  price?: number;
 }
 
 export interface DefaultPackageWizardPayload {
@@ -940,6 +940,7 @@ export interface DefaultPackageWizardPayload {
   brand_name: string;
   company_id?: number | null;
   packet_vendor_id?: number | null;
+  price: number;
   items: DefaultPackageWizardItemPayload[];
 }
 

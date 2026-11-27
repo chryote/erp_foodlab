@@ -18,13 +18,11 @@ import {
   SelectInput,
   TextInput,
 } from '@/components/ui';
-import { formatCapitalIdr } from '@/modules/CFO/CapitalCompanyCrudModal';
 
 interface WizardItemDraft {
   rowId: number;
   item_id: number;
   quantity: string;
-  price: string;
 }
 
 export interface DefaultPackageWizardPanelProps {
@@ -90,6 +88,7 @@ export const DefaultPackageWizardPanel: React.FC<
   const [itemSearch, setItemSearch] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [rows, setRows] = useState<WizardItemDraft[]>([]);
+  const [totalPrice, setTotalPrice] = useState('0');
   const [nextRowId, setNextRowId] = useState(1);
   const [localError, setLocalError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -119,6 +118,7 @@ export const DefaultPackageWizardPanel: React.FC<
     setItemSearch('');
     setDropdownOpen(false);
     setRows([]);
+    setTotalPrice('0');
     setLocalError(null);
     setConfirmOpen(false);
   }, []);
@@ -196,7 +196,6 @@ export const DefaultPackageWizardPanel: React.FC<
         rowId: index + 1,
         item_id: Number(ing.item_id),
         quantity: resolveQty(Number(ing.item_id)),
-        price: String(ing.price ?? 0),
       }));
     } else if (editingPackage.item_packet) {
       hydratedRows = [
@@ -204,7 +203,6 @@ export const DefaultPackageWizardPanel: React.FC<
           rowId: 1,
           item_id: Number(editingPackage.item_packet.item_id),
           quantity: String(editingPackage.item_packet.quantity ?? 1),
-          price: String(editingPackage.price ?? 0),
         },
       ];
     }
@@ -217,6 +215,7 @@ export const DefaultPackageWizardPanel: React.FC<
     setItemSearch('');
     setDropdownOpen(false);
     setRows(hydratedRows);
+    setTotalPrice(String(editingPackage.price ?? 0));
     setNextRowId(hydratedRows.length + 1);
     setLocalError(null);
     setConfirmOpen(false);
@@ -297,15 +296,6 @@ export const DefaultPackageWizardPanel: React.FC<
     });
   }, [addedItemIds, itemSearch, ownerItems]);
 
-  const totalWizardPrice = useMemo(
-    () =>
-      rows.reduce((sum, row) => {
-        const parsed = parseFloat(row.price);
-        return sum + (Number.isFinite(parsed) && parsed >= 0 ? parsed : 0);
-      }, 0),
-    [rows]
-  );
-
   const handleOwnerChange = (nextOwnerKey: string) => {
     setLocalError(null);
     onClearExternalError();
@@ -352,7 +342,6 @@ export const DefaultPackageWizardPanel: React.FC<
         rowId: nextRowId,
         item_id: itemId,
         quantity: '1',
-        price: '0',
       },
     ]);
     setNextRowId((prev) => prev + 1);
@@ -401,22 +390,21 @@ export const DefaultPackageWizardPanel: React.FC<
       return null;
     }
 
+    const parsedTotalPrice = totalPrice ? parseFloat(totalPrice) : 0;
+    if (!Number.isFinite(parsedTotalPrice) || parsedTotalPrice < 0) {
+      return null;
+    }
+
     const items: DefaultPackageWizardPayload['items'] = [];
     for (const row of rows) {
       const quantity = parseInt(row.quantity, 10);
-      const price = row.price ? parseFloat(row.price) : 0;
-      if (
-        !Number.isFinite(quantity) ||
-        quantity < 1 ||
-        !Number.isFinite(price) ||
-        price < 0
-      ) {
+      if (!Number.isFinite(quantity) || quantity < 1) {
         return null;
       }
       items.push({
         item_id: row.item_id,
         quantity,
-        price: Math.round(price * 100) / 100,
+        price: 0,
       });
     }
 
@@ -427,6 +415,7 @@ export const DefaultPackageWizardPanel: React.FC<
       ...(selectedOwner.company_id !== null
         ? { company_id: selectedOwner.company_id }
         : { packet_vendor_id: selectedOwner.packet_vendor_id }),
+      price: Math.round(parsedTotalPrice * 100) / 100,
       items,
     };
   };
@@ -436,7 +425,7 @@ export const DefaultPackageWizardPanel: React.FC<
     onClearExternalError();
     const payload = buildWizardPayload();
     if (!payload) {
-      setLocalError('Pastikan harga setiap bahan bernilai valid (>= 0).');
+      setLocalError('Pastikan total harga paket awal bernilai valid (>= 0).');
       return;
     }
     setConfirmOpen(true);
@@ -472,7 +461,7 @@ export const DefaultPackageWizardPanel: React.FC<
               ? 'Informasi Paket & Vendor'
               : step === 2
                 ? 'Pilih Item & Quantity'
-                : 'Input Harga Bahan (Ingredient)'}
+                : 'Input Total Harga Paket Awal'}
           </p>
         </div>
         <div className="flex items-center gap-1.5">
@@ -797,39 +786,32 @@ export const DefaultPackageWizardPanel: React.FC<
                 <div
                   key={row.rowId}
                   data-testid={`wizard-price-row-${idx}`}
-                  className="grid grid-cols-1 gap-2 rounded-lg border border-border/80 bg-background p-2.5 sm:grid-cols-[minmax(0,1fr)_160px] sm:items-center"
+                  className="rounded-lg border border-border/80 bg-background p-2.5"
                 >
                   <div className="text-xs">
                     <div className="font-semibold text-foreground">
                       {matchedItem?.name ?? `Item #${row.item_id}`}
                     </div>
                     <div className="text-muted-foreground">
-                      Kode: {matchedItem?.code || '-'} • Qty: {row.quantity}
+                      Kode: {matchedItem?.code || '-'}
                     </div>
                   </div>
-                  <DecimalInput
-                    id={`wizard-price-input-${idx}`}
-                    data-testid={`wizard-price-input-${idx}`}
-                    label="Harga (Rp)"
-                    value={row.price}
-                    onChange={(rawValue) =>
-                      handleUpdateRow(row.rowId, { price: rawValue })
-                    }
-                  />
                 </div>
               );
             })}
 
-            <div className="flex items-center justify-between border-t border-border pt-2 text-xs">
-              <span className="font-medium text-muted-foreground">
-                Total Harga Paket Awal
-              </span>
-              <strong
-                data-testid="paket-awal-wizard-total-price"
-                className="text-sm text-foreground"
-              >
-                {formatCapitalIdr(totalWizardPrice)}
-              </strong>
+            <div className="border-t border-border pt-3">
+              <DecimalInput
+                id="paket-awal-wizard-total-price-input"
+                data-testid="paket-awal-wizard-total-price-input"
+                label="Total Harga Paket Awal (Rp)"
+                labelPlacement="left"
+                value={totalPrice}
+                onChange={(rawValue) => {
+                  setLocalError(null);
+                  setTotalPrice(rawValue);
+                }}
+              />
             </div>
           </div>
 
