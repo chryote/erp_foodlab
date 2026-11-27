@@ -57,6 +57,13 @@ class SaveDefaultPackageWizardRequest extends FormRequest
                 'integer',
                 Rule::exists('packet_vendors', 'id')->whereNull('deleted_at'),
             ],
+            'price' => [
+                'required',
+                'numeric',
+                'min:0',
+                'max:9999999999999999.99',
+                'decimal:0,2',
+            ],
             'items' => ['required', 'array', 'min:1', 'max:100'],
             'items.*.item_id' => [
                 'required',
@@ -66,7 +73,8 @@ class SaveDefaultPackageWizardRequest extends FormRequest
             ],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:4294967295'],
             'items.*.price' => [
-                'required',
+                'sometimes',
+                'nullable',
                 'numeric',
                 'min:0',
                 'max:9999999999999999.99',
@@ -119,15 +127,9 @@ class SaveDefaultPackageWizardRequest extends FormRequest
                         ? Item::query()->whereNull('deleted_at')->whereIn('id', $itemIds)->get()->keyBy('id')
                         : collect();
 
-                    $totalPrice = 0.0;
-
                     foreach ($itemsInput as $index => $row) {
                         if (! is_array($row)) {
                             continue;
-                        }
-
-                        if (! $validator->errors()->has("items.{$index}.price") && isset($row['price']) && is_numeric($row['price'])) {
-                            $totalPrice += round((float) $row['price'], 2);
                         }
 
                         if ($validator->errors()->hasAny(['company_id', 'packet_vendor_id', "items.{$index}.item_id"])) {
@@ -158,10 +160,6 @@ class SaveDefaultPackageWizardRequest extends FormRequest
                                 'Item yang dipilih tidak dimiliki oleh vendor paket yang dipilih.'
                             );
                         }
-                    }
-
-                    if (round($totalPrice, 2) > 9999999999999999.99) {
-                        $validator->errors()->add('items', 'Total harga bahan melebihi batas maksimum.');
                     }
                 }
 
@@ -217,11 +215,13 @@ class SaveDefaultPackageWizardRequest extends FormRequest
             $validated[$textField] = InputNormalizer::text((string) $validated[$textField]) ?? '';
         }
 
+        $validated['price'] = round((float) $validated['price'], 2);
+
         $validated['items'] = array_map(
             static fn (array $row): array => [
                 'item_id' => (int) $row['item_id'],
                 'quantity' => (int) $row['quantity'],
-                'price' => round((float) $row['price'], 2),
+                'price' => 0.0,
             ],
             $validated['items']
         );

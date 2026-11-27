@@ -50,6 +50,19 @@ class SaveDefaultPackageWizardAction
             ]);
         }
 
+        $rawPackagePrice = $attributes['price'] ?? null;
+        if (
+            $rawPackagePrice === null
+            || ! is_numeric($rawPackagePrice)
+            || (float) $rawPackagePrice < 0
+            || round((float) $rawPackagePrice, 2) > 9999999999999999.99
+        ) {
+            throw ValidationException::withMessages([
+                'price' => ['Total harga paket awal tidak valid.'],
+            ]);
+        }
+        $totalPrice = round((float) $rawPackagePrice, 2);
+
         $resolvedOwner = ExclusiveOwner::resolveForService($attributes);
         $companyId = $resolvedOwner['company_id'];
         $packetVendorId = $resolvedOwner['packet_vendor_id'];
@@ -61,7 +74,8 @@ class SaveDefaultPackageWizardAction
             $brandName,
             $companyId,
             $packetVendorId,
-            $itemsInput
+            $itemsInput,
+            $totalPrice
         ): DefaultPackage {
             $lockedExisting = $existing !== null
                 ? DefaultPackage::query()->lockForUpdate()->findOrFail($existing->getKey())
@@ -70,17 +84,6 @@ class SaveDefaultPackageWizardAction
             ExclusiveOwner::assertActiveOwner($companyId, $packetVendorId, true);
 
             $normalizedRows = $this->normalizeAndValidateItems($itemsInput, $companyId, $packetVendorId);
-
-            $totalPrice = 0.0;
-            foreach ($normalizedRows as $row) {
-                $totalPrice = round($totalPrice + $row['price'], 2);
-            }
-
-            if ($totalPrice > 9999999999999999.99) {
-                throw ValidationException::withMessages([
-                    'items' => ['Total harga bahan melebihi batas maksimum.'],
-                ]);
-            }
 
             /** @var PacketName $packetNameRecord */
             $packetNameRecord = $this->firstOrCreateActiveByName(PacketName::class, $packetName);
@@ -322,9 +325,6 @@ class SaveDefaultPackageWizardAction
 
             $itemId = isset($rawRow['item_id']) ? (int) $rawRow['item_id'] : 0;
             $quantity = isset($rawRow['quantity']) ? (int) $rawRow['quantity'] : 0;
-            $price = isset($rawRow['price']) && is_numeric($rawRow['price'])
-                ? round((float) $rawRow['price'], 2)
-                : -1.0;
 
             if ($itemId <= 0 || in_array($itemId, $seenItemIds, true)) {
                 throw ValidationException::withMessages([
@@ -338,18 +338,12 @@ class SaveDefaultPackageWizardAction
                 ]);
             }
 
-            if ($price < 0) {
-                throw ValidationException::withMessages([
-                    "items.{$index}.price" => ['Harga bahan tidak valid.'],
-                ]);
-            }
-
             $seenItemIds[] = $itemId;
             $rows[] = [
                 'index' => $index,
                 'item_id' => $itemId,
                 'quantity' => $quantity,
-                'price' => $price,
+                'price' => 0.0,
             ];
         }
 

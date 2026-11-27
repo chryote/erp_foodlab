@@ -275,11 +275,6 @@ export const ViewPaketAwalModal: React.FC<ViewPaketAwalModalProps> = ({
         header: 'Qty',
         render: (row) => row.quantity,
       },
-      {
-        key: 'price',
-        header: 'Harga (Rp)',
-        render: (row) => formatCapitalIdr(row.price),
-      },
     ],
     []
   );

@@ -177,4 +177,87 @@ describe('ExpenseItem Golden Module & Spec-Driven Backend Standards', function (
             ->assertOk()
             ->assertJsonStructure(['openapi', 'info', 'paths']);
     });
+
+    it('filters expense items by YYYY-MM-DD daterange and date_from/date_to', function () {
+        $company = Company::factory()->create(['name' => 'PT. Foodlab DateRange']);
+        $category = ExpenseCategory::factory()->create(['company_id' => $company->id, 'name' => 'Operasional']);
+        $type = ExpenseType::factory()->create([
+            'company_id' => $company->id,
+            'expense_category_id' => $category->id,
+            'name' => 'Listrik',
+        ]);
+
+        $itemNov01 = ExpenseItem::factory()->create([
+            'company_id' => $company->id,
+            'expense_category_id' => $category->id,
+            'expense_type_id' => $type->id,
+            'name' => 'Expense Nov 01',
+            'purchased_on' => '2026-11-01',
+        ]);
+        $itemNov15 = ExpenseItem::factory()->create([
+            'company_id' => $company->id,
+            'expense_category_id' => $category->id,
+            'expense_type_id' => $type->id,
+            'name' => 'Expense Nov 15',
+            'purchased_on' => '2026-11-15',
+        ]);
+        $itemNov30 = ExpenseItem::factory()->create([
+            'company_id' => $company->id,
+            'expense_category_id' => $category->id,
+            'expense_type_id' => $type->id,
+            'name' => 'Expense Nov 30',
+            'purchased_on' => '2026-11-30',
+        ]);
+
+        // Inclusive filter[daterange]=YYYY-MM-DD,YYYY-MM-DD
+        $this->getJson('/api/v1/modules/cfo/expense-items?filter[daterange]=2026-11-10,2026-11-30&sort=purchased_on')
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.id', $itemNov15->id)
+            ->assertJsonPath('data.1.id', $itemNov30->id);
+
+        // Flat ?daterange=YYYY-MM-DD..YYYY-MM-DD
+        $this->getJson('/api/v1/modules/cfo/expense-items?daterange=2026-11-01..2026-11-15&sort=purchased_on')
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.id', $itemNov01->id)
+            ->assertJsonPath('data.1.id', $itemNov15->id);
+
+        // Single-day filter[daterange]=YYYY-MM-DD
+        $this->getJson('/api/v1/modules/cfo/expense-items?filter[daterange]=2026-11-15')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $itemNov15->id);
+
+        // filter[date_from] and filter[date_to] (and flat aliases)
+        $this->getJson('/api/v1/modules/cfo/expense-items?filter[date_from]=2026-11-15&filter[date_to]=2026-11-30&sort=purchased_on')
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.id', $itemNov15->id)
+            ->assertJsonPath('data.1.id', $itemNov30->id);
+
+        $this->getJson('/api/v1/modules/cfo/expense-items?date_from=2026-11-20')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $itemNov30->id);
+
+        $this->getJson('/api/v1/modules/cfo/expense-items?date_to=2026-11-05')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $itemNov01->id);
+
+        // Invalid date format returns 422
+        $this->getJson('/api/v1/modules/cfo/expense-items?filter[daterange]=2026-02-30,2026-11-30')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['daterange']);
+
+        $this->getJson('/api/v1/modules/cfo/expense-items?filter[date_from]=19-11-2026')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['date_from']);
+
+        // Unfiltered list still returns all 3 items (not polluted by filtered requests)
+        $this->getJson('/api/v1/modules/cfo/expense-items')
+            ->assertOk()
+            ->assertJsonCount(3, 'data');
+    });
 });
