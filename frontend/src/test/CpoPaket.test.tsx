@@ -303,10 +303,7 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
 
     vi.mocked(apiClient.createDefaultPackageWizard).mockImplementation(
       async (payload) => {
-        const totalPrice = payload.items.reduce(
-          (sum, row) => sum + row.price,
-          0
-        );
+        const totalPrice = payload.price;
         const createdItemPackets: apiClient.ItemPacket[] = payload.items.map(
           (row, idx) => {
             const matchedItem = itemsCatalogStore.find(
@@ -396,7 +393,7 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
             id: 500 + idx,
             default_package_id: created.id,
             item_id: row.item_id,
-            price: row.price,
+            price: 0,
             default_package: created,
             item:
               itemsCatalogStore.find((item) => item.id === row.item_id) ?? null,
@@ -408,10 +405,7 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
 
     vi.mocked(apiClient.updateDefaultPackageWizard).mockImplementation(
       async (id, payload) => {
-        const totalPrice = payload.items.reduce(
-          (sum, row) => sum + row.price,
-          0
-        );
+        const totalPrice = payload.price;
         const existing = defaultPackagesStore.find((dp) => dp.id === id);
         const packetId = existing?.packet_id ?? 20;
 
@@ -509,7 +503,7 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
             id: 600 + idx,
             default_package_id: id,
             item_id: row.item_id,
-            price: row.price,
+            price: 0,
             default_package: updated,
             item:
               itemsCatalogStore.find((item) => item.id === row.item_id) ?? null,
@@ -826,17 +820,17 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
 
     fireEvent.click(screen.getByTestId('paket-awal-wizard-next-2'));
 
-    // Screen 3: input Ingredient.price per item, see live total, and Simpan
+    // Screen 3: Qty display & per-item Harga input are removed; input Total Harga Paket Awal (DefaultPackage.price) and Simpan
     expect(screen.getByTestId('paket-awal-wizard-step-3')).toBeInTheDocument();
-    fireEvent.change(screen.getByTestId('wizard-price-input-0'), {
-      target: { value: '150000' },
+    expect(
+      within(screen.getByTestId('wizard-price-row-0')).queryByText(/Qty:/)
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('wizard-price-input-0')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('wizard-price-input-1')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId('paket-awal-wizard-total-price-input'), {
+      target: { value: '250000' },
     });
-    fireEvent.change(screen.getByTestId('wizard-price-input-1'), {
-      target: { value: '100000' },
-    });
-    expect(screen.getByTestId('paket-awal-wizard-total-price')).toHaveTextContent(
-      'Rp 250.000'
-    );
 
     fireEvent.click(screen.getByTestId('paket-awal-wizard-save'));
     fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
@@ -847,9 +841,10 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
         packet_category: 'Kategori Spesial',
         brand_name: 'Brand Nusantara',
         company_id: 1,
+        price: 250000,
         items: [
-          { item_id: 30, quantity: 3, price: 150000 },
-          { item_id: 31, quantity: 5, price: 100000 },
+          { item_id: 30, quantity: 3, price: 0 },
+          { item_id: 31, quantity: 5, price: 0 },
         ],
       });
       expect(
@@ -916,15 +911,14 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
     );
     fireEvent.click(screen.getByTestId('paket-awal-wizard-next-2'));
 
-    // Screen 3 hydrated price 150000 -> update to 175000 -> Perbarui
+    // Screen 3 hydrated total price 250000 -> update to 175000 -> Perbarui
     expect(screen.getByTestId('paket-awal-wizard-step-3')).toBeInTheDocument();
-    expect(screen.getByTestId('wizard-price-input-0')).toHaveValue('150.000');
-    fireEvent.change(screen.getByTestId('wizard-price-input-0'), {
+    expect(
+      screen.getByTestId('paket-awal-wizard-total-price-input')
+    ).toHaveValue('250.000');
+    fireEvent.change(screen.getByTestId('paket-awal-wizard-total-price-input'), {
       target: { value: '175000' },
     });
-    expect(screen.getByTestId('paket-awal-wizard-total-price')).toHaveTextContent(
-      'Rp 175.000'
-    );
 
     fireEvent.click(screen.getByTestId('paket-awal-wizard-save'));
     fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
@@ -935,7 +929,8 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
         packet_category: 'Kategori Spesial',
         brand_name: 'Brand Nusantara Edited',
         company_id: 1,
-        items: [{ item_id: 30, quantity: 4, price: 175000 }],
+        price: 175000,
+        items: [{ item_id: 30, quantity: 4, price: 0 }],
       });
       expect(
         within(defaultTablePanel).getByText('Brand Nusantara Edited')
@@ -1189,13 +1184,20 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
       screen.getByTestId('view-paket-awal-detail-total-banner-value')
     ).toHaveTextContent('Rp 100.000');
 
-    // Individual item rows with Qty & Price in Detail modal
+    // Individual item rows with Qty (Harga (Rp) column hidden) in Detail modal
     expect(within(detailModal).getByText('BHN-01')).toBeInTheDocument();
     expect(within(detailModal).getByText('Tepung Terigu')).toBeInTheDocument();
-    expect(within(detailModal).getByText('Rp 12.000')).toBeInTheDocument();
     expect(within(detailModal).getByText('BHN-02')).toBeInTheDocument();
     expect(within(detailModal).getByText('Gula Pasir')).toBeInTheDocument();
-    expect(within(detailModal).getByText('Rp 18.500')).toBeInTheDocument();
+    expect(
+      within(detailModal).queryByText('Harga (Rp)')
+    ).not.toBeInTheDocument();
+    expect(
+      within(detailModal).queryByText('Rp 12.000')
+    ).not.toBeInTheDocument();
+    expect(
+      within(detailModal).queryByText('Rp 18.500')
+    ).not.toBeInTheDocument();
 
     // Close detail modal and main view modal
     fireEvent.click(

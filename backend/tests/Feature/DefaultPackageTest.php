@@ -559,9 +559,10 @@ describe('DefaultPackage CPO module', function () {
             'packet_category' => 'Kategori Rollback Uji',
             'brand_name' => 'Brand Rollback',
             'company_id' => $company->id,
+            'price' => 8000,
             'items' => [
-                ['item_id' => $companyItem1->id, 'quantity' => 2, 'price' => 5000],
-                ['item_id' => $vendorAItem1->id, 'quantity' => 1, 'price' => 3000],
+                ['item_id' => $companyItem1->id, 'quantity' => 2],
+                ['item_id' => $vendorAItem1->id, 'quantity' => 1],
             ],
         ])->assertUnprocessable()->assertJsonValidationErrors(['items.1.item_id']);
 
@@ -577,13 +578,15 @@ describe('DefaultPackage CPO module', function () {
             'brand_name' => 'Brand Invalid',
             'company_id' => $company->id,
             'packet_vendor_id' => $vendorA->id,
-            'items' => [['item_id' => $companyItem1->id, 'quantity' => 1, 'price' => 1000]],
+            'price' => 1000,
+            'items' => [['item_id' => $companyItem1->id, 'quantity' => 1]],
         ])->assertUnprocessable()->assertJsonValidationErrors(['company_id', 'packet_vendor_id']);
 
         $this->postJson('/api/v1/modules/cpo/default-packages/wizard', [
             'packet_name' => 'Paket Invalid',
             'packet_category' => 'Kategori Invalid',
             'brand_name' => 'Brand Invalid',
+            'price' => 1000,
             'items' => [],
         ])->assertUnprocessable()->assertJsonValidationErrors(['company_id', 'packet_vendor_id', 'items']);
 
@@ -592,9 +595,10 @@ describe('DefaultPackage CPO module', function () {
             'packet_category' => 'Kategori Invalid',
             'brand_name' => 'Brand Invalid',
             'packet_vendor_id' => $vendorA->id,
+            'price' => 3000,
             'items' => [
-                ['item_id' => $vendorAItem1->id, 'quantity' => 1, 'price' => 1000],
-                ['item_id' => $vendorAItem1->id, 'quantity' => 2, 'price' => 2000],
+                ['item_id' => $vendorAItem1->id, 'quantity' => 1],
+                ['item_id' => $vendorAItem1->id, 'quantity' => 2],
             ],
         ])->assertUnprocessable()->assertJsonValidationErrors(['items.0.item_id', 'items.1.item_id']);
 
@@ -603,19 +607,21 @@ describe('DefaultPackage CPO module', function () {
             'packet_category' => 'Kategori Invalid',
             'brand_name' => 'Brand Invalid',
             'packet_vendor_id' => $vendorB->id,
-            'items' => [['item_id' => $vendorBItem->id, 'quantity' => 1, 'price' => -5]],
-        ])->assertUnprocessable()->assertJsonValidationErrors(['items.0.price']);
+            'price' => -5,
+            'items' => [['item_id' => $vendorBItem->id, 'quantity' => 1]],
+        ])->assertUnprocessable()->assertJsonValidationErrors(['price']);
 
-        // 3. Company-owned wizard submission creates PacketName, PacketCategory, Packet, ItemPackets, DefaultPackage, and Ingredients atomically
+        // 3. Company-owned wizard submission creates PacketName, PacketCategory, Packet, ItemPackets, DefaultPackage, and Ingredients (price 0) atomically
         $idemHeaders = ['Idempotency-Key' => 'idem-wizard-company-001'];
         $companyWizardPayload = [
             'packet_name' => '  Paket   Internal Hemat  ',
             'packet_category' => '  Kategori   Internal  ',
             'brand_name' => '  Brand   Internal Prima  ',
             'company_id' => $company->id,
+            'price' => 20000,
             'items' => [
-                ['item_id' => $companyItem1->id, 'quantity' => 2, 'price' => 12500.50],
-                ['item_id' => $companyItem2->id, 'quantity' => 3, 'price' => 7499.50],
+                ['item_id' => $companyItem1->id, 'quantity' => 2],
+                ['item_id' => $companyItem2->id, 'quantity' => 3],
             ],
         ];
 
@@ -628,7 +634,9 @@ describe('DefaultPackage CPO module', function () {
             ->assertJsonPath('data.packet_name.name', 'Paket Internal Hemat')
             ->assertJsonPath('data.packet_category.name', 'Kategori Internal')
             ->assertJsonPath('data.packet.name', 'Paket Internal Hemat')
-            ->assertJsonCount(2, 'data.ingredients');
+            ->assertJsonCount(2, 'data.ingredients')
+            ->assertJsonPath('data.ingredients.0.price', 0)
+            ->assertJsonPath('data.ingredients.1.price', 0);
 
         // Idempotency-Key replay returns same record without duplicating
         $replayWizardRes = $this->postJson('/api/v1/modules/cpo/default-packages/wizard', $companyWizardPayload, $idemHeaders)
@@ -656,9 +664,10 @@ describe('DefaultPackage CPO module', function () {
             'packet_category' => 'KATEGORI MINUMAN',
             'brand_name' => 'Brand Kopi Nusantara',
             'packet_vendor_id' => $vendorA->id,
+            'price' => 25000,
             'items' => [
-                ['item_id' => $vendorAItem1->id, 'quantity' => 4, 'price' => 15000],
-                ['item_id' => $vendorAItem2->id, 'quantity' => 2, 'price' => 10000],
+                ['item_id' => $vendorAItem1->id, 'quantity' => 4],
+                ['item_id' => $vendorAItem2->id, 'quantity' => 2],
             ],
         ])->assertCreated()
             ->assertJsonPath('data.company_id', null)
@@ -666,7 +675,9 @@ describe('DefaultPackage CPO module', function () {
             ->assertJsonPath('data.packet_name_id', $existingVendorName->id)
             ->assertJsonPath('data.packet_category_id', $existingVendorCat->id)
             ->assertJsonPath('data.price', 25000)
-            ->assertJsonCount(2, 'data.ingredients');
+            ->assertJsonCount(2, 'data.ingredients')
+            ->assertJsonPath('data.ingredients.0.price', 0)
+            ->assertJsonPath('data.ingredients.1.price', 0);
 
         expect(PacketName::query()->whereRaw('LOWER(name) = ?', ['paket vendor kopi'])->count())->toBe(1);
         expect(PacketCategory::query()->whereRaw('LOWER(name) = ?', ['kategori minuman'])->count())->toBe(1);
@@ -678,8 +689,9 @@ describe('DefaultPackage CPO module', function () {
             'packet_category' => 'kategori minuman',
             'brand_name' => '  BRAND   KOPI NUSANTARA ',
             'packet_vendor_id' => $vendorA->id,
+            'price' => 5000,
             'items' => [
-                ['item_id' => $vendorAItem1->id, 'quantity' => 1, 'price' => 5000],
+                ['item_id' => $vendorAItem1->id, 'quantity' => 1],
             ],
         ])->assertUnprocessable()->assertJsonValidationErrors(['brand_name']);
 
@@ -693,13 +705,15 @@ describe('DefaultPackage CPO module', function () {
             'packet_category' => 'Kategori Internal',
             'brand_name' => 'Brand Internal Prima',
             'company_id' => $company->id,
+            'price' => 15000,
             'items' => [
-                ['item_id' => $companyItem1->id, 'quantity' => 5, 'price' => 15000],
+                ['item_id' => $companyItem1->id, 'quantity' => 5],
             ],
         ])->assertOk()
             ->assertJsonPath('data.brand_name', 'Brand Internal Prima')
             ->assertJsonPath('data.price', 15000)
-            ->assertJsonCount(1, 'data.ingredients');
+            ->assertJsonCount(1, 'data.ingredients')
+            ->assertJsonPath('data.ingredients.0.price', 0);
 
         // Removed $companyItem2 Ingredient is gone and unused ItemPacket is soft-deleted
         expect(Ingredient::query()->where('default_package_id', $companyDpId)->count())->toBe(1);
@@ -712,8 +726,9 @@ describe('DefaultPackage CPO module', function () {
             'packet_category' => 'kategori minuman',
             'brand_name' => 'BRAND KOPI NUSANTARA',
             'packet_vendor_id' => $vendorA->id,
+            'price' => 5000,
             'items' => [
-                ['item_id' => $vendorAItem1->id, 'quantity' => 1, 'price' => 5000],
+                ['item_id' => $vendorAItem1->id, 'quantity' => 1],
             ],
         ])->assertUnprocessable()->assertJsonValidationErrors(['brand_name']);
 
@@ -726,8 +741,9 @@ describe('DefaultPackage CPO module', function () {
             'packet_category' => 'Kategori Switch',
             'brand_name' => 'Brand Switch Invalid',
             'packet_vendor_id' => $vendorA->id,
+            'price' => 5000,
             'items' => [
-                ['item_id' => $companyItem1->id, 'quantity' => 1, 'price' => 5000],
+                ['item_id' => $companyItem1->id, 'quantity' => 1],
             ],
         ])->assertUnprocessable()->assertJsonValidationErrors(['items.0.item_id']);
 
@@ -737,15 +753,17 @@ describe('DefaultPackage CPO module', function () {
             'packet_category' => 'Kategori Edited',
             'brand_name' => 'Brand Edited Vendor',
             'packet_vendor_id' => $vendorA->id,
+            'price' => 30000,
             'items' => [
-                ['item_id' => $vendorAItem1->id, 'quantity' => 7, 'price' => 30000],
+                ['item_id' => $vendorAItem1->id, 'quantity' => 7],
             ],
         ])->assertOk()
             ->assertJsonPath('data.brand_name', 'Brand Edited Vendor')
             ->assertJsonPath('data.company_id', null)
             ->assertJsonPath('data.packet_vendor_id', $vendorA->id)
             ->assertJsonPath('data.price', 30000)
-            ->assertJsonCount(1, 'data.ingredients');
+            ->assertJsonCount(1, 'data.ingredients')
+            ->assertJsonPath('data.ingredients.0.price', 0);
 
         expect(ItemPacket::query()->where('company_id', $company->id)->where('item_id', $companyItem1->id)->count())->toBe(0);
 
