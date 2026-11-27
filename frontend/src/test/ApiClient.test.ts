@@ -428,6 +428,8 @@ describe('General API Client Contract & Error Handling', () => {
       expense_type_id: 41,
       search: 'Susu',
       sort: '-purchased_on',
+      date_from: '2026-11-01',
+      date_to: '2026-11-30',
     });
 
     const calls = vi.mocked(globalThis.fetch).mock.calls;
@@ -450,6 +452,8 @@ describe('General API Client Contract & Error Handling', () => {
     expect(itemUrl.searchParams.get('filter[expense_type_id]')).toBe('41');
     expect(itemUrl.searchParams.get('filter[search]')).toBe('Susu');
     expect(itemUrl.searchParams.get('sort')).toBe('-purchased_on');
+    expect(itemUrl.searchParams.get('filter[date_from]')).toBe('2026-11-01');
+    expect(itemUrl.searchParams.get('filter[date_to]')).toBe('2026-11-30');
   });
 
   it('sends employee search as a filter parameter', async () => {

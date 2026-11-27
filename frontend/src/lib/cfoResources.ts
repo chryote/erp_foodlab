@@ -746,11 +746,19 @@ export interface ExpenseItemMutationInput {
 export function useMasterOperasionalCrudResource(
   enabled: boolean,
   company: Company | null,
-  options: { includeTypes?: boolean; includeItems?: boolean } = {}
+  options: {
+    includeTypes?: boolean;
+    includeItems?: boolean;
+    itemDateRange?: { from: string; to: string };
+  } = {}
 ) {
   const queryClient = useQueryClient();
   const [mutationError, setMutationError] = useState<string | null>(null);
-  const { includeTypes = true, includeItems = true } = options;
+  const {
+    includeTypes = true,
+    includeItems = true,
+    itemDateRange,
+  } = options;
 
   const categoriesQuery = useQuery<ExpenseCategory[]>({
     queryKey: cfoQueryKeys.expenseCategories,
@@ -771,9 +779,18 @@ export function useMasterOperasionalCrudResource(
   });
 
   const itemsQuery = useQuery<ExpenseItem[]>({
-    queryKey: cfoQueryKeys.expenseItems,
+    queryKey: itemDateRange
+      ? [...cfoQueryKeys.expenseItems, itemDateRange]
+      : cfoQueryKeys.expenseItems,
     queryFn: async () => {
-      const res = await fetchExpenseItems();
+      const res = await fetchExpenseItems(
+        itemDateRange
+          ? {
+              date_from: itemDateRange.from,
+              date_to: itemDateRange.to,
+            }
+          : undefined
+      );
       return res?.data ?? [];
     },
     enabled: enabled && includeItems,

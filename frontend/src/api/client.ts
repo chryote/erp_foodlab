@@ -1112,14 +1112,16 @@ export async function fetchCfoEnums(): Promise<{ data: CfoEnums }> {
 }
 
 interface ListRequestParams {
-  page: number;
-  per_page: number;
+  page?: number;
+  per_page?: number;
   search?: string;
   sort?: string;
   company_id?: number;
   series?: number;
   expense_category_id?: number;
   expense_type_id?: number;
+  date_from?: string;
+  date_to?: string;
 }
 
 
@@ -1128,10 +1130,13 @@ function buildListQuery(params?: ListRequestParams): string {
     return '';
   }
 
-  const query = new URLSearchParams({
-    page: String(params.page),
-    per_page: String(params.per_page),
-  });
+  const query = new URLSearchParams();
+  if (params.page !== undefined) {
+    query.set('page', String(params.page));
+  }
+  if (params.per_page !== undefined) {
+    query.set('per_page', String(params.per_page));
+  }
   if (params.search?.trim()) {
     query.set('filter[search]', params.search.trim());
   }
@@ -1153,8 +1158,15 @@ function buildListQuery(params?: ListRequestParams): string {
   if (params.expense_type_id !== undefined) {
     query.set('filter[expense_type_id]', String(params.expense_type_id));
   }
+  if (params.date_from) {
+    query.set('filter[date_from]', params.date_from);
+  }
+  if (params.date_to) {
+    query.set('filter[date_to]', params.date_to);
+  }
 
-  return `?${query.toString()}`;
+  const queryString = query.toString();
+  return queryString ? `?${queryString}` : '';
 }
 
 export async function fetchCompanies(
@@ -1361,7 +1373,7 @@ export async function deleteExpenseType(
 }
 
 export async function fetchExpenseItems(
-  params?: ListRequestParams
+  params?: Partial<ListRequestParams>
 ): Promise<ExpenseItemsListResponse> {
   return requestJson<ExpenseItemsListResponse>(
     `/v1/modules/cfo/expense-items${buildListQuery(params)}`,

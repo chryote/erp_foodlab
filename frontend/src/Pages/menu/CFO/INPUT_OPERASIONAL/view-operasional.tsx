@@ -93,22 +93,30 @@ export default function CfoViewOperasionalPage() {
       ? parsedCompanyId
       : getActiveCompanyId();
   const companyResource = useCompanyCrudResource(true);
-  const company =
-    companyResource.companies.find((item) => item.id === selectedCompanyId) ??
-    null;
-  const resource = useMasterOperasionalCrudResource(Boolean(company), company);
-
-  const [, setSelectedDetail] = useState<SelectedDetail | null>(
-    null
-  );
-  const [, setSearch] = useState('');
-  const [, setPage] = useState(1);
   const effectiveDate = useMemo(() => new Date(), []);
   const [appliedDateRange, setAppliedDateRange] = useState<DateRange>(() =>
     getMonthDateRange(effectiveDate)
   );
   const [draftDateRange, setDraftDateRange] =
     useState<DateRange>(appliedDateRange);
+  const company =
+    companyResource.companies.find((item) => item.id === selectedCompanyId) ??
+    null;
+  const resource = useMasterOperasionalCrudResource(Boolean(company), company, {
+    itemDateRange:
+      appliedDateRange.from && appliedDateRange.to
+        ? {
+            from: formatDateKey(appliedDateRange.from),
+            to: formatDateKey(appliedDateRange.to),
+          }
+        : undefined,
+  });
+
+  const [, setSelectedDetail] = useState<SelectedDetail | null>(
+    null
+  );
+  const [, setSearch] = useState('');
+  const [, setPage] = useState(1);
   const [isSelectingEndDate, setIsSelectingEndDate] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(effectiveDate);
   const [isDateRangeDialogOpen, setIsDateRangeDialogOpen] = useState(false);
