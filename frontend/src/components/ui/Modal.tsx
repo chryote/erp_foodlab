@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Pencil, Trash2, X } from 'lucide-react';
 import { cn, formatCapitalInput } from '@/lib/utils';
 import { Button, type ButtonVariant } from './Button';
 import {
@@ -85,8 +86,9 @@ export const Modal: React.FC<ModalProps> = ({
             variant="secondary"
             aria-label="Tutup Modal"
             onClick={onClose}
+            className="h-9 w-9 p-0"
           >
-            Tutup
+            <X className="h-4 w-4" aria-hidden="true" />
           </Button>
         </div>
 
@@ -585,6 +587,15 @@ export interface CrudFieldConfig<T> {
   renderValue?: (row: T) => React.ReactNode;
   filterText?: (row: T) => string;
   sortable?: boolean;
+  sortKey?: string;
+  renderControl?: (props: {
+    id: string;
+    value: string;
+    disabled: boolean;
+    placeholder?: string;
+    editingItem: T | null;
+    onChange: (value: string) => void;
+  }) => React.ReactNode;
 }
 
 export interface CrudComputedColumnConfig<T> {
@@ -642,6 +653,7 @@ export interface CrudModalProps<T extends CrudEntity> {
   sortKey?: string | null;
   sortDirection?: 'asc' | 'desc';
   onSort?: (key: string) => void;
+  hideRowNumber?: boolean;
   maxWidthClass?: string;
   dialogClassName?: string;
   formLayout?: 'auto' | 'single-row';
@@ -690,6 +702,7 @@ export function CrudModal<T extends CrudEntity>({
   sortKey,
   sortDirection,
   onSort,
+  hideRowNumber = false,
   maxWidthClass,
   dialogClassName,
   formLayout = 'auto',
@@ -889,20 +902,29 @@ export function CrudModal<T extends CrudEntity>({
   const handleCancelEdit = () => {
     setEditingItem(null);
     setFormValues(createEmptyFormValues());
+    if (pageMode) {
+      setMobileFormOpen(false);
+    }
   };
 
   const columns: DataTableColumn<T>[] = [
-    {
-      key: 'no',
-      header: 'No',
-      render: (_row, index) => (
-        <code>{(pageMode ? 0 : (safeCurrentPage - 1) * pageSize) + index + 1}</code>
-      ),
-    },
+    ...(!hideRowNumber
+      ? [
+          {
+            key: 'no',
+            header: 'No',
+            render: (_row: T, index: number) => (
+              <code>
+                {(pageMode ? 0 : (safeCurrentPage - 1) * pageSize) + index + 1}
+              </code>
+            ),
+          },
+        ]
+      : []),
     ...resolvedFields
       .filter((field) => !field.hideInTable)
       .map((field) => ({
-      key: field.key,
+      key: field.sortKey ?? field.key,
       header: field.label,
       sortable: field.sortable,
       render: (row: T) => {
@@ -936,6 +958,7 @@ export function CrudModal<T extends CrudEntity>({
           {
             key: 'actions',
             header: 'Aksi',
+            sticky: pageMode,
             render: (row: T) => (
               <div
                 className="flex flex-nowrap items-center gap-1.5 whitespace-nowrap"
@@ -966,21 +989,39 @@ export function CrudModal<T extends CrudEntity>({
                   <>
                     <Button
                       variant="secondary"
-                      className="h-7 px-2.5 py-1 text-xs"
+                      className={
+                        pageMode
+                          ? 'h-9 w-9 p-0'
+                          : 'h-7 px-2.5 py-1 text-xs'
+                      }
+                      aria-label={`Edit ${String(row.id)}`}
                       data-testid={`edit-row-${row.id}`}
                       onClick={() => handleStartEdit(row)}
                     >
-                      Edit
+                      {pageMode ? (
+                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                      ) : (
+                        'Edit'
+                      )}
                     </Button>
                     <Button
-                      variant="ghost"
-                      className="h-7 px-2.5 py-1 text-xs"
+                      variant={pageMode ? 'secondary' : 'ghost'}
+                      className={
+                        pageMode
+                          ? 'h-9 w-9 p-0'
+                          : 'h-7 px-2.5 py-1 text-xs'
+                      }
+                      aria-label={`Hapus ${String(row.id)}`}
                       data-testid={`delete-row-${row.id}`}
                       onClick={() =>
                         setPendingAction({ type: 'delete', id: row.id })
                       }
                     >
-                      Hapus
+                      {pageMode ? (
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      ) : (
+                        'Hapus'
+                      )}
                     </Button>
                   </>
                 )}
@@ -1000,6 +1041,25 @@ export function CrudModal<T extends CrudEntity>({
       typeof field.disabled === 'function'
         ? field.disabled(formValues)
         : field.disabled;
+    if (field.renderControl) {
+      return (
+        <FieldWrapper
+          key={field.key}
+          id={`${testId}-${field.key}-input`}
+          label={field.label}
+          labelPlacement={labelPlacement}
+        >
+          {field.renderControl({
+            id: `${testId}-${field.key}-input`,
+            value: formValues[field.key] ?? '',
+            disabled: Boolean(isFieldDisabled),
+            placeholder: field.placeholder,
+            editingItem,
+            onChange: (value) => handleFieldChange(field.key, value),
+          })}
+        </FieldWrapper>
+      );
+    }
     if (field.type === 'select') {
       const resolvedOptions =
         typeof field.options === 'function'
@@ -1154,7 +1214,12 @@ export function CrudModal<T extends CrudEntity>({
   const formPanel = (
     <div
       data-testid={`${testId}-form-panel`}
-      className="flex min-h-0 flex-col rounded-xl border border-border bg-muted/25 p-4 lg:overflow-y-auto"
+      className={cn(
+        'flex min-h-0 flex-col lg:overflow-y-auto',
+        pageMode
+          ? 'p-0'
+          : 'rounded-xl border border-border bg-muted/25 p-4'
+      )}
     >
       <form
         onSubmit={handleSubmit}
