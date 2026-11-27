@@ -86,6 +86,16 @@ export const App: React.FC<AppProps> = ({ queryClient: providedClient }) => {
             }
           />
           <Route
+            path="/dashboard/admin/*"
+            element={
+              <Navigate
+                to="/login"
+                state={{ from: '/dashboard/admin/master-modal' }}
+                replace
+              />
+            }
+          />
+          <Route
             path="/dashboard-flow-simulator"
             element={
               <Navigate to="/login" state={{ from: '/dashboard-flow-simulator' }} replace />
@@ -125,6 +135,16 @@ export const App: React.FC<AppProps> = ({ queryClient: providedClient }) => {
           />
           <Route
             path="/dashboard/company/:companyId/menu/*"
+            element={
+              developmentMode ? (
+                <Navigate to="/dashboard-flow-simulator" replace />
+              ) : (
+                <Dashboard onLogout={handleLogout} />
+              )
+            }
+          />
+          <Route
+            path="/dashboard/admin/*"
             element={
               developmentMode ? (
                 <Navigate to="/dashboard-flow-simulator" replace />

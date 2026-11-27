@@ -72,8 +72,8 @@ describe('DashboardHeader', () => {
 
     await user.keyboard('{ArrowDown}{ArrowRight}{ArrowRight}');
 
-    expect(await screen.findByText('Master Modal')).toBeInTheDocument();
-    expect(screen.getByText('View Modal')).toBeInTheDocument();
+    expect(await screen.findByText('View Modal')).toBeInTheDocument();
+    expect(screen.queryByText('Master Modal')).not.toBeInTheDocument();
     expect(onSelectCompany).not.toHaveBeenCalled();
     expect(onSelectModule).not.toHaveBeenCalled();
     expect(onSelectSubMenu).not.toHaveBeenCalled();
@@ -92,8 +92,8 @@ describe('DashboardHeader', () => {
       expect.objectContaining({ code: 'INPUT_MODAL', title: 'Input Modal' })
     );
     expect(onSelectChildSubMenu).toHaveBeenCalledWith({
-      code: 'PERUSAHAAN',
-      title: 'Master Modal',
+      code: 'DAFTAR_KAPITAL_PERUSAHAAN',
+      title: 'View Modal',
     });
   });
 
@@ -112,6 +112,86 @@ describe('DashboardHeader', () => {
     expect(await screen.findByText('Input SDM')).toBeInTheDocument();
     expect(screen.getByText('Input Presensi')).toBeInTheDocument();
     expect(screen.queryByText('Input Modal')).not.toBeInTheDocument();
+  });
+
+  it('shows the admin master modal navigation only to admin users', async () => {
+    const onNavigateAdminMasterModal = vi.fn();
+    const { rerender } = render(
+      <DashboardHeader
+        companies={[]}
+        user={{
+          id: 1,
+          name: 'Regular User',
+          email: 'user@foodlab.test',
+          role: 'user',
+        }}
+        onNavigateAdminMasterModal={onNavigateAdminMasterModal}
+      />
+    );
+    expect(
+      screen.queryByTestId('dashboard-admin-master-modal')
+    ).not.toBeInTheDocument();
+
+    rerender(
+      <DashboardHeader
+        companies={[]}
+        user={{
+          id: 1,
+          name: 'Admin User',
+          email: 'admin@foodlab.test',
+          role: 'admin',
+        }}
+        onNavigateAdminMasterModal={onNavigateAdminMasterModal}
+      />
+    );
+    await userEvent.setup().click(
+      screen.getByTestId('dashboard-admin-master-modal')
+    );
+    expect(onNavigateAdminMasterModal).toHaveBeenCalledOnce();
+  });
+
+  it('moves the underline from the admin page to series and company tabs when a series is opened', async () => {
+    const user = userEvent.setup();
+    const DashboardHeaderHarness = () => {
+      const [selectedSeries, setSelectedSeries] = useState(2);
+      return (
+        <DashboardHeader
+          companies={[
+            { id: 1, name: 'PT ABC', series: 1 },
+            { id: 2, name: 'PT XYZ', series: 2 },
+          ]}
+          selectedSeries={selectedSeries}
+          selectedCompanyId={2}
+          user={{
+            id: 1,
+            name: 'Admin User',
+            email: 'admin@foodlab.test',
+            role: 'admin',
+          }}
+          isAdminMasterModalActive
+          onSelectSeries={setSelectedSeries}
+        />
+      );
+    };
+
+    render(
+      <DashboardHeaderHarness />
+    );
+
+    const selectedSeries = screen.getByTestId('dashboard-series-tab-2');
+    const selectedCompany = screen.getByTestId('dashboard-company-tab-2');
+    const adminPage = screen.getByTestId('dashboard-admin-master-modal');
+
+    expect(adminPage).toHaveClass('after:absolute');
+    expect(selectedSeries).not.toHaveClass('after:absolute');
+    expect(selectedCompany).not.toHaveClass('after:absolute');
+
+    await user.click(selectedSeries);
+
+    expect(adminPage).not.toHaveClass('after:absolute');
+    expect(selectedSeries).toHaveClass('after:absolute');
+    expect(selectedCompany).toHaveClass('after:absolute');
+    expect(adminPage).toHaveAttribute('aria-current', 'page');
   });
 
   it('selects a module menu item directly when it has no child menu', async () => {

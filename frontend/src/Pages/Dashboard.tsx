@@ -20,6 +20,7 @@ import {
   useMasterOperasionalCrudResource,
 } from '@/lib/cfoResources';
 import { ExpenseItemCrudModal } from '@/modules/CFO/ExpenseItemCrudModal';
+import CfoMasterModalPage from '@/pages/menu/CFO/INPUT_MODAL/master-modal';
 import {
   getDashboardMenuCompanyId,
   getDashboardMenuPage,
@@ -31,12 +32,23 @@ export interface DashboardProps {
   onLogout?: () => void | Promise<void>;
 }
 
+// WIP: Replace this static role map when the auth API provides user roles.
+const STATIC_USER_ROLES: Record<string, NonNullable<AuthUser['role']>> = {
+  'admin@foodlab.test': 'admin',
+};
+
 export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const theme = useTheme();
   const routeCompanyId = getDashboardMenuCompanyId(location.pathname);
   const isMenuRoute = location.pathname.startsWith('/dashboard/company/');
+  const isAdminMasterModalRoute =
+    location.pathname === '/dashboard/admin/master-modal';
+  const isLegacyMasterModalRoute =
+    /^\/dashboard\/company\/\d+\/menu\/CFO\/INPUT_MODAL\/master-modal$/.test(
+      location.pathname
+    );
   const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(
     routeCompanyId
   );
@@ -151,10 +163,43 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   ].filter((message): message is string => Boolean(message));
 
   const MenuPage = getDashboardMenuPage(location.pathname);
+  const userRole = currentUserQuery.data
+    ? currentUserQuery.data.role ??
+      STATIC_USER_ROLES[currentUserQuery.data.email.trim().toLowerCase()] ??
+      'user'
+    : undefined;
+  const dashboardUser = currentUserQuery.data
+    ? { ...currentUserQuery.data, role: userRole }
+    : undefined;
+  const isAdmin = userRole === 'admin';
   const routeCompanyDoesNotExist =
     routeCompanyId !== null &&
     !capitalLoading &&
     !companies.some((company) => company.id === routeCompanyId);
+
+  if (
+    (isAdminMasterModalRoute || isLegacyMasterModalRoute) &&
+    currentUserQuery.isLoading
+  ) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <p role="status" className="text-sm text-muted-foreground">
+          Memuat pengguna...
+        </p>
+      </div>
+    );
+  }
+
+  if (
+    (isAdminMasterModalRoute || isLegacyMasterModalRoute) &&
+    !isAdmin
+  ) {
+    return <Navigate to="/404" replace />;
+  }
+
+  if (isLegacyMasterModalRoute) {
+    return <Navigate to="/dashboard/admin/master-modal" replace />;
+  }
 
   if (isMenuRoute && (!MenuPage || routeCompanyDoesNotExist)) {
     return <Navigate to="/404" replace />;
@@ -166,13 +211,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         companies={companies}
         selectedSeries={selectedSeries ?? selectedCompany?.series ?? 1}
         selectedCompanyId={selectedCompany?.id ?? null}
-        user={currentUserQuery.data}
+        user={dashboardUser}
         userLoading={currentUserQuery.isLoading}
         modulesMap={modulesMap}
         selectedModuleCode={selectedModule?.code ?? null}
         selectedSubMenuCode={selectedSubMenu?.code ?? null}
         selectedChildSubMenuCode={selectedChildSubMenu?.code ?? null}
         onSelectSeries={handleSelectSeries}
+        onNavigateAdminMasterModal={() =>
+          navigate('/dashboard/admin/master-modal')
+        }
+        isAdminMasterModalActive={isAdminMasterModalRoute}
         onSelectCompany={handleSelectCompany}
         onSelectModule={handleSelectModule}
         onSelectSubMenu={handleSelectSubMenu}
@@ -200,7 +249,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             {message}
           </div>
         ))}
-        {MenuPage ? (
+        {isAdminMasterModalRoute ? (
+          <CfoMasterModalPage />
+        ) : MenuPage ? (
           <MenuPage />
         ) : (
           <div className="flex flex-col items-center justify-center gap-4 rounded-xl bg-card/50 p-6 text-center">

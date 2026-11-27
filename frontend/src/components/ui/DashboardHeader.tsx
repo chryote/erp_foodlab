@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { LogOut } from 'lucide-react';
 import type {
   AuthUser,
@@ -114,6 +114,8 @@ export interface DashboardHeaderProps {
     menuItem: HorizontalMenuItem,
     childItem?: HorizontalMenuItem
   ) => void;
+  onNavigateAdminMasterModal?: () => void;
+  isAdminMasterModalActive?: boolean;
   onLogout?: () => void | Promise<void>;
 }
 
@@ -133,6 +135,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   onSelectSubMenu,
   onSelectChildSubMenu,
   onSelectItem,
+  onNavigateAdminMasterModal,
+  isAdminMasterModalActive = false,
   onLogout,
 }) => {
   const theme = useTheme();
@@ -141,6 +145,11 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   const [openCompanyMenuId, setOpenCompanyMenuId] = useState<number | null>(
     null
   );
+  const [seriesSelectedOnAdminPage, setSeriesSelectedOnAdminPage] =
+    useState(false);
+  useEffect(() => {
+    setSeriesSelectedOnAdminPage(false);
+  }, [isAdminMasterModalActive]);
   const seriesList = useMemo(
     () =>
       Array.from(new Set(companies.map((company) => company.series ?? 1))).sort(
@@ -152,6 +161,10 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     selectedSeries !== undefined && seriesList.includes(selectedSeries)
       ? selectedSeries
       : (seriesList[0] ?? 1);
+  const showSeriesAndCompanyIndicators =
+    !isAdminMasterModalActive || seriesSelectedOnAdminPage;
+  const showAdminPageIndicator =
+    isAdminMasterModalActive && !seriesSelectedOnAdminPage;
   const companiesInActiveSeries = companies.filter(
     (company) => (company.series ?? 1) === activeSeries
   );
@@ -214,10 +227,15 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   role="tab"
                   aria-selected={isSelected}
                   data-testid={`dashboard-series-tab-${series}`}
-                  onClick={() => onSelectSeries?.(series)}
+                  onClick={() => {
+                    if (isAdminMasterModalActive) {
+                      setSeriesSelectedOnAdminPage(true);
+                    }
+                    onSelectSeries?.(series);
+                  }}
                   className={cn(
                     'relative shrink-0 px-3 text-xs font-semibold transition-colors sm:px-4',
-                    isSelected
+                    isSelected && showSeriesAndCompanyIndicators
                       ? 'after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-primary'
                       : ''
                   )}
@@ -226,6 +244,25 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 </button>
               );
             })}
+            {user?.role === 'admin' && (
+              <button
+                type="button"
+                aria-current={isAdminMasterModalActive ? 'page' : undefined}
+                data-testid="dashboard-admin-master-modal"
+                onClick={() => {
+                  setSeriesSelectedOnAdminPage(false);
+                  onNavigateAdminMasterModal?.();
+                }}
+                className={cn(
+                  'relative shrink-0 px-3 text-xs font-semibold transition-colors sm:px-4',
+                  showAdminPageIndicator
+                    ? 'after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-primary'
+                    : ''
+                )}
+              >
+                Master Modal
+              </button>
+            )}
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
@@ -293,7 +330,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     }}
                     className={cn(
                       'relative h-12 shrink-0 rounded-sm px-3 text-xs font-semibold transition-colors sm:px-4',
-                      isSelected
+                      isSelected && showSeriesAndCompanyIndicators
                         ? 'after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-primary'
                         : ''
                     )}
@@ -304,6 +341,20 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     {COMPANY_MENU_MODULES.map((moduleConfig) => {
                       const module =
                         modulesMap[moduleConfig.code] ?? moduleConfig.fallback;
+                      const menuItems =
+                        moduleConfig.code === 'CFO'
+                          ? moduleConfig.items.map((menuItem) =>
+                              menuItem.code === 'INPUT_MODAL'
+                                ? {
+                                    ...menuItem,
+                                    children: menuItem.children?.filter(
+                                      (childItem) =>
+                                        childItem.code !== 'PERUSAHAAN'
+                                    ),
+                                  }
+                                : menuItem
+                            )
+                          : moduleConfig.items;
 
                       return (
                         <MenubarSub key={moduleConfig.code}>
@@ -318,7 +369,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                             {moduleConfig.code}
                           </MenubarSubTrigger>
                           <MenubarSubContent className={`w-max ${theme === "dark" ? 'border-gray-800' : 'border-gray-200'}`}>
-                            {moduleConfig.items.map((menuItem) => (
+                            {menuItems.map((menuItem) => (
                               menuItem.children?.length ? (
                                 <MenubarSub key={menuItem.code}>
                                   <MenubarSubTrigger
