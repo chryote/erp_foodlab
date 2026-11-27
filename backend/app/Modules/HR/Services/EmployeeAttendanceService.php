@@ -109,7 +109,18 @@ class EmployeeAttendanceService
                 }),
                 AllowedFilter::exact('status'),
             ])
-            ->allowedSorts(['attendance_date', 'clock_in_at', 'late_minutes', 'overtime_minutes'])
+            ->allowedSorts([
+                'company_id',
+                'employee_id',
+                'employee_shift_id',
+                'attendance_date',
+                'clock_in_at',
+                'clock_out_at',
+                'late_minutes',
+                'overtime_minutes',
+                'status',
+                'notes',
+            ])
             ->allowedIncludes(self::RELATIONS)
             ->defaultSort('-attendance_date', '-id');
     }
