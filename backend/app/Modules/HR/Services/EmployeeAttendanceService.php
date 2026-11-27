@@ -2,7 +2,10 @@
 
 namespace App\Modules\HR\Services;
 
+use App\Models\Company;
+use App\Models\Employee;
 use App\Models\EmployeeAttendance;
+use App\Models\EmployeeShift;
 use App\Modules\HR\Actions\RecordAttendanceAction;
 use App\Support\IndexQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -12,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
 class EmployeeAttendanceService
@@ -120,6 +124,24 @@ class EmployeeAttendanceService
                 'overtime_minutes',
                 'status',
                 'notes',
+                AllowedSort::callback('company_name', function (Builder $query, bool $descending): void {
+                    $query->orderBy(
+                        Company::select('name')->whereColumn('companies.id', 'employee_attendances.company_id'),
+                        $descending ? 'desc' : 'asc'
+                    );
+                }),
+                AllowedSort::callback('employee_name', function (Builder $query, bool $descending): void {
+                    $query->orderBy(
+                        Employee::select('name')->whereColumn('employees.id', 'employee_attendances.employee_id'),
+                        $descending ? 'desc' : 'asc'
+                    );
+                }),
+                AllowedSort::callback('employee_shift_name', function (Builder $query, bool $descending): void {
+                    $query->orderBy(
+                        EmployeeShift::select('name')->whereColumn('employee_shifts.id', 'employee_attendances.employee_shift_id'),
+                        $descending ? 'desc' : 'asc'
+                    );
+                }),
             ])
             ->allowedIncludes(self::RELATIONS)
             ->defaultSort('-attendance_date', '-id');
