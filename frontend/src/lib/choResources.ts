@@ -150,7 +150,8 @@ function getNextChoListPage<T>(
 export function useInfiniteEmployeesQuery(
   companyId: number | null,
   search: string,
-  sort: string
+  sort: string,
+  enabled = true
 ) {
   return useInfiniteQuery({
     queryKey: [
@@ -174,7 +175,7 @@ export function useInfiniteEmployeesQuery(
     initialPageParam: 1,
     getNextPageParam: (lastPage, _allPages, lastPageParam) =>
       getNextChoListPage(lastPage, lastPageParam),
-    enabled: companyId !== null,
+    enabled: enabled && companyId !== null,
   });
 }
 
@@ -1359,7 +1360,8 @@ export function useMasterPresensiCrudResource(
 export function useEmployeeAttendanceCrudResource(
   enabled: boolean,
   company: Company | null,
-  loadAttendances = true
+  loadAttendances = true,
+  loadEmployees = true
 ) {
   const queryClient = useQueryClient();
   const [mutationError, setMutationError] = useState<string | null>(null);
@@ -1388,7 +1390,7 @@ export function useEmployeeAttendanceCrudResource(
       const res = await fetchEmployees();
       return res?.data ?? [];
     },
-    enabled,
+    enabled: enabled && loadEmployees,
   });
 
   const allAttendances = attendancesQuery.data ?? [];
@@ -1500,7 +1502,7 @@ export function useEmployeeAttendanceCrudResource(
   const loading =
     attendancesQuery.isLoading ||
     shiftsQuery.isLoading ||
-    employeesQuery.isLoading ||
+    (loadEmployees && employeesQuery.isLoading) ||
     createAttendanceMutation.isPending ||
     updateAttendanceMutation.isPending ||
     deleteAttendanceMutation.isPending;
