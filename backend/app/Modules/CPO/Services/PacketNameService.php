@@ -3,6 +3,7 @@
 namespace App\Modules\CPO\Services;
 
 use App\Models\PacketName;
+use App\Support\CompanyOwnerScope;
 use App\Support\IndexQuery;
 use App\Support\InputNormalizer;
 use App\Support\WriteGuard;
@@ -36,12 +37,18 @@ class PacketNameService
     {
         $query = IndexQuery::withDefaultRelations($this->query($request), $request, self::RELATIONS);
 
+        $ownerId = CompanyOwnerScope::applyListFilter($query->getEloquentBuilder(), $request);
+
         if (IndexQuery::isPaginated($request)) {
             return IndexQuery::paginate($query, $request);
         }
 
         if (IndexQuery::isCacheable($request)) {
-            return Cache::remember(self::CACHE_KEY_LIST, 60, fn () => $query->get());
+            return Cache::remember(
+                CompanyOwnerScope::listCacheKey(self::CACHE_KEY_LIST, $ownerId),
+                60,
+                fn () => $query->get()
+            );
         }
 
         return $query->get();
@@ -53,14 +60,19 @@ class PacketNameService
     public function createPacketName(array $attributes): PacketName
     {
         $attributes['name'] = InputNormalizer::text((string) $attributes['name']) ?? '';
+        $companyOwnerId = CompanyOwnerScope::resolveId($attributes);
+        if ($companyOwnerId !== null) {
+            $attributes['company_owner_id'] = $companyOwnerId;
+        }
 
-        $packetName = DB::transaction(function () use ($attributes): PacketName {
-            $this->assertNameUnique($attributes['name']);
+        $packetName = DB::transaction(function () use ($attributes, $companyOwnerId): PacketName {
+            CompanyOwnerScope::assertActiveOwner($companyOwnerId);
+            $this->assertNameUnique($companyOwnerId, $attributes['name']);
 
             return PacketName::query()->create($attributes);
         });
 
-        $this->forgetDependentCaches();
+        $this->forgetDependentCaches($companyOwnerId);
 
         return $packetName;
     }
@@ -74,25 +86,37 @@ class PacketNameService
             $attributes['name'] = InputNormalizer::text((string) $attributes['name']) ?? '';
         }
 
+        $oldOwnerId = $packetName->company_owner_id !== null ? (int) $packetName->company_owner_id : null;
+
         $updated = DB::transaction(function () use ($packetName, $attributes): PacketName {
             $locked = PacketName::query()->lockForUpdate()->findOrFail($packetName->getKey());
 
+            $targetOwnerId = CompanyOwnerScope::resolveId($attributes, $locked);
+            if ($targetOwnerId !== null && array_key_exists('company_owner_id', $attributes)) {
+                $attributes['company_owner_id'] = $targetOwnerId;
+            }
+
+            CompanyOwnerScope::assertActiveOwner($targetOwnerId);
             $targetName = (string) ($attributes['name'] ?? $locked->name);
-            $this->assertNameUnique($targetName, $locked->getKey());
+            $this->assertNameUnique($targetOwnerId, $targetName, $locked->getKey());
 
             $locked->update($attributes);
 
             return $locked;
         });
 
-        $this->forgetDependentCaches();
+        $newOwnerId = $updated->company_owner_id !== null ? (int) $updated->company_owner_id : null;
+        $this->forgetDependentCaches($oldOwnerId);
+        if ($newOwnerId !== $oldOwnerId) {
+            $this->forgetDependentCaches($newOwnerId);
+        }
 
         return $updated->refresh();
     }
 
     public function deletePacketName(PacketName $packetName): void
     {
-        DB::transaction(function () use ($packetName): void {
+        $ownerId = DB::transaction(function () use ($packetName): ?int {
             $locked = PacketName::query()->lockForUpdate()->findOrFail($packetName->getKey());
 
             // Deferred until DefaultPackage / Ingredient models and tables are created.
@@ -119,16 +143,20 @@ class PacketNameService
                 }
             }
 
+            $ownerId = $locked->company_owner_id !== null ? (int) $locked->company_owner_id : null;
             $locked->delete();
+
+            return $ownerId;
         });
 
-        $this->forgetDependentCaches();
+        $this->forgetDependentCaches($ownerId);
     }
 
     private function query(Request $request): QueryBuilder
     {
         $query = IndexQuery::make(PacketName::class, $request)
             ->allowedFilters([
+                AllowedFilter::exact('company_owner_id'),
                 AllowedFilter::callback('name', function (Builder $query, mixed $value): void {
                     $escaped = IndexQuery::escapeLike($value);
                     if ($escaped === null) {
@@ -146,10 +174,11 @@ class PacketNameService
                     IndexQuery::whereLike($query, 'name', $escaped);
                 }),
             ])
-            ->allowedSorts(['id', 'name', 'created_at', 'updated_at'])
+            ->allowedSorts(['id', 'company_owner_id', 'name', 'created_at', 'updated_at'])
             ->defaultSort('name', 'id');
 
         $availableIncludes = array_values(array_filter([
+            'companyOwner',
             class_exists('App\\Models\\DefaultPackage') ? 'defaultPackages' : null,
         ]));
 
@@ -160,13 +189,13 @@ class PacketNameService
         return $query;
     }
 
-    private function assertNameUnique(string $name, mixed $ignoreKey = null): void
+    private function assertNameUnique(?int $companyOwnerId, string $name, mixed $ignoreKey = null): void
     {
         WriteGuard::assertUniqueActive(
             PacketName::query(),
             'name',
             $name,
-            [],
+            CompanyOwnerScope::scopeFilters($companyOwnerId),
             'name',
             'Nama paket yang sama sudah terdaftar.',
             $ignoreKey,
@@ -174,11 +203,11 @@ class PacketNameService
         );
     }
 
-    private function forgetDependentCaches(): void
+    private function forgetDependentCaches(?int $ownerId = null): void
     {
-        Cache::forget(self::CACHE_KEY_LIST);
+        CompanyOwnerScope::forgetListCache(self::CACHE_KEY_LIST, $ownerId);
         Cache::forget(CpoService::CACHE_KEY);
-        Cache::forget(self::CACHE_KEY_DEFAULT_PACKAGES_LIST);
-        Cache::forget(self::CACHE_KEY_INGREDIENTS_LIST);
+        CompanyOwnerScope::forgetListCache(self::CACHE_KEY_DEFAULT_PACKAGES_LIST, $ownerId);
+        CompanyOwnerScope::forgetListCache(self::CACHE_KEY_INGREDIENTS_LIST, $ownerId);
     }
 }

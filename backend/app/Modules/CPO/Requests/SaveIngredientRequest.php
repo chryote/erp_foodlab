@@ -5,6 +5,7 @@ namespace App\Modules\CPO\Requests;
 use App\Models\DefaultPackage;
 use App\Models\Ingredient;
 use App\Models\Item;
+use App\Support\CompanyOwnerScope;
 use App\Support\InputNormalizer;
 use App\Support\WriteGuard;
 use Illuminate\Foundation\Http\FormRequest;
@@ -41,6 +42,12 @@ class SaveIngredientRequest extends FormRequest
         $presence = $this->isMethod('PATCH') ? ['sometimes', 'required'] : ['required'];
 
         return [
+            'company_owner_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
             'default_package_id' => [
                 ...$presence,
                 'integer',
@@ -138,6 +145,11 @@ class SaveIngredientRequest extends FormRequest
         $isPatch = $this->isMethod('PATCH');
         /** @var Ingredient|null $routeIngredient */
         $routeIngredient = $this->route('ingredient');
+
+        $companyOwnerId = CompanyOwnerScope::resolveForRequest($this, $routeIngredient);
+        if ($companyOwnerId !== null && (! $isPatch || array_key_exists('company_owner_id', $validated))) {
+            $validated['company_owner_id'] = $companyOwnerId;
+        }
 
         foreach (['default_package_id', 'item_id'] as $intField) {
             if (array_key_exists($intField, $validated)) {

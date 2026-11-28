@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Company;
 use App\Models\PacketCategory;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -19,6 +20,7 @@ class PacketCategoryFactory extends Factory
         $seq = self::$sequence++;
 
         return [
+            'company_owner_id' => Company::factory(),
             'name' => 'Kategori '.ucfirst($this->faker->unique()->words(2, true)).' #'.$seq,
         ];
     }

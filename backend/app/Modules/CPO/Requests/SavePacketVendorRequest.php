@@ -4,6 +4,7 @@ namespace App\Modules\CPO\Requests;
 
 use App\Enums\PacketVendorType;
 use App\Models\PacketVendor;
+use App\Support\CompanyOwnerScope;
 use App\Support\InputNormalizer;
 use App\Support\WriteGuard;
 use Illuminate\Foundation\Http\FormRequest;
@@ -40,6 +41,12 @@ class SavePacketVendorRequest extends FormRequest
         $presence = $this->isMethod('PATCH') ? ['sometimes', 'required'] : ['required'];
 
         return [
+            'company_owner_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
             'name' => [...$presence, 'string', 'max:150'],
             'type' => ['sometimes', 'required', 'string', Rule::enum(PacketVendorType::class)],
         ];
@@ -58,6 +65,7 @@ class SavePacketVendorRequest extends FormRequest
 
                 /** @var PacketVendor|null $packetVendor */
                 $packetVendor = $this->route('packetVendor');
+                $companyOwnerId = CompanyOwnerScope::resolveForRequest($this, $packetVendor);
 
                 $effectiveName = $this->has('name')
                     ? InputNormalizer::text((string) $this->input('name'))
@@ -67,7 +75,7 @@ class SavePacketVendorRequest extends FormRequest
                     PacketVendor::query(),
                     'name',
                     $effectiveName,
-                    [],
+                    CompanyOwnerScope::scopeFilters($companyOwnerId),
                     $packetVendor?->getKey()
                 )) {
                     $validator->errors()->add('name', 'Nama vendor paket yang sama sudah terdaftar.');
@@ -85,6 +93,11 @@ class SavePacketVendorRequest extends FormRequest
         $isPatch = $this->isMethod('PATCH');
         /** @var PacketVendor|null $routePacketVendor */
         $routePacketVendor = $this->route('packetVendor');
+
+        $companyOwnerId = CompanyOwnerScope::resolveForRequest($this, $routePacketVendor);
+        if ($companyOwnerId !== null && (! $isPatch || array_key_exists('company_owner_id', $validated))) {
+            $validated['company_owner_id'] = $companyOwnerId;
+        }
 
         if (array_key_exists('name', $validated)) {
             $validated['name'] = InputNormalizer::text((string) $validated['name']) ?? '';

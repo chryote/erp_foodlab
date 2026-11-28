@@ -730,11 +730,13 @@ export interface CpoEnums {
 
 export interface Item {
   id: number;
+  company_owner_id?: number | null;
   company_id: number | null;
   packet_vendor_id?: number | null;
   code?: string | null;
   name: string;
   type: ItemType;
+  company_owner?: Company | null;
   company?: Company | null;
   packet_vendor?: PacketVendor | null;
   created_at?: string;
@@ -743,6 +745,7 @@ export interface Item {
 }
 
 export interface ItemPayload {
+  company_owner_id?: number | null;
   company_id?: number | null;
   packet_vendor_id?: number | null;
   code?: string | null;
@@ -764,13 +767,16 @@ export interface ItemsListResponse {
 
 export interface Packet {
   id: number;
+  company_owner_id?: number | null;
   name: string;
+  company_owner?: Company | null;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
 }
 
 export interface PacketPayload {
+  company_owner_id?: number | null;
   name: string;
 }
 
@@ -788,11 +794,13 @@ export interface PacketsListResponse {
 
 export interface ItemPacket {
   id: number;
+  company_owner_id?: number | null;
   company_id: number | null;
   packet_vendor_id?: number | null;
   packet_id: number;
   item_id: number;
   quantity: number;
+  company_owner?: Company | null;
   company?: Company | null;
   packet_vendor?: PacketVendor | null;
   packet?: Packet | null;
@@ -803,6 +811,7 @@ export interface ItemPacket {
 }
 
 export interface ItemPacketPayload {
+  company_owner_id?: number | null;
   company_id?: number | null;
   packet_vendor_id?: number | null;
   packet_id: number;
@@ -824,13 +833,16 @@ export interface ItemPacketsListResponse {
 
 export interface PacketName {
   id: number;
+  company_owner_id?: number | null;
   name: string;
+  company_owner?: Company | null;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
 }
 
 export interface PacketNamePayload {
+  company_owner_id?: number | null;
   name: string;
 }
 
@@ -848,14 +860,17 @@ export interface PacketNamesListResponse {
 
 export interface PacketVendor {
   id: number;
+  company_owner_id?: number | null;
   name: string;
   type?: PacketVendorType;
+  company_owner?: Company | null;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
 }
 
 export interface PacketVendorPayload {
+  company_owner_id?: number | null;
   name: string;
   type?: PacketVendorType;
 }
@@ -874,13 +889,16 @@ export interface PacketVendorsListResponse {
 
 export interface PacketCategory {
   id: number;
+  company_owner_id?: number | null;
   name: string;
+  company_owner?: Company | null;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
 }
 
 export interface PacketCategoryPayload {
+  company_owner_id?: number | null;
   name: string;
 }
 
@@ -898,6 +916,7 @@ export interface PacketCategoriesListResponse {
 
 export interface DefaultPackage {
   id: number;
+  company_owner_id?: number | null;
   brand_name: string;
   packet_name_id: number;
   company_id?: number | null;
@@ -906,6 +925,7 @@ export interface DefaultPackage {
   packet_id?: number | null;
   item_packet_id?: number | null;
   price: number;
+  company_owner?: Company | null;
   packet_name?: PacketName | null;
   company?: Company | null;
   packet_vendor?: PacketVendor | null;
@@ -918,6 +938,7 @@ export interface DefaultPackage {
 }
 
 export interface DefaultPackagePayload {
+  company_owner_id?: number | null;
   brand_name: string;
   packet_name_id: number;
   company_id?: number | null;
@@ -935,6 +956,7 @@ export interface DefaultPackageWizardItemPayload {
 }
 
 export interface DefaultPackageWizardPayload {
+  company_owner_id?: number | null;
   packet_name: string;
   packet_category: string;
   brand_name: string;
@@ -958,9 +980,11 @@ export interface DefaultPackagesListResponse {
 
 export interface Ingredient {
   id: number;
+  company_owner_id?: number | null;
   default_package_id: number;
   item_id: number;
   price: number;
+  company_owner?: Company | null;
   default_package?: DefaultPackage | null;
   item?: Item | null;
   created_at?: string;
@@ -969,6 +993,7 @@ export interface Ingredient {
 }
 
 export interface IngredientPayload {
+  company_owner_id?: number | null;
   default_package_id: number;
   item_id: number;
   price?: number;

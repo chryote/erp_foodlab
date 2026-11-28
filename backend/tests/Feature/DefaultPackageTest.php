@@ -730,7 +730,14 @@ describe('DefaultPackage CPO module', function () {
         expect(ItemPacket::withTrashed()->where('company_id', $company->id)->where('item_id', $companyItem2->id)->first()?->trashed())->toBeTrue();
 
         // 6b. Colliding with ANOTHER active DefaultPackage fails 422 and rolls back changes
+        $existingVendorDp = DefaultPackage::query()->where('brand_name', 'Brand Kopi Nusantara')->firstOrFail();
+        $existingVendorDp->update(['company_owner_id' => $company->id]);
+        PacketName::query()->whereKey($existingVendorDp->packet_name_id)->update(['company_owner_id' => $company->id]);
+        PacketCategory::query()->whereKey($existingVendorDp->packet_category_id)->update(['company_owner_id' => $company->id]);
+        Packet::query()->whereKey($existingVendorDp->packet_id)->update(['company_owner_id' => $company->id]);
+
         $this->putJson("/api/v1/modules/cpo/default-packages/{$companyDpId}/wizard", [
+            'company_owner_id' => $company->id,
             'packet_name' => 'paket vendor kopi',
             'packet_category' => 'kategori minuman',
             'brand_name' => 'BRAND KOPI NUSANTARA',

@@ -77,14 +77,14 @@ class DatabaseSeeder extends Seeder
             $this->seedEmployeeShiftAssignments($employees, $shiftsByCompany);
             $this->seedEmployeeAttendances($employees, $shiftsByCompany);
 
-            $packetVendors = $this->seedCpoPacketVendors();
+            $packetVendors = $this->seedCpoPacketVendors($primaryCompany);
             $items = $this->seedCpoItems($companies, $packetVendors);
-            $packets = $this->seedCpoPackets();
-            $packetNames = $this->seedCpoPacketNames();
-            $packetCategories = $this->seedCpoPacketCategories();
+            $packets = $this->seedCpoPackets($primaryCompany);
+            $packetNames = $this->seedCpoPacketNames($primaryCompany);
+            $packetCategories = $this->seedCpoPacketCategories($primaryCompany);
             $itemPackets = $this->seedCpoItemPackets($primaryCompany, $items, $packets);
             $defaultPackages = $this->seedCpoDefaultPackages($primaryCompany, $packetNames, $packetVendors, $packetCategories, $itemPackets);
-            $this->seedCpoIngredients($defaultPackages, $items);
+            $this->seedCpoIngredients($primaryCompany, $defaultPackages, $items);
         });
 
         Cache::flush();
@@ -1507,6 +1507,7 @@ class DatabaseSeeder extends Seeder
             $key = $ownerKey.'|'.$entry['code'];
             /** @var Item $item */
             $item = $existingByCodeKey->get($key) ?? new Item;
+            $item->company_owner_id = $entry['company_id'] ?? $primaryCompany->id;
             $item->company_id = $entry['company_id'];
             $item->packet_vendor_id = $entry['packet_vendor_id'];
             $item->code = $entry['code'];
@@ -1523,7 +1524,7 @@ class DatabaseSeeder extends Seeder
     /**
      * @return EloquentCollection<int, Packet>
      */
-    private function seedCpoPackets(): EloquentCollection
+    private function seedCpoPackets(Company $primaryCompany): EloquentCollection
     {
         $existingByName = Packet::query()->withTrashed()->get()->keyBy('name');
 
@@ -1536,6 +1537,7 @@ class DatabaseSeeder extends Seeder
         foreach ($names as $name) {
             /** @var Packet $packet */
             $packet = $existingByName->get($name) ?? new Packet;
+            $packet->company_owner_id = $primaryCompany->id;
             $packet->name = $name;
             $packet->deleted_at = null;
             $packet->save();
@@ -1548,7 +1550,7 @@ class DatabaseSeeder extends Seeder
     /**
      * @return EloquentCollection<int, PacketName>
      */
-    private function seedCpoPacketNames(): EloquentCollection
+    private function seedCpoPacketNames(Company $primaryCompany): EloquentCollection
     {
         $existingByName = PacketName::query()->withTrashed()->get()->keyBy('name');
 
@@ -1561,6 +1563,7 @@ class DatabaseSeeder extends Seeder
         foreach ($names as $name) {
             /** @var PacketName $packetName */
             $packetName = $existingByName->get($name) ?? new PacketName;
+            $packetName->company_owner_id = $primaryCompany->id;
             $packetName->name = $name;
             $packetName->deleted_at = null;
             $packetName->save();
@@ -1573,7 +1576,7 @@ class DatabaseSeeder extends Seeder
     /**
      * @return EloquentCollection<int, PacketVendor>
      */
-    private function seedCpoPacketVendors(): EloquentCollection
+    private function seedCpoPacketVendors(Company $primaryCompany): EloquentCollection
     {
         $existingByName = PacketVendor::query()->withTrashed()->get()->keyBy('name');
 
@@ -1587,6 +1590,7 @@ class DatabaseSeeder extends Seeder
         foreach ($names as $index => $name) {
             /** @var PacketVendor $packetVendor */
             $packetVendor = $existingByName->get($name) ?? new PacketVendor;
+            $packetVendor->company_owner_id = $primaryCompany->id;
             $packetVendor->name = $name;
             $packetVendor->type = $vendorTypes[$index % count($vendorTypes)];
             $packetVendor->deleted_at = null;
@@ -1600,7 +1604,7 @@ class DatabaseSeeder extends Seeder
     /**
      * @return EloquentCollection<int, PacketCategory>
      */
-    private function seedCpoPacketCategories(): EloquentCollection
+    private function seedCpoPacketCategories(Company $primaryCompany): EloquentCollection
     {
         $existingByName = PacketCategory::query()->withTrashed()->get()->keyBy('name');
 
@@ -1613,6 +1617,7 @@ class DatabaseSeeder extends Seeder
         foreach ($names as $name) {
             /** @var PacketCategory $packetCategory */
             $packetCategory = $existingByName->get($name) ?? new PacketCategory;
+            $packetCategory->company_owner_id = $primaryCompany->id;
             $packetCategory->name = $name;
             $packetCategory->deleted_at = null;
             $packetCategory->save();
@@ -1716,6 +1721,7 @@ class DatabaseSeeder extends Seeder
         $key = $ownerKey.'|'.$packetId.'|'.$itemId;
         /** @var ItemPacket $itemPacket */
         $itemPacket = $existingByKey->get($key) ?? new ItemPacket;
+        $itemPacket->company_owner_id = $companyId ?? 1;
         $itemPacket->company_id = $companyId;
         $itemPacket->packet_vendor_id = $packetVendorId;
         $itemPacket->packet_id = $packetId;
@@ -1850,6 +1856,7 @@ class DatabaseSeeder extends Seeder
             'packet_id' => $packetId,
             'item_packet_id' => $itemPacketId,
         ]);
+        $defaultPackage->company_owner_id = $companyId ?? 1;
         $defaultPackage->company_id = $companyId;
         $defaultPackage->packet_vendor_id = $packetVendorId;
         $defaultPackage->packet_id = $packetId;
@@ -1866,6 +1873,7 @@ class DatabaseSeeder extends Seeder
      * @param  EloquentCollection<int, Item>  $items
      */
     private function seedCpoIngredients(
+        Company $primaryCompany,
         EloquentCollection $defaultPackages,
         EloquentCollection $items
     ): void {
@@ -1877,7 +1885,7 @@ class DatabaseSeeder extends Seeder
         $firstDefaultPackage = $defaultPackages->firstOrFail();
         $firstItem = $items->firstOrFail();
 
-        $this->upsertIngredient($existingByKey, $firstDefaultPackage->id, $firstItem->id, 1.00);
+        $this->upsertIngredient($existingByKey, $firstDefaultPackage->company_owner_id ?? $primaryCompany->id, $firstDefaultPackage->id, $firstItem->id, 1.00);
 
         $dpList = $defaultPackages->values();
         $itemList = $items->values();
@@ -1890,6 +1898,7 @@ class DatabaseSeeder extends Seeder
 
             $this->upsertIngredient(
                 $existingByKey,
+                $dp->company_owner_id ?? $primaryCompany->id,
                 $dp->id,
                 $item->id,
                 round(1500.00 + ($i * 500.00), 2)
@@ -1902,6 +1911,7 @@ class DatabaseSeeder extends Seeder
      */
     private function upsertIngredient(
         EloquentCollection $existingByKey,
+        int $companyOwnerId,
         int $defaultPackageId,
         int $itemId,
         float $price
@@ -1912,6 +1922,7 @@ class DatabaseSeeder extends Seeder
             'default_package_id' => $defaultPackageId,
             'item_id' => $itemId,
         ]);
+        $ingredient->company_owner_id = $companyOwnerId;
         $ingredient->price = $price;
         $ingredient->deleted_at = null;
         $ingredient->save();

@@ -18,7 +18,9 @@ class PacketResource extends JsonResource
     {
         return [
             'id' => (int) $this->id,
+            'company_owner_id' => $this->company_owner_id !== null ? (int) $this->company_owner_id : null,
             'name' => $this->name,
+            'company_owner' => $this->whenLoaded('companyOwner', fn ($company) => $company !== null ? new CompanyResource($company) : null),
             'item_packets' => $this->whenLoaded('itemPackets', function () {
                 $resourceClass = 'App\\Http\\Resources\\ItemPacketResource';
 

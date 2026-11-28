@@ -6,17 +6,6 @@ import {
 } from '../../components/ui/HorizontalMenuCard';
 import { ModuleLauncherCard } from '../../components/ui/ModuleLauncherCard';
 
-export const CPO_INPUT_PACKING_ITEMS: HorizontalMenuItem[] = [
-  { code: 'MASTER_PACKING', title: 'Master Packing' },
-  { code: 'VIEW_PACKING', title: 'View Packing' },
-];
-
-export const CPO_INPUT_PACKING_MENU: HorizontalMenuItem = {
-  code: 'INPUT_PACKING',
-  title: 'Input Packing',
-  children: CPO_INPUT_PACKING_ITEMS,
-};
-
 export const CPO_INPUT_PAKET_ITEMS: HorizontalMenuItem[] = [
   { code: 'MASTER_PAKET', title: 'Master Paket' },
   { code: 'VIEW_PAKET_AWAL', title: 'View Paket Awal' },
@@ -28,7 +17,6 @@ export const CPO_INPUT_ITEM_ITEMS: HorizontalMenuItem[] = [
 ];
 
 export const CPO_MENU_ITEMS: HorizontalMenuItem[] = [
-  CPO_INPUT_PACKING_MENU,
   {
     code: 'INPUT_ITEM',
     title: 'Input Item',

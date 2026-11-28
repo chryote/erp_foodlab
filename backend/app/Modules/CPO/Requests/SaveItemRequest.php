@@ -4,6 +4,7 @@ namespace App\Modules\CPO\Requests;
 
 use App\Enums\ItemType;
 use App\Models\Item;
+use App\Support\CompanyOwnerScope;
 use App\Support\ExclusiveOwner;
 use App\Support\InputNormalizer;
 use App\Support\WriteGuard;
@@ -46,6 +47,12 @@ class SaveItemRequest extends FormRequest
         $codePresence = $this->isMethod('PATCH') ? ['sometimes'] : [];
 
         return [
+            'company_owner_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
             'company_id' => [
                 'sometimes',
                 'nullable',
@@ -119,7 +126,11 @@ class SaveItemRequest extends FormRequest
                     }
                 }
 
-                $scopeFilters = ExclusiveOwner::scopeFilters($effectiveCompanyId, $effectiveVendorId);
+                $companyOwnerId = CompanyOwnerScope::resolveForRequest($this, $item) ?? $effectiveCompanyId;
+                $scopeFilters = [
+                    ...CompanyOwnerScope::scopeFilters($companyOwnerId),
+                    ...ExclusiveOwner::scopeFilters($effectiveCompanyId, $effectiveVendorId),
+                ];
                 $ownerLabel = $effectiveCompanyId !== null ? 'perusahaan' : 'vendor paket';
 
                 if (! $validator->errors()->has('code')) {
@@ -168,6 +179,12 @@ class SaveItemRequest extends FormRequest
         $isPatch = $this->isMethod('PATCH');
         /** @var Item|null $routeItem */
         $routeItem = $this->route('item');
+
+        $companyOwnerId = CompanyOwnerScope::resolveForRequest($this, $routeItem)
+            ?? (isset($validated['company_id']) && $validated['company_id'] !== null ? (int) $validated['company_id'] : null);
+        if ($companyOwnerId !== null && (! $isPatch || array_key_exists('company_owner_id', $validated))) {
+            $validated['company_owner_id'] = $companyOwnerId;
+        }
 
         if (array_key_exists('code', $validated)) {
             $validated['code'] = $validated['code'] !== null

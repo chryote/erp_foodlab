@@ -6,6 +6,7 @@ import type {
   ItemType,
 } from '@/api/client';
 import { type CrudFieldConfig, CrudModal } from '@/components/ui';
+import { getActiveCompanyId } from '@/lib/activeCompanyStorage';
 import { DEFAULT_CPO_ENUMS, useItemCrudResource } from '@/lib/cpoResources';
 import { cn } from '@/lib/utils';
 
@@ -55,12 +56,23 @@ export const MasterItemInternalCrudModal: React.FC<
     }
   }, [isOpen, defaultTab, clearError]);
 
+  const activeCompany = useMemo<Company | null>(() => {
+    if (company) {
+      return company;
+    }
+    const activeCompanyId = getActiveCompanyId();
+    if (activeCompanyId !== null && companies && companies.length > 0) {
+      return companies.find((c) => c.id === activeCompanyId) ?? null;
+    }
+    return null;
+  }, [companies, company]);
+
   const availableCompanies = useMemo<Company[]>(() => {
     if (companies && companies.length > 0) {
       return companies;
     }
-    return company ? [company] : [];
-  }, [companies, company]);
+    return activeCompany ? [activeCompany] : [];
+  }, [companies, activeCompany]);
 
   const companiesById = useMemo(() => {
     const map = new Map<number, Company>();
@@ -70,15 +82,14 @@ export const MasterItemInternalCrudModal: React.FC<
     return map;
   }, [availableCompanies]);
 
-  const defaultCompanyId = company ? String(company.id) : '';
+  const defaultCompanyId = activeCompany ? String(activeCompany.id) : '';
 
   const companyOptions = useMemo(
     () =>
-      availableCompanies.map((c) => ({
-        value: String(c.id),
-        label: c.name,
-      })),
-    [availableCompanies]
+      activeCompany
+        ? [{ value: String(activeCompany.id), label: activeCompany.name }]
+        : [],
+    [activeCompany]
   );
 
   const renderCompanyName = useMemo(
@@ -126,6 +137,7 @@ export const MasterItemInternalCrudModal: React.FC<
         type: 'select',
         placeholder: 'Pilih perusahaan...',
         defaultValue: defaultCompanyId,
+        disabled: true,
         options: companyOptions,
         renderValue: (row) => renderCompanyName(row.company_id, row.company),
       },
@@ -166,7 +178,7 @@ export const MasterItemInternalCrudModal: React.FC<
   const parseItemPayload = (
     values: Record<string, string>
   ): ItemPayload | null => {
-    const companyId = parseInt(values.company_id ?? '', 10);
+    const companyId = activeCompany?.id ?? parseInt(values.company_id ?? '', 10);
     const code = (values.code ?? '').trim();
     const name = (values.name ?? '').trim();
     if (!Number.isFinite(companyId) || !name) {
@@ -221,7 +233,7 @@ export const MasterItemInternalCrudModal: React.FC<
       subtitle="Kelola item internal berdasarkan tipe item dan perusahaan"
       testId="master-item-internal-crud-modal"
       tabs={tabsBar}
-      resetKey={`${activeItemType}-${company?.id ?? 0}`}
+      resetKey={`${activeItemType}-${activeCompany?.id ?? 0}`}
       layout="split"
       labelPlacement="left"
       modalSize="expanded"

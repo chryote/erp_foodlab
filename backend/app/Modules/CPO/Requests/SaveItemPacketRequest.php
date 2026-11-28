@@ -5,6 +5,7 @@ namespace App\Modules\CPO\Requests;
 use App\Models\Item;
 use App\Models\ItemPacket;
 use App\Models\Packet;
+use App\Support\CompanyOwnerScope;
 use App\Support\ExclusiveOwner;
 use App\Support\InputNormalizer;
 use App\Support\WriteGuard;
@@ -42,6 +43,12 @@ class SaveItemPacketRequest extends FormRequest
         $presence = $this->isMethod('PATCH') ? ['sometimes', 'required'] : ['required'];
 
         return [
+            'company_owner_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
             'company_id' => [
                 'sometimes',
                 'nullable',
@@ -154,6 +161,8 @@ class SaveItemPacketRequest extends FormRequest
                     }
                 }
 
+                $companyOwnerId = CompanyOwnerScope::resolveForRequest($this, $routeItemPacket) ?? $effectiveCompanyId;
+
                 if (
                     ! $validator->errors()->hasAny(['company_id', 'packet_vendor_id', 'packet_id', 'item_id'])
                     && ($effectiveCompanyId !== null || $effectiveVendorId !== null)
@@ -164,6 +173,7 @@ class SaveItemPacketRequest extends FormRequest
                         'item_id',
                         (string) $effectiveItemId,
                         [
+                            ...CompanyOwnerScope::scopeFilters($companyOwnerId),
                             ...ExclusiveOwner::scopeFilters($effectiveCompanyId, $effectiveVendorId),
                             'packet_id' => $effectivePacketId,
                         ],
@@ -189,6 +199,12 @@ class SaveItemPacketRequest extends FormRequest
         $isPatch = $this->isMethod('PATCH');
         /** @var ItemPacket|null $routeItemPacket */
         $routeItemPacket = $this->route('itemPacket');
+
+        $companyOwnerId = CompanyOwnerScope::resolveForRequest($this, $routeItemPacket)
+            ?? (isset($validated['company_id']) && $validated['company_id'] !== null ? (int) $validated['company_id'] : null);
+        if ($companyOwnerId !== null && (! $isPatch || array_key_exists('company_owner_id', $validated))) {
+            $validated['company_owner_id'] = $companyOwnerId;
+        }
 
         foreach (['packet_id', 'item_id', 'quantity'] as $intField) {
             if (array_key_exists($intField, $validated)) {

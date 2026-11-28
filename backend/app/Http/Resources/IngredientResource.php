@@ -18,9 +18,11 @@ class IngredientResource extends JsonResource
     {
         return [
             'id' => (int) $this->id,
+            'company_owner_id' => $this->company_owner_id !== null ? (int) $this->company_owner_id : null,
             'default_package_id' => (int) $this->default_package_id,
             'item_id' => (int) $this->item_id,
             'price' => (float) $this->price,
+            'company_owner' => $this->whenLoaded('companyOwner', fn ($company) => $company !== null ? new CompanyResource($company) : null),
             'default_package' => $this->whenLoaded(
                 'defaultPackage',
                 fn ($defaultPackage) => $defaultPackage !== null ? new DefaultPackageResource($defaultPackage) : null
