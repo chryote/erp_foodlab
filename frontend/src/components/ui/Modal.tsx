@@ -969,6 +969,7 @@ export function CrudModal<T extends CrudEntity>({
                     key={action.key}
                     variant={action.variant ?? 'secondary'}
                     className="whitespace-nowrap"
+                    aria-label={action.label}
                     data-testid={
                       action.testId
                         ? action.testId(row)

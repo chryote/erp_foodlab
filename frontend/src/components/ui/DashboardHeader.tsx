@@ -33,53 +33,15 @@ import {
   CPO_MENU_ITEMS,
   DEFAULT_CPO_MODULE,
 } from '@/modules/CPO/CpoModuleCard';
-import { DEFAULT_CDO_MODULE } from '@/modules/CDO/CdoModuleCard';
-import { DEFAULT_CMO_MODULE } from '@/modules/CMO/CmoModuleCard';
+import {
+  CDO_MENU_ITEMS,
+  DEFAULT_CDO_MODULE,
+} from '@/modules/CDO/CdoModuleCard';
+import {
+  CMO_MENU_ITEMS,
+  DEFAULT_CMO_MODULE,
+} from '@/modules/CMO/CmoModuleCard';
 import { useTheme } from '@/lib/theme';
-
-const COMPANY_MENU_ITEMS: HorizontalMenuItem[] = [
-  {
-    code: 'INPUT_MODAL',
-    title: 'Input',
-    children: [
-      { code: 'PERUSAHAAN', title: 'Master Modal' },
-      { code: 'DAFTAR_KAPITAL_PERUSAHAAN', title: 'View Modal' },
-    ],
-  },
-  {
-    code: 'INPUT_OPERASIONAL',
-    title: 'Input Operasional',
-    children: [
-      { code: 'MASTER_OPERASIONAL', title: 'Master Operasional' },
-      { code: 'ITEM_OPERASIONAL', title: 'Item Operasional' },
-      { code: 'VIEW_OPERASIONAL', title: 'View Operasional' },
-    ],
-  },
-  {
-    code: 'INPUT_ASET',
-    title: 'Input Aset',
-    children: [
-      { code: 'MASTER_ASET', title: 'Master Aset' },
-      { code: 'VIEW_ASET', title: 'View Aset' },
-    ],
-  },
-  {
-    code: 'LABA_RUGI',
-    title: 'Laba Rugi',
-    children: [
-      { code: 'LABA_RUGI', title: 'Master Modal' },
-      { code: 'LABA_RUGI', title: 'View Modal' },
-    ],
-  },
-  {
-    code: 'NERACA',
-    title: 'Neraca',
-    children: [
-      { code: 'NERACA', title: 'Master Modal' },
-      { code: 'NERACA', title: 'View Modal' },
-    ],
-  },
-];
 
 export const COMPANY_MENU_MODULES: Array<{
   code: ErpModuleCode;
@@ -89,8 +51,8 @@ export const COMPANY_MENU_MODULES: Array<{
   { code: 'CFO', fallback: DEFAULT_CFO_MODULE, items: CFO_MENU_ITEMS },
   { code: 'CHO', fallback: DEFAULT_CHO_MODULE, items: CHO_MENU_ITEMS },
   { code: 'CPO', fallback: DEFAULT_CPO_MODULE, items: CPO_MENU_ITEMS },
-  { code: 'CDO', fallback: DEFAULT_CDO_MODULE, items: COMPANY_MENU_ITEMS },
-  { code: 'CMO', fallback: DEFAULT_CMO_MODULE, items: COMPANY_MENU_ITEMS },
+  { code: 'CDO', fallback: DEFAULT_CDO_MODULE, items: CDO_MENU_ITEMS },
+  { code: 'CMO', fallback: DEFAULT_CMO_MODULE, items: CMO_MENU_ITEMS },
 ];
 
 export interface DashboardHeaderProps {
