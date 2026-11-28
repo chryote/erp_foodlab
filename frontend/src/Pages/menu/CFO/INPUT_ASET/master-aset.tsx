@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import type { Company, CompanyAsset } from '@/api/client';
+import type { CompanyAsset } from '@/api/client';
 import {
   Button,
   CardHeader,
@@ -67,14 +67,6 @@ function getEmptyForm(companyId: number | null): AssetFormValues {
   };
 }
 
-function getCompanyName(asset: CompanyAsset, companies: Company[]): string {
-  return (
-    companies.find((company) => company.id === asset.company_id)?.name ??
-    asset.company?.name ??
-    String(asset.company_id)
-  );
-}
-
 export default function CfoMasterAsetPage() {
   const { companyId: routeCompanyId } = useParams();
   const parsedCompanyId = Number(routeCompanyId);
@@ -109,13 +101,19 @@ export default function CfoMasterAsetPage() {
     ? `${assetSort.direction === 'desc' ? '-' : ''}${assetSort.key},-id`
     : '-asset_date,-id';
   const assetListQuery = useInfiniteCompanyAssetsQuery(
-    null,
+    selectedCompany?.id ?? null,
     debouncedSearch,
-    assetSortParam
+    assetSortParam,
+    Boolean(selectedCompany)
   );
   const assets = useMemo(
-    () => assetListQuery.data?.pages.flatMap((page) => page.data) ?? [],
-    [assetListQuery.data]
+    () =>
+      (assetListQuery.data?.pages.flatMap((page) => page.data) ?? []).filter(
+        (asset) =>
+          selectedCompany !== null &&
+          Number(asset.company_id) === selectedCompany.id
+      ),
+    [assetListQuery.data, selectedCompany]
   );
   const loadedAssetValue = useMemo(
     () =>
@@ -137,13 +135,14 @@ export default function CfoMasterAsetPage() {
 
   const submitForm = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const companyId = Number(formValues.companyId);
+    const companyId = selectedCompanyId;
     const amount = Number(formValues.amount.replace(/\./g, ''));
     const pricePerUnit = Number(formValues.pricePerUnit);
     const assetDate = formValues.assetDate.trim();
     const name = formValues.name.trim();
 
     if (
+      companyId === null ||
       !Number.isSafeInteger(companyId) ||
       companyId <= 0 ||
       !assetDate ||
@@ -192,7 +191,7 @@ export default function CfoMasterAsetPage() {
   const beginEditing = (asset: CompanyAsset) => {
     setEditingAsset(asset);
     setFormValues({
-      companyId: String(asset.company_id),
+      companyId: String(selectedCompanyId),
       assetDate: asset.asset_date,
       name: asset.name,
       amount: formatCapitalInput(String(asset.amount)),
@@ -236,18 +235,13 @@ export default function CfoMasterAsetPage() {
         render: (asset) => formatCapitalIdr(Number(asset.total_price)),
       },
       {
-        key: 'company',
-        header: 'Perusahaan',
-        render: (asset) => getCompanyName(asset, companyResource.companies),
-      },
-      {
         key: 'actions',
         header: 'Aksi',
         sticky: true,
         render: (asset) => (
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap gap-2">
             <Button
-              variant="ghost"
+              variant="secondary"
               className="h-9 w-9 p-0"
               aria-label={`Ubah aset ${asset.name}`}
               title={`Ubah aset ${asset.name}`}
@@ -256,7 +250,7 @@ export default function CfoMasterAsetPage() {
               <Pencil className="h-4 w-4" />
             </Button>
             <Button
-              variant="ghost"
+              variant="secondary"
               className="h-9 w-9 p-0"
               aria-label={`Hapus aset ${asset.name}`}
               title={`Hapus aset ${asset.name}`}
@@ -274,32 +268,11 @@ export default function CfoMasterAsetPage() {
         ),
       },
     ],
-    [companyResource.companies]
+    []
   );
 
   const renderForm = (formId: string) => (
     <form id={formId} className="flex flex-col gap-4" onSubmit={submitForm}>
-      <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium">Pilih Perusahaan</span>
-        <select
-          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
-          value={formValues.companyId}
-          onChange={(event) =>
-            setFormValues((current) => ({
-              ...current,
-              companyId: event.target.value,
-            }))
-          }
-          required
-        >
-          <option value="">Pilih perusahaan...</option>
-          {companyResource.companies.map((company) => (
-            <option key={company.id} value={company.id}>
-              {company.name}
-            </option>
-          ))}
-        </select>
-      </label>
       <TextInput
         id={`${formId}-asset-date`}
         label="Tanggal Aset"

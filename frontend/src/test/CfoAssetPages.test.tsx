@@ -156,6 +156,7 @@ describe('CFO asset pages', () => {
     await waitFor(() =>
       expect(apiClient.fetchCompanyAssets).toHaveBeenCalledWith(
         expect.objectContaining({
+          company_id: 21,
           page: 1,
           per_page: 10,
           sort: 'price_per_unit,-id',
@@ -232,9 +233,8 @@ describe('CFO asset pages', () => {
     await screen.findByText('Asset 25');
     fireEvent.click(screen.getByTestId('master-aset-open-form'));
     const formModal = screen.getByTestId('master-aset-form-modal');
-    fireEvent.change(within(formModal).getByLabelText('Pilih Perusahaan'), {
-      target: { value: '21' },
-    });
+    expect(within(formModal).queryByLabelText('Pilih Perusahaan')).not.toBeInTheDocument();
+    expect(within(formModal).queryByText('Perusahaan Aktif')).not.toBeInTheDocument();
     fireEvent.change(within(formModal).getByLabelText('Tanggal Aset'), {
       target: { value: '2026-11-25' },
     });

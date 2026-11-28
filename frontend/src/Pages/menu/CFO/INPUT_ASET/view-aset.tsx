@@ -53,8 +53,12 @@ export default function CfoViewAsetPage() {
     Boolean(company)
   );
   const assets = useMemo(
-    () => assetListQuery.data?.pages.flatMap((page) => page.data) ?? [],
-    [assetListQuery.data]
+    () =>
+      (assetListQuery.data?.pages.flatMap((page) => page.data) ?? []).filter(
+        (asset) =>
+          company !== null && Number(asset.company_id) === company.id
+      ),
+    [assetListQuery.data, company]
   );
   const loadedAssetValue = useMemo(
     () =>
