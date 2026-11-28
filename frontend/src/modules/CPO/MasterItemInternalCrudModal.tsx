@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 
 export interface MasterItemInternalCrudModalProps {
   isOpen: boolean;
+  pageMode?: boolean;
   company: Company | null;
   companies?: Company[];
   onClose: () => void;
@@ -19,7 +20,7 @@ export interface MasterItemInternalCrudModalProps {
 
 export const MasterItemInternalCrudModal: React.FC<
   MasterItemInternalCrudModalProps
-> = ({ isOpen, company, companies, onClose }) => {
+> = ({ isOpen, pageMode = false, company, companies, onClose }) => {
   const {
     enums,
     allItems,
@@ -29,7 +30,12 @@ export const MasterItemInternalCrudModal: React.FC<
     createItem,
     updateItem,
     removeItem,
-  } = useItemCrudResource(isOpen);
+    pageQuery,
+  } = useItemCrudResource(
+    isOpen,
+    pageMode,
+    company?.id ?? getActiveCompanyId()
+  );
 
   const tabs = useMemo(
     () =>
@@ -229,6 +235,7 @@ export const MasterItemInternalCrudModal: React.FC<
   return (
     <CrudModal
       isOpen={isOpen}
+      pageMode={pageMode}
       title="Master Item Internal"
       subtitle="Kelola item internal berdasarkan tipe item dan perusahaan"
       testId="master-item-internal-crud-modal"
@@ -241,6 +248,32 @@ export const MasterItemInternalCrudModal: React.FC<
       fields={itemFields}
       emptyMessage={`Belum ada data item ${activeItemTypeLabel.toLowerCase()}.`}
       items={filteredItems}
+      displayItems={pageMode ? filteredItems : undefined}
+      hasMore={pageMode && Boolean(pageQuery.hasNextPage)}
+      onLoadMore={
+        pageMode
+          ? () => {
+              if (pageQuery.hasNextPage && !pageQuery.isFetchingNextPage) {
+                void pageQuery.fetchNextPage();
+              }
+            }
+          : undefined
+      }
+      isLoadingMore={pageMode && pageQuery.isFetchingNextPage}
+      loadMoreError={
+        pageMode && pageQuery.isFetchNextPageError
+          ? 'Gagal memuat item berikutnya.'
+          : null
+      }
+      onRetryLoadMore={
+        pageMode
+          ? () => {
+              if (pageQuery.isFetchNextPageError) {
+                void pageQuery.fetchNextPage();
+              }
+            }
+          : undefined
+      }
       loading={loading}
       error={error}
       onClose={onClose}

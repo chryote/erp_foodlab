@@ -118,7 +118,57 @@ export function useInfiniteItemsQuery(
     initialPageParam: 1,
     getNextPageParam: (lastPage, _allPages, lastPageParam) =>
       getNextCpoListPage(lastPage, lastPageParam),
-    enabled: enabled && companyId !== null,
+    enabled,
+  });
+}
+
+export function useInfinitePacketVendorsQuery(
+  sort: string,
+  enabled = true
+) {
+  const activeCompanyId = getActiveCompanyId();
+  return useInfiniteQuery({
+    queryKey: [
+      ...cpoQueryKeys.packetVendors,
+      'infinite',
+      activeCompanyId,
+      sort,
+    ],
+    queryFn: ({ pageParam }) =>
+      fetchPacketVendors({
+        page: pageParam,
+        per_page: CPO_LIST_PAGE_SIZE,
+        sort,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      getNextCpoListPage(lastPage, lastPageParam),
+    enabled,
+  });
+}
+
+export function useInfiniteDefaultPackagesQuery(
+  sort: string,
+  enabled = true
+) {
+  const activeCompanyId = getActiveCompanyId();
+  return useInfiniteQuery({
+    queryKey: [
+      ...cpoQueryKeys.defaultPackages,
+      'infinite',
+      activeCompanyId,
+      sort,
+    ],
+    queryFn: ({ pageParam }) =>
+      fetchDefaultPackages({
+        page: pageParam,
+        per_page: CPO_LIST_PAGE_SIZE,
+        sort,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      getNextCpoListPage(lastPage, lastPageParam),
+    enabled,
   });
 }
 
@@ -191,7 +241,9 @@ export function useCpoEnumsResource(enabled: boolean) {
 
 function useItemsCore(
   enabled: boolean,
-  runMutation: <R>(fn: () => Promise<R>, fallback: string) => Promise<R | null>
+  runMutation: <R>(fn: () => Promise<R>, fallback: string) => Promise<R | null>,
+  pageMode = false,
+  companyId: number | null = null
 ) {
   const queryClient = useQueryClient();
   const activeCompanyId = getActiveCompanyId();
@@ -206,8 +258,15 @@ function useItemsCore(
       const res = await fetchItems();
       return res?.data ?? [];
     },
-    enabled,
+    enabled: enabled && !pageMode,
   });
+  const itemsPageQuery = useInfiniteItemsQuery(
+    companyId,
+    'name,id',
+    enabled && pageMode
+  );
+  const pageItems =
+    itemsPageQuery.data?.pages.flatMap((page) => page.data) ?? [];
 
   const createItemMutation = useMutation({
     mutationFn: async (payload: ItemPayload) => {
@@ -288,20 +347,25 @@ function useItemsCore(
   );
 
   return {
-    allItems: itemsQuery.data ?? [],
+    allItems: pageMode ? pageItems : (itemsQuery.data ?? []),
     isLoading:
-      itemsQuery.isLoading ||
+      (pageMode ? itemsPageQuery.isLoading : itemsQuery.isLoading) ||
       createItemMutation.isPending ||
       updateItemMutation.isPending ||
       deleteItemMutation.isPending,
-    error: itemsQuery.error,
+    error: pageMode ? itemsPageQuery.error : itemsQuery.error,
+    pageQuery: itemsPageQuery,
     createItem: addItem,
     updateItem: editItem,
     removeItem,
   };
 }
 
-export function useItemCrudResource(enabled: boolean) {
+export function useItemCrudResource(
+  enabled: boolean,
+  pageMode = false,
+  companyId: number | null = null
+) {
   const [mutationError, setMutationError] = useState<string | null>(null);
   const enumsResource = useCpoEnumsResource(enabled);
   const activeCompanyId = getActiveCompanyId();
@@ -328,12 +392,13 @@ export function useItemCrudResource(enabled: boolean) {
     []
   );
 
-  const itemsCore = useItemsCore(enabled, runMutation);
+  const itemsCore = useItemsCore(enabled, runMutation, pageMode, companyId);
 
   return {
     enums: enumsResource.enums,
     allItems: itemsCore.allItems,
     allPacketVendors: packetVendorsQuery.data ?? [],
+    pageQuery: itemsCore.pageQuery,
     loading: itemsCore.isLoading || packetVendorsQuery.isLoading,
     error:
       mutationError ??
@@ -622,7 +687,8 @@ function useNamedCpoEntity<T extends { id: number; name: string }>(
     remove: (id: number) => Promise<{ message: string }>;
   },
   messages: { create: string; update: string; remove: string },
-  runMutation: <R>(fn: () => Promise<R>, fallback: string) => Promise<R | null>
+  runMutation: <R>(fn: () => Promise<R>, fallback: string) => Promise<R | null>,
+  loadAll = true
 ) {
   const queryClient = useQueryClient();
   const activeCompanyId = getActiveCompanyId();
@@ -637,7 +703,7 @@ function useNamedCpoEntity<T extends { id: number; name: string }>(
       const res = await api.fetchAll();
       return res?.data ?? [];
     },
-    enabled,
+    enabled: enabled && loadAll,
   });
 
   const createMutation = useMutation({
@@ -724,7 +790,11 @@ function useNamedCpoEntity<T extends { id: number; name: string }>(
   };
 }
 
-export function useMasterPaketCrudResource(enabled: boolean) {
+export function useMasterPaketCrudResource(
+  enabled: boolean,
+  pageMode = false,
+  activeTab: 'vendor' | 'default-package' = 'vendor'
+) {
   const queryClient = useQueryClient();
   const [mutationError, setMutationError] = useState<string | null>(null);
   const enumsResource = useCpoEnumsResource(enabled);
@@ -756,7 +826,8 @@ export function useMasterPaketCrudResource(enabled: boolean) {
       update: 'Gagal memperbarui nama paket.',
       remove: 'Gagal menghapus nama paket.',
     },
-    runMutation
+    runMutation,
+    !pageMode || activeTab === 'default-package'
   );
 
   const packetVendors = useNamedCpoEntity<PacketVendor>(
@@ -774,7 +845,8 @@ export function useMasterPaketCrudResource(enabled: boolean) {
       update: 'Gagal memperbarui vendor paket.',
       remove: 'Gagal menghapus vendor paket.',
     },
-    runMutation
+    runMutation,
+    !pageMode || activeTab !== 'vendor'
   );
 
   const packetCategories = useNamedCpoEntity<PacketCategory>(
@@ -792,10 +864,13 @@ export function useMasterPaketCrudResource(enabled: boolean) {
       update: 'Gagal memperbarui kategori paket.',
       remove: 'Gagal menghapus kategori paket.',
     },
-    runMutation
+    runMutation,
+    !pageMode || activeTab === 'default-package'
   );
 
   const activeCompanyId = getActiveCompanyId();
+  const loadSupportingLists =
+    !pageMode || activeTab === 'default-package';
 
   const itemsQuery = useQuery<Item[]>({
     queryKey: [...cpoQueryKeys.items, activeCompanyId],
@@ -803,7 +878,7 @@ export function useMasterPaketCrudResource(enabled: boolean) {
       const res = await fetchItems();
       return res?.data ?? [];
     },
-    enabled,
+    enabled: enabled && loadSupportingLists,
   });
 
   const itemPacketsQuery = useQuery<ItemPacket[]>({
@@ -812,7 +887,7 @@ export function useMasterPaketCrudResource(enabled: boolean) {
       const res = await fetchItemPackets();
       return res?.data ?? [];
     },
-    enabled,
+    enabled: enabled && loadSupportingLists,
   });
 
   const defaultPackagesQuery = useQuery<DefaultPackage[]>({
@@ -821,8 +896,20 @@ export function useMasterPaketCrudResource(enabled: boolean) {
       const res = await fetchDefaultPackages();
       return res?.data ?? [];
     },
-    enabled,
+    enabled: enabled && !pageMode,
   });
+  const packetVendorsPageQuery = useInfinitePacketVendorsQuery(
+    'name,id',
+    enabled && pageMode && activeTab === 'vendor'
+  );
+  const defaultPackagesPageQuery = useInfiniteDefaultPackagesQuery(
+    'brand_name,id',
+    enabled && pageMode && activeTab === 'default-package'
+  );
+  const packetVendorPageItems =
+    packetVendorsPageQuery.data?.pages.flatMap((page) => page.data) ?? [];
+  const defaultPackagePageItems =
+    defaultPackagesPageQuery.data?.pages.flatMap((page) => page.data) ?? [];
 
   const ingredientsQuery = useQuery<Ingredient[]>({
     queryKey: [...cpoQueryKeys.ingredients, activeCompanyId],
@@ -830,7 +917,7 @@ export function useMasterPaketCrudResource(enabled: boolean) {
       const res = await fetchIngredients();
       return res?.data ?? [];
     },
-    enabled,
+    enabled: enabled && loadSupportingLists,
   });
 
   const invalidateWizardQueries = useCallback(() => {
@@ -990,6 +1077,10 @@ export function useMasterPaketCrudResource(enabled: boolean) {
     itemsQuery.isLoading ||
     itemPacketsQuery.isLoading ||
     defaultPackagesQuery.isLoading ||
+    (pageMode &&
+      (activeTab === 'vendor'
+        ? packetVendorsPageQuery.isLoading
+        : defaultPackagesPageQuery.isLoading)) ||
     ingredientsQuery.isLoading ||
     createDefaultPackageMutation.isPending ||
     createDefaultPackageWizardMutation.isPending ||
@@ -1004,17 +1095,30 @@ export function useMasterPaketCrudResource(enabled: boolean) {
     itemsQuery.error ??
     itemPacketsQuery.error ??
     defaultPackagesQuery.error ??
+    (pageMode && activeTab === 'vendor'
+      ? packetVendorsPageQuery.error
+      : defaultPackagesPageQuery.error) ??
     ingredientsQuery.error;
 
   return {
     enums: enumsResource.enums,
     allPacketNames: packetNames.items,
-    allPacketVendors: packetVendors.items,
+    allPacketVendors:
+      pageMode && activeTab === 'vendor'
+        ? packetVendorPageItems
+        : packetVendors.items,
     allPacketCategories: packetCategories.items,
     allItems: itemsQuery.data ?? [],
     allItemPackets: itemPacketsQuery.data ?? [],
-    allDefaultPackages: defaultPackagesQuery.data ?? [],
+    allDefaultPackages:
+      pageMode && activeTab === 'default-package'
+        ? defaultPackagePageItems
+        : (defaultPackagesQuery.data ?? []),
     allIngredients: ingredientsQuery.data ?? [],
+    pageQuery:
+      activeTab === 'vendor'
+        ? packetVendorsPageQuery
+        : defaultPackagesPageQuery,
     loading,
     error:
       mutationError ??
@@ -1037,7 +1141,10 @@ export function useMasterPaketCrudResource(enabled: boolean) {
   };
 }
 
-export function useIngredientCrudResource(enabled: boolean) {
+export function useIngredientCrudResource(
+  enabled: boolean,
+  pageMode = false
+) {
   const queryClient = useQueryClient();
   const [mutationError, setMutationError] = useState<string | null>(null);
 
@@ -1071,8 +1178,12 @@ export function useIngredientCrudResource(enabled: boolean) {
       const res = await fetchDefaultPackages();
       return res?.data ?? [];
     },
-    enabled,
+    enabled: enabled && !pageMode,
   });
+  const defaultPackagesPageQuery = useInfiniteDefaultPackagesQuery(
+    'brand_name,id',
+    enabled && pageMode
+  );
 
   const itemPacketsQuery = useQuery<ItemPacket[]>({
     queryKey: [...cpoQueryKeys.itemPackets, activeCompanyId],
@@ -1164,7 +1275,9 @@ export function useIngredientCrudResource(enabled: boolean) {
 
   const loading =
     ingredientsQuery.isLoading ||
-    defaultPackagesQuery.isLoading ||
+    (pageMode
+      ? defaultPackagesPageQuery.isLoading
+      : defaultPackagesQuery.isLoading) ||
     itemPacketsQuery.isLoading ||
     itemsQuery.isLoading ||
     createIngredientMutation.isPending ||
@@ -1173,13 +1286,18 @@ export function useIngredientCrudResource(enabled: boolean) {
 
   const queryError =
     ingredientsQuery.error ??
-    defaultPackagesQuery.error ??
+    (pageMode
+      ? defaultPackagesPageQuery.error
+      : defaultPackagesQuery.error) ??
     itemPacketsQuery.error ??
     itemsQuery.error;
 
   return {
     allIngredients: ingredientsQuery.data ?? [],
-    allDefaultPackages: defaultPackagesQuery.data ?? [],
+    allDefaultPackages: pageMode
+      ? (defaultPackagesPageQuery.data?.pages.flatMap((page) => page.data) ?? [])
+      : (defaultPackagesQuery.data ?? []),
+    pageQuery: defaultPackagesPageQuery,
     allItemPackets: itemPacketsQuery.data ?? [],
     allItems: itemsQuery.data ?? [],
     loading,

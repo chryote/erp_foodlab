@@ -20,6 +20,7 @@ import { formatCapitalIdr } from '@/modules/CFO/CapitalCompanyCrudModal';
 
 export interface ViewPaketAwalModalProps {
   isOpen: boolean;
+  pageMode?: boolean;
   companies?: Company[];
   onClose: () => void;
 }
@@ -35,6 +36,7 @@ interface DefaultPackageDetailItemRow {
 
 export const ViewPaketAwalModal: React.FC<ViewPaketAwalModalProps> = ({
   isOpen,
+  pageMode = false,
   companies = [],
   onClose,
 }) => {
@@ -43,9 +45,10 @@ export const ViewPaketAwalModal: React.FC<ViewPaketAwalModalProps> = ({
     allDefaultPackages,
     allItemPackets,
     allItems,
+    pageQuery,
     loading,
     error,
-  } = useIngredientCrudResource(isOpen);
+  } = useIngredientCrudResource(isOpen, pageMode);
 
   const [selectedPackageId, setSelectedPackageId] = useState<number | null>(
     null
@@ -293,6 +296,7 @@ export const ViewPaketAwalModal: React.FC<ViewPaketAwalModalProps> = ({
     <>
       <CrudModal
         isOpen={isOpen}
+        pageMode={pageMode}
         title="View Paket Awal"
         subtitle="Daftar paket awal beserta komposisi item dan total harga"
         testId="view-paket-awal-modal"
@@ -311,7 +315,11 @@ export const ViewPaketAwalModal: React.FC<ViewPaketAwalModalProps> = ({
         ]}
         summary={
           <SummaryBanner
-            label={`Total Nilai Paket Awal (${allDefaultPackages.length} Paket)`}
+            label={
+              pageMode
+                ? `Nilai Paket Awal Dimuat (${allDefaultPackages.length} Paket)`
+                : `Total Nilai Paket Awal (${allDefaultPackages.length} Paket)`
+            }
             value={formatCapitalIdr(grandTotalPrice)}
             testId="view-paket-awal-total-banner"
           />
@@ -319,6 +327,32 @@ export const ViewPaketAwalModal: React.FC<ViewPaketAwalModalProps> = ({
         emptyMessage="Belum ada data paket awal."
         pageSize={10}
         items={allDefaultPackages}
+        displayItems={pageMode ? allDefaultPackages : undefined}
+        hasMore={pageMode && Boolean(pageQuery.hasNextPage)}
+        onLoadMore={
+          pageMode
+            ? () => {
+                if (pageQuery.hasNextPage && !pageQuery.isFetchingNextPage) {
+                  void pageQuery.fetchNextPage();
+                }
+              }
+            : undefined
+        }
+        isLoadingMore={pageMode && pageQuery.isFetchingNextPage}
+        loadMoreError={
+          pageMode && pageQuery.isFetchNextPageError
+            ? 'Gagal memuat paket berikutnya.'
+            : null
+        }
+        onRetryLoadMore={
+          pageMode
+            ? () => {
+                if (pageQuery.isFetchNextPageError) {
+                  void pageQuery.fetchNextPage();
+                }
+              }
+            : undefined
+        }
         loading={loading}
         error={error}
         readOnly={true}

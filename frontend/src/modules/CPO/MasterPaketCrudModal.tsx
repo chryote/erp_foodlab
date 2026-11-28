@@ -37,6 +37,7 @@ export const MASTER_PAKET_TABS: Array<{
 
 export interface MasterPaketCrudModalProps {
   isOpen: boolean;
+  pageMode?: boolean;
   company?: Company | null;
   companies?: Company[];
   onClose: () => void;
@@ -44,6 +45,7 @@ export interface MasterPaketCrudModalProps {
 
 export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
   isOpen,
+  pageMode = false,
   company = null,
   companies = [],
   onClose,
@@ -77,6 +79,7 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
     allItemPackets,
     allDefaultPackages,
     allIngredients,
+    pageQuery,
     loading,
     error,
     clearError,
@@ -86,7 +89,7 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
     createDefaultPackageWizard,
     updateDefaultPackageWizard,
     removeDefaultPackage,
-  } = useMasterPaketCrudResource(isOpen);
+  } = useMasterPaketCrudResource(isOpen, pageMode, activeTab);
 
   useEffect(() => {
     if (!isOpen) {
@@ -177,7 +180,9 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
         key: 'no',
         header: 'No',
         render: (_row, index) => (
-          <code>{(safeCurrentPage - 1) * pageSize + index + 1}</code>
+          <code>
+            {(pageMode ? 0 : (safeCurrentPage - 1) * pageSize) + index + 1}
+          </code>
         ),
       },
       {
@@ -265,6 +270,7 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
       allPacketNames,
       allPacketVendors,
       companies,
+      pageMode,
       safeCurrentPage,
     ]
   );
@@ -308,6 +314,7 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
       <>
         <Modal
           isOpen={isOpen}
+          pageMode={pageMode}
           title="Master Paket"
           subtitle="Kelola vendor paket dan paket awal"
           testId="master-paket-crud-modal"
@@ -333,7 +340,10 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
           >
             <div
               data-testid="master-paket-crud-modal-form-panel"
-              className="flex min-h-0 flex-col rounded-xl border border-border bg-muted/25 p-4 lg:overflow-y-auto"
+              className={cn(
+                'flex min-h-0 flex-col lg:overflow-y-auto',
+                !pageMode && 'rounded-xl border border-border bg-muted/25 p-4'
+              )}
             >
               <DefaultPackageWizardPanel
                 allPacketNames={allPacketNames}
@@ -359,26 +369,64 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
 
             <div
               data-testid="master-paket-crud-modal-table-panel"
-              className="flex min-h-0 min-w-0 flex-col justify-between gap-4 rounded-xl border border-border bg-card p-4"
+              className={cn(
+                'flex min-h-0 min-w-0 flex-col gap-4',
+                !pageMode &&
+                  'justify-between rounded-xl border border-border bg-card p-4'
+              )}
             >
               <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto">
                 <DataTable
                   columns={defaultPackageColumns}
-                  data={paginatedDefaultPackages}
+                  data={pageMode ? allDefaultPackages : paginatedDefaultPackages}
                   emptyMessage="Belum ada data paket awal."
                   rowKey={(row) => row.id}
+                  stickyHeader={pageMode}
+                  scrollTestId={
+                    pageMode ? 'master-paket-default-packages-scroll' : undefined
+                  }
+                  hasMore={pageMode && Boolean(pageQuery.hasNextPage)}
+                  onLoadMore={
+                    pageMode
+                      ? () => {
+                          if (
+                            pageQuery.hasNextPage &&
+                            !pageQuery.isFetchingNextPage
+                          ) {
+                            void pageQuery.fetchNextPage();
+                          }
+                        }
+                      : undefined
+                  }
+                  isLoadingMore={pageMode && pageQuery.isFetchingNextPage}
+                  loadMoreError={
+                    pageMode && pageQuery.isFetchNextPageError
+                      ? 'Gagal memuat paket berikutnya.'
+                      : null
+                  }
+                  onRetryLoadMore={
+                    pageMode
+                      ? () => {
+                          if (pageQuery.isFetchNextPageError) {
+                            void pageQuery.fetchNextPage();
+                          }
+                        }
+                      : undefined
+                  }
                 />
               </div>
 
-              <div className="shrink-0 border-t border-border pt-3">
-                <Pagination
-                  currentPage={safeCurrentPage}
-                  totalPages={totalPages}
-                  totalItems={allDefaultPackages.length}
-                  testId="master-paket-crud-modal-pagination"
-                  onPageChange={setCurrentPage}
-                />
-              </div>
+              {!pageMode && (
+                <div className="shrink-0 border-t border-border pt-3">
+                  <Pagination
+                    currentPage={safeCurrentPage}
+                    totalPages={totalPages}
+                    totalItems={allDefaultPackages.length}
+                    testId="master-paket-crud-modal-pagination"
+                    onPageChange={setCurrentPage}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </Modal>
@@ -409,6 +457,7 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
   return (
     <CrudModal
       isOpen={isOpen}
+      pageMode={pageMode}
       title="Master Paket"
       subtitle="Kelola vendor paket dan paket awal"
       testId="master-paket-crud-modal"
@@ -417,6 +466,32 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
       labelPlacement="left"
       modalSize="expanded"
       pageSize={pageSize}
+      displayItems={pageMode ? allPacketVendors : undefined}
+      hasMore={pageMode && Boolean(pageQuery.hasNextPage)}
+      onLoadMore={
+        pageMode
+          ? () => {
+              if (pageQuery.hasNextPage && !pageQuery.isFetchingNextPage) {
+                void pageQuery.fetchNextPage();
+              }
+            }
+          : undefined
+      }
+      isLoadingMore={pageMode && pageQuery.isFetchingNextPage}
+      loadMoreError={
+        pageMode && pageQuery.isFetchNextPageError
+          ? 'Gagal memuat vendor berikutnya.'
+          : null
+      }
+      onRetryLoadMore={
+        pageMode
+          ? () => {
+              if (pageQuery.isFetchNextPageError) {
+                void pageQuery.fetchNextPage();
+              }
+            }
+          : undefined
+      }
       loading={loading}
       error={error}
       onClose={onClose}

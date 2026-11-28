@@ -38,6 +38,7 @@ describe('MasterItemInternalCrudModal active company lock', () => {
       <QueryClientProvider client={queryClient}>
         <MasterItemInternalCrudModal
           isOpen={true}
+          pageMode
           company={companies[0]}
           companies={companies}
           onClose={() => undefined}
@@ -47,7 +48,7 @@ describe('MasterItemInternalCrudModal active company lock', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByTestId('master-item-internal-crud-modal')
+        screen.getByTestId('master-item-internal-crud-modal-page')
       ).toBeInTheDocument();
     });
 
@@ -66,5 +67,91 @@ describe('MasterItemInternalCrudModal active company lock', () => {
       expect(optionValues).toEqual(['', '1']);
       expect(companySelect.options[1]?.text).toBe('PT. Slaras Nusa Foodlab');
     }
+  });
+
+  it('loads internal items incrementally without pagination', async () => {
+    const itemsByPage: apiClient.Item[][] = [
+      [
+        {
+          id: 11,
+          company_id: 1,
+          packet_vendor_id: null,
+          code: 'ITM-011',
+          name: 'Item halaman pertama',
+          type: 'Bahan',
+        },
+      ],
+      [
+        {
+          id: 12,
+          company_id: 1,
+          packet_vendor_id: null,
+          code: 'ITM-012',
+          name: 'Item halaman berikutnya',
+          type: 'Bahan',
+        },
+      ],
+    ];
+    vi.mocked(apiClient.fetchItems).mockImplementation(async (params) => {
+      const page = params?.page ?? 1;
+      const data = itemsByPage[page - 1] ?? [];
+      return {
+        data,
+        meta: {
+          count: data.length,
+          total: 2,
+          page,
+          per_page: 10,
+          last_page: 2,
+        },
+      };
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MasterItemInternalCrudModal
+          isOpen
+          pageMode
+          company={companies[0]}
+          companies={companies}
+          onClose={() => undefined}
+        />
+      </QueryClientProvider>
+    );
+
+    expect(await screen.findByText('Item halaman pertama')).toBeInTheDocument();
+    expect(apiClient.fetchItems).toHaveBeenCalledWith({
+      page: 1,
+      per_page: 10,
+      company_id: 1,
+      sort: 'name,id',
+    });
+    expect(
+      screen.queryByTestId('master-item-internal-crud-modal-pagination-info')
+    ).not.toBeInTheDocument();
+
+    const scrollContainer = screen.getByTestId(
+      'master-item-internal-crud-modal-table-scroll'
+    );
+    Object.defineProperties(scrollContainer, {
+      scrollHeight: { configurable: true, value: 1000 },
+      clientHeight: { configurable: true, value: 400 },
+      scrollTop: { configurable: true, writable: true, value: 600 },
+    });
+    fireEvent.scroll(scrollContainer);
+
+    expect(
+      await screen.findByText('Item halaman berikutnya')
+    ).toBeInTheDocument();
+    expect(apiClient.fetchItems).toHaveBeenCalledWith({
+      page: 2,
+      per_page: 10,
+      company_id: 1,
+      sort: 'name,id',
+    });
   });
 });
