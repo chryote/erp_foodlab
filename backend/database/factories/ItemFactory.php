@@ -22,6 +22,7 @@ class ItemFactory extends Factory
         $seq = self::$sequence++;
 
         return [
+            'company_owner_id' => Company::factory(),
             'company_id' => fn (array $attributes): mixed => ($attributes['packet_vendor_id'] ?? null) !== null
                 ? null
                 : Company::factory(),

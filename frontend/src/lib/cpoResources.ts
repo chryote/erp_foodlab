@@ -5,6 +5,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
+import { getActiveCompanyId } from '@/lib/activeCompanyStorage';
 import {
   ApiRequestError,
   type Company,
@@ -122,8 +123,9 @@ export function useInfiniteItemsQuery(
 }
 
 export function useInfinitePacketsQuery(sort: string, enabled = true) {
+  const activeCompanyId = getActiveCompanyId();
   return useInfiniteQuery({
-    queryKey: [...cpoQueryKeys.packets, 'infinite', sort],
+    queryKey: [...cpoQueryKeys.packets, 'infinite', activeCompanyId, sort],
     queryFn: ({ pageParam }) =>
       fetchPackets({
         page: pageParam,
@@ -192,9 +194,14 @@ function useItemsCore(
   runMutation: <R>(fn: () => Promise<R>, fallback: string) => Promise<R | null>
 ) {
   const queryClient = useQueryClient();
+  const activeCompanyId = getActiveCompanyId();
+  const itemsQueryKey = useMemo(
+    () => [...cpoQueryKeys.items, activeCompanyId] as const,
+    [activeCompanyId]
+  );
 
   const itemsQuery = useQuery<Item[]>({
-    queryKey: cpoQueryKeys.items,
+    queryKey: itemsQueryKey,
     queryFn: async () => {
       const res = await fetchItems();
       return res?.data ?? [];
@@ -208,7 +215,7 @@ function useItemsCore(
       return res.data;
     },
     onSuccess: (created) => {
-      queryClient.setQueryData<Item[]>(cpoQueryKeys.items, (prev = []) => [
+      queryClient.setQueryData<Item[]>(itemsQueryKey, (prev = []) => [
         created,
         ...prev,
       ]);
@@ -222,7 +229,7 @@ function useItemsCore(
       return res.data;
     },
     onSuccess: (updated) => {
-      queryClient.setQueryData<Item[]>(cpoQueryKeys.items, (prev = []) =>
+      queryClient.setQueryData<Item[]>(itemsQueryKey, (prev = []) =>
         prev.map((item) => (item.id === updated.id ? updated : item))
       );
       void queryClient.invalidateQueries({ queryKey: cpoQueryKeys.items });
@@ -238,11 +245,11 @@ function useItemsCore(
       return id;
     },
     onSuccess: (deletedId) => {
-      queryClient.setQueryData<Item[]>(cpoQueryKeys.items, (prev = []) =>
+      queryClient.setQueryData<Item[]>(itemsQueryKey, (prev = []) =>
         prev.filter((item) => item.id !== deletedId)
       );
       queryClient.setQueryData<ItemPacket[]>(
-        cpoQueryKeys.itemPackets,
+        [...cpoQueryKeys.itemPackets, activeCompanyId],
         (prev = []) =>
           prev.filter((assignment) => Number(assignment.item_id) !== deletedId)
       );
@@ -297,9 +304,10 @@ function useItemsCore(
 export function useItemCrudResource(enabled: boolean) {
   const [mutationError, setMutationError] = useState<string | null>(null);
   const enumsResource = useCpoEnumsResource(enabled);
+  const activeCompanyId = getActiveCompanyId();
 
   const packetVendorsQuery = useQuery<PacketVendor[]>({
-    queryKey: cpoQueryKeys.packetVendors,
+    queryKey: [...cpoQueryKeys.packetVendors, activeCompanyId],
     queryFn: async () => {
       const res = await fetchPacketVendors();
       return res?.data ?? [];
@@ -617,9 +625,14 @@ function useNamedCpoEntity<T extends { id: number; name: string }>(
   runMutation: <R>(fn: () => Promise<R>, fallback: string) => Promise<R | null>
 ) {
   const queryClient = useQueryClient();
+  const activeCompanyId = getActiveCompanyId();
+  const scopedQueryKey = useMemo(
+    () => [...queryKey, activeCompanyId] as const,
+    [queryKey, activeCompanyId]
+  );
 
   const query = useQuery<T[]>({
-    queryKey,
+    queryKey: scopedQueryKey,
     queryFn: async () => {
       const res = await api.fetchAll();
       return res?.data ?? [];
@@ -782,8 +795,10 @@ export function useMasterPaketCrudResource(enabled: boolean) {
     runMutation
   );
 
+  const activeCompanyId = getActiveCompanyId();
+
   const itemsQuery = useQuery<Item[]>({
-    queryKey: cpoQueryKeys.items,
+    queryKey: [...cpoQueryKeys.items, activeCompanyId],
     queryFn: async () => {
       const res = await fetchItems();
       return res?.data ?? [];
@@ -792,7 +807,7 @@ export function useMasterPaketCrudResource(enabled: boolean) {
   });
 
   const itemPacketsQuery = useQuery<ItemPacket[]>({
-    queryKey: cpoQueryKeys.itemPackets,
+    queryKey: [...cpoQueryKeys.itemPackets, activeCompanyId],
     queryFn: async () => {
       const res = await fetchItemPackets();
       return res?.data ?? [];
@@ -801,7 +816,7 @@ export function useMasterPaketCrudResource(enabled: boolean) {
   });
 
   const defaultPackagesQuery = useQuery<DefaultPackage[]>({
-    queryKey: cpoQueryKeys.defaultPackages,
+    queryKey: [...cpoQueryKeys.defaultPackages, activeCompanyId],
     queryFn: async () => {
       const res = await fetchDefaultPackages();
       return res?.data ?? [];
@@ -810,7 +825,7 @@ export function useMasterPaketCrudResource(enabled: boolean) {
   });
 
   const ingredientsQuery = useQuery<Ingredient[]>({
-    queryKey: cpoQueryKeys.ingredients,
+    queryKey: [...cpoQueryKeys.ingredients, activeCompanyId],
     queryFn: async () => {
       const res = await fetchIngredients();
       return res?.data ?? [];
@@ -1039,8 +1054,10 @@ export function useIngredientCrudResource(enabled: boolean) {
     []
   );
 
+  const activeCompanyId = getActiveCompanyId();
+
   const ingredientsQuery = useQuery<Ingredient[]>({
-    queryKey: cpoQueryKeys.ingredients,
+    queryKey: [...cpoQueryKeys.ingredients, activeCompanyId],
     queryFn: async () => {
       const res = await fetchIngredients();
       return res?.data ?? [];
@@ -1049,7 +1066,7 @@ export function useIngredientCrudResource(enabled: boolean) {
   });
 
   const defaultPackagesQuery = useQuery<DefaultPackage[]>({
-    queryKey: cpoQueryKeys.defaultPackages,
+    queryKey: [...cpoQueryKeys.defaultPackages, activeCompanyId],
     queryFn: async () => {
       const res = await fetchDefaultPackages();
       return res?.data ?? [];
@@ -1058,7 +1075,7 @@ export function useIngredientCrudResource(enabled: boolean) {
   });
 
   const itemPacketsQuery = useQuery<ItemPacket[]>({
-    queryKey: cpoQueryKeys.itemPackets,
+    queryKey: [...cpoQueryKeys.itemPackets, activeCompanyId],
     queryFn: async () => {
       const res = await fetchItemPackets();
       return res?.data ?? [];
@@ -1067,7 +1084,7 @@ export function useIngredientCrudResource(enabled: boolean) {
   });
 
   const itemsQuery = useQuery<Item[]>({
-    queryKey: cpoQueryKeys.items,
+    queryKey: [...cpoQueryKeys.items, activeCompanyId],
     queryFn: async () => {
       const res = await fetchItems();
       return res?.data ?? [];

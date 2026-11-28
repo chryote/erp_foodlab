@@ -18,6 +18,7 @@ class DefaultPackageResource extends JsonResource
     {
         return [
             'id' => (int) $this->id,
+            'company_owner_id' => $this->company_owner_id !== null ? (int) $this->company_owner_id : null,
             'brand_name' => $this->brand_name,
             'packet_name_id' => (int) $this->packet_name_id,
             'company_id' => $this->company_id !== null ? (int) $this->company_id : null,
@@ -26,6 +27,7 @@ class DefaultPackageResource extends JsonResource
             'packet_id' => $this->packet_id !== null ? (int) $this->packet_id : null,
             'item_packet_id' => $this->item_packet_id !== null ? (int) $this->item_packet_id : null,
             'price' => (float) $this->price,
+            'company_owner' => $this->whenLoaded('companyOwner', fn ($company) => $company !== null ? new CompanyResource($company) : null),
             'packet_name' => $this->whenLoaded('packetName', fn ($packetName) => $packetName !== null ? new PacketNameResource($packetName) : null),
             'company' => $this->whenLoaded('company', fn ($company) => $company !== null ? new CompanyResource($company) : null),
             'packet_vendor' => $this->whenLoaded('packetVendor', fn ($packetVendor) => $packetVendor !== null ? new PacketVendorResource($packetVendor) : null),

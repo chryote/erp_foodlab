@@ -518,19 +518,18 @@ describe('CPO Input Item vendor flow: Master Item Vendor', () => {
       within(tablePanel).queryByText('Kardus Packing Internal')
     ).not.toBeInTheDocument();
 
-    // Pilih Perusahaan pre-selects active company 1 and lists all companies
+    // Pilih Perusahaan is locked to active company 1 only
     const companySelect = within(modal).getByLabelText(
       'Pilih Perusahaan'
     ) as HTMLSelectElement;
+    expect(companySelect).toBeDisabled();
     expect(companySelect.value).toBe('1');
     expect(Array.from(companySelect.options).map((o) => o.textContent)).toEqual([
       'Pilih perusahaan...',
       'PT. Slaras Nusa Foodlab',
-      'PT. Kemasan Nusantara',
     ]);
 
-    // Create internal Bahan item sending company_id (no packet_vendor_id)
-    fireEvent.change(companySelect, { target: { value: '2' } });
+    // Create internal Bahan item sending active company_id (no packet_vendor_id)
     fireEvent.change(within(modal).getByLabelText('Kode Item'), {
       target: { value: 'INT-BHN-02' },
     });
@@ -542,7 +541,7 @@ describe('CPO Input Item vendor flow: Master Item Vendor', () => {
 
     await waitFor(() => {
       expect(apiClient.createItem).toHaveBeenCalledWith({
-        company_id: 2,
+        company_id: 1,
         code: 'INT-BHN-02',
         name: 'Gula Pasir Internal',
         type: 'Bahan',
@@ -562,7 +561,7 @@ describe('CPO Input Item vendor flow: Master Item Vendor', () => {
 
     await waitFor(() => {
       expect(apiClient.updateItem).toHaveBeenCalledWith(401, {
-        company_id: 2,
+        company_id: 1,
         code: 'INT-BHN-02',
         name: 'Gula Halus Internal',
         type: 'Bahan',

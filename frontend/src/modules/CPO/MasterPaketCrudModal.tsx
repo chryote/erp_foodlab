@@ -20,6 +20,7 @@ import {
   DEFAULT_CPO_ENUMS,
   useMasterPaketCrudResource,
 } from '@/lib/cpoResources';
+import { getActiveCompanyId } from '@/lib/activeCompanyStorage';
 import { cn } from '@/lib/utils';
 import { formatCapitalIdr } from '@/modules/CFO/CapitalCompanyCrudModal';
 import { DefaultPackageWizardPanel } from './DefaultPackageWizardPanel';
@@ -36,15 +37,27 @@ export const MASTER_PAKET_TABS: Array<{
 
 export interface MasterPaketCrudModalProps {
   isOpen: boolean;
+  company?: Company | null;
   companies?: Company[];
   onClose: () => void;
 }
 
 export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
   isOpen,
+  company = null,
   companies = [],
   onClose,
 }) => {
+  const activeCompany = useMemo<Company | null>(() => {
+    if (company) {
+      return company;
+    }
+    const activeId = getActiveCompanyId();
+    if (activeId !== null) {
+      return companies.find((c) => c.id === activeId) ?? null;
+    }
+    return null;
+  }, [companies, company]);
   const [activeTab, setActiveTab] = useState<MasterPaketTabKey>('vendor');
   const [currentPage, setCurrentPage] = useState(1);
   const [editingDefaultPackage, setEditingDefaultPackage] =
@@ -326,6 +339,7 @@ export const MasterPaketCrudModal: React.FC<MasterPaketCrudModalProps> = ({
                 allPacketNames={allPacketNames}
                 allPacketCategories={allPacketCategories}
                 allPacketVendors={allPacketVendors}
+                activeCompany={activeCompany}
                 companies={companies}
                 allItems={allItems}
                 allItemPackets={allItemPackets}

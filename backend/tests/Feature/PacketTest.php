@@ -52,8 +52,9 @@ describe('Packet CPO module', function () {
         expect(Cache::has(ItemService::CACHE_KEY_LIST))->toBeFalse();
 
         $paketHematId = $createRes->json('data.id');
-        $paketA = Packet::factory()->create(['name' => 'Paket Alpha_Lab']);
-        $paketB = Packet::factory()->create(['name' => 'Paket Beta']);
+        Packet::query()->whereKey($paketHematId)->update(['company_owner_id' => $companyA->id]);
+        $paketA = Packet::factory()->create(['company_owner_id' => $companyA->id, 'name' => 'Paket Alpha_Lab']);
+        $paketB = Packet::factory()->create(['company_owner_id' => $companyB->id, 'name' => 'Paket Beta']);
 
         // Unfiltered list uses defaultSort('name', 'id') and populates cache
         expect(Cache::has(PacketService::CACHE_KEY_LIST))->toBeFalse();
@@ -68,14 +69,14 @@ describe('Packet CPO module', function () {
 
         expect(Cache::has(PacketService::CACHE_KEY_LIST))->toBeTrue();
 
-        // Company-agnostic: ?active_company=1 does not filter packets out
+        // Tenant-scoped: ?active_company=1 filters packets to the active company owner
         $this->getJson('/api/v1/modules/cpo/packets?active_company=1', [
             'X-Active-Company-Id' => (string) $companyA->id,
-        ])->assertOk()->assertJsonCount(3, 'data');
+        ])->assertOk()->assertJsonCount(2, 'data');
 
         $this->getJson('/api/v1/modules/cpo/packets?active_company=1', [
             'X-Active-Company-Id' => (string) $companyB->id,
-        ])->assertOk()->assertJsonCount(3, 'data');
+        ])->assertOk()->assertJsonCount(1, 'data');
 
         // Filter by name and search with LIKE wildcard escaping & whitespace-only skipping
         $this->getJson('/api/v1/modules/cpo/packets?filter[name]='.urlencode('100%'))

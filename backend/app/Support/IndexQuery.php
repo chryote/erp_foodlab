@@ -24,6 +24,7 @@ final class IndexQuery
     private const LEGACY_FILTERS = [
         'search',
         'company_id',
+        'company_owner_id',
         'expense_category_id',
         'expense_type_id',
         'series',
@@ -179,6 +180,18 @@ final class IndexQuery
         $searchBuilder = $model::search($trimmed)->take(1000);
 
         $effectiveRequest = $request ?? request();
+        if ($effectiveRequest instanceof Request && in_array('company_owner_id', $model->getFillable(), true)) {
+            $activeCompanyId = active_company_id();
+            if ($activeCompanyId !== null) {
+                $scoutFilters['company_owner_id'] = $activeCompanyId;
+            } elseif (! array_key_exists('company_owner_id', $scoutFilters)) {
+                $requestedOwnerId = $effectiveRequest->input('filter.company_owner_id', $effectiveRequest->query('company_owner_id'));
+                if (is_numeric($requestedOwnerId) && (int) $requestedOwnerId > 0) {
+                    $scoutFilters['company_owner_id'] = (int) $requestedOwnerId;
+                }
+            }
+        }
+
         if ($effectiveRequest instanceof Request && in_array('company_id', $model->getFillable(), true)) {
             if ($effectiveRequest->boolean('active_company')) {
                 $activeCompanyId = active_company_id();

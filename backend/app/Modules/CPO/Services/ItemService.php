@@ -5,6 +5,7 @@ namespace App\Modules\CPO\Services;
 use App\Enums\ItemType;
 use App\Models\Item;
 use App\Support\ActiveCompany;
+use App\Support\CompanyOwnerScope;
 use App\Support\ExclusiveOwner;
 use App\Support\IndexQuery;
 use App\Support\InputNormalizer;
@@ -40,14 +41,18 @@ class ItemService
     {
         $query = IndexQuery::withDefaultRelations($this->query($request), $request, self::RELATIONS);
 
-        IndexQuery::applyActiveCompanyFilter($query->getEloquentBuilder(), $request);
+        $ownerId = CompanyOwnerScope::applyListFilter($query->getEloquentBuilder(), $request);
 
         if (IndexQuery::isPaginated($request)) {
             return IndexQuery::paginate($query, $request);
         }
 
         if (IndexQuery::isCacheable($request)) {
-            return Cache::remember(self::CACHE_KEY_LIST, 60, fn () => $query->get());
+            return Cache::remember(
+                CompanyOwnerScope::listCacheKey(self::CACHE_KEY_LIST, $ownerId),
+                60,
+                fn () => $query->get()
+            );
         }
 
         return $query->get();
@@ -82,18 +87,24 @@ class ItemService
         $vendorId = $resolved['packet_vendor_id'];
         $attributes = $resolved['attributes'];
 
-        $item = DB::transaction(function () use ($attributes, $companyId, $vendorId): Item {
+        $companyOwnerId = CompanyOwnerScope::resolveId($attributes) ?? $companyId;
+        if ($companyOwnerId !== null) {
+            $attributes['company_owner_id'] = $companyOwnerId;
+        }
+
+        $item = DB::transaction(function () use ($attributes, $companyOwnerId, $companyId, $vendorId): Item {
+            CompanyOwnerScope::assertActiveOwner($companyOwnerId);
             ExclusiveOwner::assertActiveOwner($companyId, $vendorId);
 
             if (($attributes['code'] ?? null) !== null && $attributes['code'] !== '') {
-                $this->assertCodeUnique($companyId, $vendorId, (string) $attributes['code']);
+                $this->assertCodeUnique($companyOwnerId, $companyId, $vendorId, (string) $attributes['code']);
             }
-            $this->assertNameUnique($companyId, $vendorId, $attributes['name']);
+            $this->assertNameUnique($companyOwnerId, $companyId, $vendorId, $attributes['name']);
 
             return Item::query()->create($attributes);
         });
 
-        $this->forgetDependentCaches($companyId);
+        $this->forgetDependentCaches($companyOwnerId ?? $companyId);
 
         return $item->load(self::RELATIONS);
     }
@@ -127,6 +138,7 @@ class ItemService
         }
 
         $oldCompanyId = $item->company_id !== null ? (int) $item->company_id : null;
+        $oldOwnerId = $item->company_owner_id !== null ? (int) $item->company_owner_id : null;
 
         $updated = DB::transaction(function () use ($item, $attributes): Item {
             $locked = Item::query()->lockForUpdate()->findOrFail($item->getKey());
@@ -135,6 +147,11 @@ class ItemService
             $targetCompanyId = $resolved['company_id'];
             $targetVendorId = $resolved['packet_vendor_id'];
             $attributes = $resolved['attributes'];
+
+            $targetOwnerId = CompanyOwnerScope::resolveId($attributes, $locked) ?? $targetCompanyId;
+            if ($targetOwnerId !== null && array_key_exists('company_owner_id', $attributes)) {
+                $attributes['company_owner_id'] = $targetOwnerId;
+            }
 
             $lockedCompanyId = $locked->company_id !== null ? (int) $locked->company_id : null;
             $lockedVendorId = $locked->packet_vendor_id !== null ? (int) $locked->packet_vendor_id : null;
@@ -152,15 +169,16 @@ class ItemService
                 ]);
             }
 
+            CompanyOwnerScope::assertActiveOwner($targetOwnerId);
             ExclusiveOwner::assertActiveOwner($targetCompanyId, $targetVendorId);
 
             $targetCode = array_key_exists('code', $attributes) ? $attributes['code'] : $locked->code;
             if ($targetCode !== null && $targetCode !== '') {
-                $this->assertCodeUnique($targetCompanyId, $targetVendorId, (string) $targetCode, $locked->getKey());
+                $this->assertCodeUnique($targetOwnerId, $targetCompanyId, $targetVendorId, (string) $targetCode, $locked->getKey());
             }
 
             $targetName = (string) ($attributes['name'] ?? $locked->name);
-            $this->assertNameUnique($targetCompanyId, $targetVendorId, $targetName, $locked->getKey());
+            $this->assertNameUnique($targetOwnerId, $targetCompanyId, $targetVendorId, $targetName, $locked->getKey());
 
             $locked->update($attributes);
 
@@ -168,9 +186,10 @@ class ItemService
         });
 
         $newCompanyId = $updated->company_id !== null ? (int) $updated->company_id : null;
-        $this->forgetDependentCaches($oldCompanyId);
-        if ($newCompanyId !== $oldCompanyId) {
-            $this->forgetDependentCaches($newCompanyId);
+        $newOwnerId = $updated->company_owner_id !== null ? (int) $updated->company_owner_id : null;
+        $this->forgetDependentCaches($oldOwnerId ?? $oldCompanyId);
+        if ($newOwnerId !== $oldOwnerId || $newCompanyId !== $oldCompanyId) {
+            $this->forgetDependentCaches($newOwnerId ?? $newCompanyId);
         }
 
         return $updated->refresh()->load(self::RELATIONS);
@@ -199,7 +218,9 @@ class ItemService
                 $locked->ingredients()->delete();
             }
 
-            $companyId = $locked->company_id !== null ? (int) $locked->company_id : null;
+            $companyId = $locked->company_owner_id !== null
+                ? (int) $locked->company_owner_id
+                : ($locked->company_id !== null ? (int) $locked->company_id : null);
             $locked->delete();
 
             return $companyId;
@@ -212,6 +233,7 @@ class ItemService
     {
         $query = IndexQuery::make(Item::class, $request)
             ->allowedFilters([
+                AllowedFilter::exact('company_owner_id'),
                 AllowedFilter::exact('company_id'),
                 AllowedFilter::exact('packet_vendor_id'),
                 AllowedFilter::exact('type'),
@@ -240,10 +262,11 @@ class ItemService
                     }, request: $request);
                 }),
             ])
-            ->allowedSorts(['id', 'code', 'name', 'type', 'company_id', 'packet_vendor_id', 'created_at', 'updated_at'])
+            ->allowedSorts(['id', 'code', 'name', 'type', 'company_owner_id', 'company_id', 'packet_vendor_id', 'created_at', 'updated_at'])
             ->defaultSort('name', 'id');
 
         $availableIncludes = array_values(array_filter([
+            'companyOwner',
             'company',
             'packetVendor',
             class_exists('App\\Models\\ItemPacket') ? 'itemPackets' : null,
@@ -258,7 +281,7 @@ class ItemService
         return $query;
     }
 
-    private function assertCodeUnique(?int $companyId, ?int $vendorId, string $code, mixed $ignoreKey = null): void
+    private function assertCodeUnique(?int $companyOwnerId, ?int $companyId, ?int $vendorId, string $code, mixed $ignoreKey = null): void
     {
         $ownerLabel = $companyId !== null ? 'perusahaan' : 'vendor paket';
 
@@ -266,7 +289,10 @@ class ItemService
             Item::query(),
             'code',
             $code,
-            ExclusiveOwner::scopeFilters($companyId, $vendorId),
+            [
+                ...CompanyOwnerScope::scopeFilters($companyOwnerId),
+                ...ExclusiveOwner::scopeFilters($companyId, $vendorId),
+            ],
             'code',
             "Item dengan kode yang sama sudah terdaftar pada {$ownerLabel} ini.",
             $ignoreKey,
@@ -274,7 +300,7 @@ class ItemService
         );
     }
 
-    private function assertNameUnique(?int $companyId, ?int $vendorId, string $name, mixed $ignoreKey = null): void
+    private function assertNameUnique(?int $companyOwnerId, ?int $companyId, ?int $vendorId, string $name, mixed $ignoreKey = null): void
     {
         $ownerLabel = $companyId !== null ? 'perusahaan' : 'vendor paket';
 
@@ -282,7 +308,10 @@ class ItemService
             Item::query(),
             'name',
             $name,
-            ExclusiveOwner::scopeFilters($companyId, $vendorId),
+            [
+                ...CompanyOwnerScope::scopeFilters($companyOwnerId),
+                ...ExclusiveOwner::scopeFilters($companyId, $vendorId),
+            ],
             'name',
             "Item dengan nama yang sama sudah terdaftar pada {$ownerLabel} ini.",
             $ignoreKey,
@@ -292,12 +321,12 @@ class ItemService
 
     private function forgetDependentCaches(?int $companyId = null): void
     {
-        Cache::forget(self::CACHE_KEY_LIST);
+        CompanyOwnerScope::forgetListCache(self::CACHE_KEY_LIST, $companyId);
         Cache::forget(CpoService::CACHE_KEY);
-        Cache::forget(self::CACHE_KEY_ITEM_PACKETS_LIST);
-        Cache::forget(self::CACHE_KEY_PACKETS_LIST);
-        Cache::forget(DefaultPackageService::CACHE_KEY_LIST);
-        Cache::forget('erp_foodlab:cpo:ingredients:list');
+        CompanyOwnerScope::forgetListCache(self::CACHE_KEY_ITEM_PACKETS_LIST, $companyId);
+        CompanyOwnerScope::forgetListCache(self::CACHE_KEY_PACKETS_LIST, $companyId);
+        CompanyOwnerScope::forgetListCache(DefaultPackageService::CACHE_KEY_LIST, $companyId);
+        CompanyOwnerScope::forgetListCache('erp_foodlab:cpo:ingredients:list', $companyId);
         ActiveCompany::forgetCompanyCache($companyId);
     }
 }

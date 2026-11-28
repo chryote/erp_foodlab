@@ -3,9 +3,11 @@
 namespace App\Modules\CPO\Requests;
 
 use App\Models\Packet;
+use App\Support\CompanyOwnerScope;
 use App\Support\InputNormalizer;
 use App\Support\WriteGuard;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class SavePacketRequest extends FormRequest
@@ -32,6 +34,12 @@ class SavePacketRequest extends FormRequest
         $presence = $this->isMethod('PATCH') ? ['sometimes', 'required'] : ['required'];
 
         return [
+            'company_owner_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
             'name' => [...$presence, 'string', 'max:150'],
         ];
     }
@@ -49,6 +57,7 @@ class SavePacketRequest extends FormRequest
 
                 /** @var Packet|null $packet */
                 $packet = $this->route('packet');
+                $companyOwnerId = CompanyOwnerScope::resolveForRequest($this, $packet);
 
                 $effectiveName = $this->has('name')
                     ? InputNormalizer::text((string) $this->input('name'))
@@ -58,7 +67,7 @@ class SavePacketRequest extends FormRequest
                     Packet::query(),
                     'name',
                     $effectiveName,
-                    [],
+                    CompanyOwnerScope::scopeFilters($companyOwnerId),
                     $packet?->getKey()
                 )) {
                     $validator->errors()->add('name', 'Paket dengan nama yang sama sudah terdaftar.');
@@ -73,6 +82,13 @@ class SavePacketRequest extends FormRequest
     public function payload(): array
     {
         $validated = $this->validated();
+        /** @var Packet|null $packet */
+        $packet = $this->route('packet');
+
+        $companyOwnerId = CompanyOwnerScope::resolveForRequest($this, $packet);
+        if ($companyOwnerId !== null && (! $this->isMethod('PATCH') || array_key_exists('company_owner_id', $validated))) {
+            $validated['company_owner_id'] = $companyOwnerId;
+        }
 
         if (array_key_exists('name', $validated)) {
             $validated['name'] = InputNormalizer::text((string) $validated['name']) ?? '';

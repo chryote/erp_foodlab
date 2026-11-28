@@ -24,6 +24,7 @@ class DefaultPackageFactory extends Factory
         $seq = self::$sequence++;
 
         return [
+            'company_owner_id' => Company::factory(),
             'brand_name' => 'Brand '.ucfirst($this->faker->unique()->word()).' #'.$seq,
             'packet_name_id' => PacketName::factory(),
             'company_id' => null,
