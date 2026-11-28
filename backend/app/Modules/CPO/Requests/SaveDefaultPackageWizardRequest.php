@@ -221,7 +221,7 @@ class SaveDefaultPackageWizardRequest extends FormRequest
             static fn (array $row): array => [
                 'item_id' => (int) $row['item_id'],
                 'quantity' => (int) $row['quantity'],
-                'price' => 0.0,
+                'price' => isset($row['price']) ? round((float) $row['price'], 2) : 0.0,
             ],
             $validated['items']
         );

@@ -393,7 +393,7 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
             id: 500 + idx,
             default_package_id: created.id,
             item_id: row.item_id,
-            price: 0,
+            price: row.price ?? 0,
             default_package: created,
             item:
               itemsCatalogStore.find((item) => item.id === row.item_id) ?? null,
@@ -503,7 +503,7 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
             id: 600 + idx,
             default_package_id: id,
             item_id: row.item_id,
-            price: 0,
+            price: row.price ?? 0,
             default_package: updated,
             item:
               itemsCatalogStore.find((item) => item.id === row.item_id) ?? null,
@@ -820,13 +820,17 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
 
     fireEvent.click(screen.getByTestId('paket-awal-wizard-next-2'));
 
-    // Screen 3: Qty display & per-item Harga input are removed; input Total Harga Paket Awal (DefaultPackage.price) and Simpan
+    // Screen 3: input per-item price (used only for Ingredient.price) and Total Harga Paket Awal (DefaultPackage.price untouched) and Simpan
     expect(screen.getByTestId('paket-awal-wizard-step-3')).toBeInTheDocument();
     expect(
       within(screen.getByTestId('wizard-price-row-0')).queryByText(/Qty:/)
     ).not.toBeInTheDocument();
-    expect(screen.queryByTestId('wizard-price-input-0')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('wizard-price-input-1')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByTestId('wizard-price-input-0'), {
+      target: { value: '15000' },
+    });
+    fireEvent.change(screen.getByTestId('wizard-price-input-1'), {
+      target: { value: '25000' },
+    });
 
     fireEvent.change(screen.getByTestId('paket-awal-wizard-total-price-input'), {
       target: { value: '250000' },
@@ -843,8 +847,8 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
         company_id: 1,
         price: 250000,
         items: [
-          { item_id: 30, quantity: 3, price: 0 },
-          { item_id: 31, quantity: 5, price: 0 },
+          { item_id: 30, quantity: 3, price: 15000 },
+          { item_id: 31, quantity: 5, price: 25000 },
         ],
       });
       expect(
@@ -911,8 +915,12 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
     );
     fireEvent.click(screen.getByTestId('paket-awal-wizard-next-2'));
 
-    // Screen 3 hydrated total price 250000 -> update to 175000 -> Perbarui
+    // Screen 3 hydrated item price 15000 & total price 250000 -> update item price to 20000 and total price to 175000 -> Perbarui
     expect(screen.getByTestId('paket-awal-wizard-step-3')).toBeInTheDocument();
+    expect(screen.getByTestId('wizard-price-input-0')).toHaveValue('15.000');
+    fireEvent.change(screen.getByTestId('wizard-price-input-0'), {
+      target: { value: '20000' },
+    });
     expect(
       screen.getByTestId('paket-awal-wizard-total-price-input')
     ).toHaveValue('250.000');
@@ -930,7 +938,7 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
         brand_name: 'Brand Nusantara Edited',
         company_id: 1,
         price: 175000,
-        items: [{ item_id: 30, quantity: 4, price: 0 }],
+        items: [{ item_id: 30, quantity: 4, price: 20000 }],
       });
       expect(
         within(defaultTablePanel).getByText('Brand Nusantara Edited')

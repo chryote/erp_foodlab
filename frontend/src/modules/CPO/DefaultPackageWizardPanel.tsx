@@ -23,6 +23,7 @@ interface WizardItemDraft {
   rowId: number;
   item_id: number;
   quantity: string;
+  price: string;
 }
 
 export interface DefaultPackageWizardPanelProps {
@@ -196,6 +197,7 @@ export const DefaultPackageWizardPanel: React.FC<
         rowId: index + 1,
         item_id: Number(ing.item_id),
         quantity: resolveQty(Number(ing.item_id)),
+        price: String(ing.price ?? 0),
       }));
     } else if (editingPackage.item_packet) {
       hydratedRows = [
@@ -203,6 +205,7 @@ export const DefaultPackageWizardPanel: React.FC<
           rowId: 1,
           item_id: Number(editingPackage.item_packet.item_id),
           quantity: String(editingPackage.item_packet.quantity ?? 1),
+          price: '0',
         },
       ];
     }
@@ -342,6 +345,7 @@ export const DefaultPackageWizardPanel: React.FC<
         rowId: nextRowId,
         item_id: itemId,
         quantity: '1',
+        price: '0',
       },
     ]);
     setNextRowId((prev) => prev + 1);
@@ -401,10 +405,14 @@ export const DefaultPackageWizardPanel: React.FC<
       if (!Number.isFinite(quantity) || quantity < 1) {
         return null;
       }
+      const parsedItemPrice = row.price ? parseFloat(row.price) : 0;
+      if (!Number.isFinite(parsedItemPrice) || parsedItemPrice < 0) {
+        return null;
+      }
       items.push({
         item_id: row.item_id,
         quantity,
-        price: 0,
+        price: Math.round(parsedItemPrice * 100) / 100,
       });
     }
 
@@ -425,7 +433,9 @@ export const DefaultPackageWizardPanel: React.FC<
     onClearExternalError();
     const payload = buildWizardPayload();
     if (!payload) {
-      setLocalError('Pastikan total harga paket awal bernilai valid (>= 0).');
+      setLocalError(
+        'Pastikan harga item dan total harga paket awal bernilai valid (>= 0).'
+      );
       return;
     }
     setConfirmOpen(true);
@@ -786,16 +796,26 @@ export const DefaultPackageWizardPanel: React.FC<
                 <div
                   key={row.rowId}
                   data-testid={`wizard-price-row-${idx}`}
-                  className="rounded-lg border border-border/80 bg-background p-2.5"
+                  className="grid grid-cols-1 gap-2 rounded-lg border border-border/80 bg-background p-2.5 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-center"
                 >
-                  <div className="text-xs">
-                    <div className="font-semibold text-foreground">
+                  <div className="min-w-0 text-xs">
+                    <div className="truncate font-semibold text-foreground">
                       {matchedItem?.name ?? `Item #${row.item_id}`}
                     </div>
                     <div className="text-muted-foreground">
                       Kode: {matchedItem?.code || '-'}
                     </div>
                   </div>
+
+                  <DecimalInput
+                    id={`wizard-price-input-${idx}`}
+                    data-testid={`wizard-price-input-${idx}`}
+                    label="Harga (Rp)"
+                    value={row.price}
+                    onChange={(rawValue) =>
+                      handleUpdateRow(row.rowId, { price: rawValue })
+                    }
+                  />
                 </div>
               );
             })}
