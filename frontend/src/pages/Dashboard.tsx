@@ -102,7 +102,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       routeCompanyId !== null &&
       selectedCompany?.id === routeCompanyId
     ) {
-      setSelectedSeries(selectedCompany.series ?? 1);
+      setSelectedSeries(selectedCompany?.series ?? 1);
       void syncCompany(routeCompanyId);
     }
   }, [routeCompanyId, selectedCompany?.id, selectedCompany?.series, syncCompany]);
