@@ -14,6 +14,7 @@ const HIDDEN_ITEM_VENDOR_TYPES = new Set<string>(['Kelengkapan', 'Sarpras']);
 
 export interface MasterItemVendorCrudModalProps {
   isOpen: boolean;
+  pageMode?: boolean;
   company?: Company | null;
   companies?: Company[];
   onClose: () => void;
@@ -21,7 +22,7 @@ export interface MasterItemVendorCrudModalProps {
 
 export const MasterItemVendorCrudModal: React.FC<
   MasterItemVendorCrudModalProps
-> = ({ isOpen, onClose }) => {
+> = ({ isOpen, pageMode = false, onClose }) => {
   const {
     enums,
     allItems,
@@ -32,7 +33,8 @@ export const MasterItemVendorCrudModal: React.FC<
     createItem,
     updateItem,
     removeItem,
-  } = useItemCrudResource(isOpen);
+    pageQuery,
+  } = useItemCrudResource(isOpen, pageMode);
 
   const tabs = useMemo(() => {
     const source =
@@ -230,6 +232,7 @@ export const MasterItemVendorCrudModal: React.FC<
   return (
     <CrudModal
       isOpen={isOpen}
+      pageMode={pageMode}
       title="Master Item Vendor"
       subtitle="Kelola item vendor berdasarkan tipe item dan vendor paket"
       testId="master-item-vendor-crud-modal"
@@ -242,6 +245,32 @@ export const MasterItemVendorCrudModal: React.FC<
       fields={itemFields}
       emptyMessage={`Belum ada data item ${activeItemTypeLabel.toLowerCase()}.`}
       items={filteredItems}
+      displayItems={pageMode ? filteredItems : undefined}
+      hasMore={pageMode && Boolean(pageQuery.hasNextPage)}
+      onLoadMore={
+        pageMode
+          ? () => {
+              if (pageQuery.hasNextPage && !pageQuery.isFetchingNextPage) {
+                void pageQuery.fetchNextPage();
+              }
+            }
+          : undefined
+      }
+      isLoadingMore={pageMode && pageQuery.isFetchingNextPage}
+      loadMoreError={
+        pageMode && pageQuery.isFetchNextPageError
+          ? 'Gagal memuat item berikutnya.'
+          : null
+      }
+      onRetryLoadMore={
+        pageMode
+          ? () => {
+              if (pageQuery.isFetchNextPageError) {
+                void pageQuery.fetchNextPage();
+              }
+            }
+          : undefined
+      }
       loading={loading}
       error={error}
       onClose={onClose}

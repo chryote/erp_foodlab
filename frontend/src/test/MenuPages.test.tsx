@@ -46,4 +46,43 @@ describe('Dashboard menu pages', () => {
       getDashboardMenuPage(getDashboardMenuRoute(1, 'CMO', cmoMenu))
     ).not.toBeNull();
   });
+
+  it('places Kelola Vendor at CPO top level and groups package pages under Input Paket', () => {
+    const cpoMenu = COMPANY_MENU_MODULES.find(
+      (module) => module.code === 'CPO'
+    );
+    const kelolaVendorItem = cpoMenu?.items.find(
+      (menuItem) => menuItem.code === 'KELOLA_VENDOR'
+    );
+    const paketMenu = cpoMenu?.items.find(
+      (menuItem) => menuItem.code === 'INPUT_PAKET'
+    );
+    const paketChildren = paketMenu?.children ?? [];
+    const paketAwalItem = paketChildren.find(
+      (childItem) => childItem.code === 'MASTER_PAKET_PAKET_AWAL'
+    );
+
+    expect(kelolaVendorItem).toEqual({
+      code: 'KELOLA_VENDOR',
+      title: 'Kelola Vendor',
+    });
+    expect(
+      paketChildren.map((childItem) => childItem.code)
+    ).toEqual(['MASTER_PAKET_PAKET_AWAL', 'VIEW_PAKET_AWAL']);
+    expect(paketAwalItem?.title).toBe('Master Paket - Paket Awal');
+    expect(
+      paketMenu && paketAwalItem
+        ? getDashboardMenuPage(
+            getDashboardMenuRoute(1, 'CPO', paketMenu, paketAwalItem)
+          )
+        : null
+    ).not.toBeNull();
+    expect(
+      kelolaVendorItem
+        ? getDashboardMenuPage(
+            getDashboardMenuRoute(1, 'CPO', kelolaVendorItem)
+          )
+        : null
+    ).not.toBeNull();
+  });
 });

@@ -1,5 +1,6 @@
 import { ViewPaketAwalModal } from '@/modules/CPO/ViewPaketAwalModal';
 import { useMenuCompany } from '@/lib/useMenuCompany';
+import '../cpo-page.css';
 
 export default function CpoViewPaketAwalPage() {
   const { companies, loading, error } = useMenuCompany();
@@ -12,10 +13,13 @@ export default function CpoViewPaketAwalPage() {
   }
 
   return (
-    <ViewPaketAwalModal
-      isOpen
-      companies={companies}
-      onClose={() => undefined}
-    />
+    <div className="cpo-page">
+      <ViewPaketAwalModal
+        isOpen
+        pageMode
+        companies={companies}
+        onClose={() => undefined}
+      />
+    </div>
   );
 }

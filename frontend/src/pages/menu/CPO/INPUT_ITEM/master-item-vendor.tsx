@@ -1,5 +1,6 @@
 import { MasterItemVendorCrudModal } from '@/modules/CPO/MasterItemVendorCrudModal';
 import { useMenuCompany } from '@/lib/useMenuCompany';
+import '../cpo-page.css';
 
 export default function CpoMasterItemVendorPage() {
   const { company, companies, loading, error } = useMenuCompany();
@@ -12,11 +13,14 @@ export default function CpoMasterItemVendorPage() {
   }
 
   return (
-    <MasterItemVendorCrudModal
-      isOpen
-      company={company}
-      companies={companies}
-      onClose={() => undefined}
-    />
+    <div className="cpo-page">
+      <MasterItemVendorCrudModal
+        isOpen
+        pageMode
+        company={company}
+        companies={companies}
+        onClose={() => undefined}
+      />
+    </div>
   );
 }
