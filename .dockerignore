@@ -1,0 +1,6 @@
+.git
+**/.env
+**/vendor
+**/node_modules
+backend/public/storage
+backend/storage

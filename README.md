@@ -243,6 +243,13 @@ docker compose exec frontend npm run test:run
 cd frontend && npm run test:run && npm run build
 ```
 
+**Run before deploying to production:**
+```powershell
+docker build --target production -f frontend/Dockerfile frontend
+docker build -f docker/nginx/Dockerfile .
+docker build -f backend/Dockerfile backend
+```
+
 ### Running k6 Benchmarks
 
 The `k6` service runs under the `benchmark` Docker Compose profile against the internal `nginx` container:
