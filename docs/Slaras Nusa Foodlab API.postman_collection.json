@@ -1,19 +1,37 @@
 {
   "info": {
-    "_postman_id": "2fb8d4d2-57b8-4a67-b511-4b634eed80dd",
+    "_postman_id": "fb0f442c-a072-48fb-96b9-d311be429c90",
     "name": "Slaras Nusa Foodlab API",
-    "description": "# Slaras Nusa Foodlab API\n\nLaravel 11 REST API for the Slaras Nusa Foodlab ERP. All endpoints are served under `/api`.\n\n## Base URL\n`{{baseURL}}` defaults to `http://localhost:8080` — the docker nginx port follows\n`BACKEND_HTTP_PORT`. Every request path already includes `/api`.\n\n## Authentication\nSanctum personal access tokens (`Authorization: Bearer {{bearerToken}}`).\n\n1. Run **Auth > Login** (`admin@foodlab.test` / `password` with the default seeder).\n2. The test script saves `data.token` into `bearerToken`.\n3. Every other request inherits the collection auth.\n\nPublic endpoints: `POST /api/v1/auth/login`, `GET /api/health`, `GET /api/metrics`.\n\nEvery `/api` response is forced to JSON (`ForceJsonResponse`), so `Accept` headers are optional;\nthe collection still sends `Accept: application/json` on every request.\n\n## Active company\n`GET/POST /api/v1/active-company` selects the global company. The selection can be overridden\nper request with the `X-Active-Company-Id` header (available as a disabled header on list\nrequests) and is used by `?active_company=1` list scoping.\n\n## List convention\nEvery index endpoint supports:\n\n- `filter[<field>]=value` — flat aliases such as `?search=` / `?company_id=` still work\n- exact filters accept **multiple values** as a comma-separated list (`filter[status]=draft,approved`,\n  OR-ed) or repeated arrays (`filter[status][]=draft&filter[status][]=approved`)\n- **full-text search** (`search` / `filter[search]`) accepts **multiple keywords** on the\n  Scout + Meilisearch resources (expense items, employees, items, packets, lab samples);\n  other text filters (`name`, `code`) take a single keyword/phrase matched with `LIKE`\n- blank/whitespace-only search terms are ignored\n- `sort=field` / `sort=-field`\n- `include=relation` (camelCase relations; `...Count` / `...Exists` variants are available too)\n- date ranges on expense items: `filter[date_from]`, `filter[date_to]` or\n  `filter[daterange]=2026-11-01..2026-11-30` (applied to `purchased_on`; malformed dates return `422`)\n- `active_company=1` on company-scoped lists\n- `page` + `per_page` — without them the full filtered list is returned (cached 60 s);\n  `per_page` is capped at **100**\n\n## Search (Laravel Scout + Meilisearch)\n`search` / `filter[search]` runs through Laravel Scout on:\n\n| Resource | Indexed fields |\n| --- | --- |\n| Expense items | `name`, `detail`, expense category name, expense type name |\n| Employees | `name`, `nickname`, `nik_ktp`, attendance code, `email`, `phone` |\n| Items | `code`, `name`, `type` |\n| Packets | `name` |\n| Lab samples | `batch_code`, `product_name`, `category`, `status` |\n\n- Multiple space-separated keywords are supported (`filter[search]=teh botol`); Meilisearch\n  tokenises them, tolerates typos and prefix-matches the last term.\n- Results are automatically scoped to the request's company (`X-Active-Company-Id`,\n  `?active_company=1`, or `filter[company_id]`) where the model is company-scoped.\n- If Scout is disabled (driver `null`) or the term contains `%`/`_`, the API falls back to SQL\n  `LIKE` with the whole value escaped.\n- All other text filters (`name`, `code`, `brand_name`, ...) remain single-keyword `LIKE`\n  searches; \"Full-text search (multiple keywords)\" examples are attached to the five Scout lists.\n\n## Writes\n- `POST` / `PUT` / `PATCH` / `DELETE` run in DB transactions; deletes are soft deletes.\n- `PATCH` is a real partial update (`sometimes` rules): send only the changed fields.\n- Optional `Idempotency-Key` header on POST: the same key + payload within 300 s replays the\n  cached 2xx response (`X-Idempotency-Replayed: true`); a different payload returns `422`.\n- Duplicate active records (DB-level race) surface as `422` with `errors.duplicate`.\n\n## Payroll workspace\nThe payroll input flow lives under `/api/v1/modules/cho/payroll`:\n\n- `GET /workspace` — computed grid for a `company_id` + `period` (`YYYY-MM`). Attendance is\n  counted in the cutoff window **22nd of the previous month → 21st of the period month**\n  (`period_start_day` 22, `cutoff_day` 21, `effective_work_days` 25). Nothing is persisted;\n  `payroll_item_id` stays `null` for unsaved rows.\n- `POST /save-row` — persists one employee row as a `draft` payroll item and creates a draft\n  payroll run for the period when needed (server-calculated salary, BPJS, PPh 21, total net).\n- `POST /finalize-row` — locks the row (`status: finalized`, `finalized_by`, `finalized_at`);\n  finalized rows are no longer recalculated.\n\n## Responses\n- Single resource: `{ \"data\": { ... } }`\n- List: `{ \"data\": [ ... ], \"meta\": { \"count\", \"total\", \"page\", \"per_page\", \"last_page\", ... } }`\n- Delete: `{ \"message\": \"...\" }`\n- Validation failure: `422` with `{ \"message\", \"errors\": { field: [...] } }`\n- Missing/invalid token: `401` with `{ \"message\": \"Unauthenticated.\" }`\n\n## Modules\n| Module | Overview | Resources |\n| --- | --- | --- |\n| CFO (Keuangan) | `GET /api/v1/modules/cfo` (+ `/enums`) | companies, capital-companies, company-assets, expense-categories, expense-types, expense-items |\n| CHO (SDM) | `GET /api/v1/modules/cho` (+ `/enums`) | employee-positions, employment-statuses, payroll-grades, tax-statuses, employees, payroll-runs, payroll-items, payroll (workspace, save-row, finalize-row) |\n| CPO (Persediaan) | `GET /api/v1/modules/cpo` (+ `/enums`) | items, packets, packet-names, packet-vendors, packet-categories, item-packets, default-packages (+ `/wizard`), ingredients |\n| CDO | `GET /api/v1/modules/cdo` | overview only |\n| CMO | `GET /api/v1/modules/cmo` | overview only |\n| HR | — (no overview) | employee-shifts, employee-shift-assignments, employee-attendances (+ `/scan`) |\n\n`GET /api/v1/modules` aggregates the five launcher modules (HR is not included).\n\nOther endpoints: `GET/POST /api/v1/samples`, `GET /api/v1/samples/{id}`,\n`POST /api/v1/documents`, `POST /api/v1/modules/cho/employees/upload-document`.\n\n## Notes\n- CHO master dictionaries (positions, employment statuses, payroll grades, tax statuses) and\n  CPO packets/packet names/categories/vendors are global; employees, payroll, attendance and\n  CFO data are company-scoped.\n- CPO inventory uses an **exclusive owner**: items, item packets and default packages belong to\n  either a company (`company_id`) or a packet vendor (`packet_vendor_id`) — exactly one.\n- Companies carry a `type` (`CompanyType`: Utama, Packing, Kelengkapan, Sarpras, Bahan).\n- All writes invalidate the related list caches (and the active-company cache where relevant).\n- Interactive OpenAPI docs are generated by Scramble at `/docs/api` (`/docs/api.json`).",
+    "description": "# Slaras Nusa Foodlab API\n\nLaravel 11 REST API for the Slaras Nusa Foodlab ERP. All endpoints are served under `/api`.\n\n## Base URL\n`{{baseURL}}` defaults to `http://localhost:8080` — the docker nginx port follows\n`BACKEND_HTTP_PORT`. Every request path already includes `/api`.\n\n## Authentication\nSanctum personal access tokens (`Authorization: Bearer {{bearerToken}}`).\n\n1. Run **Auth > Login** (`admin@foodlab.test` / `password` with the default seeder).\n2. The test script saves `data.token` into `bearerToken`.\n3. Every other request inherits the collection auth.\n\nPublic endpoints: `POST /api/v1/auth/login`, `GET /api/health`, `GET /api/metrics`.\n\nEvery `/api` response is forced to JSON (`ForceJsonResponse`), so `Accept` headers are optional;\nthe collection still sends `Accept: application/json` on every request.\n\n## Active company\n`GET/POST /api/v1/active-company` selects the global company. The selection can be overridden\nper request with the `X-Active-Company-Id` header (available as a disabled header on list\nrequests) and is used by `?active_company=1` list scoping.\n\n## List convention\nEvery index endpoint supports:\n\n- `filter[<field>]=value` — flat aliases such as `?search=` / `?company_id=` still work\n- exact filters accept **multiple values** as a comma-separated list (`filter[status]=draft,approved`,\n  OR-ed) or repeated arrays (`filter[status][]=draft&filter[status][]=approved`)\n- **full-text search** (`search` / `filter[search]`) accepts **multiple keywords** on the\n  Scout + Meilisearch resources (expense items, employees, items, packets, lab samples);\n  other text filters (`name`, `code`) take a single keyword/phrase matched with `LIKE`\n- blank/whitespace-only search terms are ignored\n- `sort=field` / `sort=-field`\n- `include=relation` (camelCase relations; `...Count` / `...Exists` variants are available too)\n- `active_company=1` on company-scoped lists\n- `page` + `per_page` — without them the full filtered list is returned (cached 60 s);\n  `per_page` is capped at **100**\n\n## Search (Laravel Scout + Meilisearch)\n`search` / `filter[search]` runs through Laravel Scout on:\n\n| Resource | Indexed fields |\n| --- | --- |\n| Expense items | `name`, `detail`, expense category name, expense type name |\n| Employees | `name`, `nickname`, `nik_ktp`, attendance code, `email`, `phone` |\n| Items | `code`, `name`, `type` |\n| Packets | `name` |\n| Lab samples | `batch_code`, `product_name`, `category`, `status` |\n\n- Multiple space-separated keywords are supported (`filter[search]=teh botol`); Meilisearch\n  tokenises them, tolerates typos and prefix-matches the last term.\n- Results are automatically scoped to the request's company (`X-Active-Company-Id`,\n  `?active_company=1`, or `filter[company_id]`) where the model is company-scoped.\n- If Scout is disabled (driver `null`) or the term contains `%`/`_`, the API falls back to SQL\n  `LIKE` with the whole value escaped.\n- All other text filters (`name`, `code`, `brand_name`, ...) remain single-keyword `LIKE`\n  searches; \"Full-text search (multiple keywords)\" examples are attached to the five Scout lists.\n\n## Writes\n- `POST` / `PUT` / `PATCH` / `DELETE` run in DB transactions; deletes are soft deletes.\n- `PATCH` is a real partial update (`sometimes` rules): send only the changed fields.\n- Optional `Idempotency-Key` header on POST: the same key + payload within 300 s replays the\n  cached 2xx response (`X-Idempotency-Replayed: true`); a different payload returns `422`.\n- Duplicate active records (DB-level race) surface as `422` with `errors.duplicate`.\n\n## Payroll workspace\nThe payroll input flow lives under `/api/v1/modules/cho/payroll`:\n\n- `GET /workspace` — computed grid for a `company_id` + `period` (`YYYY-MM`). Attendance is\n  counted in the cutoff window **22nd of the previous month → 21st of the period month**\n  (`period_start_day` 22, `cutoff_day` 21, `effective_work_days` 25). Nothing is persisted;\n  `payroll_item_id` stays `null` for unsaved rows.\n- `POST /save-row` — persists one employee row as a `draft` payroll item and creates a draft\n  payroll run for the period when needed (server-calculated salary, BPJS, PPh 21, total net).\n- `POST /finalize-row` — locks the row (`status: finalized`, `finalized_by`, `finalized_at`);\n  finalized rows are no longer recalculated.\n\n## Responses\n- Single resource: `{ \"data\": { ... } }`\n- List: `{ \"data\": [ ... ], \"meta\": { \"count\", \"total\", \"page\", \"per_page\", \"last_page\", ... } }`\n- Delete: `{ \"message\": \"...\" }`\n- Validation failure: `422` with `{ \"message\", \"errors\": { field: [...] } }`\n- Missing/invalid token: `401` with `{ \"message\": \"Unauthenticated.\" }`\n\n## Modules\n| Module | Overview | Resources |\n| --- | --- | --- |\n| CFO (Keuangan) | `GET /api/v1/modules/cfo` (+ `/enums`) | companies, capital-companies, company-assets, expense-categories, expense-types, expense-items |\n| CHO (SDM) | `GET /api/v1/modules/cho` (+ `/enums`) | employee-positions, employment-statuses, payroll-grades, tax-statuses, employees, payroll-runs, payroll-items, payroll (workspace, save-row, finalize-row) |\n| CPO (Persediaan) | `GET /api/v1/modules/cpo` (+ `/enums`) | items, packets, packet-names, packet-vendors, packet-categories, item-packets, default-packages (+ `/wizard`), ingredients |\n| CDO | `GET /api/v1/modules/cdo` | overview only |\n| CMO | `GET /api/v1/modules/cmo` | overview only |\n| HR | — (no overview) | employee-shifts, employee-shift-assignments, employee-attendances (+ `/scan`) |\n\n`GET /api/v1/modules` aggregates the five launcher modules (HR is not included).\n\nOther endpoints: `GET/POST /api/v1/samples`, `GET /api/v1/samples/{id}`,\n`POST /api/v1/documents`, `POST /api/v1/modules/cho/employees/upload-document`.\n\n## Notes\n- CHO master dictionaries (positions, employment statuses, payroll grades, tax statuses) and\n  CPO packets/packet names/categories/vendors are global; employees, payroll, attendance and\n  CFO data are company-scoped.\n- CPO inventory uses an **exclusive owner**: items, item packets and default packages belong to\n  either a company (`company_id`) or a packet vendor (`packet_vendor_id`) — exactly one.\n- Companies carry a `type` (`CompanyType`: Utama, Packing, Kelengkapan, Sarpras, Bahan).\n- All writes invalidate the related list caches (and the active-company cache where relevant).\n- Interactive OpenAPI docs are generated by Scramble at `/docs/api` (`/docs/api.json`).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_exporter_id": "25327324"
+    "_exporter_id": "25520070"
   },
   "item": [
     {
       "name": "Auth",
-      "description": "Sanctum personal access token flow. `POST /auth/login` is public and throttled to 5 requests/minute. The test script stores `data.token` in `bearerToken`, which the collection auth uses for every other request.",
       "item": [
         {
           "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const response = pm.response.json();",
+                  "",
+                  "if (response.data && response.data.token) {",
+                  "    pm.collectionVariables.set('bearerToken', response.data.token);",
+                  "    console.log('bearerToken saved to collection variables.');",
+                  "}"
+                ]
+              }
+            }
+          ],
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
             "header": [
               {
@@ -46,27 +64,8 @@
                 "login"
               ]
             },
-            "description": "Creates a Sanctum access token. Public (throttle: 5/min). Credentials use the seeded `admin@foodlab.test` / `password`.",
-            "auth": {
-              "type": "noauth"
-            }
+            "description": "Creates a Sanctum access token. Public (throttle: 5/min). Credentials use the seeded `admin@foodlab.test` / `password`."
           },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const response = pm.response.json();",
-                  "",
-                  "if (response.data && response.data.token) {",
-                  "    pm.collectionVariables.set('bearerToken', response.data.token);",
-                  "    console.log('bearerToken saved to collection variables.');",
-                  "}"
-                ]
-              }
-            }
-          ],
           "response": [
             {
               "name": "Login succeeded",
@@ -265,6 +264,19 @@
         },
         {
           "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.collectionVariables.set('bearerToken', '');",
+                  "}"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -287,19 +299,6 @@
             },
             "description": "Revokes the current access token and clears `bearerToken`."
           },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    pm.collectionVariables.set('bearerToken', '');",
-                  "}"
-                ]
-              }
-            }
-          ],
           "response": [
             {
               "name": "Logged out",
@@ -338,11 +337,11 @@
             }
           ]
         }
-      ]
+      ],
+      "description": "Sanctum personal access token flow. `POST /auth/login` is public and throttled to 5 requests/minute. The test script stores `data.token` in `bearerToken`, which the collection auth uses for every other request."
     },
     {
       "name": "Active Company",
-      "description": "Global active-company context used by `?active_company=1` list scoping.\n\nThe selection is resolved per request from the `X-Active-Company-Id` header, then the saved per-user selection, then the global active company. `POST /active-company` with `company_id: null` clears the selection.",
       "item": [
         {
           "name": "Get active company",
@@ -440,6 +439,21 @@
         },
         {
           "name": "Set active company",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const response = pm.response.json();",
+                  "",
+                  "if (response.data && response.data.id) {",
+                  "    pm.collectionVariables.set('activeCompanyID', String(response.data.id));",
+                  "}"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -474,21 +488,6 @@
             },
             "description": "Selects the active company for the current user (and globally). Send `company_id: null` to clear it. Stores the id in `activeCompanyID`."
           },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const response = pm.response.json();",
-                  "",
-                  "if (response.data && response.data.id) {",
-                  "    pm.collectionVariables.set('activeCompanyID', String(response.data.id));",
-                  "}"
-                ]
-              }
-            }
-          ],
           "response": [
             {
               "name": "Active company set",
@@ -539,11 +538,11 @@
             }
           ]
         }
-      ]
+      ],
+      "description": "Global active-company context used by `?active_company=1` list scoping.\n\nThe selection is resolved per request from the `X-Active-Company-Id` header, then the saved per-user selection, then the global active company. `POST /active-company` with `company_id: null` clears the selection."
     },
     {
       "name": "ERP Modules",
-      "description": "Main-menu overviews. `GET /api/v1/modules` aggregates the five launcher cards (CFO, CHO, CPO, CDO, CMO); HR has no overview endpoint and is served under `/api/v1/modules/hr/*`.",
       "item": [
         {
           "name": "All modules",
@@ -915,79 +914,14 @@
             }
           ]
         }
-      ]
+      ],
+      "description": "Main-menu overviews. `GET /api/v1/modules` aggregates the five launcher cards (CFO, CHO, CPO, CDO, CMO); HR has no overview endpoint and is served under `/api/v1/modules/hr/*`."
     },
     {
       "name": "CFO",
-      "description": "CFO (Keuangan): companies, capital companies (pemegang saham), company assets, expense categories, expense types and expense items.\n\nShared list conventions: `filter[...]`, `sort`, `include`, `page`/`per_page` (cap 100) and `active_company=1`. Writes run in transactions; deletes are soft deletes; list caches are invalidated after every write.",
       "item": [
         {
-          "name": "CFO enums",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseURL}}/api/v1/modules/cfo/enums",
-              "host": [
-                "{{baseURL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "modules",
-                "cfo",
-                "enums"
-              ]
-            },
-            "description": "Reference values for CFO forms. `company_type` lists the `CompanyType` enum used by companies (`Utama`, `Packing`, `Kelengkapan`, `Sarpras`, `Bahan`)."
-          },
-          "response": [
-            {
-              "name": "Enum options",
-              "originalRequest": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Accept",
-                    "value": "application/json"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseURL}}/api/v1/modules/cfo/enums",
-                  "host": [
-                    "{{baseURL}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "modules",
-                    "cfo",
-                    "enums"
-                  ]
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"data\": {\n        \"company_type\": [\n            {\n                \"value\": \"Utama\",\n                \"nama\": \"Utama\"\n            },\n            {\n                \"value\": \"Packing\",\n                \"nama\": \"Packing\"\n            },\n            {\n                \"value\": \"Kelengkapan\",\n                \"nama\": \"Kelengkapan\"\n            },\n            {\n                \"value\": \"Sarpras\",\n                \"nama\": \"Sarpras\"\n            },\n            {\n                \"value\": \"Bahan\",\n                \"nama\": \"Bahan\"\n            }\n        ]\n    }\n}"
-            }
-          ]
-        },
-        {
           "name": "Companies",
-          "description": "`name` + `series` must be unique (case-insensitive) among active companies. `type` is the `CompanyType` enum (`Utama` default, `Packing`, `Kelengkapan`, `Sarpras`, `Bahan`). Deleting a company soft-deletes its company-scoped children (CFO data, CPO items/item packets/default packages, employees, payroll runs/items, attendance, shifts) and clears the active-company cache. Global dictionaries, packets and packet vendors are not affected.",
           "item": [
             {
               "name": "List companies",
@@ -1161,6 +1095,21 @@
             },
             {
               "name": "Create company",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('companyID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -1203,21 +1152,6 @@
                 },
                 "description": "`POST /api/v1/modules/cfo/companies` — creates a company.\n\nRequired: `name`.\n\n`name` + `series` must be unique (case-insensitive) among active companies. `type` is the `CompanyType` enum (`Utama` default, `Packing`, `Kelengkapan`, `Sarpras`, `Bahan`). Deleting a company soft-deletes its company-scoped children (CFO data, CPO items/item packets/default packages, employees, payroll runs/items, attendance, shifts) and clears the active-company cache. Global dictionaries, packets and packet vendors are not affected."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('companyID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -1642,11 +1576,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "`name` + `series` must be unique (case-insensitive) among active companies. `type` is the `CompanyType` enum (`Utama` default, `Packing`, `Kelengkapan`, `Sarpras`, `Bahan`). Deleting a company soft-deletes its company-scoped children (CFO data, CPO items/item packets/default packages, employees, payroll runs/items, attendance, shifts) and clears the active-company cache. Global dictionaries, packets and packet vendors are not affected."
         },
         {
           "name": "Capital Companies",
-          "description": "List `meta` also contains `total_capital` (sum over the filtered set).",
           "item": [
             {
               "name": "List capital companies",
@@ -1808,6 +1742,21 @@
             },
             {
               "name": "Create shareholder",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('capitalCompanyID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -1850,21 +1799,6 @@
                 },
                 "description": "`POST /api/v1/modules/cfo/capital-companies` — creates a shareholder.\n\nRequired: `company_id`, `stakeholder_name`, `capital`.\n\nList `meta` also contains `total_capital` (sum over the filtered set)."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('capitalCompanyID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -2289,11 +2223,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "List `meta` also contains `total_capital` (sum over the filtered set)."
         },
         {
           "name": "Company Assets",
-          "description": "`total_price` is derived server-side (`amount x price_per_unit`) and ignored from client input; `amount` is an integer >= 1.",
           "item": [
             {
               "name": "List company assets",
@@ -2455,6 +2389,21 @@
             },
             {
               "name": "Create company asset",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('companyAssetID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -2497,21 +2446,6 @@
                 },
                 "description": "`POST /api/v1/modules/cfo/company-assets` — creates a company asset.\n\nRequired: `company_id`, `asset_date`, `name`, `amount`, `price_per_unit`.\n\n`total_price` is derived server-side (`amount x price_per_unit`) and ignored from client input; `amount` is an integer >= 1."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('companyAssetID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -2936,11 +2870,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "`total_price` is derived server-side (`amount x price_per_unit`) and ignored from client input; `amount` is an integer >= 1."
         },
         {
           "name": "Expense Categories",
-          "description": "A category cannot be deleted while expense types or items still reference it.",
           "item": [
             {
               "name": "List expense categories",
@@ -3102,6 +3036,21 @@
             },
             {
               "name": "Create category",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('expenseCategoryID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -3144,21 +3093,6 @@
                 },
                 "description": "`POST /api/v1/modules/cfo/expense-categories` — creates a category.\n\nRequired: `company_id`, `name`.\n\nA category cannot be deleted while expense types or items still reference it."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('expenseCategoryID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -3583,11 +3517,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "A category cannot be deleted while expense types or items still reference it."
         },
         {
           "name": "Expense Types",
-          "description": "`expense_category_id` must belong to the same company as `company_id`. Deleting is rejected while expense items reference the type.",
           "item": [
             {
               "name": "List expense types",
@@ -3761,6 +3695,21 @@
             },
             {
               "name": "Create expense type",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('expenseTypeID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -3803,21 +3752,6 @@
                 },
                 "description": "`POST /api/v1/modules/cfo/expense-types` — creates an expense type.\n\nRequired: `company_id`, `expense_category_id`, `name`.\n\n`expense_category_id` must belong to the same company as `company_id`. Deleting is rejected while expense items reference the type."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('expenseTypeID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -4242,11 +4176,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "`expense_category_id` must belong to the same company as `company_id`. Deleting is rejected while expense items reference the type."
         },
         {
           "name": "Expense Items",
-          "description": "`expense_type_id` is required; `expense_category_id` is optional and defaults to the type's category. `closing_date` must not be earlier than `purchased_on`. `purchased_on` supports `filter[date_from]`, `filter[date_to]` and `filter[daterange]` (e.g. `2026-11-01..2026-11-30`).",
           "item": [
             {
               "name": "List expense items",
@@ -4314,24 +4248,6 @@
                       "disabled": true
                     },
                     {
-                      "key": "filter[date_from]",
-                      "value": "2026-11-01",
-                      "description": "Inclusive lower bound on `purchased_on` (`Y-m-d`). Malformed values return `422`.",
-                      "disabled": true
-                    },
-                    {
-                      "key": "filter[date_to]",
-                      "value": "2026-11-30",
-                      "description": "Inclusive upper bound on `purchased_on` (`Y-m-d`). Malformed values return `422`.",
-                      "disabled": true
-                    },
-                    {
-                      "key": "filter[daterange]",
-                      "value": "2026-11-01..2026-11-30",
-                      "description": "Range on `purchased_on`. Accepts `from`/`to` (or `start`/`end`) keys, a single date, or a string pair such as `2026-11-01..2026-11-30` (separators: `..`, `/`, `,`, ` - `, ` to `). Malformed values return `422`.",
-                      "disabled": true
-                    },
-                    {
                       "key": "filter[search]",
                       "value": "botol kaca",
                       "description": "Full-text search via Laravel Scout + Meilisearch. **Multiple space-separated keywords** are supported (`botol kaca`), tokenised and typo-tolerant, with prefix matching on the last term. Indexed fields: name, detail, expense category name, expense type name. Automatically scoped to the request's company; falls back to SQL LIKE when Scout is disabled or the value contains `%`/`_`.",
@@ -4351,7 +4267,7 @@
                     }
                   ]
                 },
-                "description": "`GET /api/v1/modules/cfo/expense-items` — Expense Items list.\n\n- Filters: `company_id`, `expense_category_id`, `expense_type_id`, `date_from`, `date_to`, `daterange`, `search`\n- Sorts: `id`, `name`, `amount`, `purchased_on`, `closing_date`, `created_at` (default `-id`)\n- Includes: `expenseCategory`, `expenseType`, `company` (default loaded: expenseCategory, expenseType, company)\n- Pagination: send `page`/`per_page`; without them the full filtered list is returned and cached for 60 s. `per_page` is capped at 100.\n- Full-text search: `filter[search]` / `?search=` accepts **multiple keywords** (Scout + Meilisearch, typo-tolerant, prefix on the last term). Exact filters still accept comma-separated values (OR).\n- `active_company=1` scopes to the currently selected company.\n\n`expense_type_id` is required; `expense_category_id` is optional and defaults to the type's category. `closing_date` must not be earlier than `purchased_on`. `purchased_on` supports `filter[date_from]`, `filter[date_to]` and `filter[daterange]` (e.g. `2026-11-01..2026-11-30`)."
+                "description": "`GET /api/v1/modules/cfo/expense-items` — Expense Items list.\n\n- Filters: `company_id`, `expense_category_id`, `expense_type_id`, `search`\n- Sorts: `id`, `name`, `amount`, `purchased_on`, `closing_date`, `created_at` (default `-id`)\n- Includes: `expenseCategory`, `expenseType`, `company` (default loaded: expenseCategory, expenseType, company)\n- Pagination: send `page`/`per_page`; without them the full filtered list is returned and cached for 60 s. `per_page` is capped at 100.\n- Full-text search: `filter[search]` / `?search=` accepts **multiple keywords** (Scout + Meilisearch, typo-tolerant, prefix on the last term). Exact filters still accept comma-separated values (OR).\n- `active_company=1` scopes to the currently selected company.\n\n`expense_type_id` is required; `expense_category_id` is optional and defaults to the type's category. `closing_date` must not be earlier than `purchased_on`."
               },
               "response": [
                 {
@@ -4411,24 +4327,6 @@
                           "key": "filter[expense_type_id]",
                           "value": "1",
                           "description": "Exact match. Multiple values accepted: comma-separated list (`filter[expense_type_id]=a,b`, OR-ed) or repeated `filter[expense_type_id][]=`.",
-                          "disabled": true
-                        },
-                        {
-                          "key": "filter[date_from]",
-                          "value": "2026-11-01",
-                          "description": "Inclusive lower bound on `purchased_on` (`Y-m-d`). Malformed values return `422`.",
-                          "disabled": true
-                        },
-                        {
-                          "key": "filter[date_to]",
-                          "value": "2026-11-30",
-                          "description": "Inclusive upper bound on `purchased_on` (`Y-m-d`). Malformed values return `422`.",
-                          "disabled": true
-                        },
-                        {
-                          "key": "filter[daterange]",
-                          "value": "2026-11-01..2026-11-30",
-                          "description": "Range on `purchased_on`. Accepts `from`/`to` (or `start`/`end`) keys, a single date, or a string pair such as `2026-11-01..2026-11-30` (separators: `..`, `/`, `,`, ` - `, ` to `). Malformed values return `422`.",
                           "disabled": true
                         },
                         {
@@ -4521,6 +4419,21 @@
             },
             {
               "name": "Create expense item",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('expenseItemID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -4561,23 +4474,8 @@
                     "expense-items"
                   ]
                 },
-                "description": "`POST /api/v1/modules/cfo/expense-items` — creates an expense item.\n\nRequired: `company_id`, `expense_type_id`, `name`, `amount`, `purchased_on`.\n\n`expense_type_id` is required; `expense_category_id` is optional and defaults to the type's category. `closing_date` must not be earlier than `purchased_on`. `purchased_on` supports `filter[date_from]`, `filter[date_to]` and `filter[daterange]` (e.g. `2026-11-01..2026-11-30`)."
+                "description": "`POST /api/v1/modules/cfo/expense-items` — creates an expense item.\n\nRequired: `company_id`, `expense_type_id`, `name`, `amount`, `purchased_on`.\n\n`expense_type_id` is required; `expense_category_id` is optional and defaults to the type's category. `closing_date` must not be earlier than `purchased_on`."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('expenseItemID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -4953,7 +4851,7 @@
                     }
                   ]
                 },
-                "description": "`DELETE /api/v1/modules/cfo/expense-items/{expenseItem}` — soft delete (the row keeps its `deleted_at`) and dependent caches are invalidated.\n\n`expense_type_id` is required; `expense_category_id` is optional and defaults to the type's category. `closing_date` must not be earlier than `purchased_on`. `purchased_on` supports `filter[date_from]`, `filter[date_to]` and `filter[daterange]` (e.g. `2026-11-01..2026-11-30`)."
+                "description": "`DELETE /api/v1/modules/cfo/expense-items/{expenseItem}` — soft delete (the row keeps its `deleted_at`) and dependent caches are invalidated.\n\n`expense_type_id` is required; `expense_category_id` is optional and defaults to the type's category. `closing_date` must not be earlier than `purchased_on`."
               },
               "response": [
                 {
@@ -5002,16 +4900,11 @@
                 }
               ]
             }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "CPO",
-      "description": "CPO (Persediaan Barang Dagang): inventory items, packets (bundles) and the per-company item↔packet composition.\n\nItems and item packets are company-scoped and support `active_company=1`; packets are global. Exact filters accept comma-separated values (OR).",
-      "item": [
+          ],
+          "description": "`expense_type_id` is required; `expense_category_id` is optional and defaults to the type's category. `closing_date` must not be earlier than `purchased_on`."
+        },
         {
-          "name": "CPO enums",
+          "name": "CFO enums",
           "request": {
             "method": "GET",
             "header": [
@@ -5021,7 +4914,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseURL}}/api/v1/modules/cpo/enums",
+              "raw": "{{baseURL}}/api/v1/modules/cfo/enums",
               "host": [
                 "{{baseURL}}"
               ],
@@ -5029,11 +4922,11 @@
                 "api",
                 "v1",
                 "modules",
-                "cpo",
+                "cfo",
                 "enums"
               ]
             },
-            "description": "Reference values for CPO forms: `item_type` (`Bahan`, `Kelengkapan`, `Sarpras`) and `packet_vendor_type` (same values) for the type dropdowns."
+            "description": "Reference values for CFO forms. `company_type` lists the `CompanyType` enum used by companies (`Utama`, `Packing`, `Kelengkapan`, `Sarpras`, `Bahan`)."
           },
           "response": [
             {
@@ -5047,7 +4940,7 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{baseURL}}/api/v1/modules/cpo/enums",
+                  "raw": "{{baseURL}}/api/v1/modules/cfo/enums",
                   "host": [
                     "{{baseURL}}"
                   ],
@@ -5055,7 +4948,7 @@
                     "api",
                     "v1",
                     "modules",
-                    "cpo",
+                    "cfo",
                     "enums"
                   ]
                 }
@@ -5070,13 +4963,18 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n    \"data\": {\n        \"item_type\": [\n            {\n                \"value\": \"Bahan\",\n                \"nama\": \"Bahan\"\n            },\n            {\n                \"value\": \"Kelengkapan\",\n                \"nama\": \"Kelengkapan\"\n            },\n            {\n                \"value\": \"Sarpras\",\n                \"nama\": \"Sarpras\"\n            }\n        ],\n        \"packet_vendor_type\": [\n            {\n                \"value\": \"Bahan\",\n                \"nama\": \"Bahan\"\n            },\n            {\n                \"value\": \"Kelengkapan\",\n                \"nama\": \"Kelengkapan\"\n            },\n            {\n                \"value\": \"Sarpras\",\n                \"nama\": \"Sarpras\"\n            }\n        ]\n    }\n}"
+              "body": "{\n    \"data\": {\n        \"company_type\": [\n            {\n                \"value\": \"Utama\",\n                \"nama\": \"Utama\"\n            },\n            {\n                \"value\": \"Packing\",\n                \"nama\": \"Packing\"\n            },\n            {\n                \"value\": \"Kelengkapan\",\n                \"nama\": \"Kelengkapan\"\n            },\n            {\n                \"value\": \"Sarpras\",\n                \"nama\": \"Sarpras\"\n            },\n            {\n                \"value\": \"Bahan\",\n                \"nama\": \"Bahan\"\n            }\n        ]\n    }\n}"
             }
           ]
-        },
+        }
+      ],
+      "description": "CFO (Keuangan): companies, capital companies (pemegang saham), company assets, expense categories, expense types and expense items.\n\nShared list conventions: `filter[...]`, `sort`, `include`, `page`/`per_page` (cap 100) and `active_company=1`. Writes run in transactions; deletes are soft deletes; list caches are invalidated after every write."
+    },
+    {
+      "name": "CPO",
+      "item": [
         {
           "name": "Items",
-          "description": "Inventory item owned by **exactly one** company or packet vendor (`company_id` XOR `packet_vendor_id`; sending both or neither is rejected). `name`/`code` are unique within that owner and `type` is the `ItemType` enum (`Bahan`, `Kelengkapan`, `Sarpras`). Deleting soft-deletes its item packets.",
           "item": [
             {
               "name": "List items",
@@ -5339,6 +5237,21 @@
             },
             {
               "name": "Create item",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('itemID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -5381,21 +5294,6 @@
                 },
                 "description": "`POST /api/v1/modules/cpo/items` — creates an item.\n\nRequired: `name`.\n\nInventory item owned by **exactly one** company or packet vendor (`company_id` XOR `packet_vendor_id`; sending both or neither is rejected). `name`/`code` are unique within that owner and `type` is the `ItemType` enum (`Bahan`, `Kelengkapan`, `Sarpras`). Deleting soft-deletes its item packets."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('itemID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -5820,11 +5718,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "Inventory item owned by **exactly one** company or packet vendor (`company_id` XOR `packet_vendor_id`; sending both or neither is rejected). `name`/`code` are unique within that owner and `type` is the `ItemType` enum (`Bahan`, `Kelengkapan`, `Sarpras`). Deleting soft-deletes its item packets."
         },
         {
           "name": "Packets",
-          "description": "Company-agnostic packet/bundle master (global). Deleting soft-deletes the item packets that compose it.",
           "item": [
             {
               "name": "List packets",
@@ -6021,6 +5919,21 @@
             },
             {
               "name": "Create packet",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('packetID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -6063,21 +5976,6 @@
                 },
                 "description": "`POST /api/v1/modules/cpo/packets` — creates a packet.\n\nRequired: `name`.\n\nCompany-agnostic packet/bundle master (global). Deleting soft-deletes the item packets that compose it."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('packetID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -6502,11 +6400,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "Company-agnostic packet/bundle master (global). Deleting soft-deletes the item packets that compose it."
         },
         {
           "name": "Item Packets",
-          "description": "Composition of a packet and an item with `quantity` (integer >= 1), owned by exactly one company or packet vendor (`company_id` XOR `packet_vendor_id`). `(owner, packet_id, item_id)` is unique among active rows and both parents must belong to the same owner.",
           "item": [
             {
               "name": "List item packets",
@@ -6740,6 +6638,21 @@
             },
             {
               "name": "Create item packet",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('itemPacketID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -6782,21 +6695,6 @@
                 },
                 "description": "`POST /api/v1/modules/cpo/item-packets` — creates an item packet.\n\nRequired: `packet_id`, `item_id`.\n\nComposition of a packet and an item with `quantity` (integer >= 1), owned by exactly one company or packet vendor (`company_id` XOR `packet_vendor_id`). `(owner, packet_id, item_id)` is unique among active rows and both parents must belong to the same owner."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('itemPacketID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -7221,11 +7119,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "Composition of a packet and an item with `quantity` (integer >= 1), owned by exactly one company or packet vendor (`company_id` XOR `packet_vendor_id`). `(owner, packet_id, item_id)` is unique among active rows and both parents must belong to the same owner."
         },
         {
           "name": "Packet Names",
-          "description": "Global dictionary of packet-name templates (referenced by default packages; the default-package wizard creates entries automatically when missing).",
           "item": [
             {
               "name": "List packet names",
@@ -7369,6 +7267,21 @@
             },
             {
               "name": "Create packet name",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('packetNameID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -7411,21 +7324,6 @@
                 },
                 "description": "`POST /api/v1/modules/cpo/packet-names` — creates a packet name.\n\nRequired: `name`.\n\nGlobal dictionary of packet-name templates (referenced by default packages; the default-package wizard creates entries automatically when missing)."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('packetNameID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -7850,11 +7748,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "Global dictionary of packet-name templates (referenced by default packages; the default-package wizard creates entries automatically when missing)."
         },
         {
           "name": "Packet Vendors",
-          "description": "Global packet-vendor master — an ownership alternative to a company for items, item packets and default packages. `type` is the `PacketVendorType` enum (`Bahan`, `Kelengkapan`, `Sarpras`).",
           "item": [
             {
               "name": "List packet vendors",
@@ -8010,6 +7908,21 @@
             },
             {
               "name": "Create packet vendor",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('packetVendorID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -8052,21 +7965,6 @@
                 },
                 "description": "`POST /api/v1/modules/cpo/packet-vendors` — creates a packet vendor.\n\nRequired: `name`.\n\nGlobal packet-vendor master — an ownership alternative to a company for items, item packets and default packages. `type` is the `PacketVendorType` enum (`Bahan`, `Kelengkapan`, `Sarpras`)."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('packetVendorID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -8491,11 +8389,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "Global packet-vendor master — an ownership alternative to a company for items, item packets and default packages. `type` is the `PacketVendorType` enum (`Bahan`, `Kelengkapan`, `Sarpras`)."
         },
         {
           "name": "Packet Categories",
-          "description": "Global dictionary of packet categories used by default packages (also auto-created by the default-package wizard).",
           "item": [
             {
               "name": "List packet categories",
@@ -8639,6 +8537,21 @@
             },
             {
               "name": "Create packet category",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('packetCategoryID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -8681,21 +8594,6 @@
                 },
                 "description": "`POST /api/v1/modules/cpo/packet-categories` — creates a packet category.\n\nRequired: `name`.\n\nGlobal dictionary of packet categories used by default packages (also auto-created by the default-package wizard)."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('packetCategoryID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -9120,11 +9018,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "Global dictionary of packet categories used by default packages (also auto-created by the default-package wizard)."
         },
         {
           "name": "Default Packages",
-          "description": "Default (recipe/bundle) package owned by exactly one company or packet vendor (`company_id` XOR `packet_vendor_id`). It must reference a `packet_id` **or** an `item_packet_id` (exactly one); `brand_name` is unique per owner + packet name + category + packet/item packet. The wizard endpoints create the packet name/category/packet and its ingredient rows in one call.",
           "item": [
             {
               "name": "List default packages",
@@ -9364,6 +9262,21 @@
             },
             {
               "name": "Create default package",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('defaultPackageID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -9406,21 +9319,6 @@
                 },
                 "description": "`POST /api/v1/modules/cpo/default-packages` — creates a default package.\n\nRequired: `brand_name`, `packet_name_id`, `packet_category_id`.\n\nDefault (recipe/bundle) package owned by exactly one company or packet vendor (`company_id` XOR `packet_vendor_id`). It must reference a `packet_id` **or** an `item_packet_id` (exactly one); `brand_name` is unique per owner + packet name + category + packet/item packet. The wizard endpoints create the packet name/category/packet and its ingredient rows in one call."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('defaultPackageID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -9475,6 +9373,23 @@
             },
             {
               "name": "Create default package (wizard)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('defaultPackageID', String(response.data.id));",
+                      "}"
+                    ],
+                    "type": "text/javascript",
+                    "packages": {},
+                    "requests": {}
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -9495,7 +9410,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    \"packet_name\": \"Paket Sarapan Pagi\",\n    \"packet_category\": \"Makanan\",\n    \"brand_name\": \"Nusa Fresh\",\n    \"company_id\": {{companyID}},\n    \"price\": 25000,\n    \"items\": [\n        {\n            \"item_id\": {{itemID}},\n            \"quantity\": 2\n        }\n    ]\n}",
+                  "raw": "{\n\t\"brand_name\": \"Brand A\",\n\t\"items\": [\n\t\t{\n\t\t\t\"item_id\": 12,\n\t\t\t\"price\": 5000,\n\t\t\t\"quantity\": 1\n\t\t}\n\t],\n\t\"packet_category\": \"reguler\",\n\t\"packet_name\": \"Paket anjay\",\n\t\"packet_vendor_id\": 5,\n\t\"price\": 6000\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -9515,24 +9430,8 @@
                     "default-packages",
                     "wizard"
                   ]
-                },
-                "description": "Creates a default package from text inputs in one call: resolves (or creates) the packet name, packet category and packet, then creates the package plus one ingredient row per `items[]` entry.\n\nRequired: `packet_name`, `packet_category`, `brand_name`, `price` (package total) and `items` (1–100 rows with `item_id` and `quantity`; per-row `price` is accepted but ignored — ingredients are stored with `price: 0`). Exactly one owner: `company_id` **XOR** `packet_vendor_id`; every item must belong to that owner. Returns `201` with the package including its `ingredients` (each with the related `item`)."
-              },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('defaultPackageID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
                 }
-              ],
+              },
               "response": [
                 {
                   "name": "Created (wizard)",
@@ -9550,7 +9449,7 @@
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n    \"packet_name\": \"Paket Sarapan Pagi\",\n    \"packet_category\": \"Makanan\",\n    \"brand_name\": \"Nusa Fresh\",\n    \"company_id\": {{companyID}},\n    \"price\": 25000,\n    \"items\": [\n        {\n            \"item_id\": {{itemID}},\n            \"quantity\": 2\n        }\n    ]\n}",
+                      "raw": "{\n    \"packet_name\": \"Paket Sarapan Pagi\",\n    \"packet_category\": \"Makanan\",\n    \"brand_name\": \"Nusa Fresh\",\n    \"company_id\": {{companyID}},\n    \"items\": [\n        {\n            \"item_id\": {{itemID}},\n            \"quantity\": 2,\n            \"price\": 15000\n        }\n    ]\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -9582,7 +9481,111 @@
                     }
                   ],
                   "cookie": [],
-                  "body": "{\n    \"data\": {\n        \"id\": 10,\n        \"brand_name\": \"Nusa Fresh\",\n        \"packet_name_id\": 1,\n        \"company_id\": 1,\n        \"packet_vendor_id\": 1,\n        \"packet_category_id\": 1,\n        \"packet_id\": 1,\n        \"item_packet_id\": 1,\n        \"price\": 25000,\n        \"packet_name\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"company\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"series\": 1,\n            \"type\": \"Utama\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"packet_vendor\": null,\n        \"packet_category\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"packet\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"item_packet\": null,\n        \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n        \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n        \"deleted_at\": \"2026-11-23T03:00:00.000000Z\",\n        \"ingredients\": [\n            {\n                \"id\": 1,\n                \"default_package_id\": 10,\n                \"item_id\": 1,\n                \"price\": 0,\n                \"item\": {\n                    \"id\": 1,\n                    \"company_id\": 1,\n                    \"packet_vendor_id\": 1,\n                    \"code\": \"RM-001\",\n                    \"name\": \"Teh Botol\",\n                    \"type\": \"Bahan\",\n                    \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n                    \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n                    \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n                },\n                \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n                \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n                \"deleted_at\": null\n            }\n        ]\n    }\n}"
+                  "body": "{\n    \"data\": {\n        \"id\": 10,\n        \"brand_name\": \"Nusa Fresh\",\n        \"packet_name_id\": 1,\n        \"company_id\": 1,\n        \"packet_vendor_id\": 1,\n        \"packet_category_id\": 1,\n        \"packet_id\": 1,\n        \"item_packet_id\": 1,\n        \"price\": 25000,\n        \"packet_name\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"company\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"series\": 1,\n            \"type\": \"Utama\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"packet_vendor\": null,\n        \"packet_category\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"packet\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"item_packet\": null,\n        \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n        \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n        \"deleted_at\": \"2026-11-23T03:00:00.000000Z\",\n        \"ingredients\": [\n            {\n                \"id\": 1,\n                \"default_package_id\": 10,\n                \"item_id\": 1,\n                \"price\": 15000,\n                \"item\": {\n                    \"id\": 1,\n                    \"company_id\": 1,\n                    \"packet_vendor_id\": 1,\n                    \"code\": \"RM-001\",\n                    \"name\": \"Teh Botol\",\n                    \"type\": \"Bahan\",\n                    \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n                    \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n                    \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n                },\n                \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n                \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n                \"deleted_at\": null\n            }\n        ]\n    }\n}"
+                },
+                {
+                  "name": "Using packet_vendor_id",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Accept",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Idempotency-Key",
+                        "value": "{{$guid}}",
+                        "description": "Optional. Same key + payload within 300s replays the cached 2xx response (header `X-Idempotency-Replayed: true`); reuse with a different payload returns 422.",
+                        "disabled": true
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n\t\"brand_name\": \"Brand A\",\n\t\"items\": [\n\t\t{\n\t\t\t\"item_id\": 12,\n\t\t\t\"price\": 5000,\n\t\t\t\"quantity\": 1\n\t\t}\n\t],\n\t\"packet_category\": \"reguler\",\n\t\"packet_name\": \"Paket anjay\",\n\t\"packet_vendor_id\": 5,\n\t\"price\": 6000\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{baseURL}}/api/v1/modules/cpo/default-packages/wizard",
+                      "host": [
+                        "{{baseURL}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "modules",
+                        "cpo",
+                        "default-packages",
+                        "wizard"
+                      ]
+                    }
+                  },
+                  "_postman_previewlanguage": null,
+                  "header": null,
+                  "cookie": [],
+                  "body": null
+                },
+                {
+                  "name": "Using company_id",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Accept",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Idempotency-Key",
+                        "value": "{{$guid}}",
+                        "description": "Optional. Same key + payload within 300s replays the cached 2xx response (header `X-Idempotency-Replayed: true`); reuse with a different payload returns 422.",
+                        "disabled": true
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n\t\"brand_name\": \"brand\",\n\t\"company_id\": 1,\n\t\"items\": [\n\t\t{\n\t\t\t\"item_id\": 1,\n\t\t\t\"price\": 5000,\n\t\t\t\"quantity\": 1\n\t\t}\n\t],\n\t\"packet_category\": \"kategori\",\n\t\"packet_name\": \"paket BBB\",\n\t\"price\": 20000\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{baseURL}}/api/v1/modules/cpo/default-packages/wizard",
+                      "host": [
+                        "{{baseURL}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "modules",
+                        "cpo",
+                        "default-packages",
+                        "wizard"
+                      ]
+                    }
+                  },
+                  "_postman_previewlanguage": "",
+                  "header": [],
+                  "cookie": [
+                    {
+                      "expires": "Invalid Date",
+                      "domain": "",
+                      "path": ""
+                    }
+                  ],
+                  "body": ""
                 }
               ]
             },
@@ -9894,7 +9897,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    \"packet_name\": \"Paket Sarapan Pagi\",\n    \"packet_category\": \"Makanan\",\n    \"brand_name\": \"Nusa Fresh\",\n    \"company_id\": {{companyID}},\n    \"price\": 25000,\n    \"items\": [\n        {\n            \"item_id\": {{itemID}},\n            \"quantity\": 2\n        }\n    ]\n}",
+                  "raw": "{\n    \"packet_name\": \"Paket Sarapan Pagi\",\n    \"packet_category\": \"Makanan\",\n    \"brand_name\": \"Nusa Fresh\",\n    \"company_id\": {{companyID}},\n    \"items\": [\n        {\n            \"item_id\": {{itemID}},\n            \"quantity\": 2,\n            \"price\": 15000\n        }\n    ]\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -9942,7 +9945,7 @@
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n    \"packet_name\": \"Paket Sarapan Pagi\",\n    \"packet_category\": \"Makanan\",\n    \"brand_name\": \"Nusa Fresh\",\n    \"company_id\": {{companyID}},\n    \"price\": 25000,\n    \"items\": [\n        {\n            \"item_id\": {{itemID}},\n            \"quantity\": 2\n        }\n    ]\n}",
+                      "raw": "{\n    \"packet_name\": \"Paket Sarapan Pagi\",\n    \"packet_category\": \"Makanan\",\n    \"brand_name\": \"Nusa Fresh\",\n    \"company_id\": {{companyID}},\n    \"items\": [\n        {\n            \"item_id\": {{itemID}},\n            \"quantity\": 2,\n            \"price\": 15000\n        }\n    ]\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -9982,7 +9985,7 @@
                     }
                   ],
                   "cookie": [],
-                  "body": "{\n    \"data\": {\n        \"id\": 10,\n        \"brand_name\": \"Nusa Fresh\",\n        \"packet_name_id\": 1,\n        \"company_id\": 1,\n        \"packet_vendor_id\": 1,\n        \"packet_category_id\": 1,\n        \"packet_id\": 1,\n        \"item_packet_id\": 1,\n        \"price\": 25000,\n        \"packet_name\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"company\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"series\": 1,\n            \"type\": \"Utama\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"packet_vendor\": null,\n        \"packet_category\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"packet\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"item_packet\": null,\n        \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n        \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n        \"deleted_at\": \"2026-11-23T03:00:00.000000Z\",\n        \"ingredients\": [\n            {\n                \"id\": 1,\n                \"default_package_id\": 10,\n                \"item_id\": 1,\n                \"price\": 0,\n                \"item\": {\n                    \"id\": 1,\n                    \"company_id\": 1,\n                    \"packet_vendor_id\": 1,\n                    \"code\": \"RM-001\",\n                    \"name\": \"Teh Botol\",\n                    \"type\": \"Bahan\",\n                    \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n                    \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n                    \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n                },\n                \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n                \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n                \"deleted_at\": null\n            }\n        ]\n    }\n}"
+                  "body": "{\n    \"data\": {\n        \"id\": 10,\n        \"brand_name\": \"Nusa Fresh\",\n        \"packet_name_id\": 1,\n        \"company_id\": 1,\n        \"packet_vendor_id\": 1,\n        \"packet_category_id\": 1,\n        \"packet_id\": 1,\n        \"item_packet_id\": 1,\n        \"price\": 25000,\n        \"packet_name\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"company\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"series\": 1,\n            \"type\": \"Utama\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"packet_vendor\": null,\n        \"packet_category\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"packet\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"item_packet\": null,\n        \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n        \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n        \"deleted_at\": \"2026-11-23T03:00:00.000000Z\",\n        \"ingredients\": [\n            {\n                \"id\": 1,\n                \"default_package_id\": 10,\n                \"item_id\": 1,\n                \"price\": 15000,\n                \"item\": {\n                    \"id\": 1,\n                    \"company_id\": 1,\n                    \"packet_vendor_id\": 1,\n                    \"code\": \"RM-001\",\n                    \"name\": \"Teh Botol\",\n                    \"type\": \"Bahan\",\n                    \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n                    \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n                    \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n                },\n                \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n                \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n                \"deleted_at\": null\n            }\n        ]\n    }\n}"
                 }
               ]
             },
@@ -10002,7 +10005,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    \"packet_name\": \"Paket Sarapan Pagi\",\n    \"packet_category\": \"Makanan\",\n    \"brand_name\": \"Nusa Fresh\",\n    \"company_id\": {{companyID}},\n    \"price\": 25000,\n    \"items\": [\n        {\n            \"item_id\": {{itemID}},\n            \"quantity\": 2\n        }\n    ]\n}",
+                  "raw": "{\n    \"packet_name\": \"Paket Sarapan Pagi\",\n    \"packet_category\": \"Makanan\",\n    \"brand_name\": \"Nusa Fresh\",\n    \"company_id\": {{companyID}},\n    \"items\": [\n        {\n            \"item_id\": {{itemID}},\n            \"quantity\": 2,\n            \"price\": 15000\n        }\n    ]\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -10050,7 +10053,7 @@
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n    \"packet_name\": \"Paket Sarapan Pagi\",\n    \"packet_category\": \"Makanan\",\n    \"brand_name\": \"Nusa Fresh\",\n    \"company_id\": {{companyID}},\n    \"price\": 25000,\n    \"items\": [\n        {\n            \"item_id\": {{itemID}},\n            \"quantity\": 2\n        }\n    ]\n}",
+                      "raw": "{\n    \"packet_name\": \"Paket Sarapan Pagi\",\n    \"packet_category\": \"Makanan\",\n    \"brand_name\": \"Nusa Fresh\",\n    \"company_id\": {{companyID}},\n    \"items\": [\n        {\n            \"item_id\": {{itemID}},\n            \"quantity\": 2,\n            \"price\": 15000\n        }\n    ]\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -10090,7 +10093,7 @@
                     }
                   ],
                   "cookie": [],
-                  "body": "{\n    \"data\": {\n        \"id\": 10,\n        \"brand_name\": \"Nusa Fresh\",\n        \"packet_name_id\": 1,\n        \"company_id\": 1,\n        \"packet_vendor_id\": 1,\n        \"packet_category_id\": 1,\n        \"packet_id\": 1,\n        \"item_packet_id\": 1,\n        \"price\": 25000,\n        \"packet_name\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"company\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"series\": 1,\n            \"type\": \"Utama\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"packet_vendor\": null,\n        \"packet_category\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"packet\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"item_packet\": null,\n        \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n        \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n        \"deleted_at\": \"2026-11-23T03:00:00.000000Z\",\n        \"ingredients\": [\n            {\n                \"id\": 1,\n                \"default_package_id\": 10,\n                \"item_id\": 1,\n                \"price\": 0,\n                \"item\": {\n                    \"id\": 1,\n                    \"company_id\": 1,\n                    \"packet_vendor_id\": 1,\n                    \"code\": \"RM-001\",\n                    \"name\": \"Teh Botol\",\n                    \"type\": \"Bahan\",\n                    \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n                    \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n                    \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n                },\n                \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n                \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n                \"deleted_at\": null\n            }\n        ]\n    }\n}"
+                  "body": "{\n    \"data\": {\n        \"id\": 10,\n        \"brand_name\": \"Nusa Fresh\",\n        \"packet_name_id\": 1,\n        \"company_id\": 1,\n        \"packet_vendor_id\": 1,\n        \"packet_category_id\": 1,\n        \"packet_id\": 1,\n        \"item_packet_id\": 1,\n        \"price\": 25000,\n        \"packet_name\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"company\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"series\": 1,\n            \"type\": \"Utama\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"packet_vendor\": null,\n        \"packet_category\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"packet\": {\n            \"id\": 1,\n            \"name\": \"Contoh Data\",\n            \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n            \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n        },\n        \"item_packet\": null,\n        \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n        \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n        \"deleted_at\": \"2026-11-23T03:00:00.000000Z\",\n        \"ingredients\": [\n            {\n                \"id\": 1,\n                \"default_package_id\": 10,\n                \"item_id\": 1,\n                \"price\": 15000,\n                \"item\": {\n                    \"id\": 1,\n                    \"company_id\": 1,\n                    \"packet_vendor_id\": 1,\n                    \"code\": \"RM-001\",\n                    \"name\": \"Teh Botol\",\n                    \"type\": \"Bahan\",\n                    \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n                    \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n                    \"deleted_at\": \"2026-11-23T03:00:00.000000Z\"\n                },\n                \"created_at\": \"2026-11-23T03:00:00.000000Z\",\n                \"updated_at\": \"2026-11-23T03:00:00.000000Z\",\n                \"deleted_at\": null\n            }\n        ]\n    }\n}"
                 }
               ]
             },
@@ -10174,11 +10177,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "Default (recipe/bundle) package owned by exactly one company or packet vendor (`company_id` XOR `packet_vendor_id`). It must reference a `packet_id` **or** an `item_packet_id` (exactly one); `brand_name` is unique per owner + packet name + category + packet/item packet. The wizard endpoints create the packet name/category/packet and its ingredient rows in one call."
         },
         {
           "name": "Ingredients",
-          "description": "Ingredient line of a default package: `default_package_id` + `item_id` (unique pair) with a `price`. The item must belong to the same owner (company or packet vendor) as the package.",
           "item": [
             {
               "name": "List ingredients",
@@ -10346,6 +10349,21 @@
             },
             {
               "name": "Create ingredient",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('ingredientID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -10388,21 +10406,6 @@
                 },
                 "description": "`POST /api/v1/modules/cpo/ingredients` — creates an ingredient.\n\nRequired: `default_package_id`, `item_id`.\n\nIngredient line of a default package: `default_package_id` + `item_id` (unique pair) with a `price`. The item must belong to the same owner (company or packet vendor) as the package."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('ingredientID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -10827,16 +10830,11 @@
                 }
               ]
             }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "CHO",
-      "description": "CHO (SDM): employee masters, global dictionaries (positions, employment statuses, payroll grades, tax statuses), employees, payroll runs/items and the payroll workspace.\n\nMaster dictionaries are **company-agnostic**. Employees, payroll runs/items and employees are company-scoped and support `active_company=1` list scoping. Server-managed rollups (`total_*`, `total_net`, BPJS splits, PPh 21) are never accepted from clients.",
-      "item": [
+          ],
+          "description": "Ingredient line of a default package: `default_package_id` + `item_id` (unique pair) with a `price`. The item must belong to the same owner (company or packet vendor) as the package."
+        },
         {
-          "name": "CHO enums",
+          "name": "CPO enums",
           "request": {
             "method": "GET",
             "header": [
@@ -10846,7 +10844,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseURL}}/api/v1/modules/cho/enums",
+              "raw": "{{baseURL}}/api/v1/modules/cpo/enums",
               "host": [
                 "{{baseURL}}"
               ],
@@ -10854,11 +10852,11 @@
                 "api",
                 "v1",
                 "modules",
-                "cho",
+                "cpo",
                 "enums"
               ]
             },
-            "description": "Reference values for CHO/HR forms: religion, blood type, gender, document types (with allowed file formats), payroll run statuses and payroll groups."
+            "description": "Reference values for CPO forms: `item_type` (`Bahan`, `Kelengkapan`, `Sarpras`) and `packet_vendor_type` (same values) for the type dropdowns."
           },
           "response": [
             {
@@ -10872,7 +10870,7 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{baseURL}}/api/v1/modules/cho/enums",
+                  "raw": "{{baseURL}}/api/v1/modules/cpo/enums",
                   "host": [
                     "{{baseURL}}"
                   ],
@@ -10880,7 +10878,7 @@
                     "api",
                     "v1",
                     "modules",
-                    "cho",
+                    "cpo",
                     "enums"
                   ]
                 }
@@ -10895,13 +10893,18 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n    \"data\": {\n        \"agama\": [\n            {\n                \"value\": \"islam\",\n                \"nama\": \"Islam\"\n            },\n            {\n                \"value\": \"kristen\",\n                \"nama\": \"Kristen\"\n            },\n            {\n                \"value\": \"katolik\",\n                \"nama\": \"Katolik\"\n            },\n            {\n                \"value\": \"hindu\",\n                \"nama\": \"Hindu\"\n            },\n            {\n                \"value\": \"buddha\",\n                \"nama\": \"Buddha\"\n            },\n            {\n                \"value\": \"konghucu\",\n                \"nama\": \"Konghucu\"\n            },\n            {\n                \"value\": \"lainnya\",\n                \"nama\": \"Lainnya\"\n            }\n        ],\n        \"golongan_darah\": [\n            {\n                \"value\": \"a\",\n                \"nama\": \"A\"\n            },\n            {\n                \"value\": \"b\",\n                \"nama\": \"B\"\n            },\n            {\n                \"value\": \"ab\",\n                \"nama\": \"AB\"\n            },\n            {\n                \"value\": \"o\",\n                \"nama\": \"O\"\n            },\n            {\n                \"value\": \"tidak_tahu\",\n                \"nama\": \"Tidak Tahu\"\n            }\n        ],\n        \"jenis_kelamin\": [\n            {\n                \"value\": \"laki_laki\",\n                \"nama\": \"Laki-laki\"\n            },\n            {\n                \"value\": \"perempuan\",\n                \"nama\": \"Perempuan\"\n            }\n        ],\n        \"jenis_dokumen\": [\n            {\n                \"value\": \"ktp\",\n                \"nama\": \"KTP\",\n                \"allowed_formats\": [\n                    \".pdf\",\n                    \".jpg\",\n                    \".jpeg\",\n                    \".png\"\n                ]\n            },\n            {\n                \"value\": \"kk\",\n                \"nama\": \"Kartu Keluarga (KK)\",\n                \"allowed_formats\": [\n                    \".pdf\",\n                    \".jpg\",\n                    \".jpeg\",\n                    \".png\"\n                ]\n            },\n            {\n                \"value\": \"npwp\",\n                \"nama\": \"NPWP\",\n                \"allowed_formats\": [\n                    \".pdf\",\n                    \".jpg\",\n                    \".jpeg\",\n                    \".png\"\n                ]\n            },\n            {\n                \"value\": \"bpjs_kesehatan\",\n                \"nama\": \"BPJS Kesehatan\",\n                \"allowed_formats\": [\n                    \".pdf\",\n                    \".jpg\",\n                    \".jpeg\",\n                    \".png\"\n                ]\n            },\n            {\n                \"value\": \"bpjs_ketenagakerjaan\",\n                \"nama\": \"BPJS Ketenagakerjaan\",\n                \"allowed_formats\": [\n                    \".pdf\",\n                    \".jpg\",\n                    \".jpeg\",\n                    \".png\"\n                ]\n            },\n            {\n                \"value\": \"pas_foto\",\n                \"nama\": \"Pas Foto\",\n                \"allowed_formats\": [\n                    \".jpg\",\n                    \".jpeg\",\n                    \".png\"\n                ]\n            },\n            {\n                \"value\": \"cv\",\n                \"nama\": \"Curriculum Vitae (CV)\",\n                \"allowed_formats\": [\n                    \".pdf\",\n                    \".doc\",\n                    \".docx\"\n                ]\n            },\n            {\n                \"value\": \"ijazah\",\n                \"nama\": \"Ijazah\",\n                \"allowed_formats\": [\n                    \".pdf\",\n                    \".jpg\",\n                    \".jpeg\",\n                    \".png\"\n                ]\n            },\n            {\n                \"value\": \"transkrip\",\n                \"nama\": \"Transkrip Nilai\",\n                \"allowed_formats\": [\n                    \".pdf\",\n                    \".jpg\",\n                    \".jpeg\",\n                    \".png\"\n                ]\n            },\n            {\n                \"value\": \"kontrak_kerja\",\n                \"nama\": \"Kontrak Kerja\",\n                \"allowed_formats\": [\n                    \".pdf\"\n                ]\n            },\n            {\n                \"value\": \"sertifikat\",\n                \"nama\": \"Sertifikat\",\n                \"allowed_formats\": [\n                    \".pdf\",\n                    \".jpg\",\n                    \".jpeg\",\n                    \".png\"\n                ]\n            }\n        ],\n        \"payroll_run_status\": [\n            {\n                \"value\": \"draft\",\n                \"nama\": \"Draf\"\n            },\n            {\n                \"value\": \"pending\",\n                \"nama\": \"Menunggu Persetujuan\"\n            },\n            {\n                \"value\": \"approved\",\n                \"nama\": \"Disetujui\"\n            },\n            {\n                \"value\": \"void\",\n                \"nama\": \"Dibatalkan\"\n            }\n        ],\n        \"payroll_group\": [\n            {\n                \"value\": \"office\",\n                \"nama\": \"Office\"\n            },\n            {\n                \"value\": \"outlet\",\n                \"nama\": \"Outlet\"\n            }\n        ],\n        \"payroll_item_status\": [\n            {\n                \"value\": \"draft\",\n                \"nama\": \"Draf\"\n            },\n            {\n                \"value\": \"finalized\",\n                \"nama\": \"Final\"\n            }\n        ]\n    }\n}"
+              "body": "{\n    \"data\": {\n        \"item_type\": [\n            {\n                \"value\": \"Bahan\",\n                \"nama\": \"Bahan\"\n            },\n            {\n                \"value\": \"Kelengkapan\",\n                \"nama\": \"Kelengkapan\"\n            },\n            {\n                \"value\": \"Sarpras\",\n                \"nama\": \"Sarpras\"\n            }\n        ],\n        \"packet_vendor_type\": [\n            {\n                \"value\": \"Bahan\",\n                \"nama\": \"Bahan\"\n            },\n            {\n                \"value\": \"Kelengkapan\",\n                \"nama\": \"Kelengkapan\"\n            },\n            {\n                \"value\": \"Sarpras\",\n                \"nama\": \"Sarpras\"\n            }\n        ]\n    }\n}"
             }
           ]
-        },
+        }
+      ],
+      "description": "CPO (Persediaan Barang Dagang): inventory items, packets (bundles) and the per-company item↔packet composition.\n\nItems and item packets are company-scoped and support `active_company=1`; packets are global. Exact filters accept comma-separated values (OR)."
+    },
+    {
+      "name": "CHO",
+      "item": [
         {
           "name": "Employee Positions",
-          "description": "Global job-position dictionary (company-agnostic). `code` is optional; `name` and `code` are unique among active rows. Deleting is rejected while active employees or payroll items reference it.",
           "item": [
             {
               "name": "List employee positions",
@@ -11033,6 +11036,21 @@
             },
             {
               "name": "Create employee position",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('employeePositionID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -11075,21 +11093,6 @@
                 },
                 "description": "`POST /api/v1/modules/cho/employee-positions` — creates an employee position.\n\nRequired: `name`.\n\nGlobal job-position dictionary (company-agnostic). `code` is optional; `name` and `code` are unique among active rows. Deleting is rejected while active employees or payroll items reference it."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('employeePositionID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -11514,11 +11517,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "Global job-position dictionary (company-agnostic). `code` is optional; `name` and `code` are unique among active rows. Deleting is rejected while active employees or payroll items reference it."
         },
         {
           "name": "Employment Statuses",
-          "description": "Global employment-status dictionary (company-agnostic), e.g. permanent/contract. `name` and `code` are unique among active rows. Deleting is rejected while active employees reference it.",
           "item": [
             {
               "name": "List employment statuses",
@@ -11650,6 +11653,21 @@
             },
             {
               "name": "Create employment status",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('employmentStatusID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -11692,21 +11710,6 @@
                 },
                 "description": "`POST /api/v1/modules/cho/employment-statuses` — creates an employment status.\n\nRequired: `name`.\n\nGlobal employment-status dictionary (company-agnostic), e.g. permanent/contract. `name` and `code` are unique among active rows. Deleting is rejected while active employees reference it."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('employmentStatusID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -12131,11 +12134,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "Global employment-status dictionary (company-agnostic), e.g. permanent/contract. `name` and `code` are unique among active rows. Deleting is rejected while active employees reference it."
         },
         {
           "name": "Payroll Grades",
-          "description": "Global payroll-grade dictionary (company-agnostic); `grade` + `sub_grade` are unique among active rows. `total_gross`, BPJS splits, `net_employee_received` and `total_company_cost` are calculated server-side. Deleting is rejected while active employees reference the grade.",
           "item": [
             {
               "name": "List payroll grades",
@@ -12291,6 +12294,21 @@
             },
             {
               "name": "Create payroll grade",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('payrollGradeID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -12333,21 +12351,6 @@
                 },
                 "description": "`POST /api/v1/modules/cho/payroll-grades` — creates a payroll grade.\n\nRequired: `grade`, `sub_grade`, `base_salary`.\n\nGlobal payroll-grade dictionary (company-agnostic); `grade` + `sub_grade` are unique among active rows. `total_gross`, BPJS splits, `net_employee_received` and `total_company_cost` are calculated server-side. Deleting is rejected while active employees reference the grade."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('payrollGradeID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -12772,11 +12775,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "Global payroll-grade dictionary (company-agnostic); `grade` + `sub_grade` are unique among active rows. `total_gross`, BPJS splits, `net_employee_received` and `total_company_cost` are calculated server-side. Deleting is rejected while active employees reference the grade."
         },
         {
           "name": "Tax Statuses",
-          "description": "Global PPh 21 tax-status dictionary (PTKP categories, company-agnostic). Deleting is rejected while active employees reference it.",
           "item": [
             {
               "name": "List tax statuses",
@@ -12908,6 +12911,21 @@
             },
             {
               "name": "Create tax status",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('taxStatusID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -12950,21 +12968,6 @@
                 },
                 "description": "`POST /api/v1/modules/cho/tax-statuses` — creates a tax status.\n\nRequired: `name`.\n\nGlobal PPh 21 tax-status dictionary (PTKP categories, company-agnostic). Deleting is rejected while active employees reference it."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('taxStatusID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -13389,11 +13392,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "Global PPh 21 tax-status dictionary (PTKP categories, company-agnostic). Deleting is rejected while active employees reference it."
         },
         {
           "name": "Employees",
-          "description": "`nik_ktp` is unique per company (16 digits). `documents` is required on create (min 1 doc, `file_url` from Documents upload). Deleting is rejected while the employee has attendances, shift assignments, expense items or payroll items.",
           "item": [
             {
               "name": "List employees",
@@ -13704,6 +13707,21 @@
             },
             {
               "name": "Create employee",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('employeeID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -13746,21 +13764,6 @@
                 },
                 "description": "`POST /api/v1/modules/cho/employees` — creates an employee.\n\nRequired: `company_id`, `employee_position_id`, `employment_status_id`, `payroll_grade_id`, `tax_status_id`, `name`, `email`, `phone`, `photo_url`, `nik_ktp`, `nickname`, `birth_place`, `birth_date`, `gender`, `religion`, `blood_type`, `mother_name`, `ktp_address`, `domicile_address`, `whatsapp_number`, `emergency_phone_number`, `instagram`, `tiktok`, `bpjs_ketenagakerjaan`, `bpjs_kesehatan`, `npwp_number`, `documents`.\n\n`nik_ktp` is unique per company (16 digits). `documents` is required on create (min 1 doc, `file_url` from Documents upload). Deleting is rejected while the employee has attendances, shift assignments, expense items or payroll items."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('employeeID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -13835,8 +13838,8 @@
                     {
                       "key": "document",
                       "type": "file",
-                      "src": [],
-                      "description": "Pick a file to upload."
+                      "description": "Pick a file to upload.",
+                      "value": null
                     }
                   ]
                 },
@@ -14268,11 +14271,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "`nik_ktp` is unique per company (16 digits). `documents` is required on create (min 1 doc, `file_url` from Documents upload). Deleting is rejected while the employee has attendances, shift assignments, expense items or payroll items."
         },
         {
           "name": "Payroll Runs",
-          "description": "`period_date` is normalised to the first day of the month and must be unique per company. `total_*` columns are rollups maintained by payroll items and ignored from client input. Status flows draft -> pending/approved/void; approved runs can only move to void. Attendance for a period is counted in the cutoff window (period start day 22 of the previous month through cutoff day 21) — see the Payroll Workspace folder.",
           "item": [
             {
               "name": "List payroll runs",
@@ -14482,6 +14485,21 @@
             },
             {
               "name": "Create payroll run",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('payrollRunID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -14524,21 +14542,6 @@
                 },
                 "description": "`POST /api/v1/modules/cho/payroll-runs` — creates a payroll run.\n\nRequired: `company_id`, `name`, `period_date`.\n\n`period_date` is normalised to the first day of the month and must be unique per company. `total_*` columns are rollups maintained by payroll items and ignored from client input. Status flows draft -> pending/approved/void; approved runs can only move to void. Attendance for a period is counted in the cutoff window (period start day 22 of the previous month through cutoff day 21) — see the Payroll Workspace folder."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('payrollRunID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -14963,11 +14966,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "`period_date` is normalised to the first day of the month and must be unique per company. `total_*` columns are rollups maintained by payroll items and ignored from client input. Status flows draft -> pending/approved/void; approved runs can only move to void. Attendance for a period is counted in the cutoff window (period start day 22 of the previous month through cutoff day 21) — see the Payroll Workspace folder."
         },
         {
           "name": "Payroll Items",
-          "description": "`total_net` is computed server-side and rolled up into the payroll run totals. `payroll_run_id` and `employee_id` must belong to the same company. `status` is `draft` or `finalized`; finalized rows are locked and keep their stored amounts. The Payroll Workspace save-row endpoint is the usual way to create/update a row.",
           "item": [
             {
               "name": "List payroll items",
@@ -15177,6 +15180,21 @@
             },
             {
               "name": "Create payroll item",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('payrollItemID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -15219,21 +15237,6 @@
                 },
                 "description": "`POST /api/v1/modules/cho/payroll-items` — creates a payroll item.\n\nRequired: `company_id`, `payroll_run_id`, `employee_id`, `base_salary`.\n\n`total_net` is computed server-side and rolled up into the payroll run totals. `payroll_run_id` and `employee_id` must belong to the same company. `status` is `draft` or `finalized`; finalized rows are locked and keep their stored amounts. The Payroll Workspace save-row endpoint is the usual way to create/update a row."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('payrollItemID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -15658,11 +15661,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "`total_net` is computed server-side and rolled up into the payroll run totals. `payroll_run_id` and `employee_id` must belong to the same company. `status` is `draft` or `finalized`; finalized rows are locked and keep their stored amounts. The Payroll Workspace save-row endpoint is the usual way to create/update a row."
         },
         {
           "name": "Payroll Workspace",
-          "description": "Payroll input flow for a period. The monthly attendance window is **period start day 22** of the previous month through **cutoff day 21** of the period month, with 25 effective work days.\n\n1. `GET /payroll/workspace` computes preview rows per employee (attendance days, base salary from the payroll grade, BPJS, PPh 21, total net) without persisting anything.\n2. `POST /payroll/save-row` persists one employee's row as a `draft` payroll item, creating a draft payroll run for the period when needed.\n3. `POST /payroll/finalize-row` locks the row (`status: finalized`, `finalized_by`, `finalized_at`); finalized rows are no longer recalculated.",
           "item": [
             {
               "name": "Payroll workspace",
@@ -15756,6 +15759,21 @@
             },
             {
               "name": "Save payroll row",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('payrollItemID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -15799,21 +15817,6 @@
                 },
                 "description": "`POST /payroll/save-row` — creates or updates the `draft` payroll item for one employee in the period (creating a draft payroll run when none exists) and syncs the run totals.\n\nRequired: `company_id`, `employee_id`, `period` (`YYYY-MM`). Optional: `payroll_group`, `bank_account_number`, `bonus`, `overtime`, `deduction`, `thr`, `notes`. `base_salary`, BPJS and PPh 21 are calculated server-side.\n\nReturns `PayrollItemResource` with `status: draft`; stores the item id in `payrollItemID`."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('payrollItemID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Draft row created",
@@ -16015,17 +16018,81 @@
                 }
               ]
             }
+          ],
+          "description": "Payroll input flow for a period. The monthly attendance window is **period start day 22** of the previous month through **cutoff day 21** of the period month, with 25 effective work days.\n\n1. `GET /payroll/workspace` computes preview rows per employee (attendance days, base salary from the payroll grade, BPJS, PPh 21, total net) without persisting anything.\n2. `POST /payroll/save-row` persists one employee's row as a `draft` payroll item, creating a draft payroll run for the period when needed.\n3. `POST /payroll/finalize-row` locks the row (`status: finalized`, `finalized_by`, `finalized_at`); finalized rows are no longer recalculated."
+        },
+        {
+          "name": "CHO enums",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseURL}}/api/v1/modules/cho/enums",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "modules",
+                "cho",
+                "enums"
+              ]
+            },
+            "description": "Reference values for CHO/HR forms: religion, blood type, gender, document types (with allowed file formats), payroll run statuses and payroll groups."
+          },
+          "response": [
+            {
+              "name": "Enum options",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseURL}}/api/v1/modules/cho/enums",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "modules",
+                    "cho",
+                    "enums"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"data\": {\n        \"agama\": [\n            {\n                \"value\": \"islam\",\n                \"nama\": \"Islam\"\n            },\n            {\n                \"value\": \"kristen\",\n                \"nama\": \"Kristen\"\n            },\n            {\n                \"value\": \"katolik\",\n                \"nama\": \"Katolik\"\n            },\n            {\n                \"value\": \"hindu\",\n                \"nama\": \"Hindu\"\n            },\n            {\n                \"value\": \"buddha\",\n                \"nama\": \"Buddha\"\n            },\n            {\n                \"value\": \"konghucu\",\n                \"nama\": \"Konghucu\"\n            },\n            {\n                \"value\": \"lainnya\",\n                \"nama\": \"Lainnya\"\n            }\n        ],\n        \"golongan_darah\": [\n            {\n                \"value\": \"a\",\n                \"nama\": \"A\"\n            },\n            {\n                \"value\": \"b\",\n                \"nama\": \"B\"\n            },\n            {\n                \"value\": \"ab\",\n                \"nama\": \"AB\"\n            },\n            {\n                \"value\": \"o\",\n                \"nama\": \"O\"\n            },\n            {\n                \"value\": \"tidak_tahu\",\n                \"nama\": \"Tidak Tahu\"\n            }\n        ],\n        \"jenis_kelamin\": [\n            {\n                \"value\": \"laki_laki\",\n                \"nama\": \"Laki-laki\"\n            },\n            {\n                \"value\": \"perempuan\",\n                \"nama\": \"Perempuan\"\n            }\n        ],\n        \"jenis_dokumen\": [\n            {\n                \"value\": \"ktp\",\n                \"nama\": \"KTP\",\n                \"allowed_formats\": [\n                    \".pdf\",\n                    \".jpg\",\n                    \".jpeg\",\n                    \".png\"\n                ]\n            },\n            {\n                \"value\": \"kk\",\n                \"nama\": \"Kartu Keluarga (KK)\",\n                \"allowed_formats\": [\n                    \".pdf\",\n                    \".jpg\",\n                    \".jpeg\",\n                    \".png\"\n                ]\n            },\n            {\n                \"value\": \"npwp\",\n                \"nama\": \"NPWP\",\n                \"allowed_formats\": [\n                    \".pdf\",\n                    \".jpg\",\n                    \".jpeg\",\n                    \".png\"\n                ]\n            },\n            {\n                \"value\": \"bpjs_kesehatan\",\n                \"nama\": \"BPJS Kesehatan\",\n                \"allowed_formats\": [\n                    \".pdf\",\n                    \".jpg\",\n                    \".jpeg\",\n                    \".png\"\n                ]\n            },\n            {\n                \"value\": \"bpjs_ketenagakerjaan\",\n                \"nama\": \"BPJS Ketenagakerjaan\",\n                \"allowed_formats\": [\n                    \".pdf\",\n                    \".jpg\",\n                    \".jpeg\",\n                    \".png\"\n                ]\n            },\n            {\n                \"value\": \"pas_foto\",\n                \"nama\": \"Pas Foto\",\n                \"allowed_formats\": [\n                    \".jpg\",\n                    \".jpeg\",\n                    \".png\"\n                ]\n            },\n            {\n                \"value\": \"cv\",\n                \"nama\": \"Curriculum Vitae (CV)\",\n                \"allowed_formats\": [\n                    \".pdf\",\n                    \".doc\",\n                    \".docx\"\n                ]\n            },\n            {\n                \"value\": \"ijazah\",\n                \"nama\": \"Ijazah\",\n                \"allowed_formats\": [\n                    \".pdf\",\n                    \".jpg\",\n                    \".jpeg\",\n                    \".png\"\n                ]\n            },\n            {\n                \"value\": \"transkrip\",\n                \"nama\": \"Transkrip Nilai\",\n                \"allowed_formats\": [\n                    \".pdf\",\n                    \".jpg\",\n                    \".jpeg\",\n                    \".png\"\n                ]\n            },\n            {\n                \"value\": \"kontrak_kerja\",\n                \"nama\": \"Kontrak Kerja\",\n                \"allowed_formats\": [\n                    \".pdf\"\n                ]\n            },\n            {\n                \"value\": \"sertifikat\",\n                \"nama\": \"Sertifikat\",\n                \"allowed_formats\": [\n                    \".pdf\",\n                    \".jpg\",\n                    \".jpeg\",\n                    \".png\"\n                ]\n            }\n        ],\n        \"payroll_run_status\": [\n            {\n                \"value\": \"draft\",\n                \"nama\": \"Draf\"\n            },\n            {\n                \"value\": \"pending\",\n                \"nama\": \"Menunggu Persetujuan\"\n            },\n            {\n                \"value\": \"approved\",\n                \"nama\": \"Disetujui\"\n            },\n            {\n                \"value\": \"void\",\n                \"nama\": \"Dibatalkan\"\n            }\n        ],\n        \"payroll_group\": [\n            {\n                \"value\": \"office\",\n                \"nama\": \"Office\"\n            },\n            {\n                \"value\": \"outlet\",\n                \"nama\": \"Outlet\"\n            }\n        ],\n        \"payroll_item_status\": [\n            {\n                \"value\": \"draft\",\n                \"nama\": \"Draf\"\n            },\n            {\n                \"value\": \"finalized\",\n                \"nama\": \"Final\"\n            }\n        ]\n    }\n}"
+            }
           ]
         }
-      ]
+      ],
+      "description": "CHO (SDM): employee masters, global dictionaries (positions, employment statuses, payroll grades, tax statuses), employees, payroll runs/items and the payroll workspace.\n\nMaster dictionaries are **company-agnostic**. Employees, payroll runs/items and employees are company-scoped and support `active_company=1` list scoping. Server-managed rollups (`total_*`, `total_net`, BPJS splits, PPh 21) are never accepted from clients."
     },
     {
       "name": "HR",
-      "description": "HR: shift templates, per-employee shift assignments and attendance (including the barcode scan workflow). HR lists do not implement `active_company`; filter with `company_id`.",
       "item": [
         {
           "name": "Employee Shifts",
-          "description": "`start_time` / `end_time` use `HH:MM` or `HH:MM:SS` (24h). `is_overnight` marks shifts crossing midnight; `grace_period_minutes` feeds lateness calculation.",
           "item": [
             {
               "name": "List employee shifts",
@@ -16217,6 +16284,21 @@
             },
             {
               "name": "Create employee shift",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('employeeShiftID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -16259,21 +16341,6 @@
                 },
                 "description": "`POST /api/v1/modules/hr/employee-shifts` — creates an employee shift.\n\nRequired: `company_id`, `name`, `start_time`, `end_time`.\n\n`start_time` / `end_time` use `HH:MM` or `HH:MM:SS` (24h). `is_overnight` marks shifts crossing midnight; `grace_period_minutes` feeds lateness calculation."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('employeeShiftID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -16698,11 +16765,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "`start_time` / `end_time` use `HH:MM` or `HH:MM:SS` (24h). `is_overnight` marks shifts crossing midnight; `grace_period_minutes` feeds lateness calculation."
         },
         {
           "name": "Shift Assignments",
-          "description": "Assigns a shift to an employee for a date range (`end_date` nullable = open-ended). The scan endpoint auto-resolves the active assignment when no shift is provided.",
           "item": [
             {
               "name": "List shift assignments",
@@ -16882,6 +16949,21 @@
             },
             {
               "name": "Create shift assignment",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('employeeShiftAssignmentID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -16924,21 +17006,6 @@
                 },
                 "description": "`POST /api/v1/modules/hr/employee-shift-assignments` — creates a shift assignment.\n\nRequired: `company_id`, `employee_id`, `employee_shift_id`, `effective_date`.\n\nAssigns a shift to an employee for a date range (`end_date` nullable = open-ended). The scan endpoint auto-resolves the active assignment when no shift is provided."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('employeeShiftAssignmentID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -17363,11 +17430,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "Assigns a shift to an employee for a date range (`end_date` nullable = open-ended). The scan endpoint auto-resolves the active assignment when no shift is provided."
         },
         {
           "name": "Employee Attendances",
-          "description": "`late_minutes` and `overtime_minutes` are computed from the shift. Create accepts `employee_id` or `employee_attendance_code`; one active attendance per employee per date. Use the Scan request for clock-in/clock-out.",
           "item": [
             {
               "name": "List employee attendances",
@@ -17443,7 +17510,7 @@
                     {
                       "key": "sort",
                       "value": "-attendance_date,-id",
-                      "description": "Allowed sorts: company_id, employee_id, employee_shift_id, attendance_date, clock_in_at, clock_out_at, late_minutes, overtime_minutes, status, notes, company_name, employee_name, employee_shift_name. Default: -attendance_date,-id. Comma-separate multiple sorts: `sort=name,-id`.",
+                      "description": "Allowed sorts: attendance_date, clock_in_at, late_minutes, overtime_minutes. Default: -attendance_date,-id. Comma-separate multiple sorts: `sort=name,-id`.",
                       "disabled": true
                     },
                     {
@@ -17454,7 +17521,7 @@
                     }
                   ]
                 },
-                "description": "`GET /api/v1/modules/hr/employee-attendances` — Employee Attendances list.\n\n- Filters: `company_id`, `employee_id`, `employee_attendance_code`, `employee_shift_id`, `attendance_date`, `status`\n- Sorts: `company_id`, `employee_id`, `employee_shift_id`, `attendance_date`, `clock_in_at`, `clock_out_at`, `late_minutes`, `overtime_minutes`, `status`, `notes`, `company_name`, `employee_name`, `employee_shift_name` (default `-attendance_date,-id`)\n- Includes: `company`, `employee`, `employeeShift` (default loaded: company, employee, employeeShift)\n- Pagination: send `page`/`per_page`; without them the full filtered list is returned and cached for 60 s. `per_page` is capped at 100.\n- Multiple keywords: exact filters accept comma-separated values (OR) or repeated `filter[x][]=`; text filters (`search`, `name`, `code`) take a single keyword/phrase.\n\n`late_minutes` and `overtime_minutes` are computed from the shift. Create accepts `employee_id` or `employee_attendance_code`; one active attendance per employee per date. Use the Scan request for clock-in/clock-out."
+                "description": "`GET /api/v1/modules/hr/employee-attendances` — Employee Attendances list.\n\n- Filters: `company_id`, `employee_id`, `employee_attendance_code`, `employee_shift_id`, `attendance_date`, `status`\n- Sorts: `attendance_date`, `clock_in_at`, `late_minutes`, `overtime_minutes` (default `-attendance_date,-id`)\n- Includes: `company`, `employee`, `employeeShift` (default loaded: company, employee, employeeShift)\n- Pagination: send `page`/`per_page`; without them the full filtered list is returned and cached for 60 s. `per_page` is capped at 100.\n- Multiple keywords: exact filters accept comma-separated values (OR) or repeated `filter[x][]=`; text filters (`search`, `name`, `code`) take a single keyword/phrase.\n\n`late_minutes` and `overtime_minutes` are computed from the shift. Create accepts `employee_id` or `employee_attendance_code`; one active attendance per employee per date. Use the Scan request for clock-in/clock-out."
               },
               "response": [
                 {
@@ -17531,7 +17598,7 @@
                         {
                           "key": "sort",
                           "value": "-attendance_date,-id",
-                          "description": "Allowed sorts: company_id, employee_id, employee_shift_id, attendance_date, clock_in_at, clock_out_at, late_minutes, overtime_minutes, status, notes, company_name, employee_name, employee_shift_name. Default: -attendance_date,-id. Comma-separate multiple sorts: `sort=name,-id`.",
+                          "description": "Allowed sorts: attendance_date, clock_in_at, late_minutes, overtime_minutes. Default: -attendance_date,-id. Comma-separate multiple sorts: `sort=name,-id`.",
                           "disabled": true
                         },
                         {
@@ -17559,6 +17626,21 @@
             },
             {
               "name": "Create employee attendance",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json();",
+                      "",
+                      "if (response.data && response.data.id) {",
+                      "    pm.collectionVariables.set('employeeAttendanceID', String(response.data.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -17601,21 +17683,6 @@
                 },
                 "description": "`POST /api/v1/modules/hr/employee-attendances` — creates an employee attendance.\n\nRequired: `attendance_date`.\n\n`late_minutes` and `overtime_minutes` are computed from the shift. Create accepts `employee_id` or `employee_attendance_code`; one active attendance per employee per date. Use the Scan request for clock-in/clock-out."
               },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json();",
-                      "",
-                      "if (response.data && response.data.id) {",
-                      "    pm.collectionVariables.set('employeeAttendanceID', String(response.data.id));",
-                      "}"
-                    ]
-                  }
-                }
-              ],
               "response": [
                 {
                   "name": "Created",
@@ -17684,7 +17751,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    \"employee_attendance_code\": \"{{employeeAttendanceCode}}\",\n    \"attendance_date\": \"2026-11-20\",\n    \"date_from\": \"2026-11-01\",\n    \"date_to\": \"2026-11-30\",\n    \"daterange\": \"2026-11-01..2026-11-30\"\n}",
+                  "raw": "{\n    \"employee_attendance_code\": \"{{employeeAttendanceCode}}\",\n    \"attendance_date\": \"2026-11-20\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -18182,13 +18249,14 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "`late_minutes` and `overtime_minutes` are computed from the shift. Create accepts `employee_id` or `employee_attendance_code`; one active attendance per employee per date. Use the Scan request for clock-in/clock-out."
         }
-      ]
+      ],
+      "description": "HR: shift templates, per-employee shift assignments and attendance (including the barcode scan workflow). HR lists do not implement `active_company`; filter with `company_id`."
     },
     {
       "name": "Lab Samples",
-      "description": "Create/show responses add a computed top-level `quality_grade` (PASS / REVIEW / REJECT). No update or delete endpoint exists.",
       "item": [
         {
           "name": "List lab samples",
@@ -18379,6 +18447,21 @@
         },
         {
           "name": "Create lab sample",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const response = pm.response.json();",
+                  "",
+                  "if (response.data && response.data.id) {",
+                  "    pm.collectionVariables.set('labSampleID', String(response.data.id));",
+                  "}"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -18419,21 +18502,6 @@
             },
             "description": "`POST /api/v1/samples` — creates a lab sample.\n\nRequired: `batch_code`, `product_name`, `category`, `ph_level`, `moisture_percent`.\n\nCreate/show responses add a computed top-level `quality_grade` (PASS / REVIEW / REJECT). No update or delete endpoint exists."
           },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const response = pm.response.json();",
-                  "",
-                  "if (response.data && response.data.id) {",
-                  "    pm.collectionVariables.set('labSampleID', String(response.data.id));",
-                  "}"
-                ]
-              }
-            }
-          ],
           "response": [
             {
               "name": "Created",
@@ -18560,11 +18628,11 @@
             }
           ]
         }
-      ]
+      ],
+      "description": "Create/show responses add a computed top-level `quality_grade` (PASS / REVIEW / REJECT). No update or delete endpoint exists."
     },
     {
       "name": "Documents",
-      "description": "Generic document upload (max 10 MB). Allowed formats depend on `document_type` (see CHO enums); without a type the union of all formats is accepted: pdf, jpg, jpeg, png, doc, docx.",
       "item": [
         {
           "name": "Upload document",
@@ -18588,8 +18656,8 @@
                 {
                   "key": "document",
                   "type": "file",
-                  "src": [],
-                  "description": "Pick a file (pdf/jpg/jpeg/png/doc/docx, max 10 MB)."
+                  "description": "Pick a file (pdf/jpg/jpeg/png/doc/docx, max 10 MB).",
+                  "value": null
                 }
               ]
             },
@@ -18643,15 +18711,18 @@
             }
           ]
         }
-      ]
+      ],
+      "description": "Generic document upload (max 10 MB). Allowed formats depend on `document_type` (see CHO enums); without a type the union of all formats is accepted: pdf, jpg, jpeg, png, doc, docx."
     },
     {
       "name": "System",
-      "description": "Public operational endpoints (no token required).",
       "item": [
         {
           "name": "Health check",
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [
               {
@@ -18669,10 +18740,7 @@
                 "health"
               ]
             },
-            "description": "Readiness probe for the database and Redis/cache. `200` when healthy, `503` with `status: degraded` otherwise.",
-            "auth": {
-              "type": "noauth"
-            }
+            "description": "Readiness probe for the database and Redis/cache. `200` when healthy, `503` with `status: degraded` otherwise."
           },
           "response": [
             {
@@ -18746,6 +18814,9 @@
         {
           "name": "Prometheus metrics",
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [
               {
@@ -18763,10 +18834,7 @@
                 "metrics"
               ]
             },
-            "description": "Prometheus text exposition (`text/plain; version=0.0.4`).",
-            "auth": {
-              "type": "noauth"
-            }
+            "description": "Prometheus text exposition (`text/plain; version=0.0.4`)."
           },
           "response": [
             {
@@ -18804,7 +18872,8 @@
             }
           ]
         }
-      ]
+      ],
+      "description": "Public operational endpoints (no token required)."
     }
   ],
   "auth": {
