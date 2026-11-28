@@ -1,6 +1,11 @@
 import React from 'react';
 import type { ErpModuleOverview } from '../../api/client';
 import { ModuleLauncherCard } from '../../components/ui/ModuleLauncherCard';
+import type { HorizontalMenuItem } from '../../components/ui/HorizontalMenuCard';
+
+export const CMO_MENU_ITEMS: HorizontalMenuItem[] = [
+  { code: 'OVERVIEW', title: 'Overview' },
+];
 
 export const DEFAULT_CMO_MODULE: ErpModuleOverview = {
   code: 'CMO',

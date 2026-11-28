@@ -1,11 +1,18 @@
 import type React from 'react';
 import type { ErpModuleCode } from '@/api/client';
 import type { HorizontalMenuItem } from '@/components/ui/HorizontalMenuCard';
+import CdoPages from '@/pages/menu/CDO/cdoPages';
+import { CMOOverviewPage } from '@/pages/menu/CMO/cmoPages';
 
 const menuPages = import.meta.glob<{ default: React.ComponentType }>(
   './menu/**/*.tsx',
   { eager: true }
 );
+
+const moduleMenuPages: Record<string, React.ComponentType> = {
+  'CDO/OVERVIEW/direct': CdoPages,
+  'CMO/OVERVIEW/direct': CMOOverviewPage,
+};
 
 const toSlug = (value: string) =>
   value
@@ -46,5 +53,9 @@ export const getDashboardMenuPage = (pathname: string) => {
     return null;
   }
 
-  return menuPages[`./menu/${moduleCode}/${menuCode}/${itemSlug}.tsx`]?.default ?? null;
+  return (
+    moduleMenuPages[`${moduleCode}/${menuCode}/${itemSlug}`] ??
+    menuPages[`./menu/${moduleCode}/${menuCode}/${itemSlug}.tsx`]?.default ??
+    null
+  );
 };
