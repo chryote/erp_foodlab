@@ -1,4 +1,11 @@
-import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
+import {
+  act,
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import {
   Badge,
@@ -233,6 +240,100 @@ describe('Reusable UI Components (src/components/ui)', () => {
     fireEvent.click(screen.getByTestId('delete-row-10'));
     fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
     expect(onDelete).toHaveBeenCalledWith(10);
+  });
+
+  it('renders CrudModal as a page with lazy-load rows and no pagination', () => {
+    render(
+      <CrudModal
+        isOpen
+        pageMode
+        title="Master Packing"
+        fields={[{ key: 'name', label: 'Nama Item', sortable: true }]}
+        items={[]}
+        displayItems={[
+          { id: 1, name: 'Item pertama' },
+          { id: 2, name: 'Item kedua' },
+        ]}
+        hasMore
+        onLoadMore={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('crud-modal-page')).toBeInTheDocument();
+    expect(screen.getByText('Item pertama')).toBeInTheDocument();
+    expect(screen.getByText('Item kedua')).toBeInTheDocument();
+    expect(screen.getByTestId('crud-modal-table-panel')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('crud-modal-table-scroll-sentinel')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('crud-modal-pagination-info')
+    ).not.toBeInTheDocument();
+  });
+
+  it('uses icon actions and a sticky action column in page mode', () => {
+    render(
+      <CrudModal
+        isOpen
+        pageMode
+        hideRowNumber
+        title="Master"
+        fields={[{ key: 'name', label: 'Nama' }]}
+        items={[{ id: 1, name: 'Contoh' }]}
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByRole('columnheader', { name: 'No' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('edit-row-1')).toHaveClass('h-9', 'w-9', 'p-0');
+    expect(screen.getByTestId('delete-row-1')).toHaveClass('h-9', 'w-9', 'p-0');
+    expect(screen.getByTestId('edit-row-1').querySelector('svg')).toBeInTheDocument();
+    expect(screen.getByTestId('delete-row-1').querySelector('svg')).toBeInTheDocument();
+    expect(screen.getByTestId('edit-row-1').closest('td')).toHaveClass(
+      'sticky',
+      'right-0'
+    );
+    expect(screen.getByTestId('crud-modal-form-panel')).not.toHaveClass(
+      'rounded-xl',
+      'border',
+      'bg-muted/25'
+    );
+  });
+
+  it('closes the mobile edit form when cancelling an edit', () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 390,
+    });
+
+    render(
+      <CrudModal
+        isOpen
+        pageMode
+        title="Master"
+        fields={[{ key: 'name', label: 'Nama' }]}
+        items={[{ id: 1, name: 'Contoh' }]}
+        onClose={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('edit-row-1'));
+    expect(screen.getByTestId('crud-modal-mobile-form-backdrop')).toBeInTheDocument();
+    fireEvent.click(
+      within(screen.getByTestId('crud-modal-mobile-form')).getByRole('button', {
+        name: 'Batal',
+      })
+    );
+    expect(
+      screen.queryByTestId('crud-modal-mobile-form-backdrop')
+    ).not.toBeInTheDocument();
+
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: originalWidth,
+    });
   });
 
   it('renders reusable CrudModal with select and number fields', async () => {

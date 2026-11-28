@@ -81,29 +81,61 @@ function getNextListPage<T>(
 }
 
 export function useInfiniteCompaniesQuery(
-  searchName: string,
-  searchSeries: string,
+  search: string,
   sort: string
 ) {
-  const seriesFilter = searchSeries.trim()
-    ? Number(searchSeries.trim())
-    : undefined;
+  const searchTerm = search.trim();
+  const seriesFilter = /^\d+$/.test(searchTerm) ? Number(searchTerm) : undefined;
+  const canSearchSeries =
+    seriesFilter !== undefined && Number.isSafeInteger(seriesFilter);
+
   return useInfiniteQuery({
     queryKey: [
       ...cfoQueryKeys.companies,
       'infinite',
-      searchName,
-      searchSeries,
+      search,
       sort,
     ],
-    queryFn: ({ pageParam }) =>
-      fetchCompanies({
+    queryFn: async ({ pageParam }) => {
+      const searchResults = await fetchCompanies({
         page: pageParam,
         per_page: CFO_LIST_PAGE_SIZE,
-        search: searchName.trim() || undefined,
+        search: searchTerm || undefined,
         sort,
+      });
+
+      if (!canSearchSeries) {
+        return searchResults;
+      }
+
+      const seriesResults = await fetchCompanies({
+        page: pageParam,
+        per_page: CFO_LIST_PAGE_SIZE,
         series: seriesFilter,
-      }),
+        sort,
+      });
+      const companies = new Map(
+        [...searchResults.data, ...seriesResults.data].map((company) => [
+          company.id,
+          company,
+        ])
+      );
+      const lastPage = Math.max(
+        ...[searchResults, seriesResults].map(
+          (response) =>
+            response.meta.last_page ??
+            (response.data.length === CFO_LIST_PAGE_SIZE
+              ? pageParam + 1
+              : pageParam)
+        )
+      );
+
+      return {
+        ...searchResults,
+        data: [...companies.values()],
+        meta: { ...searchResults.meta, last_page: lastPage },
+      };
+    },
     initialPageParam: 1,
     getNextPageParam: (lastPage, _allPages, lastPageParam) =>
       getNextListPage(lastPage, lastPageParam),
@@ -714,11 +746,19 @@ export interface ExpenseItemMutationInput {
 export function useMasterOperasionalCrudResource(
   enabled: boolean,
   company: Company | null,
-  options: { includeTypes?: boolean; includeItems?: boolean } = {}
+  options: {
+    includeTypes?: boolean;
+    includeItems?: boolean;
+    itemDateRange?: { from: string; to: string };
+  } = {}
 ) {
   const queryClient = useQueryClient();
   const [mutationError, setMutationError] = useState<string | null>(null);
-  const { includeTypes = true, includeItems = true } = options;
+  const {
+    includeTypes = true,
+    includeItems = true,
+    itemDateRange,
+  } = options;
 
   const categoriesQuery = useQuery<ExpenseCategory[]>({
     queryKey: cfoQueryKeys.expenseCategories,
@@ -739,9 +779,18 @@ export function useMasterOperasionalCrudResource(
   });
 
   const itemsQuery = useQuery<ExpenseItem[]>({
-    queryKey: cfoQueryKeys.expenseItems,
+    queryKey: itemDateRange
+      ? [...cfoQueryKeys.expenseItems, itemDateRange]
+      : cfoQueryKeys.expenseItems,
     queryFn: async () => {
-      const res = await fetchExpenseItems();
+      const res = await fetchExpenseItems(
+        itemDateRange
+          ? {
+              date_from: itemDateRange.from,
+              date_to: itemDateRange.to,
+            }
+          : undefined
+      );
       return res?.data ?? [];
     },
     enabled: enabled && includeItems,

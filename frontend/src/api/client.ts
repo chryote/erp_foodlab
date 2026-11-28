@@ -1112,14 +1112,16 @@ export async function fetchCfoEnums(): Promise<{ data: CfoEnums }> {
 }
 
 interface ListRequestParams {
-  page: number;
-  per_page: number;
+  page?: number;
+  per_page?: number;
   search?: string;
   sort?: string;
   company_id?: number;
   series?: number;
   expense_category_id?: number;
   expense_type_id?: number;
+  date_from?: string;
+  date_to?: string;
 }
 
 
@@ -1128,10 +1130,13 @@ function buildListQuery(params?: ListRequestParams): string {
     return '';
   }
 
-  const query = new URLSearchParams({
-    page: String(params.page),
-    per_page: String(params.per_page),
-  });
+  const query = new URLSearchParams();
+  if (params.page !== undefined) {
+    query.set('page', String(params.page));
+  }
+  if (params.per_page !== undefined) {
+    query.set('per_page', String(params.per_page));
+  }
   if (params.search?.trim()) {
     query.set('filter[search]', params.search.trim());
   }
@@ -1153,8 +1158,15 @@ function buildListQuery(params?: ListRequestParams): string {
   if (params.expense_type_id !== undefined) {
     query.set('filter[expense_type_id]', String(params.expense_type_id));
   }
+  if (params.date_from) {
+    query.set('filter[date_from]', params.date_from);
+  }
+  if (params.date_to) {
+    query.set('filter[date_to]', params.date_to);
+  }
 
-  return `?${query.toString()}`;
+  const queryString = query.toString();
+  return queryString ? `?${queryString}` : '';
 }
 
 export async function fetchCompanies(
@@ -1361,7 +1373,7 @@ export async function deleteExpenseType(
 }
 
 export async function fetchExpenseItems(
-  params?: ListRequestParams
+  params?: Partial<ListRequestParams>
 ): Promise<ExpenseItemsListResponse> {
   return requestJson<ExpenseItemsListResponse>(
     `/v1/modules/cfo/expense-items${buildListQuery(params)}`,
@@ -1809,9 +1821,11 @@ export async function uploadEmployeeDocument(
   );
 }
 
-export async function fetchEmployeeShifts(): Promise<EmployeeShiftsListResponse> {
+export async function fetchEmployeeShifts(
+  params?: ListRequestParams
+): Promise<EmployeeShiftsListResponse> {
   return requestJson<EmployeeShiftsListResponse>(
-    '/v1/modules/hr/employee-shifts',
+    `/v1/modules/hr/employee-shifts${buildListQuery(params)}`,
     {},
     'Failed to fetch employee shifts'
   );
@@ -1856,9 +1870,11 @@ export async function deleteEmployeeShift(
   );
 }
 
-export async function fetchEmployeeShiftAssignments(): Promise<EmployeeShiftAssignmentsListResponse> {
+export async function fetchEmployeeShiftAssignments(
+  params?: ListRequestParams
+): Promise<EmployeeShiftAssignmentsListResponse> {
   return requestJson<EmployeeShiftAssignmentsListResponse>(
-    '/v1/modules/hr/employee-shift-assignments',
+    `/v1/modules/hr/employee-shift-assignments${buildListQuery(params)}`,
     {},
     'Failed to fetch employee shift assignments'
   );
@@ -1903,9 +1919,11 @@ export async function deleteEmployeeShiftAssignment(
   );
 }
 
-export async function fetchEmployeeAttendances(): Promise<EmployeeAttendancesListResponse> {
+export async function fetchEmployeeAttendances(
+  params?: ListRequestParams
+): Promise<EmployeeAttendancesListResponse> {
   return requestJson<EmployeeAttendancesListResponse>(
-    '/v1/modules/hr/employee-attendances',
+    `/v1/modules/hr/employee-attendances${buildListQuery(params)}`,
     {},
     'Failed to fetch employee attendances'
   );
@@ -2001,9 +2019,11 @@ export async function fetchCpoEnums(): Promise<{ data: CpoEnums }> {
   );
 }
 
-export async function fetchItems(): Promise<ItemsListResponse> {
+export async function fetchItems(
+  params?: ListRequestParams
+): Promise<ItemsListResponse> {
   return requestJson<ItemsListResponse>(
-    '/v1/modules/cpo/items',
+    `/v1/modules/cpo/items${buildListQuery(params)}`,
     {},
     'Failed to fetch items'
   );
@@ -2046,9 +2066,11 @@ export async function deleteItem(id: number): Promise<{ message: string }> {
   );
 }
 
-export async function fetchPackets(): Promise<PacketsListResponse> {
+export async function fetchPackets(
+  params?: ListRequestParams
+): Promise<PacketsListResponse> {
   return requestJson<PacketsListResponse>(
-    '/v1/modules/cpo/packets',
+    `/v1/modules/cpo/packets${buildListQuery(params)}`,
     {},
     'Failed to fetch packets'
   );
@@ -2091,9 +2113,11 @@ export async function deletePacket(id: number): Promise<{ message: string }> {
   );
 }
 
-export async function fetchItemPackets(): Promise<ItemPacketsListResponse> {
+export async function fetchItemPackets(
+  params?: ListRequestParams
+): Promise<ItemPacketsListResponse> {
   return requestJson<ItemPacketsListResponse>(
-    '/v1/modules/cpo/item-packets',
+    `/v1/modules/cpo/item-packets${buildListQuery(params)}`,
     {},
     'Failed to fetch item packets'
   );

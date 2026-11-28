@@ -1,5 +1,10 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import {
   ApiRequestError,
   type Company,
@@ -82,6 +87,76 @@ export const cpoQueryKeys = {
   defaultPackages: ['cpo', 'default-packages'] as const,
   ingredients: ['cpo', 'ingredients'] as const,
 };
+
+export const CPO_LIST_PAGE_SIZE = 10;
+
+function getNextCpoListPage<T>(
+  response: { data: T[]; meta: { last_page?: number } },
+  page: number
+): number | undefined {
+  if (response.meta.last_page !== undefined) {
+    return page < response.meta.last_page ? page + 1 : undefined;
+  }
+  return response.data.length === CPO_LIST_PAGE_SIZE ? page + 1 : undefined;
+}
+
+export function useInfiniteItemsQuery(
+  companyId: number | null,
+  sort: string,
+  enabled = true
+) {
+  return useInfiniteQuery({
+    queryKey: [...cpoQueryKeys.items, 'infinite', companyId, sort],
+    queryFn: ({ pageParam }) =>
+      fetchItems({
+        page: pageParam,
+        per_page: CPO_LIST_PAGE_SIZE,
+        company_id: companyId ?? undefined,
+        sort,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      getNextCpoListPage(lastPage, lastPageParam),
+    enabled: enabled && companyId !== null,
+  });
+}
+
+export function useInfinitePacketsQuery(sort: string, enabled = true) {
+  return useInfiniteQuery({
+    queryKey: [...cpoQueryKeys.packets, 'infinite', sort],
+    queryFn: ({ pageParam }) =>
+      fetchPackets({
+        page: pageParam,
+        per_page: CPO_LIST_PAGE_SIZE,
+        sort,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      getNextCpoListPage(lastPage, lastPageParam),
+    enabled,
+  });
+}
+
+export function useInfiniteItemPacketsQuery(
+  companyId: number | null,
+  sort: string,
+  enabled = true
+) {
+  return useInfiniteQuery({
+    queryKey: [...cpoQueryKeys.itemPackets, 'infinite', companyId, sort],
+    queryFn: ({ pageParam }) =>
+      fetchItemPackets({
+        page: pageParam,
+        per_page: CPO_LIST_PAGE_SIZE,
+        company_id: companyId ?? undefined,
+        sort,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      getNextCpoListPage(lastPage, lastPageParam),
+    enabled: enabled && companyId !== null,
+  });
+}
 
 function getErrorMessage(err: unknown, fallback: string): string | null {
   if (!err) {
@@ -265,7 +340,8 @@ export function useItemCrudResource(enabled: boolean) {
 
 export function useMasterPackingCrudResource(
   enabled: boolean,
-  company: Company | null
+  company: Company | null,
+  loadLists = true
 ) {
   const queryClient = useQueryClient();
   const [mutationError, setMutationError] = useState<string | null>(null);
@@ -284,7 +360,7 @@ export function useMasterPackingCrudResource(
     []
   );
 
-  const itemsCore = useItemsCore(enabled, runMutation);
+  const itemsCore = useItemsCore(enabled && loadLists, runMutation);
 
   const packetsQuery = useQuery<Packet[]>({
     queryKey: cpoQueryKeys.packets,
@@ -292,7 +368,7 @@ export function useMasterPackingCrudResource(
       const res = await fetchPackets();
       return res?.data ?? [];
     },
-    enabled,
+    enabled: enabled && loadLists,
   });
 
   const itemPacketsQuery = useQuery<ItemPacket[]>({
@@ -301,7 +377,7 @@ export function useMasterPackingCrudResource(
       const res = await fetchItemPackets();
       return res?.data ?? [];
     },
-    enabled,
+    enabled: enabled && loadLists,
   });
 
   const allItems = itemsCore.allItems;

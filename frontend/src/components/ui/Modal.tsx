@@ -1,13 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Pencil, Trash2, X } from 'lucide-react';
 import { cn, formatCapitalInput } from '@/lib/utils';
 import { Button, type ButtonVariant } from './Button';
-import { DataTable, type DataTableColumn } from './DataTable';
+import {
+  DataTable,
+  DataTableSearch,
+  type DataTableColumn,
+} from './DataTable';
 import { Pagination } from './Pagination';
+import { CardHeader } from './Card';
 import { ShadcnInput } from './shadcn/input';
 import { ShadcnLabel } from './shadcn/label';
 
 export interface ModalProps {
   isOpen: boolean;
+  pageMode?: boolean;
   title: string;
   subtitle?: string;
   testId?: string;
@@ -21,6 +28,7 @@ export interface ModalProps {
 
 export const Modal: React.FC<ModalProps> = ({
   isOpen,
+  pageMode = false,
   title,
   subtitle,
   testId = 'ui-modal',
@@ -33,6 +41,20 @@ export const Modal: React.FC<ModalProps> = ({
 }) => {
   if (!isOpen) {
     return null;
+  }
+
+  if (pageMode) {
+    return (
+      <section
+        className="mx-auto flex min-h-[calc(100dvh-12rem)] max-w-340 flex-col gap-4"
+        data-testid={`${testId}-page`}
+      >
+        <CardHeader title={title} subtitle={subtitle} />
+        <div className={cn('flex min-h-0 flex-1 flex-col gap-4', bodyClassName)}>
+          {children}
+        </div>
+      </section>
+    );
   }
 
   return (
@@ -64,8 +86,9 @@ export const Modal: React.FC<ModalProps> = ({
             variant="secondary"
             aria-label="Tutup Modal"
             onClick={onClose}
+            className="h-9 w-9 p-0"
           >
-            Tutup
+            <X className="h-4 w-4" aria-hidden="true" />
           </Button>
         </div>
 
@@ -563,12 +586,23 @@ export interface CrudFieldConfig<T> {
   resetFieldsOnChange?: (keyof T & string)[];
   renderValue?: (row: T) => React.ReactNode;
   filterText?: (row: T) => string;
+  sortable?: boolean;
+  sortKey?: string;
+  renderControl?: (props: {
+    id: string;
+    value: string;
+    disabled: boolean;
+    placeholder?: string;
+    editingItem: T | null;
+    onChange: (value: string) => void;
+  }) => React.ReactNode;
 }
 
 export interface CrudComputedColumnConfig<T> {
   key: string;
   label: string;
   render: (row: T, index: number) => React.ReactNode;
+  sortable?: boolean;
   filterText?: (row: T) => string;
 }
 
@@ -606,6 +640,20 @@ export interface CrudModalProps<T extends CrudEntity> {
   layout?: 'stacked' | 'split';
   labelPlacement?: FieldLabelPlacement;
   modalSize?: 'default' | 'expanded';
+  pageMode?: boolean;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  isLoadingMore?: boolean;
+  loadMoreError?: string | null;
+  onRetryLoadMore?: () => void;
+  displayItems?: T[];
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  onSearchSubmit?: () => void;
+  sortKey?: string | null;
+  sortDirection?: 'asc' | 'desc';
+  onSort?: (key: string) => void;
+  hideRowNumber?: boolean;
   maxWidthClass?: string;
   dialogClassName?: string;
   formLayout?: 'auto' | 'single-row';
@@ -641,6 +689,20 @@ export function CrudModal<T extends CrudEntity>({
   layout = 'stacked',
   labelPlacement = 'top',
   modalSize = 'default',
+  pageMode = false,
+  hasMore = false,
+  onLoadMore,
+  isLoadingMore = false,
+  loadMoreError = null,
+  onRetryLoadMore,
+  displayItems,
+  searchValue,
+  onSearchChange,
+  onSearchSubmit,
+  sortKey,
+  sortDirection,
+  onSort,
+  hideRowNumber = false,
   maxWidthClass,
   dialogClassName,
   formLayout = 'auto',
@@ -687,9 +749,11 @@ export function CrudModal<T extends CrudEntity>({
   const [currentPage, setCurrentPage] = useState(1);
   const [pendingAction, setPendingAction] =
     useState<PendingCrudAction<T> | null>(null);
+  const [mobileFormOpen, setMobileFormOpen] = useState(false);
 
   useEffect(() => {
     setFormValues(createEmptyFormValues());
+    setMobileFormOpen(false);
     setEditingItem(null);
     setCurrentPage(1);
     setPendingAction(null);
@@ -762,6 +826,7 @@ export function CrudModal<T extends CrudEntity>({
       await onCreate?.(currentAction.values);
       setFormValues(createEmptyFormValues());
       setCurrentPage(1);
+      setMobileFormOpen(false);
     } else if (currentAction.type === 'update') {
       await onUpdate?.(currentAction.id, currentAction.values);
       setEditingItem(null);
@@ -811,6 +876,9 @@ export function CrudModal<T extends CrudEntity>({
 
   const handleStartEdit = (item: T) => {
     setEditingItem(item);
+    if (pageMode && window.innerWidth < 1024) {
+      setMobileFormOpen(true);
+    }
     const nextValues: Record<string, string> = {};
     for (const field of resolvedFields) {
       const raw = item[field.key];
@@ -834,21 +902,31 @@ export function CrudModal<T extends CrudEntity>({
   const handleCancelEdit = () => {
     setEditingItem(null);
     setFormValues(createEmptyFormValues());
+    if (pageMode) {
+      setMobileFormOpen(false);
+    }
   };
 
   const columns: DataTableColumn<T>[] = [
-    {
-      key: 'no',
-      header: 'No',
-      render: (_row, index) => (
-        <code>{(safeCurrentPage - 1) * pageSize + index + 1}</code>
-      ),
-    },
+    ...(!hideRowNumber
+      ? [
+          {
+            key: 'no',
+            header: 'No',
+            render: (_row: T, index: number) => (
+              <code>
+                {(pageMode ? 0 : (safeCurrentPage - 1) * pageSize) + index + 1}
+              </code>
+            ),
+          },
+        ]
+      : []),
     ...resolvedFields
       .filter((field) => !field.hideInTable)
       .map((field) => ({
-      key: field.key,
+      key: field.sortKey ?? field.key,
       header: field.label,
+      sortable: field.sortable,
       render: (row: T) => {
         if (field.renderValue) {
           return field.renderValue(row);
@@ -872,6 +950,7 @@ export function CrudModal<T extends CrudEntity>({
     ...computedColumns.map((col) => ({
       key: col.key,
       header: col.label,
+      sortable: col.sortable,
       render: (row: T, index: number) => col.render(row, index),
     })),
     ...(!readOnly || rowActions.length > 0
@@ -879,6 +958,7 @@ export function CrudModal<T extends CrudEntity>({
           {
             key: 'actions',
             header: 'Aksi',
+            sticky: pageMode,
             render: (row: T) => (
               <div
                 className="flex flex-nowrap items-center gap-1.5 whitespace-nowrap"
@@ -909,21 +989,39 @@ export function CrudModal<T extends CrudEntity>({
                   <>
                     <Button
                       variant="secondary"
-                      className="h-7 px-2.5 py-1 text-xs"
+                      className={
+                        pageMode
+                          ? 'h-9 w-9 p-0'
+                          : 'h-7 px-2.5 py-1 text-xs'
+                      }
+                      aria-label={`Edit ${String(row.id)}`}
                       data-testid={`edit-row-${row.id}`}
                       onClick={() => handleStartEdit(row)}
                     >
-                      Edit
+                      {pageMode ? (
+                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                      ) : (
+                        'Edit'
+                      )}
                     </Button>
                     <Button
-                      variant="ghost"
-                      className="h-7 px-2.5 py-1 text-xs"
+                      variant={pageMode ? 'secondary' : 'ghost'}
+                      className={
+                        pageMode
+                          ? 'h-9 w-9 p-0'
+                          : 'h-7 px-2.5 py-1 text-xs'
+                      }
+                      aria-label={`Hapus ${String(row.id)}`}
                       data-testid={`delete-row-${row.id}`}
                       onClick={() =>
                         setPendingAction({ type: 'delete', id: row.id })
                       }
                     >
-                      Hapus
+                      {pageMode ? (
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      ) : (
+                        'Hapus'
+                      )}
                     </Button>
                   </>
                 )}
@@ -943,6 +1041,25 @@ export function CrudModal<T extends CrudEntity>({
       typeof field.disabled === 'function'
         ? field.disabled(formValues)
         : field.disabled;
+    if (field.renderControl) {
+      return (
+        <FieldWrapper
+          key={field.key}
+          id={`${testId}-${field.key}-input`}
+          label={field.label}
+          labelPlacement={labelPlacement}
+        >
+          {field.renderControl({
+            id: `${testId}-${field.key}-input`,
+            value: formValues[field.key] ?? '',
+            disabled: Boolean(isFieldDisabled),
+            placeholder: field.placeholder,
+            editingItem,
+            onChange: (value) => handleFieldChange(field.key, value),
+          })}
+        </FieldWrapper>
+      );
+    }
     if (field.type === 'select') {
       const resolvedOptions =
         typeof field.options === 'function'
@@ -1068,9 +1185,19 @@ export function CrudModal<T extends CrudEntity>({
   const dataTableElement = (
     <DataTable
       columns={columns}
-      data={paginatedItems}
+      data={pageMode ? (displayItems ?? items) : paginatedItems}
       rowKey={(row) => row.id}
       emptyMessage={emptyMessage}
+      stickyHeader={pageMode}
+      scrollTestId={pageMode ? `${testId}-table-scroll` : undefined}
+      hasMore={pageMode && hasMore}
+      onLoadMore={pageMode ? onLoadMore : undefined}
+      isLoadingMore={pageMode && isLoadingMore}
+      loadMoreError={pageMode ? loadMoreError : null}
+      onRetryLoadMore={pageMode ? onRetryLoadMore : undefined}
+      sortKey={sortKey}
+      sortDirection={sortDirection}
+      onSort={pageMode ? onSort : undefined}
     />
   );
 
@@ -1083,6 +1210,144 @@ export function CrudModal<T extends CrudEntity>({
       onPageChange={setCurrentPage}
     />
   );
+
+  const formPanel = (
+    <div
+      data-testid={`${testId}-form-panel`}
+      className={cn(
+        'flex min-h-0 flex-col lg:overflow-y-auto',
+        pageMode
+          ? 'p-0'
+          : 'rounded-xl border border-border bg-muted/25 p-4'
+      )}
+    >
+      <form
+        onSubmit={handleSubmit}
+        data-testid={`${testId}-form`}
+        className="flex flex-col gap-4"
+      >
+        <div className="border-b border-border pb-2.5">
+          <h3 className="text-sm font-semibold text-foreground">
+            {editingItem ? 'Edit Data' : 'Tambah Data'}
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            {editingItem
+              ? 'Perbarui data yang dipilih lalu simpan perubahan.'
+              : 'Lengkapi formulir di bawah ini untuk menambahkan data baru.'}
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-3">
+          {resolvedFields
+            .filter((field) => !field.hideInForm)
+            .map((field) => renderFieldControl(field))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+          {formActionButtons}
+        </div>
+      </form>
+    </div>
+  );
+
+  if (pageMode) {
+    if (!isOpen) {
+      return null;
+    }
+
+    return (
+      <>
+        <section
+          data-testid={`${testId}-page`}
+          className="mx-auto flex min-h-[calc(100dvh-12rem)] max-w-340 flex-col gap-4"
+        >
+          <CardHeader
+            title={title}
+            subtitle={subtitle}
+            actions={
+              !readOnly ? (
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={() => {
+                    handleCancelEdit();
+                    setMobileFormOpen(true);
+                  }}
+                  data-testid={`${testId}-mobile-add`}
+                  className="lg:hidden"
+                >
+                  Tambah Data
+                </Button>
+              ) : undefined
+            }
+          />
+          {tabs}
+          {error && (
+            <div
+              role="alert"
+              className="rounded-lg border border-primary/30 bg-primary/5 px-3.5 py-2.5 text-sm text-primary"
+            >
+              {error}
+            </div>
+          )}
+          <div
+            data-testid={`${testId}-split-layout`}
+            className={cn(
+              'grid min-h-0 flex-1 grid-cols-1 gap-4',
+              !readOnly && 'lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]'
+            )}
+          >
+            {!readOnly && (
+              <div className="hidden min-h-0 lg:flex">{formPanel}</div>
+            )}
+            <div
+              data-testid={`${testId}-table-panel`}
+              className="flex min-h-0 min-w-0 flex-col"
+            >
+              {summary}
+              {onSearchChange && searchValue !== undefined && (
+                <DataTableSearch
+                  searchValue={searchValue}
+                  onSearchChange={onSearchChange}
+                  searchLabel={`Cari ${title.toLowerCase()}`}
+                  searchPlaceholder={`Cari ${title.toLowerCase()}...`}
+                  searchTestId={`${testId}-search`}
+                  onSearchSubmit={onSearchSubmit}
+                />
+              )}
+              {loading ? (
+                <p className="py-8 text-center text-sm text-muted-foreground" role="status">
+                  Memuat data...
+                </p>
+              ) : (
+                dataTableElement
+              )}
+            </div>
+          </div>
+        </section>
+        {!readOnly && (
+          <Modal
+            isOpen={mobileFormOpen}
+            title={title}
+            subtitle={subtitle}
+            testId={`${testId}-mobile-form`}
+            onClose={() => {
+              setMobileFormOpen(false);
+              handleCancelEdit();
+            }}
+          >
+            {formPanel}
+          </Modal>
+        )}
+        <ConfirmDialog
+          isOpen={pendingAction !== null}
+          title={confirmDialogConfig.title}
+          message={confirmDialogConfig.message}
+          loading={loading}
+          onConfirm={handleConfirmPendingAction}
+          onCancel={() => setPendingAction(null)}
+        />
+      </>
+    );
+  }
 
   return (
     <>

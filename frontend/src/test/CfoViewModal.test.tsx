@@ -32,9 +32,11 @@ describe('CFO view modal', () => {
         );
         if (params?.search) {
           matching = matching.filter((item) =>
-            item.stakeholder_name
-              .toLowerCase()
-              .includes(params.search!.toLowerCase())
+            item.stakeholder_name.toLowerCase().includes(
+              params.search!.toLowerCase()
+            ) ||
+            (Number.isFinite(Number(params.search)) &&
+              item.capital === Number(params.search))
           );
         }
         if (params?.sort === 'stakeholder_name') {
@@ -126,6 +128,22 @@ describe('CFO view modal', () => {
           sort: 'stakeholder_name',
         })
       )
+    );
+
+    fireEvent.change(screen.getByTestId('pemegang-saham-table-search'), {
+      target: { value: '12000' },
+    });
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 600));
+    });
+    expect(await screen.findByText('Owner 12')).toBeInTheDocument();
+    expect(screen.queryByText('Owner 1')).not.toBeInTheDocument();
+    expect(apiClient.fetchCapitalCompanies).toHaveBeenCalledWith(
+      expect.objectContaining({
+        company_id: 21,
+        search: '12000',
+        page: 1,
+      })
     );
   });
 });

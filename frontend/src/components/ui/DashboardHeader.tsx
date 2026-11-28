@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { LogOut } from 'lucide-react';
 import type {
   AuthUser,
@@ -29,7 +29,10 @@ import {
   CHO_MENU_ITEMS,
   DEFAULT_CHO_MODULE,
 } from '@/modules/CHO/ChoModuleCard';
-import { DEFAULT_CPO_MODULE } from '@/modules/CPO/CpoModuleCard';
+import {
+  CPO_MENU_ITEMS,
+  DEFAULT_CPO_MODULE,
+} from '@/modules/CPO/CpoModuleCard';
 import { DEFAULT_CDO_MODULE } from '@/modules/CDO/CdoModuleCard';
 import { DEFAULT_CMO_MODULE } from '@/modules/CMO/CmoModuleCard';
 import { useTheme } from '@/lib/theme';
@@ -85,7 +88,7 @@ export const COMPANY_MENU_MODULES: Array<{
 }> = [
   { code: 'CFO', fallback: DEFAULT_CFO_MODULE, items: CFO_MENU_ITEMS },
   { code: 'CHO', fallback: DEFAULT_CHO_MODULE, items: CHO_MENU_ITEMS },
-  { code: 'CPO', fallback: DEFAULT_CPO_MODULE, items: COMPANY_MENU_ITEMS },
+  { code: 'CPO', fallback: DEFAULT_CPO_MODULE, items: CPO_MENU_ITEMS },
   { code: 'CDO', fallback: DEFAULT_CDO_MODULE, items: COMPANY_MENU_ITEMS },
   { code: 'CMO', fallback: DEFAULT_CMO_MODULE, items: COMPANY_MENU_ITEMS },
 ];
@@ -111,6 +114,8 @@ export interface DashboardHeaderProps {
     menuItem: HorizontalMenuItem,
     childItem?: HorizontalMenuItem
   ) => void;
+  onNavigateAdminMasterModal?: () => void;
+  isAdminMasterModalActive?: boolean;
   onLogout?: () => void | Promise<void>;
 }
 
@@ -130,11 +135,21 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   onSelectSubMenu,
   onSelectChildSubMenu,
   onSelectItem,
+  onNavigateAdminMasterModal,
+  isAdminMasterModalActive = false,
   onLogout,
 }) => {
   const theme = useTheme();
   const [logoutConfirmationOpen, setLogoutConfirmationOpen] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
+  const [openCompanyMenuId, setOpenCompanyMenuId] = useState<number | null>(
+    null
+  );
+  const [seriesSelectedOnAdminPage, setSeriesSelectedOnAdminPage] =
+    useState(false);
+  useEffect(() => {
+    setSeriesSelectedOnAdminPage(false);
+  }, [isAdminMasterModalActive]);
   const seriesList = useMemo(
     () =>
       Array.from(new Set(companies.map((company) => company.series ?? 1))).sort(
@@ -146,6 +161,10 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     selectedSeries !== undefined && seriesList.includes(selectedSeries)
       ? selectedSeries
       : (seriesList[0] ?? 1);
+  const showSeriesAndCompanyIndicators =
+    !isAdminMasterModalActive || seriesSelectedOnAdminPage;
+  const showAdminPageIndicator =
+    isAdminMasterModalActive && !seriesSelectedOnAdminPage;
   const companiesInActiveSeries = companies.filter(
     (company) => (company.series ?? 1) === activeSeries
   );
@@ -208,10 +227,15 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   role="tab"
                   aria-selected={isSelected}
                   data-testid={`dashboard-series-tab-${series}`}
-                  onClick={() => onSelectSeries?.(series)}
+                  onClick={() => {
+                    if (isAdminMasterModalActive) {
+                      setSeriesSelectedOnAdminPage(true);
+                    }
+                    onSelectSeries?.(series);
+                  }}
                   className={cn(
                     'relative shrink-0 px-3 text-xs font-semibold transition-colors sm:px-4',
-                    isSelected
+                    isSelected && showSeriesAndCompanyIndicators
                       ? 'after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-primary'
                       : ''
                   )}
@@ -220,6 +244,25 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 </button>
               );
             })}
+            {user?.role === 'admin' && (
+              <button
+                type="button"
+                aria-current={isAdminMasterModalActive ? 'page' : undefined}
+                data-testid="dashboard-admin-master-modal"
+                onClick={() => {
+                  setSeriesSelectedOnAdminPage(false);
+                  onNavigateAdminMasterModal?.();
+                }}
+                className={cn(
+                  'relative shrink-0 px-3 text-xs font-semibold transition-colors sm:px-4',
+                  showAdminPageIndicator
+                    ? 'after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-primary'
+                    : ''
+                )}
+              >
+                Master Modal
+              </button>
+            )}
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
@@ -259,19 +302,35 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         <div className="flex min-h-12 items-center justify-between gap-3">
           <Menubar
             aria-label="Companies"
+            value={openCompanyMenuId?.toString() ?? ''}
+            onValueChange={(value) => {
+              if (!value) {
+                setOpenCompanyMenuId(null);
+              }
+            }}
             className="flex h-auto min-h-12 min-w-0 flex-1 justify-start gap-1 overflow-x-auto rounded-none border-0 bg-transparent p-0 shadow-none"
           >
             {companiesInActiveSeries.map((company) => {
               const isSelected = selectedCompanyId === company.id;
               return (
-                <MenubarMenu key={company.id}>
+                <MenubarMenu key={company.id} value={company.id.toString()}>
                   <MenubarTrigger
                     aria-selected={isSelected}
                     aria-current={isSelected ? 'page' : undefined}
                     data-testid={`dashboard-company-tab-${company.id}`}
+                    onClick={() =>
+                      setOpenCompanyMenuId(
+                        openCompanyMenuId === company.id ? null : company.id
+                      )
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === 'ArrowDown') {
+                        setOpenCompanyMenuId(company.id);
+                      }
+                    }}
                     className={cn(
                       'relative h-12 shrink-0 rounded-sm px-3 text-xs font-semibold transition-colors sm:px-4',
-                      isSelected
+                      isSelected && showSeriesAndCompanyIndicators
                         ? 'after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-primary'
                         : ''
                     )}
@@ -282,6 +341,20 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     {COMPANY_MENU_MODULES.map((moduleConfig) => {
                       const module =
                         modulesMap[moduleConfig.code] ?? moduleConfig.fallback;
+                      const menuItems =
+                        moduleConfig.code === 'CFO'
+                          ? moduleConfig.items.map((menuItem) =>
+                              menuItem.code === 'INPUT_MODAL'
+                                ? {
+                                    ...menuItem,
+                                    children: menuItem.children?.filter(
+                                      (childItem) =>
+                                        childItem.code !== 'PERUSAHAAN'
+                                    ),
+                                  }
+                                : menuItem
+                            )
+                          : moduleConfig.items;
 
                       return (
                         <MenubarSub key={moduleConfig.code}>
@@ -296,7 +369,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                             {moduleConfig.code}
                           </MenubarSubTrigger>
                           <MenubarSubContent className={`w-max ${theme === "dark" ? 'border-gray-800' : 'border-gray-200'}`}>
-                            {moduleConfig.items.map((menuItem) => (
+                            {menuItems.map((menuItem) => (
                               menuItem.children?.length ? (
                                 <MenubarSub key={menuItem.code}>
                                   <MenubarSubTrigger

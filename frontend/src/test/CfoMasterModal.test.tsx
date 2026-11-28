@@ -200,7 +200,7 @@ describe('CFO master modal', () => {
   it('loads server pages on scroll and searches each table on the server', async () => {
     const companyRows = Array.from({ length: 25 }, (_, index) => ({
         id: 21 + index,
-        name: `Company ${index + 1}`,
+        name: index === 11 ? 'Series match' : `Company ${index + 1}`,
         series: index === 11 ? 2 : 1,
       }));
     vi.mocked(apiClient.fetchCompanies).mockImplementation(async (params) => {
@@ -309,13 +309,18 @@ describe('CFO master modal', () => {
     expect(screen.queryByText('Company 1')).not.toBeInTheDocument();
     submitSearch('perusahaan-table-search', '');
     expect(await screen.findByText('Company 1')).toBeInTheDocument();
-    submitSearch('perusahaan-series-search', '2');
-    expect(await screen.findByText('Company 12')).toBeInTheDocument();
+    submitSearch('perusahaan-table-search', '2');
+    expect(await screen.findByText('Series match')).toBeInTheDocument();
     expect(apiClient.fetchCompanies).toHaveBeenCalledWith(
-      expect.objectContaining({ search: undefined, series: 2, page: 1 })
+      expect.objectContaining({ search: '2', page: 1 })
     );
-    expect(screen.queryByText('Company 1')).not.toBeInTheDocument();
-    submitSearch('perusahaan-series-search', '');
+    expect(apiClient.fetchCompanies).toHaveBeenCalledWith(
+      expect.objectContaining({ series: 2, page: 1 })
+    );
+    expect(
+      screen.queryByTestId('perusahaan-series-search')
+    ).not.toBeInTheDocument();
+    submitSearch('perusahaan-table-search', '');
     expect(await screen.findByText('Company 1')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('stakeholder-row-21'));

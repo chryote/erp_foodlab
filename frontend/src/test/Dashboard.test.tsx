@@ -119,9 +119,8 @@ describe('Dashboard', () => {
       'aria-selected',
       'true'
     );
-    expect(await screen.findByText('Manajemen Perusahaan')).toBeInTheDocument();
     expect(screen.getByTestId('current-path')).toHaveTextContent(
-      '/dashboard/company/3/menu/CFO/INPUT_MODAL/master-modal'
+      '/dashboard/company/3/menu/CFO/INPUT_MODAL/view-modal'
     );
     expect(getActiveCompanyId()).toBe(3);
 
@@ -135,13 +134,13 @@ describe('Dashboard', () => {
       'true'
     );
     expect(screen.getByTestId('current-path')).toHaveTextContent(
-      '/dashboard/company/3/menu/CFO/INPUT_MODAL/master-modal'
+      '/dashboard/company/3/menu/CFO/INPUT_MODAL/view-modal'
     );
     expect(getActiveCompanyId()).toBe(3);
     expect(apiClient.syncActiveCompany).not.toHaveBeenCalledWith(1);
   });
 
-  it('navigates from a nested menu leaf to the master modal page', async () => {
+  it('navigates from a nested menu leaf to the capital companies view', async () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.fetchCompanies).mockResolvedValue({
       data: [{ id: 1, name: 'FoodLab Utama', series: 1 }],
@@ -164,8 +163,66 @@ describe('Dashboard', () => {
     await user.keyboard('{ArrowDown}{ArrowRight}{ArrowRight}{Enter}');
 
     expect(screen.getByTestId('current-path')).toHaveTextContent(
-      '/dashboard/company/1/menu/CFO/INPUT_MODAL/master-modal'
+      '/dashboard/company/1/menu/CFO/INPUT_MODAL/view-modal'
+    );
+    expect(await screen.findByTestId('view-modal-card')).toBeInTheDocument();
+  });
+
+  it('routes admins to the standalone master modal and blocks non-admin direct access', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.fetchCurrentUser).mockResolvedValue({
+      data: {
+        id: 1,
+        name: 'ERP Administrator',
+        email: 'admin@foodlab.test',
+      },
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/dashboard']}>
+        <QueryClientProvider client={queryClient}>
+          <CurrentPath />
+          <Dashboard />
+        </QueryClientProvider>
+      </MemoryRouter>
+    );
+
+    await user.click(
+      await screen.findByTestId('dashboard-admin-master-modal')
+    );
+    expect(screen.getByTestId('current-path')).toHaveTextContent(
+      '/dashboard/admin/master-modal'
     );
     expect(await screen.findByText('Manajemen Perusahaan')).toBeInTheDocument();
+  });
+
+  it('redirects non-admin users away from the standalone master modal', async () => {
+    vi.mocked(apiClient.fetchCurrentUser).mockResolvedValue({
+      data: {
+        id: 2,
+        name: 'Regular User',
+        email: 'user@foodlab.test',
+      },
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/dashboard/admin/master-modal']}>
+        <QueryClientProvider client={queryClient}>
+          <CurrentPath />
+          <Dashboard />
+        </QueryClientProvider>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('current-path')).toHaveTextContent('/404');
+    });
+    expect(screen.queryByTestId('master-modal-card')).not.toBeInTheDocument();
   });
 });

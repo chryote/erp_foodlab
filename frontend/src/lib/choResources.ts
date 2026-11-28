@@ -150,7 +150,8 @@ function getNextChoListPage<T>(
 export function useInfiniteEmployeesQuery(
   companyId: number | null,
   search: string,
-  sort: string
+  sort: string,
+  enabled = true
 ) {
   return useInfiniteQuery({
     queryKey: [
@@ -174,7 +175,97 @@ export function useInfiniteEmployeesQuery(
     initialPageParam: 1,
     getNextPageParam: (lastPage, _allPages, lastPageParam) =>
       getNextChoListPage(lastPage, lastPageParam),
-    enabled: companyId !== null,
+    enabled: enabled && companyId !== null,
+  });
+}
+
+export function useInfiniteEmployeeShiftsQuery(
+  companyId: number | null,
+  sort: string,
+  search = '',
+  enabled = true
+) {
+  return useInfiniteQuery({
+    queryKey: [
+      ...choQueryKeys.employeeShifts,
+      'infinite',
+      companyId,
+      sort,
+      search,
+    ],
+    queryFn: ({ pageParam }) =>
+      requireChoListPage(
+        fetchEmployeeShifts({
+          page: pageParam,
+          per_page: CHO_LIST_PAGE_SIZE,
+          company_id: companyId ?? undefined,
+          search: search.trim() || undefined,
+          sort,
+        }),
+        'shift'
+      ),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      getNextChoListPage(lastPage, lastPageParam),
+    enabled: enabled && companyId !== null,
+  });
+}
+
+export function useInfiniteEmployeeShiftAssignmentsQuery(
+  companyId: number | null,
+  sort: string,
+  enabled = true
+) {
+  return useInfiniteQuery({
+    queryKey: [
+      ...choQueryKeys.employeeShiftAssignments,
+      'infinite',
+      companyId,
+      sort,
+    ],
+    queryFn: ({ pageParam }) =>
+      requireChoListPage(
+        fetchEmployeeShiftAssignments({
+          page: pageParam,
+          per_page: CHO_LIST_PAGE_SIZE,
+          company_id: companyId ?? undefined,
+          sort,
+        }),
+        'penugasan shift'
+      ),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      getNextChoListPage(lastPage, lastPageParam),
+    enabled: enabled && companyId !== null,
+  });
+}
+
+export function useInfiniteEmployeeAttendancesQuery(
+  companyId: number | null,
+  sort: string,
+  enabled = true
+) {
+  return useInfiniteQuery({
+    queryKey: [
+      ...choQueryKeys.employeeAttendances,
+      'infinite',
+      companyId,
+      sort,
+    ],
+    queryFn: ({ pageParam }) =>
+      requireChoListPage(
+        fetchEmployeeAttendances({
+          page: pageParam,
+          per_page: CHO_LIST_PAGE_SIZE,
+          company_id: companyId ?? undefined,
+          sort,
+        }),
+        'absensi'
+      ),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      getNextChoListPage(lastPage, lastPageParam),
+    enabled: enabled && companyId !== null,
   });
 }
 
@@ -998,7 +1089,8 @@ export function useActiveCompanyEmployeesResource(
 
 export function useMasterPresensiCrudResource(
   enabled: boolean,
-  company: Company | null
+  company: Company | null,
+  loadLists = true
 ) {
   const queryClient = useQueryClient();
   const [mutationError, setMutationError] = useState<string | null>(null);
@@ -1009,7 +1101,7 @@ export function useMasterPresensiCrudResource(
       const res = await fetchEmployeeShifts();
       return res?.data ?? [];
     },
-    enabled,
+    enabled: enabled && loadLists,
   });
 
   const assignmentsQuery = useQuery<EmployeeShiftAssignment[]>({
@@ -1018,7 +1110,7 @@ export function useMasterPresensiCrudResource(
       const res = await fetchEmployeeShiftAssignments();
       return res?.data ?? [];
     },
-    enabled,
+    enabled: enabled && loadLists,
   });
 
   const employeesQuery = useQuery<Employee[]>({
@@ -1267,7 +1359,9 @@ export function useMasterPresensiCrudResource(
 
 export function useEmployeeAttendanceCrudResource(
   enabled: boolean,
-  company: Company | null
+  company: Company | null,
+  loadAttendances = true,
+  loadEmployees = true
 ) {
   const queryClient = useQueryClient();
   const [mutationError, setMutationError] = useState<string | null>(null);
@@ -1278,7 +1372,7 @@ export function useEmployeeAttendanceCrudResource(
       const res = await fetchEmployeeAttendances();
       return res?.data ?? [];
     },
-    enabled,
+    enabled: enabled && loadAttendances,
   });
 
   const shiftsQuery = useQuery<EmployeeShift[]>({
@@ -1296,7 +1390,7 @@ export function useEmployeeAttendanceCrudResource(
       const res = await fetchEmployees();
       return res?.data ?? [];
     },
-    enabled,
+    enabled: enabled && loadEmployees,
   });
 
   const allAttendances = attendancesQuery.data ?? [];
@@ -1408,7 +1502,7 @@ export function useEmployeeAttendanceCrudResource(
   const loading =
     attendancesQuery.isLoading ||
     shiftsQuery.isLoading ||
-    employeesQuery.isLoading ||
+    (loadEmployees && employeesQuery.isLoading) ||
     createAttendanceMutation.isPending ||
     updateAttendanceMutation.isPending ||
     deleteAttendanceMutation.isPending;

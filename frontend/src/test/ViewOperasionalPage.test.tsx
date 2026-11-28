@@ -164,6 +164,16 @@ describe('View Operasional date filter', () => {
     expect(dateRangeTrigger).toHaveTextContent(
       formatRange(previousMonth, previousMonthEnd)
     );
+    expect(
+      resourceMocks.useMasterOperasionalCrudResource.mock.calls[
+        resourceMocks.useMasterOperasionalCrudResource.mock.calls.length - 1
+      ]?.[2]
+    ).toEqual({
+      itemDateRange: {
+        from: formatDate(previousMonth),
+        to: formatDate(previousMonthEnd),
+      },
+    });
     expect(screen.getByTestId('view-operasional-month-total')).toHaveTextContent(
       '(9)'
     );

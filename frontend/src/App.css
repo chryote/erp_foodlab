@@ -73,6 +73,14 @@
   box-sizing: border-box;
 }
 
+:root.theme-switching,
+:root.theme-switching *,
+:root.theme-switching *::before,
+:root.theme-switching *::after {
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+}
+
 body {
   margin: 0;
   font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,

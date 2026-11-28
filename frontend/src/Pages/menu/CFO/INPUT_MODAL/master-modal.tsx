@@ -46,12 +46,9 @@ export default function CfoMasterModalPage() {
   } = useCompanyCrudResource(false);
   const [companyName, setCompanyName] = useState('');
   const [companySeries, setCompanySeries] = useState('1');
-  const [companyNameSearch, setCompanyNameSearch] = useState('');
-  const [companySeriesSearch, setCompanySeriesSearch] = useState('');
-  const [debouncedCompanyNameSearch, submitCompanyNameSearch] =
-    useDebouncedSearch(companyNameSearch);
-  const [debouncedCompanySeriesSearch, submitCompanySeriesSearch] =
-    useDebouncedSearch(companySeriesSearch);
+  const [companySearch, setCompanySearch] = useState('');
+  const [debouncedCompanySearch, submitCompanySearch] =
+    useDebouncedSearch(companySearch);
   const [companySort, setCompanySort] = useState<{
     key: CompanySortKey;
     direction: SortDirection;
@@ -66,13 +63,31 @@ export default function CfoMasterModalPage() {
     ? `${companySort.direction === 'desc' ? '-' : ''}${companySort.key}`
     : '-id';
   const companyListQuery = useInfiniteCompaniesQuery(
-    debouncedCompanyNameSearch,
-    debouncedCompanySeriesSearch,
+    debouncedCompanySearch,
     companySortParam
   );
   const companies = useMemo(
-    () => companyListQuery.data?.pages.flatMap((page) => page.data) ?? [],
-    [companyListQuery.data]
+    () => {
+      const rows =
+        companyListQuery.data?.pages.flatMap((page) => page.data) ?? [];
+      if (!/^\d+$/.test(debouncedCompanySearch.trim())) {
+        return rows;
+      }
+
+      const key = companySort?.key ?? 'id';
+      const direction = companySort?.direction ?? 'desc';
+      return rows.sort((left, right) => {
+        const comparison =
+          key === 'name'
+            ? left.name.localeCompare(right.name)
+            : Number(left[key] ?? 0) - Number(right[key] ?? 0);
+        if (comparison !== 0) {
+          return direction === 'desc' ? -comparison : comparison;
+        }
+        return left.id - right.id;
+      });
+    },
+    [companyListQuery.data, companySort, debouncedCompanySearch]
   );
 
   const selectCompany = (company: Company) => {
@@ -515,21 +530,12 @@ export default function CfoMasterModalPage() {
               </form>
               <div className="mt-2">
                 <DataTableSearch
-                  searchValue={companyNameSearch}
-                  searchLabel="Cari nama perusahaan"
-                  searchPlaceholder="Cari nama perusahaan..."
+                  searchValue={companySearch}
+                  searchLabel="Cari perusahaan"
+                  searchPlaceholder="Cari nama atau seri perusahaan..."
                   searchTestId="perusahaan-table-search"
-                  secondarySearchValue={companySeriesSearch}
-                  onSecondarySearchChange={setCompanySeriesSearch}
-                  secondarySearchLabel="Cari seri perusahaan"
-                  secondarySearchPlaceholder="Cari seri..."
-                  secondarySearchTestId="perusahaan-series-search"
-                  secondarySearchType="number"
-                  onSearchChange={setCompanyNameSearch}
-                  onSearchSubmit={() => {
-                    submitCompanyNameSearch();
-                    submitCompanySeriesSearch();
-                  }}
+                  onSearchChange={setCompanySearch}
+                  onSearchSubmit={submitCompanySearch}
                 />
               </div>
               {loading || companyListQuery.isLoading ? (
@@ -543,10 +549,6 @@ export default function CfoMasterModalPage() {
                   rowKey={(row) => row.id}
                   stickyHeader
                   showSearch={false}
-                  searchValue={companyNameSearch}
-                  onSearchChange={setCompanyNameSearch}
-                  secondarySearchValue={companySeriesSearch}
-                  onSecondarySearchChange={setCompanySeriesSearch}
                   scrollTestId="perusahaan-table-scroll"
                   hasMore={
                     Boolean(companyListQuery.hasNextPage) &&
@@ -590,8 +592,7 @@ export default function CfoMasterModalPage() {
                     );
                   }}
                   emptyMessage={
-                    debouncedCompanyNameSearch.trim() ||
-                    debouncedCompanySeriesSearch.trim()
+                    debouncedCompanySearch.trim()
                       ? 'Tidak ada perusahaan yang cocok dengan pencarian.'
                       : 'Belum ada data perusahaan.'
                   }

@@ -423,7 +423,10 @@ describe('App ERP Main Menu integration', () => {
 
     // Click "Input Pemegang Saham" button on company row 1 to open stakeholder modal
     const stakeholderBtn = screen.getByTestId('stakeholder-row-1');
-    expect(stakeholderBtn).toHaveTextContent('Input Pemegang Saham');
+    expect(stakeholderBtn).toHaveAttribute(
+      'aria-label',
+      'Input Pemegang Saham'
+    );
     fireEvent.click(stakeholderBtn);
 
     const stakeholderModal = await screen.findByTestId(
@@ -605,7 +608,7 @@ describe('App ERP Main Menu integration', () => {
 
     // Only "Detail" button in Aksi column (no Edit or Hapus)
     const detailBtn1 = screen.getByTestId('detail-row-1');
-    expect(detailBtn1).toHaveTextContent('Detail');
+    expect(detailBtn1).toHaveAttribute('aria-label', 'Detail');
     expect(screen.queryByTestId('edit-row-1')).not.toBeInTheDocument();
     expect(screen.queryByTestId('delete-row-1')).not.toBeInTheDocument();
 

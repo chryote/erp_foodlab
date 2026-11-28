@@ -5,6 +5,7 @@ export type Theme = 'light' | 'dark';
 const THEME_STORAGE_KEY = 'erp_foodlab.theme';
 const themeSubscribers = new Set<() => void>();
 const getServerTheme = (): Theme => 'light';
+let themeTransitionGeneration = 0;
 
 export const getTheme = (): Theme =>
   window.localStorage.getItem(THEME_STORAGE_KEY) === 'dark' ? 'dark' : 'light';
@@ -20,8 +21,22 @@ export const subscribeToTheme = (subscriber: () => void) => {
   };
 };
 
+const applyThemeWithoutTransitions = (theme: Theme): void => {
+  const root = document.documentElement;
+  const generation = ++themeTransitionGeneration;
+  root.classList.add('theme-switching');
+  root.dataset.theme = theme;
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      if (generation === themeTransitionGeneration) {
+        root.classList.remove('theme-switching');
+      }
+    });
+  });
+};
+
 export const setTheme = (theme: Theme): void => {
-  document.documentElement.dataset.theme = theme;
+  applyThemeWithoutTransitions(theme);
   window.localStorage.setItem(THEME_STORAGE_KEY, theme);
   notifyThemeSubscribers();
 };
@@ -36,8 +51,7 @@ if (typeof window !== 'undefined') {
       return;
     }
 
-    document.documentElement.dataset.theme =
-      event.newValue === 'dark' ? 'dark' : 'light';
+    applyThemeWithoutTransitions(event.newValue === 'dark' ? 'dark' : 'light');
     notifyThemeSubscribers();
   });
 }

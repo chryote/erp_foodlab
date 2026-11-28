@@ -288,14 +288,14 @@ describe('CPO Input Packing flow: Master Packing (Item, Packet, ItemPacket)', ()
 
     renderApp();
 
-    // 1. Select company & open CPO module -> Input Packing horizontal menu card is hidden
+    // 1. Select company & open CPO module -> Input Packing is available in the menubar
     fireEvent.click(await screen.findByTestId('company-tab-1'));
     fireEvent.click(screen.getByTestId('module-card-CPO'));
 
     const cpoMenu = await screen.findByTestId('cpo-horizontal-menu');
     expect(
-      within(cpoMenu).queryByTestId('horizontal-menu-card-INPUT_PACKING')
-    ).not.toBeInTheDocument();
+      within(cpoMenu).getByTestId('horizontal-menu-card-INPUT_PACKING')
+    ).toBeInTheDocument();
 
     renderMasterPackingModal(companiesStore[0], companiesStore);
     const modal = await screen.findByTestId('master-packing-crud-modal');

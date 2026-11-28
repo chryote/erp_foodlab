@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type {
   Company,
   EmployeeAttendance,
@@ -11,6 +11,7 @@ import {
   CrudModal,
 } from '@/components/ui';
 import { useEmployeeAttendanceCrudResource } from '@/lib/choResources';
+import { useInfiniteEmployeeAttendancesQuery } from '@/lib/choResources';
 
 const ATTENDANCE_STATUS_OPTIONS = [
   { value: 'present', label: 'Hadir' },
@@ -57,6 +58,7 @@ function normalizeDateTimePayload(raw?: string): string | null {
 
 export interface InputAbsensiCrudModalProps {
   isOpen: boolean;
+  pageMode?: boolean;
   company: Company | null;
   companies?: Company[];
   onClose: () => void;
@@ -64,6 +66,7 @@ export interface InputAbsensiCrudModalProps {
 
 export const InputAbsensiCrudModal: React.FC<InputAbsensiCrudModalProps> = ({
   isOpen,
+  pageMode = false,
   company,
   companies,
   onClose,
@@ -78,7 +81,19 @@ export const InputAbsensiCrudModal: React.FC<InputAbsensiCrudModalProps> = ({
     createAttendance,
     updateAttendance,
     removeAttendance,
-  } = useEmployeeAttendanceCrudResource(isOpen, company);
+  } = useEmployeeAttendanceCrudResource(isOpen, company, !pageMode);
+  const [sort, setSort] = useState<{
+    key: string;
+    direction: 'asc' | 'desc';
+  } | null>({ key: 'attendance_date', direction: 'desc' });
+  const sortParam = `${sort?.direction === 'asc' ? '' : '-'}${sort?.key ?? 'attendance_date'},-id`;
+  const pageQuery = useInfiniteEmployeeAttendancesQuery(
+    company?.id ?? null,
+    sortParam,
+    pageMode
+  );
+  const pageItems =
+    pageQuery.data?.pages.flatMap((page) => page.data) ?? [];
 
   useEffect(() => {
     if (!isOpen) {
@@ -184,6 +199,7 @@ export const InputAbsensiCrudModal: React.FC<InputAbsensiCrudModalProps> = ({
       {
         key: 'attendance_date',
         label: 'Tanggal Absensi',
+        sortable: true,
         type: 'date',
         defaultValue: todayDate,
         renderValue: (row) =>
@@ -192,6 +208,7 @@ export const InputAbsensiCrudModal: React.FC<InputAbsensiCrudModalProps> = ({
       {
         key: 'clock_in_at',
         label: 'Jam Masuk',
+        sortable: true,
         type: 'datetime-local',
         optional: true,
         renderValue: (row) => formatDateTimeDisplay(row.clock_in_at),
@@ -239,11 +256,13 @@ export const InputAbsensiCrudModal: React.FC<InputAbsensiCrudModalProps> = ({
       {
         key: 'late_minutes',
         label: 'Terlambat',
+        sortable: true,
         render: (row) => `${row.late_minutes ?? 0} menit`,
       },
       {
         key: 'overtime_minutes',
         label: 'Lembur',
+        sortable: true,
         render: (row) => `${row.overtime_minutes ?? 0} menit`,
       },
     ],
@@ -288,6 +307,7 @@ export const InputAbsensiCrudModal: React.FC<InputAbsensiCrudModalProps> = ({
     <CrudModal
       resetKey={`input-absensi-${company?.id ?? 0}`}
       isOpen={isOpen}
+      pageMode={pageMode}
       title="Input Absensi"
       subtitle="Kelola data kehadiran, jam masuk, jam pulang, dan status absensi karyawan"
       testId="input-absensi-crud-modal"
@@ -299,8 +319,65 @@ export const InputAbsensiCrudModal: React.FC<InputAbsensiCrudModalProps> = ({
       computedColumns={computedColumns}
       emptyMessage="Belum ada data absensi karyawan."
       items={allAttendances}
-      loading={loading}
-      error={error}
+      loading={pageMode ? pageQuery.isLoading || loading : loading}
+      error={
+        pageQuery.error instanceof Error && pageMode
+          ? pageQuery.error.message
+          : error
+      }
+      displayItems={pageMode ? pageItems : undefined}
+      hasMore={pageMode && Boolean(pageQuery.hasNextPage)}
+      onLoadMore={
+        pageMode
+          ? () => {
+              if (pageQuery.hasNextPage && !pageQuery.isFetchingNextPage) {
+                void pageQuery.fetchNextPage();
+              }
+            }
+          : undefined
+      }
+      isLoadingMore={pageMode && pageQuery.isFetchingNextPage}
+      loadMoreError={
+        pageQuery.isFetchNextPageError
+          ? 'Gagal memuat data berikutnya.'
+          : null
+      }
+      onRetryLoadMore={
+        pageMode
+          ? () => {
+              if (pageQuery.isFetchNextPageError) {
+                void pageQuery.fetchNextPage();
+              }
+            }
+          : undefined
+      }
+      sortKey={sort?.key ?? 'attendance_date'}
+      sortDirection={sort?.direction ?? 'desc'}
+      onSort={
+        pageMode
+          ? (key) => {
+              if (
+                ![
+                  'attendance_date',
+                  'clock_in_at',
+                  'late_minutes',
+                  'overtime_minutes',
+                ].includes(key)
+              ) {
+                return;
+              }
+              setSort((current) =>
+                current?.key === key
+                  ? {
+                      key,
+                      direction:
+                        current.direction === 'asc' ? 'desc' : 'asc',
+                    }
+                  : { key, direction: 'asc' }
+              );
+            }
+          : undefined
+      }
       onClose={onClose}
       onCreate={async (values) => {
         const payload = parseAttendancePayload(values);
