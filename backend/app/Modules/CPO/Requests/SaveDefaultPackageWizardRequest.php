@@ -7,6 +7,7 @@ use App\Models\Item;
 use App\Models\Packet;
 use App\Models\PacketCategory;
 use App\Models\PacketName;
+use App\Support\CompanyOwnerScope;
 use App\Support\ExclusiveOwner;
 use App\Support\InputNormalizer;
 use App\Support\WriteGuard;
@@ -42,6 +43,12 @@ class SaveDefaultPackageWizardRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'company_owner_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
             'packet_name' => ['required', 'string', 'max:150'],
             'packet_category' => ['required', 'string', 'max:150'],
             'brand_name' => ['required', 'string', 'max:150'],
@@ -173,10 +180,11 @@ class SaveDefaultPackageWizardRequest extends FormRequest
 
                 /** @var DefaultPackage|null $routeDefaultPackage */
                 $routeDefaultPackage = $this->route('defaultPackage');
+                $companyOwnerId = CompanyOwnerScope::resolveForRequest($this, $routeDefaultPackage) ?? $companyId;
 
-                $existingNameId = $this->findActiveIdByName(PacketName::query(), $packetNameText);
-                $existingCategoryId = $this->findActiveIdByName(PacketCategory::query(), $packetCategoryText);
-                $existingPacketId = $this->findActiveIdByName(Packet::query(), $packetNameText);
+                $existingNameId = $this->findActiveIdByName(PacketName::query(), $packetNameText, $companyOwnerId);
+                $existingCategoryId = $this->findActiveIdByName(PacketCategory::query(), $packetCategoryText, $companyOwnerId);
+                $existingPacketId = $this->findActiveIdByName(Packet::query(), $packetNameText, $companyOwnerId);
 
                 if (
                     $existingNameId !== null
@@ -187,6 +195,7 @@ class SaveDefaultPackageWizardRequest extends FormRequest
                         'brand_name',
                         $brandNameText,
                         [
+                            ...CompanyOwnerScope::scopeFilters($companyOwnerId),
                             'packet_name_id' => $existingNameId,
                             ...ExclusiveOwner::scopeFilters($companyId, $vendorId),
                             'packet_category_id' => $existingCategoryId,
@@ -210,6 +219,14 @@ class SaveDefaultPackageWizardRequest extends FormRequest
     public function payload(): array
     {
         $validated = ExclusiveOwner::applyToPayload($this->validated());
+        /** @var DefaultPackage|null $routeDefaultPackage */
+        $routeDefaultPackage = $this->route('defaultPackage');
+
+        $companyOwnerId = CompanyOwnerScope::resolveForRequest($this, $routeDefaultPackage)
+            ?? (isset($validated['company_id']) && $validated['company_id'] !== null ? (int) $validated['company_id'] : null);
+        if ($companyOwnerId !== null) {
+            $validated['company_owner_id'] = $companyOwnerId;
+        }
 
         foreach (['packet_name', 'packet_category', 'brand_name'] as $textField) {
             $validated[$textField] = InputNormalizer::text((string) $validated[$textField]) ?? '';
@@ -232,12 +249,17 @@ class SaveDefaultPackageWizardRequest extends FormRequest
     /**
      * @param  \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model>  $query
      */
-    private function findActiveIdByName($query, string $name): ?int
+    private function findActiveIdByName($query, string $name, ?int $companyOwnerId = null): ?int
     {
         $wrapped = $query->getGrammar()->wrap('name');
-        $id = $query->whereNull('deleted_at')
-            ->whereRaw("LOWER({$wrapped}) = ?", [mb_strtolower($name, 'UTF-8')])
-            ->value('id');
+        $query->whereNull('deleted_at')
+            ->whereRaw("LOWER({$wrapped}) = ?", [mb_strtolower($name, 'UTF-8')]);
+
+        if ($companyOwnerId !== null) {
+            $query->where('company_owner_id', $companyOwnerId);
+        }
+
+        $id = $query->value('id');
 
         return $id !== null ? (int) $id : null;
     }

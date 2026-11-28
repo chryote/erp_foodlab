@@ -69,7 +69,8 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
       { id: 1, name: 'Paket Starter' },
     ];
     let packetVendorsStore: apiClient.PacketVendor[] = [
-      { id: 1, name: 'Vendor Nusantara', type: 'Bahan' },
+      { id: 1, company_owner_id: 1, name: 'Vendor Nusantara', type: 'Bahan' },
+      { id: 99, company_owner_id: 2, name: 'Vendor Perusahaan Lain', type: 'Bahan' },
     ];
     let packetCategoriesStore: apiClient.PacketCategory[] = [
       { id: 1, name: 'Kategori Reguler' },
@@ -192,6 +193,7 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
       async (payload) => {
         const created: apiClient.PacketVendor = {
           id: 2,
+          company_owner_id: 1,
           name: payload.name,
           type: payload.type ?? 'Bahan',
         };
@@ -745,12 +747,13 @@ describe('CPO Input Paket flow: Master Paket (Paket & Paket Awal)', () => {
     const ownerSelect = within(defaultModal).getByLabelText(
       'Vendor Paket'
     ) as HTMLSelectElement;
-    expect(Array.from(ownerSelect.options).map((o) => o.value)).toContain(
-      'vendor:1'
+    const ownerOptionValues = Array.from(ownerSelect.options).map(
+      (o) => o.value
     );
-    expect(Array.from(ownerSelect.options).map((o) => o.value)).toContain(
-      'company:1'
-    );
+    expect(ownerOptionValues).toEqual(['', 'vendor:1', 'company:1']);
+    expect(ownerOptionValues).not.toContain('vendor:99');
+    expect(ownerOptionValues).not.toContain('company:2');
+    expect(ownerOptionValues).not.toContain('company:3');
     fireEvent.change(ownerSelect, { target: { value: 'company:1' } });
     fireEvent.click(screen.getByTestId('paket-awal-wizard-next-1'));
 

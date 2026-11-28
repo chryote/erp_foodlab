@@ -14,6 +14,7 @@ class Ingredient extends Model
     protected $table = 'ingredients';
 
     protected $fillable = [
+        'company_owner_id',
         'default_package_id',
         'item_id',
         'price',
@@ -26,10 +27,16 @@ class Ingredient extends Model
     protected function casts(): array
     {
         return [
+            'company_owner_id' => 'integer',
             'default_package_id' => 'integer',
             'item_id' => 'integer',
             'price' => 'float',
         ];
+    }
+
+    public function companyOwner(): BelongsTo
+    {
+        return $this->belongsTo(Company::class, 'company_owner_id');
     }
 
     public function defaultPackage(): BelongsTo

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -16,12 +17,25 @@ class Packet extends Model
     protected $table = 'packets';
 
     protected $fillable = [
+        'company_owner_id',
         'name',
     ];
 
     protected $hidden = [
         'active_flag',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'company_owner_id' => 'integer',
+        ];
+    }
+
+    public function companyOwner(): BelongsTo
+    {
+        return $this->belongsTo(Company::class, 'company_owner_id');
+    }
 
     public function itemPackets(): HasMany
     {
@@ -48,6 +62,7 @@ class Packet extends Model
     {
         return [
             'id' => $this->id,
+            'company_owner_id' => $this->company_owner_id,
             'name' => $this->name,
         ];
     }

@@ -58,12 +58,14 @@ describe('Item CPO module', function () {
 
         $sugarId = $createRes->json('data.id');
         $apple = Item::factory()->create([
+            'company_owner_id' => $companyA->id,
             'company_id' => $companyA->id,
             'code' => 'ITM-APL_1',
             'name' => 'Apple_Organic',
             'type' => ItemType::Bahan,
         ]);
         $blender = Item::factory()->create([
+            'company_owner_id' => $companyB->id,
             'company_id' => $companyB->id,
             'code' => 'ITM-BLD-02',
             'name' => 'Blender Lab',

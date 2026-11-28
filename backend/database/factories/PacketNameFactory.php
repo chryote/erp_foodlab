@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Company;
 use App\Models\PacketName;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -19,6 +20,7 @@ class PacketNameFactory extends Factory
         $seq = self::$sequence++;
 
         return [
+            'company_owner_id' => Company::factory(),
             'name' => 'Paket '.ucfirst($this->faker->unique()->words(2, true)).' #'.$seq,
         ];
     }

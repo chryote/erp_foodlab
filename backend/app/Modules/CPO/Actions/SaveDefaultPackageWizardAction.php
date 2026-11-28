@@ -10,6 +10,7 @@ use App\Models\Packet;
 use App\Models\PacketCategory;
 use App\Models\PacketName;
 use App\Modules\CPO\Services\DefaultPackageService;
+use App\Support\CompanyOwnerScope;
 use App\Support\ExclusiveOwner;
 use App\Support\InputNormalizer;
 use App\Support\WriteGuard;
@@ -66,12 +67,14 @@ class SaveDefaultPackageWizardAction
         $resolvedOwner = ExclusiveOwner::resolveForService($attributes);
         $companyId = $resolvedOwner['company_id'];
         $packetVendorId = $resolvedOwner['packet_vendor_id'];
+        $companyOwnerId = CompanyOwnerScope::resolveId($attributes, $existing) ?? $companyId;
 
         $defaultPackage = DB::transaction(function () use (
             $existing,
             $packetName,
             $packetCategory,
             $brandName,
+            $companyOwnerId,
             $companyId,
             $packetVendorId,
             $itemsInput,
@@ -81,16 +84,17 @@ class SaveDefaultPackageWizardAction
                 ? DefaultPackage::query()->lockForUpdate()->findOrFail($existing->getKey())
                 : null;
 
+            CompanyOwnerScope::assertActiveOwner($companyOwnerId, true);
             ExclusiveOwner::assertActiveOwner($companyId, $packetVendorId, true);
 
             $normalizedRows = $this->normalizeAndValidateItems($itemsInput, $companyId, $packetVendorId);
 
             /** @var PacketName $packetNameRecord */
-            $packetNameRecord = $this->firstOrCreateActiveByName(PacketName::class, $packetName);
+            $packetNameRecord = $this->firstOrCreateActiveByName(PacketName::class, $packetName, $companyOwnerId);
             /** @var PacketCategory $packetCategoryRecord */
-            $packetCategoryRecord = $this->firstOrCreateActiveByName(PacketCategory::class, $packetCategory);
+            $packetCategoryRecord = $this->firstOrCreateActiveByName(PacketCategory::class, $packetCategory, $companyOwnerId);
             /** @var Packet $packetRecord */
-            $packetRecord = $this->firstOrCreateActiveByName(Packet::class, $packetName);
+            $packetRecord = $this->firstOrCreateActiveByName(Packet::class, $packetName, $companyOwnerId);
 
             $ownerScope = ExclusiveOwner::scopeFilters($companyId, $packetVendorId);
             $targetPacketId = (int) $packetRecord->getKey();
@@ -100,6 +104,7 @@ class SaveDefaultPackageWizardAction
                 'brand_name',
                 $brandName,
                 [
+                    ...CompanyOwnerScope::scopeFilters($companyOwnerId),
                     'packet_name_id' => (int) $packetNameRecord->getKey(),
                     ...$ownerScope,
                     'packet_category_id' => (int) $packetCategoryRecord->getKey(),
@@ -118,6 +123,7 @@ class SaveDefaultPackageWizardAction
                     ->whereNull('deleted_at')
                     ->where('packet_id', $targetPacketId)
                     ->where('item_id', $row['item_id'])
+                    ->when($companyOwnerId !== null, fn ($q) => $q->where('company_owner_id', $companyOwnerId))
                     ->lockForUpdate();
 
                 if ($companyId !== null) {
@@ -134,6 +140,7 @@ class SaveDefaultPackageWizardAction
                     $itemPacket = $existingItemPacket;
                 } else {
                     $itemPacket = ItemPacket::query()->create([
+                        'company_owner_id' => $companyOwnerId,
                         'company_id' => $companyId,
                         'packet_vendor_id' => $packetVendorId,
                         'packet_id' => $targetPacketId,
@@ -148,6 +155,7 @@ class SaveDefaultPackageWizardAction
             }
 
             $packageAttributes = [
+                'company_owner_id' => $companyOwnerId,
                 'brand_name' => $brandName,
                 'packet_name_id' => (int) $packetNameRecord->getKey(),
                 'company_id' => $companyId,
@@ -166,7 +174,7 @@ class SaveDefaultPackageWizardAction
                 $lockedExisting->update($packageAttributes);
                 $defaultPackage = $lockedExisting;
 
-                $this->syncIngredients($defaultPackage, $normalizedRows);
+                $this->syncIngredients($defaultPackage, $normalizedRows, $companyOwnerId);
                 $this->pruneUnusedItemPackets(
                     $defaultPackage,
                     $oldPacketId,
@@ -182,6 +190,7 @@ class SaveDefaultPackageWizardAction
 
                 foreach ($normalizedRows as $row) {
                     Ingredient::query()->create([
+                        'company_owner_id' => $companyOwnerId,
                         'default_package_id' => (int) $defaultPackage->getKey(),
                         'item_id' => $row['item_id'],
                         'price' => $row['price'],
@@ -192,7 +201,7 @@ class SaveDefaultPackageWizardAction
             return $defaultPackage;
         });
 
-        $this->defaultPackageService->forgetDependentCaches();
+        $this->defaultPackageService->forgetDependentCaches($companyOwnerId);
 
         return $defaultPackage->refresh()->load([
             'packetName',
@@ -208,7 +217,7 @@ class SaveDefaultPackageWizardAction
     /**
      * @param  list<array{item_id: int, quantity: int, price: float}>  $normalizedRows
      */
-    private function syncIngredients(DefaultPackage $defaultPackage, array $normalizedRows): void
+    private function syncIngredients(DefaultPackage $defaultPackage, array $normalizedRows, ?int $companyOwnerId = null): void
     {
         $existingByItemId = $defaultPackage->ingredients()
             ->lockForUpdate()
@@ -227,9 +236,13 @@ class SaveDefaultPackageWizardAction
             /** @var Ingredient|null $existingIngredient */
             $existingIngredient = $existingByItemId->get($row['item_id']);
             if ($existingIngredient !== null) {
-                $existingIngredient->update(['price' => $row['price']]);
+                $existingIngredient->update([
+                    'company_owner_id' => $companyOwnerId,
+                    'price' => $row['price'],
+                ]);
             } else {
                 Ingredient::query()->create([
+                    'company_owner_id' => $companyOwnerId,
                     'default_package_id' => (int) $defaultPackage->getKey(),
                     'item_id' => $row['item_id'],
                     'price' => $row['price'],
@@ -406,7 +419,7 @@ class SaveDefaultPackageWizardAction
      * @param  class-string<TModel>  $modelClass
      * @return TModel
      */
-    private function firstOrCreateActiveByName(string $modelClass, string $name): Model
+    private function firstOrCreateActiveByName(string $modelClass, string $name, ?int $companyOwnerId = null): Model
     {
         /** @var Builder<TModel> $query */
         $query = $modelClass::query();
@@ -414,6 +427,7 @@ class SaveDefaultPackageWizardAction
 
         /** @var TModel|null $existing */
         $existing = $query->whereNull('deleted_at')
+            ->when($companyOwnerId !== null, fn ($q) => $q->where('company_owner_id', $companyOwnerId))
             ->whereRaw("LOWER({$wrapped}) = ?", [mb_strtolower($name, 'UTF-8')])
             ->sharedLock()
             ->first();
@@ -422,6 +436,9 @@ class SaveDefaultPackageWizardAction
             return $existing;
         }
 
-        return $modelClass::query()->create(['name' => $name]);
+        return $modelClass::query()->create([
+            'company_owner_id' => $companyOwnerId,
+            'name' => $name,
+        ]);
     }
 }

@@ -311,6 +311,7 @@ export const DashboardFlowSimulator: React.FC<DashboardProps> = ({ onLogout }) =
 
             <MasterPaketCrudModal
               isOpen={selectedChildSubMenu?.code === 'MASTER_PAKET'}
+              company={selectedCompany}
               companies={companyResource.companies}
               onClose={() => setSelectedChildSubMenu(null)}
             />

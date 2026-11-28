@@ -7,6 +7,7 @@ use App\Models\ItemPacket;
 use App\Models\Packet;
 use App\Models\PacketCategory;
 use App\Models\PacketName;
+use App\Support\CompanyOwnerScope;
 use App\Support\ExclusiveOwner;
 use App\Support\InputNormalizer;
 use App\Support\WriteGuard;
@@ -48,6 +49,12 @@ class SaveDefaultPackageRequest extends FormRequest
         $presence = $this->isMethod('PATCH') ? ['sometimes', 'required'] : ['required'];
 
         return [
+            'company_owner_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
             'brand_name' => [...$presence, 'string', 'max:150'],
             'packet_name_id' => [
                 ...$presence,
@@ -201,8 +208,10 @@ class SaveDefaultPackageRequest extends FormRequest
                         $derivedPacketId = $derivedPacketId !== null ? (int) $derivedPacketId : null;
                     }
 
+                    $companyOwnerId = CompanyOwnerScope::resolveForRequest($this, $routeDefaultPackage) ?? $effectiveCompanyId;
                     $ownerScope = ExclusiveOwner::scopeFilters($effectiveCompanyId, $effectiveVendorId);
                     $baseScope = [
+                        ...CompanyOwnerScope::scopeFilters($companyOwnerId),
                         'packet_name_id' => $effectivePacketNameId,
                         ...$ownerScope,
                         'packet_category_id' => $effectivePacketCategoryId,
@@ -244,6 +253,12 @@ class SaveDefaultPackageRequest extends FormRequest
         $isPatch = $this->isMethod('PATCH');
         /** @var DefaultPackage|null $routeDefaultPackage */
         $routeDefaultPackage = $this->route('defaultPackage');
+
+        $companyOwnerId = CompanyOwnerScope::resolveForRequest($this, $routeDefaultPackage)
+            ?? (isset($validated['company_id']) && $validated['company_id'] !== null ? (int) $validated['company_id'] : null);
+        if ($companyOwnerId !== null && (! $isPatch || array_key_exists('company_owner_id', $validated))) {
+            $validated['company_owner_id'] = $companyOwnerId;
+        }
 
         if (array_key_exists('brand_name', $validated)) {
             $validated['brand_name'] = InputNormalizer::text((string) $validated['brand_name']) ?? '';

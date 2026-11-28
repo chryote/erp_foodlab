@@ -5,6 +5,7 @@ namespace App\Modules\CPO\Services;
 use App\Models\DefaultPackage;
 use App\Models\Ingredient;
 use App\Models\Item;
+use App\Support\CompanyOwnerScope;
 use App\Support\IndexQuery;
 use App\Support\WriteGuard;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -33,12 +34,18 @@ class IngredientService
     {
         $query = IndexQuery::withDefaultRelations($this->query($request), $request, self::RELATIONS);
 
+        $ownerId = CompanyOwnerScope::applyListFilter($query->getEloquentBuilder(), $request);
+
         if (IndexQuery::isPaginated($request)) {
             return IndexQuery::paginate($query, $request);
         }
 
         if (IndexQuery::isCacheable($request)) {
-            return Cache::remember(self::CACHE_KEY_LIST, 60, fn () => $query->get());
+            return Cache::remember(
+                CompanyOwnerScope::listCacheKey(self::CACHE_KEY_LIST, $ownerId),
+                60,
+                fn () => $query->get()
+            );
         }
 
         return $query->get();
@@ -53,7 +60,13 @@ class IngredientService
         $attributes['item_id'] = (int) $attributes['item_id'];
         $attributes['price'] = round((float) ($attributes['price'] ?? 0), 2);
 
-        $ingredient = DB::transaction(function () use ($attributes): Ingredient {
+        $companyOwnerId = CompanyOwnerScope::resolveId($attributes);
+        if ($companyOwnerId !== null) {
+            $attributes['company_owner_id'] = $companyOwnerId;
+        }
+
+        $ingredient = DB::transaction(function () use ($attributes, $companyOwnerId): Ingredient {
+            CompanyOwnerScope::assertActiveOwner($companyOwnerId);
             $this->assertActiveParents(
                 $attributes['default_package_id'],
                 $attributes['item_id']
@@ -67,7 +80,7 @@ class IngredientService
             return Ingredient::query()->create($attributes);
         });
 
-        $this->forgetDependentCaches();
+        $this->forgetDependentCaches($companyOwnerId);
 
         return $ingredient->load(self::RELATIONS);
     }
@@ -87,8 +100,17 @@ class IngredientService
             $attributes['price'] = round((float) $attributes['price'], 2);
         }
 
+        $oldOwnerId = $ingredient->company_owner_id !== null ? (int) $ingredient->company_owner_id : null;
+
         $updated = DB::transaction(function () use ($ingredient, $attributes): Ingredient {
             $locked = Ingredient::query()->lockForUpdate()->findOrFail($ingredient->getKey());
+
+            $targetOwnerId = CompanyOwnerScope::resolveId($attributes, $locked);
+            if ($targetOwnerId !== null && array_key_exists('company_owner_id', $attributes)) {
+                $attributes['company_owner_id'] = $targetOwnerId;
+            }
+
+            CompanyOwnerScope::assertActiveOwner($targetOwnerId);
 
             $targetDefaultPackageId = (int) ($attributes['default_package_id'] ?? $locked->default_package_id);
             $targetItemId = (int) ($attributes['item_id'] ?? $locked->item_id);
@@ -101,25 +123,33 @@ class IngredientService
             return $locked;
         });
 
-        $this->forgetDependentCaches();
+        $newOwnerId = $updated->company_owner_id !== null ? (int) $updated->company_owner_id : null;
+        $this->forgetDependentCaches($oldOwnerId);
+        if ($newOwnerId !== $oldOwnerId) {
+            $this->forgetDependentCaches($newOwnerId);
+        }
 
         return $updated->refresh()->load(self::RELATIONS);
     }
 
     public function deleteIngredient(Ingredient $ingredient): void
     {
-        DB::transaction(function () use ($ingredient): void {
+        $ownerId = DB::transaction(function () use ($ingredient): ?int {
             $locked = Ingredient::query()->lockForUpdate()->findOrFail($ingredient->getKey());
+            $ownerId = $locked->company_owner_id !== null ? (int) $locked->company_owner_id : null;
             $locked->delete();
+
+            return $ownerId;
         });
 
-        $this->forgetDependentCaches();
+        $this->forgetDependentCaches($ownerId);
     }
 
     private function query(Request $request): QueryBuilder
     {
         return IndexQuery::make(Ingredient::class, $request)
             ->allowedFilters([
+                AllowedFilter::exact('company_owner_id'),
                 AllowedFilter::exact('default_package_id'),
                 AllowedFilter::exact('item_id'),
                 AllowedFilter::callback('min_price', function (Builder $query, mixed $value): void {
@@ -147,8 +177,8 @@ class IngredientService
                     $query->where('price', '<=', round((float) $trimmed, 2));
                 }),
             ])
-            ->allowedSorts(['id', 'default_package_id', 'item_id', 'price', 'created_at'])
-            ->allowedIncludes(self::RELATIONS)
+            ->allowedSorts(['id', 'company_owner_id', 'default_package_id', 'item_id', 'price', 'created_at'])
+            ->allowedIncludes([...self::RELATIONS, 'companyOwner'])
             ->defaultSort('id');
     }
 
@@ -193,11 +223,11 @@ class IngredientService
         );
     }
 
-    private function forgetDependentCaches(): void
+    private function forgetDependentCaches(?int $ownerId = null): void
     {
-        Cache::forget(self::CACHE_KEY_LIST);
+        CompanyOwnerScope::forgetListCache(self::CACHE_KEY_LIST, $ownerId);
         Cache::forget(CpoService::CACHE_KEY);
-        Cache::forget(DefaultPackageService::CACHE_KEY_LIST);
-        Cache::forget(ItemService::CACHE_KEY_LIST);
+        CompanyOwnerScope::forgetListCache(DefaultPackageService::CACHE_KEY_LIST, $ownerId);
+        CompanyOwnerScope::forgetListCache(ItemService::CACHE_KEY_LIST, $ownerId);
     }
 }

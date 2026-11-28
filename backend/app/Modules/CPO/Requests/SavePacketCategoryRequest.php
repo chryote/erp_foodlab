@@ -3,9 +3,11 @@
 namespace App\Modules\CPO\Requests;
 
 use App\Models\PacketCategory;
+use App\Support\CompanyOwnerScope;
 use App\Support\InputNormalizer;
 use App\Support\WriteGuard;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class SavePacketCategoryRequest extends FormRequest
@@ -32,6 +34,12 @@ class SavePacketCategoryRequest extends FormRequest
         $presence = $this->isMethod('PATCH') ? ['sometimes', 'required'] : ['required'];
 
         return [
+            'company_owner_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists('companies', 'id')->whereNull('deleted_at'),
+            ],
             'name' => [...$presence, 'string', 'max:150'],
         ];
     }
@@ -49,6 +57,7 @@ class SavePacketCategoryRequest extends FormRequest
 
                 /** @var PacketCategory|null $packetCategory */
                 $packetCategory = $this->route('packetCategory');
+                $companyOwnerId = CompanyOwnerScope::resolveForRequest($this, $packetCategory);
 
                 $effectiveName = $this->has('name')
                     ? InputNormalizer::text((string) $this->input('name'))
@@ -58,7 +67,7 @@ class SavePacketCategoryRequest extends FormRequest
                     PacketCategory::query(),
                     'name',
                     $effectiveName,
-                    [],
+                    CompanyOwnerScope::scopeFilters($companyOwnerId),
                     $packetCategory?->getKey()
                 )) {
                     $validator->errors()->add('name', 'Nama kategori paket yang sama sudah terdaftar.');
@@ -73,6 +82,13 @@ class SavePacketCategoryRequest extends FormRequest
     public function payload(): array
     {
         $validated = $this->validated();
+        /** @var PacketCategory|null $packetCategory */
+        $packetCategory = $this->route('packetCategory');
+
+        $companyOwnerId = CompanyOwnerScope::resolveForRequest($this, $packetCategory);
+        if ($companyOwnerId !== null && (! $this->isMethod('PATCH') || array_key_exists('company_owner_id', $validated))) {
+            $validated['company_owner_id'] = $companyOwnerId;
+        }
 
         if (array_key_exists('name', $validated)) {
             $validated['name'] = InputNormalizer::text((string) $validated['name']) ?? '';

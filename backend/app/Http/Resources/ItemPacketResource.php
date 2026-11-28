@@ -18,11 +18,13 @@ class ItemPacketResource extends JsonResource
     {
         return [
             'id' => (int) $this->id,
+            'company_owner_id' => $this->company_owner_id !== null ? (int) $this->company_owner_id : null,
             'company_id' => $this->company_id !== null ? (int) $this->company_id : null,
             'packet_vendor_id' => $this->packet_vendor_id !== null ? (int) $this->packet_vendor_id : null,
             'packet_id' => (int) $this->packet_id,
             'item_id' => (int) $this->item_id,
             'quantity' => (int) $this->quantity,
+            'company_owner' => $this->whenLoaded('companyOwner', fn ($company) => $company !== null ? new CompanyResource($company) : null),
             'company' => $this->whenLoaded('company', fn ($company) => $company !== null ? new CompanyResource($company) : null),
             'packet_vendor' => $this->whenLoaded('packetVendor', fn ($vendor) => $vendor !== null ? new PacketVendorResource($vendor) : null),
             'packet' => $this->whenLoaded('packet', fn ($packet) => $packet !== null ? new PacketResource($packet) : null),

@@ -18,6 +18,7 @@ import {
   SelectInput,
   TextInput,
 } from '@/components/ui';
+import { getActiveCompanyId } from '@/lib/activeCompanyStorage';
 
 interface WizardItemDraft {
   rowId: number;
@@ -30,6 +31,7 @@ export interface DefaultPackageWizardPanelProps {
   allPacketNames: PacketName[];
   allPacketCategories: PacketCategory[];
   allPacketVendors: PacketVendor[];
+  activeCompany?: Company | null;
   companies: Company[];
   allItems: Item[];
   allItemPackets: ItemPacket[];
@@ -71,6 +73,7 @@ export const DefaultPackageWizardPanel: React.FC<
   allPacketNames,
   allPacketCategories,
   allPacketVendors,
+  activeCompany = null,
   companies,
   allItems,
   allItemPackets,
@@ -231,17 +234,31 @@ export const DefaultPackageWizardPanel: React.FC<
     resetWizard,
   ]);
 
+  const activeCompanyId = activeCompany?.id ?? getActiveCompanyId();
+
   const ownerOptions = useMemo(() => {
-    const vendorOpts = allPacketVendors.map((v) => ({
+    const filteredVendors =
+      activeCompanyId !== null
+        ? allPacketVendors.filter(
+            (v) =>
+              v.company_owner_id != null &&
+              Number(v.company_owner_id) === activeCompanyId
+          )
+        : allPacketVendors;
+    const filteredCompanies =
+      activeCompanyId !== null
+        ? companies.filter((c) => Number(c.id) === activeCompanyId)
+        : companies;
+    const vendorOpts = filteredVendors.map((v) => ({
       value: `vendor:${v.id}`,
       label: `${v.name} (Vendor)`,
     }));
-    const companyOpts = companies.map((c) => ({
+    const companyOpts = filteredCompanies.map((c) => ({
       value: `company:${c.id}`,
       label: `${c.name} (Perusahaan)`,
     }));
     return [...vendorOpts, ...companyOpts];
-  }, [allPacketVendors, companies]);
+  }, [activeCompanyId, allPacketVendors, companies]);
 
   const selectedOwner = useMemo(() => parseOwnerSelection(ownerKey), [ownerKey]);
 

@@ -2,7 +2,7 @@ import { MasterPaketCrudModal } from '@/modules/CPO/MasterPaketCrudModal';
 import { useMenuCompany } from '@/lib/useMenuCompany';
 
 export default function CpoMasterPaketPage() {
-  const { companies, loading, error } = useMenuCompany();
+  const { company, companies, loading, error } = useMenuCompany();
 
   if (loading) {
     return <p className="py-8 text-center text-sm text-muted-foreground">Memuat data perusahaan...</p>;
@@ -14,6 +14,7 @@ export default function CpoMasterPaketPage() {
   return (
     <MasterPaketCrudModal
       isOpen
+      company={company}
       companies={companies}
       onClose={() => undefined}
     />

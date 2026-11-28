@@ -5,6 +5,7 @@ namespace App\Modules\CPO\Services;
 use App\Models\Item;
 use App\Models\ItemPacket;
 use App\Models\Packet;
+use App\Support\CompanyOwnerScope;
 use App\Support\ExclusiveOwner;
 use App\Support\IndexQuery;
 use App\Support\WriteGuard;
@@ -34,14 +35,18 @@ class ItemPacketService
     {
         $query = IndexQuery::withDefaultRelations($this->query($request), $request, self::RELATIONS);
 
-        IndexQuery::applyActiveCompanyFilter($query->getEloquentBuilder(), $request);
+        $ownerId = CompanyOwnerScope::applyListFilter($query->getEloquentBuilder(), $request);
 
         if (IndexQuery::isPaginated($request)) {
             return IndexQuery::paginate($query, $request);
         }
 
         if (IndexQuery::isCacheable($request)) {
-            return Cache::remember(self::CACHE_KEY_LIST, 60, fn () => $query->get());
+            return Cache::remember(
+                CompanyOwnerScope::listCacheKey(self::CACHE_KEY_LIST, $ownerId),
+                60,
+                fn () => $query->get()
+            );
         }
 
         return $query->get();
@@ -58,17 +63,23 @@ class ItemPacketService
         $vendorId = $resolved['packet_vendor_id'];
         $attributes = $resolved['attributes'];
 
-        $itemPacket = DB::transaction(function () use ($attributes, $companyId, $vendorId): ItemPacket {
+        $companyOwnerId = CompanyOwnerScope::resolveId($attributes) ?? $companyId;
+        if ($companyOwnerId !== null) {
+            $attributes['company_owner_id'] = $companyOwnerId;
+        }
+
+        $itemPacket = DB::transaction(function () use ($attributes, $companyOwnerId, $companyId, $vendorId): ItemPacket {
             $packetId = (int) $attributes['packet_id'];
             $itemId = (int) $attributes['item_id'];
 
+            CompanyOwnerScope::assertActiveOwner($companyOwnerId);
             $this->assertActiveParents($companyId, $vendorId, $packetId, $itemId);
-            $this->assertPairUnique($companyId, $vendorId, $packetId, $itemId);
+            $this->assertPairUnique($companyOwnerId, $companyId, $vendorId, $packetId, $itemId);
 
             return ItemPacket::query()->create($attributes);
         });
 
-        $this->forgetDependentCaches();
+        $this->forgetDependentCaches($companyOwnerId);
 
         return $itemPacket->load(self::RELATIONS);
     }
@@ -78,6 +89,8 @@ class ItemPacketService
      */
     public function updateItemPacket(ItemPacket $itemPacket, array $attributes): ItemPacket
     {
+        $oldOwnerId = $itemPacket->company_owner_id !== null ? (int) $itemPacket->company_owner_id : null;
+
         $updated = DB::transaction(function () use ($itemPacket, $attributes): ItemPacket {
             $locked = ItemPacket::query()->lockForUpdate()->findOrFail($itemPacket->getKey());
 
@@ -86,37 +99,51 @@ class ItemPacketService
             $targetVendorId = $resolved['packet_vendor_id'];
             $attributes = $resolved['attributes'];
 
+            $targetOwnerId = CompanyOwnerScope::resolveId($attributes, $locked) ?? $targetCompanyId;
+            if ($targetOwnerId !== null && array_key_exists('company_owner_id', $attributes)) {
+                $attributes['company_owner_id'] = $targetOwnerId;
+            }
+
             $targetPacketId = (int) ($attributes['packet_id'] ?? $locked->packet_id);
             $targetItemId = (int) ($attributes['item_id'] ?? $locked->item_id);
 
+            CompanyOwnerScope::assertActiveOwner($targetOwnerId);
             $this->assertActiveParents($targetCompanyId, $targetVendorId, $targetPacketId, $targetItemId);
-            $this->assertPairUnique($targetCompanyId, $targetVendorId, $targetPacketId, $targetItemId, $locked->getKey());
+            $this->assertPairUnique($targetOwnerId, $targetCompanyId, $targetVendorId, $targetPacketId, $targetItemId, $locked->getKey());
 
             $locked->update($attributes);
 
             return $locked;
         });
 
-        $this->forgetDependentCaches();
+        $newOwnerId = $updated->company_owner_id !== null ? (int) $updated->company_owner_id : null;
+        $this->forgetDependentCaches($oldOwnerId);
+        if ($newOwnerId !== $oldOwnerId) {
+            $this->forgetDependentCaches($newOwnerId);
+        }
 
         return $updated->refresh()->load(self::RELATIONS);
     }
 
     public function deleteItemPacket(ItemPacket $itemPacket): void
     {
-        DB::transaction(function () use ($itemPacket): void {
+        $ownerId = DB::transaction(function () use ($itemPacket): ?int {
             $locked = ItemPacket::query()->lockForUpdate()->findOrFail($itemPacket->getKey());
             DefaultPackageService::softDeleteForItemPacketIds([(int) $locked->getKey()]);
+            $ownerId = $locked->company_owner_id !== null ? (int) $locked->company_owner_id : null;
             $locked->delete();
+
+            return $ownerId;
         });
 
-        $this->forgetDependentCaches();
+        $this->forgetDependentCaches($ownerId);
     }
 
     private function query(Request $request): QueryBuilder
     {
         return IndexQuery::make(ItemPacket::class, $request)
             ->allowedFilters([
+                AllowedFilter::exact('company_owner_id'),
                 AllowedFilter::exact('company_id'),
                 AllowedFilter::exact('packet_vendor_id'),
                 AllowedFilter::exact('packet_id'),
@@ -175,8 +202,8 @@ class ItemPacketService
                     $query->where('quantity', '<=', (int) $trimmed);
                 }),
             ])
-            ->allowedSorts(['id', 'company_id', 'packet_vendor_id', 'packet_id', 'item_id', 'quantity', 'created_at', 'updated_at'])
-            ->allowedIncludes([...self::RELATIONS, ...(class_exists('App\\Models\\DefaultPackage') ? ['defaultPackages'] : [])])
+            ->allowedSorts(['id', 'company_owner_id', 'company_id', 'packet_vendor_id', 'packet_id', 'item_id', 'quantity', 'created_at', 'updated_at'])
+            ->allowedIncludes(['companyOwner', ...self::RELATIONS, ...(class_exists('App\\Models\\DefaultPackage') ? ['defaultPackages'] : [])])
             ->defaultSort('id');
     }
 
@@ -223,7 +250,7 @@ class ItemPacketService
         }
     }
 
-    private function assertPairUnique(?int $companyId, ?int $packetVendorId, int $packetId, int $itemId, mixed $ignoreKey = null): void
+    private function assertPairUnique(?int $companyOwnerId, ?int $companyId, ?int $packetVendorId, int $packetId, int $itemId, mixed $ignoreKey = null): void
     {
         $ownerLabel = $companyId !== null ? 'perusahaan' : 'vendor paket';
 
@@ -232,6 +259,7 @@ class ItemPacketService
             'item_id',
             (string) $itemId,
             [
+                ...CompanyOwnerScope::scopeFilters($companyOwnerId),
                 ...ExclusiveOwner::scopeFilters($companyId, $packetVendorId),
                 'packet_id' => $packetId,
             ],
@@ -242,14 +270,14 @@ class ItemPacketService
         );
     }
 
-    private function forgetDependentCaches(): void
+    private function forgetDependentCaches(?int $ownerId = null): void
     {
-        Cache::forget(self::CACHE_KEY_LIST);
-        Cache::forget(PacketService::CACHE_KEY_LIST);
-        Cache::forget(PacketVendorService::CACHE_KEY_LIST);
-        Cache::forget(ItemService::CACHE_KEY_LIST);
-        Cache::forget(DefaultPackageService::CACHE_KEY_LIST);
-        Cache::forget('erp_foodlab:cpo:ingredients:list');
+        CompanyOwnerScope::forgetListCache(self::CACHE_KEY_LIST, $ownerId);
+        CompanyOwnerScope::forgetListCache(PacketService::CACHE_KEY_LIST, $ownerId);
+        CompanyOwnerScope::forgetListCache(PacketVendorService::CACHE_KEY_LIST, $ownerId);
+        CompanyOwnerScope::forgetListCache(ItemService::CACHE_KEY_LIST, $ownerId);
+        CompanyOwnerScope::forgetListCache(DefaultPackageService::CACHE_KEY_LIST, $ownerId);
+        CompanyOwnerScope::forgetListCache('erp_foodlab:cpo:ingredients:list', $ownerId);
         Cache::forget(CpoService::CACHE_KEY);
     }
 }

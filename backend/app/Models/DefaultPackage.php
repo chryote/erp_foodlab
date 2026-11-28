@@ -15,6 +15,7 @@ class DefaultPackage extends Model
     protected $table = 'default_packages';
 
     protected $fillable = [
+        'company_owner_id',
         'brand_name',
         'packet_name_id',
         'company_id',
@@ -32,6 +33,7 @@ class DefaultPackage extends Model
     protected function casts(): array
     {
         return [
+            'company_owner_id' => 'integer',
             'packet_name_id' => 'integer',
             'company_id' => 'integer',
             'packet_vendor_id' => 'integer',
@@ -40,6 +42,11 @@ class DefaultPackage extends Model
             'item_packet_id' => 'integer',
             'price' => 'float',
         ];
+    }
+
+    public function companyOwner(): BelongsTo
+    {
+        return $this->belongsTo(Company::class, 'company_owner_id');
     }
 
     public function packetName(): BelongsTo

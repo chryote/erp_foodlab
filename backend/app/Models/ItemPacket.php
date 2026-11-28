@@ -15,6 +15,7 @@ class ItemPacket extends Model
     protected $table = 'item_packet';
 
     protected $fillable = [
+        'company_owner_id',
         'company_id',
         'packet_vendor_id',
         'packet_id',
@@ -29,12 +30,18 @@ class ItemPacket extends Model
     protected function casts(): array
     {
         return [
+            'company_owner_id' => 'integer',
             'company_id' => 'integer',
             'packet_vendor_id' => 'integer',
             'packet_id' => 'integer',
             'item_id' => 'integer',
             'quantity' => 'integer',
         ];
+    }
+
+    public function companyOwner(): BelongsTo
+    {
+        return $this->belongsTo(Company::class, 'company_owner_id');
     }
 
     public function company(): BelongsTo
