@@ -248,6 +248,8 @@ cd frontend && npm run test:run && npm run build
 docker build --target production -f frontend/Dockerfile frontend
 docker build -f docker/nginx/Dockerfile .
 docker build -f backend/Dockerfile backend
+
+docker compose -f docker-compose.prod.yml config --quiet
 ```
 
 ### Running k6 Benchmarks
