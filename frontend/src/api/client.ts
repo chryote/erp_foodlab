@@ -2235,9 +2235,11 @@ export async function deletePacketName(
   );
 }
 
-export async function fetchPacketVendors(): Promise<PacketVendorsListResponse> {
+export async function fetchPacketVendors(
+  params?: ListRequestParams
+): Promise<PacketVendorsListResponse> {
   return requestJson<PacketVendorsListResponse>(
-    '/v1/modules/cpo/packet-vendors',
+    `/v1/modules/cpo/packet-vendors${buildListQuery(params)}`,
     {},
     'Failed to fetch packet vendors'
   );
@@ -2329,9 +2331,11 @@ export async function deletePacketCategory(
   );
 }
 
-export async function fetchDefaultPackages(): Promise<DefaultPackagesListResponse> {
+export async function fetchDefaultPackages(
+  params?: ListRequestParams
+): Promise<DefaultPackagesListResponse> {
   return requestJson<DefaultPackagesListResponse>(
-    '/v1/modules/cpo/default-packages',
+    `/v1/modules/cpo/default-packages${buildListQuery(params)}`,
     {},
     'Failed to fetch default packages'
   );

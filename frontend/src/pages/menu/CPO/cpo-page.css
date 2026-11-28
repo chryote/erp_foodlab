@@ -1,0 +1,4 @@
+.cpo-page table thead th:first-child,
+.cpo-page table tbody td:first-child {
+  display: none;
+}

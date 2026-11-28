@@ -203,7 +203,10 @@ describe('CPO Input Item vendor flow: Master Item Vendor', () => {
       within(cpoMenu).queryByTestId('horizontal-menu-card-INPUT_ITEM_VENDOR')
     ).not.toBeInTheDocument();
     expect(
-      within(cpoMenu).getByTestId('horizontal-menu-card-INPUT_PACKING')
+      within(cpoMenu).queryByTestId('horizontal-menu-card-INPUT_PACKING')
+    ).not.toBeInTheDocument();
+    expect(
+      within(cpoMenu).getByTestId('horizontal-menu-card-INPUT_PAKET')
     ).toBeInTheDocument();
 
     const inputItemCard = within(cpoMenu).getByTestId(

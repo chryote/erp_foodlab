@@ -43,6 +43,26 @@ import {
 } from '@/modules/CMO/CmoModuleCard';
 import { useTheme } from '@/lib/theme';
 
+const CPO_DASHBOARD_MENU_ITEMS: HorizontalMenuItem[] = [
+  { code: 'KELOLA_VENDOR', title: 'Kelola Vendor' },
+  ...CPO_MENU_ITEMS.map((menuItem) =>
+    menuItem.code === 'INPUT_PAKET'
+      ? {
+          ...menuItem,
+          children: [
+            {
+              code: 'MASTER_PAKET_PAKET_AWAL',
+              title: 'Master Paket - Paket Awal',
+            },
+            ...(menuItem.children ?? []).filter(
+              (childItem) => childItem.code !== 'MASTER_PAKET'
+            ),
+          ],
+        }
+      : menuItem
+  ),
+];
+
 export const COMPANY_MENU_MODULES: Array<{
   code: ErpModuleCode;
   fallback: ErpModuleOverview;
@@ -50,7 +70,7 @@ export const COMPANY_MENU_MODULES: Array<{
 }> = [
   { code: 'CFO', fallback: DEFAULT_CFO_MODULE, items: CFO_MENU_ITEMS },
   { code: 'CHO', fallback: DEFAULT_CHO_MODULE, items: CHO_MENU_ITEMS },
-  { code: 'CPO', fallback: DEFAULT_CPO_MODULE, items: CPO_MENU_ITEMS },
+  { code: 'CPO', fallback: DEFAULT_CPO_MODULE, items: CPO_DASHBOARD_MENU_ITEMS },
   { code: 'CDO', fallback: DEFAULT_CDO_MODULE, items: CDO_MENU_ITEMS },
   { code: 'CMO', fallback: DEFAULT_CMO_MODULE, items: CMO_MENU_ITEMS },
 ];
