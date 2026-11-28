@@ -46,7 +46,6 @@ import { MasterItemInternalCrudModal } from '@/modules/CPO/MasterItemInternalCru
 import { MasterItemVendorCrudModal } from '@/modules/CPO/MasterItemVendorCrudModal';
 import { MasterPaketCrudModal } from '@/modules/CPO/MasterPaketCrudModal';
 import { ViewPaketAwalModal } from '@/modules/CPO/ViewPaketAwalModal';
-import { ViewPackingModal } from '@/modules/CPO/ViewPackingModal';
 
 export interface DashboardProps {
   onLogout?: () => void | Promise<void>;
@@ -305,13 +304,6 @@ export const DashboardFlowSimulator: React.FC<DashboardProps> = ({ onLogout }) =
 
             <InputPayrollModal
               isOpen={selectedChildSubMenu?.code === 'INPUT_PAYROLL'}
-              company={selectedCompany}
-              companies={companyResource.companies}
-              onClose={() => setSelectedChildSubMenu(null)}
-            />
-
-            <ViewPackingModal
-              isOpen={selectedChildSubMenu?.code === 'VIEW_PACKING'}
               company={selectedCompany}
               companies={companyResource.companies}
               onClose={() => setSelectedChildSubMenu(null)}
