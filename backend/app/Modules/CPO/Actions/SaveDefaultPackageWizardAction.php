@@ -325,6 +325,7 @@ class SaveDefaultPackageWizardAction
 
             $itemId = isset($rawRow['item_id']) ? (int) $rawRow['item_id'] : 0;
             $quantity = isset($rawRow['quantity']) ? (int) $rawRow['quantity'] : 0;
+            $rawItemPrice = $rawRow['price'] ?? 0;
 
             if ($itemId <= 0 || in_array($itemId, $seenItemIds, true)) {
                 throw ValidationException::withMessages([
@@ -338,12 +339,22 @@ class SaveDefaultPackageWizardAction
                 ]);
             }
 
+            if (
+                ! is_numeric($rawItemPrice)
+                || (float) $rawItemPrice < 0
+                || round((float) $rawItemPrice, 2) > 9999999999999999.99
+            ) {
+                throw ValidationException::withMessages([
+                    "items.{$index}.price" => ['Harga item tidak valid.'],
+                ]);
+            }
+
             $seenItemIds[] = $itemId;
             $rows[] = [
                 'index' => $index,
                 'item_id' => $itemId,
                 'quantity' => $quantity,
-                'price' => 0.0,
+                'price' => round((float) $rawItemPrice, 2),
             ];
         }
 

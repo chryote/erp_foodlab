@@ -611,7 +611,16 @@ describe('DefaultPackage CPO module', function () {
             'items' => [['item_id' => $vendorBItem->id, 'quantity' => 1]],
         ])->assertUnprocessable()->assertJsonValidationErrors(['price']);
 
-        // 3. Company-owned wizard submission creates PacketName, PacketCategory, Packet, ItemPackets, DefaultPackage, and Ingredients (price 0) atomically
+        $this->postJson('/api/v1/modules/cpo/default-packages/wizard', [
+            'packet_name' => 'Paket Invalid Item Price',
+            'packet_category' => 'Kategori Invalid',
+            'brand_name' => 'Brand Invalid Item Price',
+            'packet_vendor_id' => $vendorB->id,
+            'price' => 1000,
+            'items' => [['item_id' => $vendorBItem->id, 'quantity' => 1, 'price' => -10]],
+        ])->assertUnprocessable()->assertJsonValidationErrors(['items.0.price']);
+
+        // 3. Company-owned wizard submission creates PacketName, PacketCategory, Packet, ItemPackets, DefaultPackage, and Ingredients (with per-item price, leaving DefaultPackage.price untouched) atomically
         $idemHeaders = ['Idempotency-Key' => 'idem-wizard-company-001'];
         $companyWizardPayload = [
             'packet_name' => '  Paket   Internal Hemat  ',
@@ -620,8 +629,8 @@ describe('DefaultPackage CPO module', function () {
             'company_id' => $company->id,
             'price' => 20000,
             'items' => [
-                ['item_id' => $companyItem1->id, 'quantity' => 2],
-                ['item_id' => $companyItem2->id, 'quantity' => 3],
+                ['item_id' => $companyItem1->id, 'quantity' => 2, 'price' => 12500.50],
+                ['item_id' => $companyItem2->id, 'quantity' => 3, 'price' => 7500],
             ],
         ];
 
@@ -635,8 +644,8 @@ describe('DefaultPackage CPO module', function () {
             ->assertJsonPath('data.packet_category.name', 'Kategori Internal')
             ->assertJsonPath('data.packet.name', 'Paket Internal Hemat')
             ->assertJsonCount(2, 'data.ingredients')
-            ->assertJsonPath('data.ingredients.0.price', 0)
-            ->assertJsonPath('data.ingredients.1.price', 0);
+            ->assertJsonPath('data.ingredients.0.price', 12500.5)
+            ->assertJsonPath('data.ingredients.1.price', 7500);
 
         // Idempotency-Key replay returns same record without duplicating
         $replayWizardRes = $this->postJson('/api/v1/modules/cpo/default-packages/wizard', $companyWizardPayload, $idemHeaders)
@@ -699,7 +708,7 @@ describe('DefaultPackage CPO module', function () {
         $vendorDpId = $vendorWizardRes->json('data.id');
         $vendorPacketId = $vendorWizardRes->json('data.packet_id');
 
-        // 6a. Re-saving with identical tuple on same record succeeds (no self-collision)
+        // 6a. Re-saving with identical tuple on same record succeeds (no self-collision) and updates Ingredient.price without altering DefaultPackage.price
         $this->putJson("/api/v1/modules/cpo/default-packages/{$companyDpId}/wizard", [
             'packet_name' => 'Paket Internal Hemat',
             'packet_category' => 'Kategori Internal',
@@ -707,13 +716,13 @@ describe('DefaultPackage CPO module', function () {
             'company_id' => $company->id,
             'price' => 15000,
             'items' => [
-                ['item_id' => $companyItem1->id, 'quantity' => 5],
+                ['item_id' => $companyItem1->id, 'quantity' => 5, 'price' => 18000],
             ],
         ])->assertOk()
             ->assertJsonPath('data.brand_name', 'Brand Internal Prima')
             ->assertJsonPath('data.price', 15000)
             ->assertJsonCount(1, 'data.ingredients')
-            ->assertJsonPath('data.ingredients.0.price', 0);
+            ->assertJsonPath('data.ingredients.0.price', 18000);
 
         // Removed $companyItem2 Ingredient is gone and unused ItemPacket is soft-deleted
         expect(Ingredient::query()->where('default_package_id', $companyDpId)->count())->toBe(1);
