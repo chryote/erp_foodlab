@@ -44,7 +44,6 @@ import {
 } from '@/modules/CPO/CpoModuleCard';
 import { MasterItemInternalCrudModal } from '@/modules/CPO/MasterItemInternalCrudModal';
 import { MasterItemVendorCrudModal } from '@/modules/CPO/MasterItemVendorCrudModal';
-import { MasterPackingCrudModal } from '@/modules/CPO/MasterPackingCrudModal';
 import { MasterPaketCrudModal } from '@/modules/CPO/MasterPaketCrudModal';
 import { ViewPaketAwalModal } from '@/modules/CPO/ViewPaketAwalModal';
 import { ViewPackingModal } from '@/modules/CPO/ViewPackingModal';
@@ -306,13 +305,6 @@ export const DashboardFlowSimulator: React.FC<DashboardProps> = ({ onLogout }) =
 
             <InputPayrollModal
               isOpen={selectedChildSubMenu?.code === 'INPUT_PAYROLL'}
-              company={selectedCompany}
-              companies={companyResource.companies}
-              onClose={() => setSelectedChildSubMenu(null)}
-            />
-
-            <MasterPackingCrudModal
-              isOpen={selectedChildSubMenu?.code === 'MASTER_PACKING'}
               company={selectedCompany}
               companies={companyResource.companies}
               onClose={() => setSelectedChildSubMenu(null)}
